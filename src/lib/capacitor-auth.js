@@ -1,0 +1,26 @@
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+
+/**
+ * When Google OAuth returns to com.titanos.myapp://auth/callback?...
+ * route into the SPA (hash router in the native WebView).
+ */
+export function installNativeAuthDeepLinks() {
+  if (!Capacitor.isNativePlatform()) return () => {};
+
+  const sub = App.addListener("appUrlOpen", ({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.host === "auth" && parsed.pathname.startsWith("/callback")) {
+        const target = `/#/auth/callback${parsed.search || ""}${parsed.hash || ""}`;
+        window.location.replace(target);
+      }
+    } catch {
+      // ignore malformed deep links
+    }
+  });
+
+  return () => {
+    sub.then((handle) => handle.remove()).catch(() => {});
+  };
+}

@@ -1,0 +1,10 @@
+RewriteEngine On
+RewriteBase /
+
+# Serve existing files/folders as-is (assets, downloads, favicon, etc.)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# SPA fallback — required for React Router on IONOS Apache hosting
+RewriteRule ^ index.html [L]

@@ -1,0 +1,190 @@
+export const MARKETPLACE_CATEGORIES = [
+  "All",
+  "HVAC",
+  "Cleaning",
+  "Roofing",
+  "Pest Control",
+  "Accounting",
+  "Inventory",
+  "AI Agents",
+  "Reports",
+];
+
+export const MARKETPLACE_MODULES = [
+  {
+    slug: "hvac-pro",
+    name: "HVAC Pro Suite",
+    description:
+      "Equipment tracking, maintenance logs, refrigerant management, and seasonal scheduling for HVAC companies.",
+    category: "HVAC",
+    rating: 4.9,
+    review_count: 312,
+    price: 29,
+    price_label: "/mo",
+    icon: "🌡️",
+    gradient: "from-blue-500/20 to-cyan-500/20",
+    features: ["Equipment registry", "Maintenance scheduler", "Refrigerant tracker", "Warranty management"],
+    install_count: 2100,
+    verified: true,
+    status: "available",
+    route: null,
+  },
+  {
+    slug: "cleaning-workflows",
+    name: "Cleaning Pro Workflows",
+    description:
+      "Digital checklists, room-by-room inspections, supply tracking, and client satisfaction scores.",
+    category: "Cleaning",
+    rating: 4.8,
+    review_count: 187,
+    price: 19,
+    price_label: "/mo",
+    icon: "🧹",
+    gradient: "from-purple-500/20 to-pink-500/20",
+    features: ["Room checklists", "Photo inspections", "Supply inventory", "Customer ratings"],
+    install_count: 1400,
+    verified: true,
+    status: "available",
+    route: null,
+  },
+  {
+    slug: "roofing-estimator",
+    name: "Roofing Estimator AI",
+    description:
+      "AI-powered material takeoffs, pitch calculations, satellite roof measurements, and photo-based damage reports.",
+    category: "Roofing",
+    rating: 4.7,
+    review_count: 94,
+    price: 49,
+    price_label: "/mo",
+    icon: "🏠",
+    gradient: "from-amber-500/20 to-orange-500/20",
+    features: ["Satellite measurements", "AI material takeoffs", "Damage reports", "Manufacturer pricing"],
+    install_count: 680,
+    verified: true,
+    status: "available",
+    route: "/estimates",
+  },
+  {
+    slug: "pest-inspection",
+    name: "Pest Control Inspector",
+    description:
+      "Digital inspection forms, treatment tracking, chemical logs, and compliance documentation.",
+    category: "Pest Control",
+    rating: 4.6,
+    review_count: 58,
+    price: 24,
+    price_label: "/mo",
+    icon: "🐛",
+    gradient: "from-green-500/20 to-emerald-500/20",
+    features: ["Inspection templates", "Chemical log", "Treatment history", "State compliance"],
+    install_count: 410,
+    verified: false,
+    status: "available",
+    route: null,
+  },
+  {
+    slug: "quickbooks-sync",
+    name: "QuickBooks Sync",
+    description:
+      "Two-way sync of invoices, expenses, customers, and payments between TitanOS and QuickBooks Online.",
+    category: "Accounting",
+    rating: 4.8,
+    review_count: 423,
+    price: 0,
+    price_label: "Free",
+    icon: "📊",
+    gradient: "from-titan-green/20 to-cyan-500/20",
+    features: ["Auto invoice sync", "Expense matching", "Customer merge", "Real-time updates"],
+    install_count: 5200,
+    verified: true,
+    status: "available",
+    route: "/finances",
+  },
+  {
+    slug: "inventory-manager",
+    name: "Inventory Manager",
+    description:
+      "Parts and supplies tracking, low-stock alerts, PO generation, and vendor management.",
+    category: "Inventory",
+    rating: 4.5,
+    review_count: 145,
+    price: 34,
+    price_label: "/mo",
+    icon: "📦",
+    gradient: "from-titan-indigo/20 to-purple-500/20",
+    features: ["Parts tracking", "Low-stock alerts", "Auto PO generation", "Vendor database"],
+    install_count: 920,
+    verified: true,
+    status: "available",
+    route: null,
+  },
+  {
+    slug: "ai-follow-up",
+    name: "AI Follow-Up Agent",
+    description:
+      "Automatically follow up with leads, send review requests, and re-engage inactive customers via SMS and email.",
+    category: "AI Agents",
+    rating: 4.9,
+    review_count: 231,
+    price: 39,
+    price_label: "/mo",
+    icon: "🤖",
+    gradient: "from-titan-cyan/20 to-titan-indigo/20",
+    features: ["Lead nurturing", "Review requests", "Win-back campaigns", "Custom triggers"],
+    install_count: 1800,
+    verified: true,
+    status: "available",
+    route: "/assistant",
+  },
+  {
+    slug: "profit-report",
+    name: "Profit & Loss Pro",
+    description:
+      "Detailed P&L reports, job costing, technician performance, and exportable financial statements.",
+    category: "Reports",
+    rating: 4.7,
+    review_count: 189,
+    price: 0,
+    price_label: "Free",
+    icon: "📈",
+    gradient: "from-titan-green/20 to-titan-amber/20",
+    features: ["Job costing", "Tech performance", "Export to PDF/CSV", "Custom date ranges"],
+    install_count: 3100,
+    verified: true,
+    status: "available",
+    route: "/reports",
+  },
+];
+
+export function formatInstallCount(count) {
+  if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(count);
+}
+
+export function formatModulePrice(module) {
+  if (module.price === 0) return "Free";
+  return `$${module.price}${module.price_label || ""}`;
+}
+
+export function normalizeModule(record) {
+  if (!record) return null;
+  return {
+    id: record.id || record.slug,
+    slug: record.slug || record.id,
+    name: record.name,
+    description: record.description,
+    category: record.category,
+    rating: record.rating ?? 0,
+    review_count: record.review_count ?? record.reviews ?? 0,
+    price: record.price ?? 0,
+    price_label: record.price_label ?? record.priceLabel ?? "",
+    icon: record.icon ?? "📦",
+    gradient: record.gradient ?? "from-titan-indigo/20 to-purple-500/20",
+    features: record.features ?? [],
+    install_count: record.install_count ?? 0,
+    verified: record.verified ?? false,
+    status: record.status ?? "available",
+    route: record.route ?? null,
+  };
+}

@@ -1,0 +1,9 @@
+{
+  "appId": "com.titanos.myapp",
+  "appName": "TitanOS",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "titanos.app"
+  }
+}

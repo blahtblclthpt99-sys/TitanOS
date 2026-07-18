@@ -1,0 +1,27 @@
+# Keep Vercel deploys small — web app only
+.tools
+.android-sdk
+android
+dealnest
+docs
+release
+scripts
+supabase
+.vscode
+.git
+
+# Binaries & local tooling
+*.apk
+*.aab
+*.zip
+*.jks
+*.keystore
+public/downloads
+public/static
+
+# Never upload deps/build caches (Vercel installs fresh)
+node_modules
+dist
+coverage
+.turbo
+.cache

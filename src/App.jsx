@@ -1,15 +1,15 @@
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
-import { BrowserRouter, HashRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import React, { Suspense, lazy, useEffect } from "react";
 import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import Spinner from "@/components/shared/Spinner";
-import PathNormalizer from "@/lib/PathNormalizer";
-import { shouldUseHashRouter } from "@/lib/routing";
+import PathNormalizer from "./lib/PathNormalizer";
+import { normalizeAppPath, shouldUseHashRouter } from "@/lib/routing";
+import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
 
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -27,8 +27,37 @@ const ThankYou = lazy(() => import("@/pages/ThankYou"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
 
-/** `/` is marketing for guests and the app shell for signed-in users. */
-function RootRoute() {
+/** Marketing + auth screens that must not use the app shell. */
+const PUBLIC_EXACT = new Set([
+  "/pricing",
+  "/download",
+  "/beta",
+  "/thank-you",
+  "/privacy-policy",
+  "/privacy",
+  "/portal",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+]);
+
+function isPublicPath(pathname) {
+  const p = normalizeAppPath(pathname);
+  if (PUBLIC_EXACT.has(p)) return true;
+  if (p.startsWith("/features/")) return true;
+  return false;
+}
+
+/**
+ * One AppLayout instance for every authenticated app route (including `/`).
+ * Previously `/` used RootRoute's AppLayout and `/reports` used a different
+ * ProtectedRoute AppLayout — so Home remounted the shell while other tabs
+ * stayed trapped if a More-menu page crashed.
+ */
+function AppShellGate() {
+  const location = useLocation();
   const {
     isAuthenticated,
     isLoadingAuth,
@@ -37,6 +66,8 @@ function RootRoute() {
     authError,
     checkUserAuth,
   } = useAuth();
+
+  usePrefetchDashboard(isAuthenticated && authChecked);
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -52,40 +83,44 @@ function RootRoute() {
     return <Navigate to="/login" replace />;
   }
 
-  if (isAuthenticated) {
+  const pathname = normalizeAppPath(location.pathname);
+  const publicPath = isPublicPath(pathname);
+
+  if (isAuthenticated && !publicPath) {
     return <AppLayout />;
   }
 
-  return <Landing />;
+  if (!isAuthenticated && !publicPath && pathname !== "/") {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return (
+    <Suspense fallback={<Spinner fullScreen label="Loading page" />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/download" element={<Download />} />
+        <Route path="/features/:slug" element={<FeatureDetail />} />
+        <Route path="/beta" element={<Beta />} />
+        <Route path="/thank-you" element={<ThankYou />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/portal" element={<CustomerPortal />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </Suspense>
+  );
 }
 
 function AuthenticatedApp() {
   return (
     <PathNormalizer>
-      <Suspense fallback={<Spinner fullScreen label="Loading page" />}>
-        <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/download" element={<Download />} />
-          <Route path="/features/:slug" element={<FeatureDetail />} />
-          <Route path="/beta" element={<Beta />} />
-          <Route path="/thank-you" element={<ThankYou />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/portal" element={<CustomerPortal />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-
-          <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-            <Route path="/*" element={<AppLayout />} />
-          </Route>
-
-          <Route path="*" element={<PageNotFound />} />
-        </Routes>
-      </Suspense>
+      <AppShellGate />
     </PathNormalizer>
   );
 }

@@ -15,6 +15,13 @@ export default class ErrorBoundary extends React.Component {
     console.error("[ErrorBoundary]", error, info);
   }
 
+  componentDidUpdate(prevProps) {
+    // Allow parent `key` changes or explicit resetToken to clear a trapped error state
+    if (this.state.hasError && prevProps.resetToken !== this.props.resetToken) {
+      this.setState({ hasError: false });
+    }
+  }
+
   handleRetry = () => {
     this.setState({ hasError: false });
   };

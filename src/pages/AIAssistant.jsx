@@ -242,7 +242,14 @@ export default function AIAssistant() {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 0px)", maxHeight: "100dvh" }}>
+    <div
+      className="flex flex-col"
+      style={{
+        // Stay inside the app chrome (header + bottom nav + safe areas)
+        height: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+        maxHeight: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+      }}
+    >
       <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-white/5 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">

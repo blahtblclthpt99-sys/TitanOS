@@ -110,7 +110,7 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
                 className="w-full flex items-start gap-2.5 text-left group"
               >
                 <span className="text-base leading-snug flex-shrink-0">{line.emoji}</span>
-                <span className="text-sm text-foreground/80 group-hover:text-foreground transition-colors leading-snug">{line.text}</span>
+                <span className="text-sm text-foreground group-hover:text-foreground transition-colors leading-snug">{line.text}</span>
               </motion.button>
             ))}
           </div>
@@ -125,7 +125,7 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
               style={{ background: "rgba(124,91,250,0.12)", border: "1px solid rgba(124,91,250,0.2)" }}
             >
               <p className="text-xs text-titan-indigo font-semibold uppercase tracking-wider mb-1">💡 Recommendation</p>
-              <p className="text-sm text-foreground/80 leading-snug">{recommendation}</p>
+              <p className="text-sm text-foreground leading-snug">{recommendation}</p>
             </motion.div>
           )}
 

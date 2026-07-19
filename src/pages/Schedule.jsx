@@ -88,7 +88,7 @@ export default function Schedule() {
             <div key={formatISO(day)}>
               <div className={`text-center py-2.5 mb-2 rounded-xl ${today ? "bg-titan-cyan/10" : ""}`}>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{formatShortDay(day)}</p>
-                <p className={`text-lg font-bold mt-0.5 ${today ? "text-titan-cyan" : "text-foreground/70"}`}>{formatDayNum(day)}</p>
+                <p className={`text-lg font-bold mt-0.5 ${today ? "text-titan-cyan" : "text-foreground/90"}`}>{formatDayNum(day)}</p>
               </div>
               <div className="space-y-1 min-h-[120px]">
                 {dayJobs.map((job) => (

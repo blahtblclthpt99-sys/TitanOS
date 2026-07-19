@@ -67,7 +67,7 @@ export default function ReviewForm({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder="Share how the job went…"
-        className="bg-[#242427] border-border text-foreground rounded-xl min-h-[80px]"
+        className="bg-muted border-border text-foreground rounded-xl min-h-[80px]"
       />
       <Button
         type="submit"

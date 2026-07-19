@@ -53,7 +53,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     navigate(s.action);
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground/80 hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
                 >
                   <s.icon className="w-4 h-4 text-primary flex-shrink-0" />
                   {s.label}
@@ -66,7 +66,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     onOpenFeedback();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground/80 hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
                 >
                   <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
                   Send feedback

@@ -24,7 +24,7 @@ const initialForm = {
   market_rate_factor: 1,
 };
 
-const inputClass = "bg-[#1A1A1C] border-border text-foreground rounded-xl h-10";
+const inputClass = "bg-card border-border text-foreground rounded-xl h-10";
 
 export default function JobEstimator() {
   const navigate = useNavigate();
@@ -100,7 +100,7 @@ export default function JobEstimator() {
             <Field label="Urgency"><select value={form.urgency} onChange={(event) => update("urgency", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="normal">Normal</option><option value="soon">Soon</option><option value="same_day">Same day</option><option value="emergency">Emergency</option></select></Field>
           </div>
           <div className="mt-5 pt-4 border-t border-border">
-            <div className="flex justify-between text-sm mb-2"><label htmlFor="market-rate" className="text-foreground/65">Local market rate</label><span className="text-titan-cyan font-semibold">{Number(form.market_rate_factor).toFixed(2)}×</span></div>
+            <div className="flex justify-between text-sm mb-2"><label htmlFor="market-rate" className="text-foreground/85">Local market rate</label><span className="text-titan-cyan font-semibold">{Number(form.market_rate_factor).toFixed(2)}×</span></div>
             <input id="market-rate" type="range" min="0.8" max="1.3" step="0.01" value={form.market_rate_factor} onChange={(event) => update("market_rate_factor", event.target.value)} className="w-full accent-[#00c7d9]" />
             <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0.80× lower market</span><span>1.30× premium market</span></div>
           </div>
@@ -108,7 +108,7 @@ export default function JobEstimator() {
 
         <section className="glass rounded-2xl p-5 h-fit">
           <h2 className="font-semibold text-foreground mb-4">Recommended range</h2>
-          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/70"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-white/[0.04] rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
+          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/90"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-white/[0.04] rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
           <div className="space-y-3 border-t border-border pt-4">
             <Metric label="Suggested Customer Price" value={estimate.suggested_price} prominent />
             <Metric label="Estimated Profit" value={estimate.profit_estimate} positive={estimate.profit_estimate >= 0} />
@@ -118,7 +118,7 @@ export default function JobEstimator() {
             <Button onClick={askAi} disabled={askingAi} variant="outline" className="border-titan-cyan/30 text-titan-cyan rounded-xl"><Sparkles className="w-4 h-4 mr-2" />{askingAi ? "Asking AI…" : "Ask AI for estimate"}</Button>
             <Button onClick={() => createDocument("/estimates?prefill=1")} disabled={submitting} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl"><FilePlus2 className="w-4 h-4 mr-2" />Create Estimate</Button>
             <Button onClick={() => createDocument("/invoices?new=1")} disabled={submitting} variant="outline" className="border-border text-foreground rounded-xl"><Receipt className="w-4 h-4 mr-2" />Create Invoice</Button>
-            <Button onClick={saveEstimate} disabled={saving} variant="ghost" className="text-foreground/65 hover:text-foreground rounded-xl">{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}{saving ? "Saving…" : "Save price estimate"}</Button>
+            <Button onClick={saveEstimate} disabled={saving} variant="ghost" className="text-foreground/85 hover:text-foreground rounded-xl">{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}{saving ? "Saving…" : "Save price estimate"}</Button>
           </div>
         </section>
       </div>

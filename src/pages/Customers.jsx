@@ -116,13 +116,13 @@ export default function Customers({ isActive = true }) {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search customers…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-[#1A1A1C] border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground" />
+            className="pl-11 bg-card border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/80" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "lead", "active", "vip", "inactive"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
               className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-muted-foreground border border-border hover:text-foreground/70"
+                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-card text-muted-foreground border border-border hover:text-foreground/90"
               }`}>
               {s === "all" ? "All" : s}
             </button>
@@ -151,7 +151,7 @@ export default function Customers({ isActive = true }) {
       )}
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Add Customer</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">

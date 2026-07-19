@@ -150,7 +150,7 @@ export default function TaxCenter({ isActive = true }) {
           onValueChange={setTaxYear}
           placeholder="Year"
           options={years.map(y => ({ value: y, label: y }))}
-          className="w-28 bg-[#1A1A1C] border-border"
+          className="w-28 bg-card border-border"
         />
       </div>
 
@@ -208,7 +208,7 @@ export default function TaxCenter({ isActive = true }) {
               { label: "Total Estimated Tax",       value: totalTaxEstimate,   color: "text-red-400", bold: true, border: true },
             ].map(row => (
               <div key={row.label} className={`flex justify-between items-center py-1 ${row.border ? "border-t border-border pt-3 mt-1" : ""}`}>
-                <span className={`text-muted-foreground ${row.bold ? "font-semibold text-foreground/80" : ""}`}>{row.label}</span>
+                <span className={`text-muted-foreground ${row.bold ? "font-semibold text-foreground" : ""}`}>{row.label}</span>
                 <span className={`font-semibold tabular-nums ${row.color}`}>
                   {row.value < 0 ? "-" : ""}${Math.abs(Math.round(row.value)).toLocaleString()}
                 </span>

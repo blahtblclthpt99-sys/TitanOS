@@ -34,7 +34,7 @@ function StatusBadge({ status }) {
 
 function Card({ children, className = "" }) {
   return (
-    <div className={`bg-[#1A1A1C] border border-white/8 rounded-2xl p-4 ${className}`}>
+    <div className={`bg-card border border-white/8 rounded-2xl p-4 ${className}`}>
       {children}
     </div>
   );
@@ -226,7 +226,7 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 bg-[#1A1A1C] rounded-xl p-1">
+        <div className="flex gap-2 bg-card rounded-xl p-1">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (

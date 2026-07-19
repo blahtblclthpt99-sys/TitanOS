@@ -139,13 +139,13 @@ export default function Invoices({ isActive = true }) {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search invoices…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-[#1A1A1C] border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground" />
+            className="pl-11 bg-card border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/80" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "draft", "sent", "paid", "overdue", "cancelled"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
               className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-muted-foreground border border-border hover:text-foreground/70"
+                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-card text-muted-foreground border border-border hover:text-foreground/90"
               }`}>
               {s === "all" ? "All" : s}
             </button>
@@ -170,7 +170,7 @@ export default function Invoices({ isActive = true }) {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">New Invoice</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
@@ -197,13 +197,13 @@ export default function Invoices({ isActive = true }) {
                   <div key={idx} className="flex gap-2 items-center">
                     <Input placeholder="Description" value={item.description}
                       onChange={e => updateLine(idx, "description", e.target.value)}
-                      className="bg-[#242427] border-border text-foreground rounded-xl flex-1 text-sm h-9" />
+                      className="bg-muted border-border text-foreground rounded-xl flex-1 text-sm h-9" />
                     <Input type="number" placeholder="Qty" value={item.quantity}
                       onChange={e => updateLine(idx, "quantity", e.target.value)}
-                      className="bg-[#242427] border-border text-foreground rounded-xl w-16 text-sm h-9" />
+                      className="bg-muted border-border text-foreground rounded-xl w-16 text-sm h-9" />
                     <Input type="number" placeholder="Price" value={item.unit_price}
                       onChange={e => updateLine(idx, "unit_price", e.target.value)}
-                      className="bg-[#242427] border-border text-foreground rounded-xl w-24 text-sm h-9" />
+                      className="bg-muted border-border text-foreground rounded-xl w-24 text-sm h-9" />
                     <span className="text-sm text-muted-foreground w-20 text-right tabular-nums">${(item.total || 0).toFixed(2)}</span>
                     {lineItems.length > 1 && (
                       <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-red-400 transition-colors">
@@ -225,7 +225,7 @@ export default function Invoices({ isActive = true }) {
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Tax</span>
                   <Input type="number" value={form.tax_rate} onChange={e => f("tax_rate", parseFloat(e.target.value) || 0)}
-                    className="bg-[#242427] border-border text-foreground rounded-lg w-16 h-7 text-xs" />
+                    className="bg-muted border-border text-foreground rounded-lg w-16 h-7 text-xs" />
                   <span className="text-muted-foreground">%</span>
                 </div>
                 <span className="text-foreground tabular-nums">${taxAmount.toFixed(2)}</span>
@@ -239,7 +239,7 @@ export default function Invoices({ isActive = true }) {
             <div className="flex flex-col gap-1">
               <label className="text-muted-foreground text-xs font-medium">Notes</label>
               <Textarea value={form.notes} onChange={e => f("notes", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl min-h-[60px]" />
+                className="bg-muted border-border text-foreground rounded-xl min-h-[60px]" />
             </div>
 
             <Button onClick={handleSave} disabled={saving || !form.customer_name}

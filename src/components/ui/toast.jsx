@@ -22,11 +22,11 @@ const ToastViewport = React.forwardRef(({ ...props }, ref) => (
 ToastViewport.displayName = "ToastViewport";
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border border-border bg-[#1A1A1C] text-foreground p-4 pr-12 shadow-lg transition-all cursor-pointer data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full",
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border border-border bg-card text-card-foreground p-4 pr-12 shadow-lift transition-all cursor-pointer data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full",
   {
     variants: {
       variant: {
-        default: "border-border bg-[#1A1A1C] text-foreground",
+        default: "border-border bg-card text-card-foreground",
         destructive:
           "destructive group border-red-500/40 bg-red-950/90 text-red-50",
       },
@@ -66,7 +66,7 @@ const ToastClose = React.forwardRef(({ className, ...props }, ref) => (
     ref={ref}
     aria-label="Dismiss"
     className={cn(
-      "absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg p-1 text-foreground/70 opacity-100 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-titan-cyan/40 group-[.destructive]:text-red-100 group-[.destructive]:hover:bg-muted",
+      "absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg p-1 text-foreground/90 opacity-100 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-titan-cyan/40 group-[.destructive]:text-red-100 group-[.destructive]:hover:bg-muted",
       className
     )}
     toast-close=""

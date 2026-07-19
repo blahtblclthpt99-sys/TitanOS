@@ -14,7 +14,7 @@ export default function FormField({ label, id, children, className, ...inputProp
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       {label && (
-        <Label htmlFor={fieldId} className="text-muted-foreground text-xs font-medium">
+        <Label htmlFor={fieldId} className="text-foreground/80 text-xs font-semibold">
           {label}
         </Label>
       )}
@@ -26,7 +26,7 @@ export default function FormField({ label, id, children, className, ...inputProp
           <Input
             {...inputProps}
             id={fieldId}
-            className="bg-[#242427] border-border text-foreground rounded-xl focus:ring-1 focus:ring-titan-cyan/40"
+            className="bg-muted border-border text-foreground rounded-xl focus:ring-1 focus:ring-titan-cyan/40"
           />
         )}
     </div>

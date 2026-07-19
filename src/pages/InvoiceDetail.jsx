@@ -131,10 +131,10 @@ export default function InvoiceDetail() {
         <div className="glass rounded-2xl p-5">
           <p className="text-xs text-muted-foreground font-medium mb-3">Update Status</p>
           <Select value={invoice.status} onValueChange={updateStatus} disabled={saving}>
-            <SelectTrigger className="bg-[#242427] border-border text-foreground rounded-xl h-11">
+            <SelectTrigger className="bg-muted border-border text-foreground rounded-xl h-11">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#242427] border-border">
+            <SelectContent className="bg-muted border-border">
               {STATUS_OPTIONS.map(s => (
                 <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
               ))}
@@ -145,7 +145,7 @@ export default function InvoiceDetail() {
         {invoice.notes && (
           <div className="glass rounded-2xl p-5 mt-4">
             <p className="text-xs text-muted-foreground font-medium mb-2">Notes</p>
-            <p className="text-sm text-foreground/70">{invoice.notes}</p>
+            <p className="text-sm text-foreground/90">{invoice.notes}</p>
           </div>
         )}
       </motion.div>

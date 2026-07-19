@@ -233,7 +233,7 @@ export default function AIAssistant() {
     return (
       <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
         <div className="glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
-          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground/80 [&_li]:text-foreground/80 [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
             {msg.content}
           </ReactMarkdown>
         </div>
@@ -339,7 +339,7 @@ export default function AIAssistant() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !isInputDisabled && sendMessage()}
             placeholder={confirming ? "Waiting for confirmation…" : "Ask Titan anything…"}
-            className="bg-[#1A1A1C] border-border text-foreground rounded-2xl h-12 pl-5 placeholder:text-muted-foreground focus:ring-1 focus:ring-titan-cyan/30 disabled:opacity-50"
+            className="bg-card border-border text-foreground rounded-2xl h-12 pl-5 placeholder:text-muted-foreground/80 focus:ring-1 focus:ring-titan-cyan/30 disabled:opacity-50"
             disabled={isInputDisabled}
           />
           <button

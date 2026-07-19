@@ -115,7 +115,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-[#1A1A1C] border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-card border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -174,7 +174,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                           : "Share your thoughts, suggestions, or anything on your mind..."
                     }
                     rows={4}
-                    className="w-full bg-[#242427] border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
+                    className="w-full bg-muted border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
                   />
 
                   {error ? (

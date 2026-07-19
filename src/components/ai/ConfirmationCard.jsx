@@ -18,7 +18,7 @@ export default function ConfirmationCard({ summary, details = [], onConfirm, onC
 
       {/* Summary */}
       <div className="px-4 pt-3 pb-1">
-        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_strong]:text-foreground [&_p]:text-foreground/80 [&_p]:my-0">
+        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_strong]:text-foreground [&_p]:text-foreground [&_p]:my-0">
           {summary}
         </ReactMarkdown>
       </div>

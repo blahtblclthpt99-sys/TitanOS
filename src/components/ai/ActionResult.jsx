@@ -17,7 +17,7 @@ export default function ActionResult({ message, isError = false }) {
           ? <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
           : <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
         }
-        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground/80 [&_strong]:text-foreground [&_p]:my-0.5 [&_li]:text-foreground/70">
+        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground [&_strong]:text-foreground [&_p]:my-0.5 [&_li]:text-foreground/90">
           {message}
         </ReactMarkdown>
       </div>

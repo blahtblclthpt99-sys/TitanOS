@@ -119,7 +119,7 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
           <p className="text-xs text-muted-foreground mt-1">Track Schedule C expenses and receipt records for {taxYear}.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportCsv} disabled={!yearExpenses.length} className="border-border text-foreground/70 rounded-xl"><Download className="w-4 h-4 mr-1" /> CSV</Button>
+          <Button variant="outline" onClick={exportCsv} disabled={!yearExpenses.length} className="border-border text-foreground/90 rounded-xl"><Download className="w-4 h-4 mr-1" /> CSV</Button>
           <Button onClick={() => setShowForm(true)} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black rounded-xl"><Plus className="w-4 h-4 mr-1" /> Add expense</Button>
         </div>
       </div>
@@ -142,15 +142,15 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
       ) : <p className="text-sm text-muted-foreground py-4">No business expenses recorded for {taxYear}.</p>}
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); else setShowForm(true); }}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? "Edit" : "Add"} business expense</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Description" value={form.description} onChange={event => f("description", event.target.value)} placeholder="e.g. Fuel fill-up" />
             <div className="grid grid-cols-2 gap-3"><FormField label="Amount ($)" type="number" min="0" step="0.01" value={form.amount} onChange={event => f("amount", event.target.value)} /><FormField label="Date" type="date" value={form.date} onChange={event => f("date", event.target.value)} /></div>
             <FormField label="Category"><NativeSelect value={form.category} onValueChange={value => f("category", value)} options={EXPENSE_CATEGORIES.map(category => ({ value: category.id, label: category.label }))} className="mt-1" /></FormField>
             <FormField label="Vendor" value={form.vendor} onChange={event => f("vendor", event.target.value)} placeholder="Optional" />
-            <FormField label="Notes"><Textarea value={form.notes} onChange={event => f("notes", event.target.value)} className="bg-[#242427] border-border text-foreground rounded-xl" placeholder="Business purpose or receipt details" /></FormField>
-            <div className="grid grid-cols-2 gap-3 items-end"><FormField label="Business use (%)" type="number" min="0" max="100" value={form.business_use_percent} onChange={event => f("business_use_percent", event.target.value)} /><label className="flex items-center gap-2 text-sm text-foreground/70 h-10"><input type="checkbox" checked={form.is_tax_deductible !== false} onChange={event => f("is_tax_deductible", event.target.checked)} className="accent-cyan-400" /> Tax deductible</label></div>
+            <FormField label="Notes"><Textarea value={form.notes} onChange={event => f("notes", event.target.value)} className="bg-muted border-border text-foreground rounded-xl" placeholder="Business purpose or receipt details" /></FormField>
+            <div className="grid grid-cols-2 gap-3 items-end"><FormField label="Business use (%)" type="number" min="0" max="100" value={form.business_use_percent} onChange={event => f("business_use_percent", event.target.value)} /><label className="flex items-center gap-2 text-sm text-foreground/90 h-10"><input type="checkbox" checked={form.is_tax_deductible !== false} onChange={event => f("is_tax_deductible", event.target.checked)} className="accent-cyan-400" /> Tax deductible</label></div>
             <div><label className="text-xs text-muted-foreground mb-2 block">Receipt</label><input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUpload} />{form.receipt_url ? <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3"><a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-sm text-titan-cyan truncate flex-1">View attached receipt</a><button onClick={() => f("receipt_url", "")} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button></div> : <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-full h-20 rounded-xl border border-dashed border-border hover:border-titan-cyan/40 text-muted-foreground flex flex-col justify-center items-center gap-1">{uploading ? "Uploading…" : <><Camera className="w-5 h-5" /><span className="text-xs">Attach receipt</span></>}</button>}</div>
             <Button onClick={handleSave} disabled={saving || !form.description.trim() || !Number(form.amount)} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black rounded-xl">{saving ? "Saving…" : "Save expense"}</Button>
           </div>

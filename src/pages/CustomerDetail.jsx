@@ -219,8 +219,8 @@ export default function CustomerDetail() {
           </div>
           <FormField label="Status">
             <Select value={form.status} onValueChange={v => f("status", v)}>
-              <SelectTrigger className="bg-[#242427] border-border text-foreground rounded-xl mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#242427] border-border">
+              <SelectTrigger className="bg-muted border-border text-foreground rounded-xl mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-muted border-border">
                 {["lead","active","vip","inactive"].map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -228,7 +228,7 @@ export default function CustomerDetail() {
           <FormField label="Notes">
             <Textarea value={form.notes || ""} onChange={e => f("notes", e.target.value)}
               placeholder="Customer preferences, access notes, or business details"
-              className="min-h-24 bg-[#242427] border-border text-foreground rounded-xl focus:ring-titan-cyan/40" />
+              className="min-h-24 bg-muted border-border text-foreground rounded-xl focus:ring-titan-cyan/40" />
           </FormField>
           <div className="flex gap-2">
             <Button onClick={handleSave} disabled={saving}
@@ -258,7 +258,7 @@ export default function CustomerDetail() {
           <div className="glass rounded-2xl p-5 space-y-3">
             <h2 className="text-base font-semibold text-foreground">Contact info</h2>
             {customer.email && (
-              <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors min-h-[44px]">
+              <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm text-foreground/90 hover:text-foreground transition-colors min-h-[44px]">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Mail className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
                 </div>
@@ -266,7 +266,7 @@ export default function CustomerDetail() {
               </a>
             )}
             {customer.phone && (
-              <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm text-foreground/70 hover:text-foreground transition-colors min-h-[44px]">
+              <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm text-foreground/90 hover:text-foreground transition-colors min-h-[44px]">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Phone className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
                 </div>
@@ -274,7 +274,7 @@ export default function CustomerDetail() {
               </a>
             )}
             {(customer.address || customer.city) && (
-              <div className="flex items-center gap-3 text-sm text-foreground/70 min-h-[44px]">
+              <div className="flex items-center gap-3 text-sm text-foreground/90 min-h-[44px]">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <MapPin className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
                 </div>
@@ -282,7 +282,7 @@ export default function CustomerDetail() {
               </div>
             )}
             {customer.source && (
-              <div className="flex items-center gap-3 text-sm text-foreground/70 min-h-[44px]">
+              <div className="flex items-center gap-3 text-sm text-foreground/90 min-h-[44px]">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Tag className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
                 </div>
@@ -299,13 +299,13 @@ export default function CustomerDetail() {
           <div className="glass rounded-2xl p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-3"><ImageIcon className="w-4 h-4 text-titan-cyan" /> Files & photos</h2>
             <label className="inline-flex mb-4 cursor-pointer">
-              <span className="inline-flex items-center rounded-xl border border-border px-3 py-2 text-xs text-foreground/70 hover:bg-muted"><Plus className="w-3.5 h-3.5 mr-1.5" />{uploadingFile ? "Uploading…" : "Upload file"}</span>
+              <span className="inline-flex items-center rounded-xl border border-border px-3 py-2 text-xs text-foreground/90 hover:bg-muted"><Plus className="w-3.5 h-3.5 mr-1.5" />{uploadingFile ? "Uploading…" : "Upload file"}</span>
               <input type="file" className="sr-only" disabled={uploadingFile} onChange={(event) => { uploadCustomerFile(event.target.files?.[0]); event.target.value = ""; }} />
             </label>
             <div className="flex flex-wrap gap-3">
               {customer.photo_url && <img src={customer.photo_url} alt={`${fullName} profile`} className="w-24 h-24 rounded-xl object-cover border border-border" />}
               {customerFiles.map(file => (
-                <a key={file.id} href={file.file_url || file.url} target="_blank" rel="noreferrer" className="w-24 min-h-24 rounded-xl border border-border bg-muted/50 p-2 text-xs text-foreground/65 hover:border-titan-cyan/40">
+                <a key={file.id} href={file.file_url || file.url} target="_blank" rel="noreferrer" className="w-24 min-h-24 rounded-xl border border-border bg-muted/50 p-2 text-xs text-foreground/85 hover:border-titan-cyan/40">
                   {(file.content_type || "").startsWith("image/") && <img src={file.file_url || file.url} alt="" className="w-full h-14 object-cover rounded-lg mb-2" />}
                   <span className="line-clamp-2">{file.name || "Attachment"}</span>
                 </a>
@@ -331,11 +331,11 @@ export default function CustomerDetail() {
           <section className="glass rounded-2xl p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4"><MessageSquare className="w-4 h-4 text-titan-cyan" /> Communication history</h2>
             <div className="grid sm:grid-cols-[140px_1fr_auto] gap-2 mb-4">
-              <Select value={communicationForm.type} onValueChange={type => setCommunicationForm(prev => ({ ...prev, type }))}><SelectTrigger className="bg-[#242427] border-border text-foreground rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="bg-[#242427] border-border">{COMMUNICATION_TYPES.map(type => <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>)}</SelectContent></Select>
-              <Textarea value={communicationForm.body} onChange={event => setCommunicationForm(prev => ({ ...prev, body: event.target.value }))} placeholder="Log a call, email, or text…" className="min-h-11 bg-[#242427] border-border text-foreground rounded-xl" />
+              <Select value={communicationForm.type} onValueChange={type => setCommunicationForm(prev => ({ ...prev, type }))}><SelectTrigger className="bg-muted border-border text-foreground rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="bg-muted border-border">{COMMUNICATION_TYPES.map(type => <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>)}</SelectContent></Select>
+              <Textarea value={communicationForm.body} onChange={event => setCommunicationForm(prev => ({ ...prev, body: event.target.value }))} placeholder="Log a call, email, or text…" className="min-h-11 bg-muted border-border text-foreground rounded-xl" />
               <Button onClick={addCommunication} className="bg-titan-cyan text-black hover:bg-titan-cyan/90 rounded-xl"><Plus className="w-4 h-4 mr-1" /> Add</Button>
             </div>
-            {communications.length ? <div className="space-y-2">{communications.map(entry => <div key={entry.id} className="rounded-xl bg-muted/50 p-3"><div className="flex justify-between gap-3 text-xs text-muted-foreground mb-1"><span className="capitalize">{entry.type}</span><span>{formatMonthDayYear(entry.date || entry.created_at || entry.created_date)}</span></div><p className="text-sm text-foreground/70 whitespace-pre-wrap">{entry.body}</p></div>)}</div> : <p className="text-sm text-muted-foreground">{communicationFallback ? "No communications logged locally for this customer." : "No communications logged for this customer."}</p>}
+            {communications.length ? <div className="space-y-2">{communications.map(entry => <div key={entry.id} className="rounded-xl bg-muted/50 p-3"><div className="flex justify-between gap-3 text-xs text-muted-foreground mb-1"><span className="capitalize">{entry.type}</span><span>{formatMonthDayYear(entry.date || entry.created_at || entry.created_date)}</span></div><p className="text-sm text-foreground/90 whitespace-pre-wrap">{entry.body}</p></div>)}</div> : <p className="text-sm text-muted-foreground">{communicationFallback ? "No communications logged locally for this customer." : "No communications logged for this customer."}</p>}
           </section>
         </motion.div>
       )}

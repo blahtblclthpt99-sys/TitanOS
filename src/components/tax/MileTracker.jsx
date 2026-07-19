@@ -154,40 +154,40 @@ export default function MileTracker({ taxYear }) {
 
       {/* Log Trip Dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setForm(BLANK); setShowForm(false); } }}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-sm rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-sm rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground">Log Business Trip</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-muted-foreground text-xs font-medium block mb-1">Date</label>
                 <Input type="date" value={form.date} onChange={e => f("date", e.target.value)}
-                  className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                  className="bg-muted border-border text-foreground rounded-xl h-10" />
               </div>
               <div>
                 <label className="text-muted-foreground text-xs font-medium block mb-1">Miles <span className="text-titan-cyan">*</span></label>
                 <Input type="number" placeholder="0.0" value={form.miles} onChange={e => f("miles", e.target.value)}
-                  className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                  className="bg-muted border-border text-foreground rounded-xl h-10" />
               </div>
             </div>
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-1">Purpose <span className="text-titan-cyan">*</span></label>
               <Input placeholder="e.g. Client visit, Supply run" value={form.purpose} onChange={e => f("purpose", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                className="bg-muted border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-1">From</label>
               <Input placeholder="Starting location" value={form.from_location} onChange={e => f("from_location", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                className="bg-muted border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-1">To</label>
               <Input placeholder="Destination" value={form.to_location} onChange={e => f("to_location", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                className="bg-muted border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-1">Client / Customer</label>
               <Input placeholder="Optional" value={form.customer_name} onChange={e => f("customer_name", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
+                className="bg-muted border-border text-foreground rounded-xl h-10" />
             </div>
 
             {/* Live deduction preview */}

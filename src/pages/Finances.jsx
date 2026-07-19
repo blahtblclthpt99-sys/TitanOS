@@ -154,7 +154,7 @@ export default function Finances() {
       </div>
 
       <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) setForm(BLANK_EXPENSE); }}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Add Expense</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Description" value={form.description} onChange={e => f("description", e.target.value)} placeholder="e.g. Fuel fill-up" />

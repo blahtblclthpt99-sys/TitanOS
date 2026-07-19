@@ -43,7 +43,7 @@ const PRIVACY_OPTIONS = [
   ["share_completed_jobs", "Share completed jobs", "Allow completed work to appear in Community."],
 ];
 
-const inputClass = "bg-[#242427] border-border text-foreground rounded-xl focus:ring-1 focus:ring-titan-cyan/40";
+const inputClass = "bg-muted border-border text-foreground rounded-xl focus:ring-1 focus:ring-titan-cyan/40";
 
 function ToggleRow({ checked, label, description, onChange }) {
   return (
@@ -339,7 +339,7 @@ export default function Settings() {
       </motion.div>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="bg-[#1A1A1C] border-border text-foreground rounded-2xl max-w-md">
+        <AlertDialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Delete your account?</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -352,7 +352,7 @@ export default function Settings() {
             value={deleteConfirmText}
             onChange={e => setDeleteConfirmText(e.target.value)}
             placeholder="Type DELETE to confirm"
-            className="bg-[#242427] border-border text-foreground rounded-xl font-mono"
+            className="bg-muted border-border text-foreground rounded-xl font-mono"
           />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteConfirmText("")}
@@ -371,7 +371,7 @@ export default function Settings() {
 
       {/* Profile Panel */}
       <Dialog open={activePanel === "profile"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Edit Profile</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
@@ -379,7 +379,7 @@ export default function Settings() {
                 {profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-muted-foreground" />}
               </div>
               <label className="cursor-pointer">
-                <span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/70 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "avatar_url" ? "Uploading…" : "Upload photo"}</span>
+                <span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/90 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "avatar_url" ? "Uploading…" : "Upload photo"}</span>
                 <input type="file" accept="image/*" className="sr-only" disabled={uploading === "avatar_url"} onChange={(event) => uploadImage(event.target.files?.[0], "avatar_url")} />
               </label>
             </div>
@@ -406,12 +406,12 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "company"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Company</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-muted overflow-hidden flex items-center justify-center">{companyForm.company_logo_url ? <img src={companyForm.company_logo_url} alt="" className="w-full h-full object-cover" /> : <Building2 className="w-5 h-5 text-muted-foreground" />}</div>
-              <label className="cursor-pointer"><span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/70 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "company_logo_url" ? "Uploading…" : "Upload logo"}</span><input type="file" accept="image/*" className="sr-only" disabled={uploading === "company_logo_url"} onChange={(event) => uploadImage(event.target.files?.[0], "company_logo_url")} /></label>
+              <label className="cursor-pointer"><span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/90 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "company_logo_url" ? "Uploading…" : "Upload logo"}</span><input type="file" accept="image/*" className="sr-only" disabled={uploading === "company_logo_url"} onChange={(event) => uploadImage(event.target.files?.[0], "company_logo_url")} /></label>
             </div>
             <FormField label="Company logo URL" value={companyForm.company_logo_url || ""} onChange={e => setCompany(f => ({ ...f, company_logo_url: e.target.value }))} />
             <FormField label="Company name" value={companyForm.company_name || ""} onChange={e => setCompany(f => ({ ...f, company_name: e.target.value }))} />
@@ -424,7 +424,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "notifications"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Notifications</DialogTitle></DialogHeader>
           <div className="space-y-1 mt-2">{NOTIFICATION_OPTIONS.map(([key, label, description]) => <ToggleRow key={key} checked={notificationPrefs[key] ?? true} label={label} description={description} onChange={(value) => setNotificationPrefs((prefs) => ({ ...prefs, [key]: value }))} />)}</div>
           <Button onClick={() => save("notifications", { notification_prefs: notificationPrefs }, "Your notification preferences have been updated.")} disabled={savingPanel === "notifications"} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "notifications" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "notifications" ? "Saving…" : "Save Changes"}</Button>
@@ -432,7 +432,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "privacy"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Privacy</DialogTitle></DialogHeader>
           <div className="space-y-1 mt-2">
             <ToggleRow checked={privacyForm.community_opt_in} label="Join the Community" description="Enable Community features for your account." onChange={(value) => setPrivacy((form) => ({ ...form, community_opt_in: value }))} />
@@ -449,7 +449,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "security"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Security</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <p className="text-xs text-muted-foreground">Choose a password with at least 8 characters.</p>
@@ -461,7 +461,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "accounts"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Connected accounts</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="rounded-xl border border-border p-4">
@@ -479,7 +479,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "theme"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Theme</DialogTitle></DialogHeader>
           <div className="grid grid-cols-3 gap-2 mt-2">
             {["system", "light", "dark"].map((option) => <button key={option} type="button" onClick={() => setThemePref(option)} className={`rounded-xl border px-3 py-4 text-sm font-medium capitalize transition-colors ${themePref === option ? "border-titan-cyan bg-titan-cyan/10 text-titan-cyan" : "border-border text-muted-foreground hover:bg-muted"}`}>{option}</button>)}

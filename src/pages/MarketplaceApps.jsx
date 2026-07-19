@@ -446,7 +446,7 @@ export default function Marketplace() {
                 className="flex items-center gap-2.5 glass rounded-2xl px-4 py-2.5 border border-titan-green/20 hover:border-titan-green/40 transition-all flex-shrink-0 group"
               >
                 <span className="text-lg">{module.icon}</span>
-                <span className="text-xs font-medium text-foreground/70 group-hover:text-foreground whitespace-nowrap">
+                <span className="text-xs font-medium text-foreground/90 group-hover:text-foreground whitespace-nowrap">
                   {module.name}
                 </span>
                 {module.route && (
@@ -470,7 +470,7 @@ export default function Marketplace() {
           placeholder="Search modules, features, categories..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-11 bg-titan-surface1/80 border-border text-foreground rounded-2xl h-12 placeholder:text-muted-foreground focus:border-titan-cyan/30 focus:ring-titan-cyan/10 transition-all"
+          className="pl-11 bg-titan-surface1/80 border-border text-foreground rounded-2xl h-12 placeholder:text-muted-foreground/80 focus:border-titan-cyan/30 focus:ring-titan-cyan/10 transition-all"
         />
       </motion.div>
 
@@ -489,7 +489,7 @@ export default function Marketplace() {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-medium whitespace-nowrap transition-colors ${
-                isActive ? "text-titan-cyan" : "text-muted-foreground hover:text-foreground/65 glass border border-border"
+                isActive ? "text-titan-cyan" : "text-muted-foreground hover:text-foreground/85 glass border border-border"
               }`}
             >
               {isActive && (
@@ -640,7 +640,7 @@ export default function Marketplace() {
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        className="flex items-center gap-2.5 text-sm text-foreground/70 glass rounded-xl px-3 py-2 border border-border"
+                        className="flex items-center gap-2.5 text-sm text-foreground/90 glass rounded-xl px-3 py-2 border border-border"
                       >
                         <div className="w-5 h-5 rounded-full bg-titan-green/15 flex items-center justify-center flex-shrink-0">
                           <Check className="w-3 h-3 text-titan-green" />

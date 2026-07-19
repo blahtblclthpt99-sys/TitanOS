@@ -235,7 +235,7 @@ export default function Jobs({ isActive = true }) {
               {completingId === job.id ? "Saving…" : "Complete"}
             </Button>
           )}
-          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/70 rounded-lg text-xs">Field ops</Button>}
+          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/90 rounded-lg text-xs">Field ops</Button>}
         </div>
       </div>
       {(expandedJobId === job.id || ["in_progress", "completed"].includes(job.status)) && !bulkMode && (
@@ -243,9 +243,9 @@ export default function Jobs({ isActive = true }) {
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => checkin(job, "check_in")} disabled={opsSaving} size="sm" className="bg-titan-cyan/15 text-titan-cyan border border-titan-cyan/20"><LogIn className="w-4 h-4 mr-1" />Check in</Button>
             <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-border text-foreground"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
-            {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-border text-xs text-foreground/75 hover:bg-muted"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
+            {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
           </div>
-          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/65 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
+          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
           {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-border" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
         </div>
       )}
@@ -291,13 +291,13 @@ export default function Jobs({ isActive = true }) {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-[#1A1A1C] border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground" />
+            className="pl-11 bg-card border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/80" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "scheduled", "in_progress", "completed", "cancelled"].map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                filter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-muted-foreground border border-border hover:text-foreground/70"
+                filter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-card text-muted-foreground border border-border hover:text-foreground/90"
               }`}>
               {s === "all" ? "All" : s.replace("_", " ")}
             </button>
@@ -308,7 +308,7 @@ export default function Jobs({ isActive = true }) {
       {/* Bulk mode header */}
       {bulkMode && (
         <div className="flex items-center gap-3 mb-4 p-3 bg-titan-cyan/5 border border-titan-cyan/20 rounded-2xl">
-          <button onClick={toggleAll} className="flex items-center gap-2 text-sm text-foreground/70 hover:text-foreground transition-colors">
+          <button onClick={toggleAll} className="flex items-center gap-2 text-sm text-foreground/90 hover:text-foreground transition-colors">
             {selected.size === filtered.length && filtered.length > 0
               ? <CheckSquare className="w-4 h-4 text-titan-cyan" />
               : <Square className="w-4 h-4" />}
@@ -348,7 +348,7 @@ export default function Jobs({ isActive = true }) {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-[#1A1A1C] border border-border rounded-2xl shadow-2xl px-4 py-3"
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-2xl shadow-2xl px-4 py-3"
           >
             <span className="text-xs text-muted-foreground mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>
 
@@ -361,10 +361,10 @@ export default function Jobs({ isActive = true }) {
                 Set Status <ChevronDown className="w-3 h-3" />
               </button>
               {showBulkStatus && (
-                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-border rounded-xl overflow-hidden shadow-xl min-w-[140px]">
+                <div className="absolute bottom-full mb-2 left-0 bg-muted border border-border rounded-xl overflow-hidden shadow-xl min-w-[140px]">
                   {JOB_STATUSES.map(s => (
                     <button key={s} onClick={() => bulkUpdateStatus(s)}
-                      className="w-full text-left px-4 py-2.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground capitalize transition-colors">
+                      className="w-full text-left px-4 py-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground capitalize transition-colors">
                       {s.replace("_", " ")}
                     </button>
                   ))}
@@ -381,10 +381,10 @@ export default function Jobs({ isActive = true }) {
                 Assign To <ChevronDown className="w-3 h-3" />
               </button>
               {showBulkAssign && (
-                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-border rounded-xl overflow-hidden shadow-xl min-w-[160px]">
+                <div className="absolute bottom-full mb-2 left-0 bg-muted border border-border rounded-xl overflow-hidden shadow-xl min-w-[160px]">
                   {(employees || []).filter(e => e.status === "active").map(emp => (
                     <button key={emp.id} onClick={() => bulkAssign(emp)}
-                      className="w-full text-left px-4 py-2.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
+                      className="w-full text-left px-4 py-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground transition-colors">
                       {emp.name}
                     </button>
                   ))}
@@ -401,7 +401,7 @@ export default function Jobs({ isActive = true }) {
       </AnimatePresence>
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">New Job</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Job Title" value={form.title} onChange={e => f("title", e.target.value)} placeholder="e.g. Full house cleaning" />
@@ -437,7 +437,7 @@ export default function Jobs({ isActive = true }) {
             <div className="flex flex-col gap-1">
               <label className="text-muted-foreground text-xs font-medium">Description</label>
               <Textarea value={form.description} onChange={e => f("description", e.target.value)}
-                className="bg-[#242427] border-border text-foreground rounded-xl min-h-[80px]" />
+                className="bg-muted border-border text-foreground rounded-xl min-h-[80px]" />
             </div>
             <Button onClick={handleSave} disabled={saving || !form.title} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 disabled:opacity-50">
               {saving ? "Creating…" : "Create Job"}

@@ -155,7 +155,7 @@ export default function Payments() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
       <PageHeader title="Payments" subtitle="Connect providers and collect customer payments" />
-      <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/70">
+      <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/90">
         <span className="text-titan-cyan font-semibold">
           Your plan: {plan.name} · {plan.feeLabel} fee
         </span>

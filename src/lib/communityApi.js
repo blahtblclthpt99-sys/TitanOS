@@ -1,6 +1,12 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
+import {
+  assertCleanLanguage,
+  assertCommunityPostRateLimit,
+  countPostsInWindow,
+  COMMUNITY_POST_LIMIT,
+} from "@/lib/contentModeration";
 
 const PREFIX = "titanos_community";
 
@@ -31,10 +37,31 @@ export async function listCommunityPosts(limit = 40) {
   }
 }
 
+async function listAuthorPosts(userId) {
+  try {
+    const rows = await api.entities.CommunityPost.filter({ author_id: userId });
+    return rows || [];
+  } catch {
+    return readLocal(PREFIX, "global", "posts", []).filter(
+      (p) => String(p.author_id) === String(userId) || String(p.created_by_id) === String(userId)
+    );
+  }
+}
+
+export async function getCommunityPostQuota(userId) {
+  const mine = await listAuthorPosts(userId);
+  const used = countPostsInWindow(mine, userId);
+  return { used, limit: COMMUNITY_POST_LIMIT, remaining: Math.max(0, COMMUNITY_POST_LIMIT - used) };
+}
+
 export async function createCommunityPost(user, input) {
   if (!user.community_opt_in && !user.privacy_prefs?.share_completed_jobs) {
     throw new Error("Enable community sharing in Settings → Privacy first.");
   }
+  assertCleanLanguage(input.description, "posts");
+  const mine = await listAuthorPosts(user.id);
+  assertCommunityPostRateLimit(countPostsInWindow(mine, user.id));
+
   const payload = sanitizeCommunityPost(input, user);
   try {
     const post = await api.entities.CommunityPost.create(payload);
@@ -48,7 +75,10 @@ export async function createCommunityPost(user, input) {
       summary: `${payload.author_username} completed a ${payload.category} job${payload.city ? ` in ${locationLabel(payload.city, payload.state)}` : ""}.`,
     });
     return post;
-  } catch {
+  } catch (error) {
+    if (error?.message?.includes("foul language") || error?.message?.includes("every 12 hours") || error?.message?.includes("Enable community")) {
+      throw error;
+    }
     const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
     const all = readLocal(PREFIX, "global", "posts", []);
     all.unshift(row);
@@ -81,6 +111,7 @@ export async function toggleLike(userId, postId) {
 }
 
 export async function addComment(user, postId, body) {
+  assertCleanLanguage(body, "comments");
   const payload = {
     post_id: postId,
     author_id: user.id,
@@ -91,7 +122,8 @@ export async function addComment(user, postId, body) {
   };
   try {
     return await api.entities.CommunityComment.create(payload);
-  } catch {
+  } catch (error) {
+    if (error?.message?.includes("foul language")) throw error;
     const rows = readLocal(PREFIX, "global", "comments", []);
     rows.push({ id: uid(), created_at: new Date().toISOString(), ...payload });
     writeLocal(PREFIX, "global", "comments", rows);

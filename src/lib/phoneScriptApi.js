@@ -50,6 +50,35 @@ export async function updatePhoneScript(userId, id, values) {
   }
 }
 
+export async function createPhoneScript(user, values = {}) {
+  const row = {
+    name: values.name || "New script",
+    greeting:
+      values.greeting ||
+      `Thanks for calling ${user.company_name || user.full_name || "us"}. How can I help?`,
+    faq_json: values.faq_json || DEFAULT_FAQ,
+    transfer_number: values.transfer_number || user.phone || "",
+    is_active: true,
+    user_id: user.id,
+    created_by_id: user.id,
+  };
+  try {
+    return await api.entities.PhoneScript.create(row);
+  } catch {
+    const item = { id: uid(), created_at: new Date().toISOString(), ...row };
+    save(user.id, [item, ...local(user.id)]);
+    return item;
+  }
+}
+
+export async function deletePhoneScript(userId, id) {
+  try {
+    await api.entities.PhoneScript.delete(id);
+  } catch {
+    save(userId, local(userId).filter((r) => r.id !== id));
+  }
+}
+
 /** Simple keyword matcher for receptionist simulator */
 export function answerFromScript(script, utterance) {
   const text = (utterance || "").toLowerCase();

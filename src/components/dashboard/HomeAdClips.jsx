@@ -375,9 +375,10 @@ export default function HomeAdClips() {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const child = scroller.children[active];
-    if (child?.scrollIntoView) {
-      child.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    }
+    if (!child) return;
+    // Scroll only the horizontal reel — never scrollIntoView (that jumps the Home page to top while idle).
+    const left = child.offsetLeft - (scroller.clientWidth - child.clientWidth) / 2;
+    scroller.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
   }, [active]);
 
   if (clips.length === 0) return null;

@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { useEntityRecord } from "@/hooks/useEntityRecord";
 import { useEntityData } from "@/hooks/useEntityData";
 import { motion } from "framer-motion";
 import {
   Phone, Mail, MapPin, Tag, Edit2, Check, X, Briefcase, FileText,
-  Receipt, MessageSquare, Plus, Image as ImageIcon, CalendarDays,
+  Receipt, MessageSquare, Plus, Image as ImageIcon, CalendarDays, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
 import StatusBadge from "@/components/shared/StatusBadge";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
@@ -48,7 +49,9 @@ function RecordList({ title, icon: Icon, records, empty, renderRecord, to }) {
 
 export default function CustomerDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { data: customer, loading, error, reload } = useEntityRecord("Customer", id);
+  const [deleting, setDeleting] = useState(false);
   const { data: [allJobs, allEstimates, allInvoices], reload: reloadRelated } = useEntityData([
     { entity: "Job", method: "list", args: ["-scheduled_date", 500] },
     { entity: "Estimate", method: "list", args: ["-created_date", 500] },
@@ -185,6 +188,20 @@ export default function CustomerDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete ${fullName}? Jobs and invoices stay, but this contact will be removed.`)) return;
+    setDeleting(true);
+    try {
+      await api.entities.Customer.delete(id);
+      toast({ title: "Contact deleted" });
+      navigate("/customers", { replace: true });
+    } catch (err) {
+      toast({ title: "Couldn't delete contact", description: err.message || "Try again.", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
@@ -201,11 +218,18 @@ export default function CustomerDetail() {
               )}
             </div>
           </div>
-          <Button onClick={() => setEditing(!editing)} variant="outline"
-            className="border-border text-muted-foreground hover:text-foreground rounded-xl min-h-[44px] min-w-[44px] p-2"
-            aria-label={editing ? "Cancel editing" : "Edit customer"}>
-            <Edit2 className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setEditing(!editing)} variant="outline"
+              className="border-border text-muted-foreground hover:text-foreground rounded-xl min-h-[44px] min-w-[44px] p-2"
+              aria-label={editing ? "Cancel editing" : "Edit customer"}>
+              <Edit2 className="w-4 h-4" />
+            </Button>
+            <Button onClick={handleDelete} disabled={deleting} variant="outline"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-xl min-h-[44px] min-w-[44px] p-2"
+              aria-label="Delete contact">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </motion.div>
 

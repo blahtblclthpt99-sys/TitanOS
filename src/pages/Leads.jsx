@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Plus, UserRound, Upload } from "lucide-react";
+import { Plus, Trash2, UserRound, Upload } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
-import { createLead, listLeads, updateStatus } from "@/lib/leadsApi";
+import { createLead, deleteLead, listLeads, updateStatus } from "@/lib/leadsApi";
 import { importLeadsFromCsv } from "@/lib/leadImportApi";
 
 const STATUSES = ["new", "called", "emailed", "interested", "scheduled"];
@@ -35,6 +35,17 @@ export default function Leads() {
   const move = async (row, status) => {
     const saved = await updateStatus(user.id, row.id, status);
     setRows(rows.map((lead) => (lead.id === row.id ? saved : lead)));
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm(`Delete lead “${row.name}”?`)) return;
+    try {
+      await deleteLead(user.id, row.id);
+      setRows((prev) => prev.filter((lead) => lead.id !== row.id));
+      toast({ title: "Lead deleted" });
+    } catch {
+      toast({ title: "Couldn't delete lead", variant: "destructive" });
+    }
   };
 
   const importCsv = async () => {
@@ -81,7 +92,17 @@ export default function Leads() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {display.map((row) => (
           <article key={row.id} className="glass rounded-2xl p-4">
-            <UserRound className="w-5 h-5 text-titan-cyan mb-3" />
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <UserRound className="w-5 h-5 text-titan-cyan" />
+              <button
+                type="button"
+                onClick={() => remove(row)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 min-h-[44px] min-w-[44px]"
+                aria-label={`Delete ${row.name}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
             <p className="font-semibold text-foreground">{row.name}</p>
             <p className="text-xs text-muted-foreground my-2">{row.phone || row.email || row.source || "New inquiry"}</p>
             <select value={row.status} onChange={(e) => move(row, e.target.value)} className="w-full bg-muted border border-border rounded-lg p-2 text-sm text-foreground">

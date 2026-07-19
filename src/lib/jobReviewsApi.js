@@ -1,6 +1,6 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
-import { pushNotification } from "@/lib/notificationsApi";
+import { notifyUser } from "@/lib/notify";
 
 const PREFIX = "titanos_reviews";
 
@@ -27,7 +27,7 @@ export async function createJobReview(user, {
 
   try {
     const row = await api.entities.JobReview.create(payload);
-    await pushNotification(revieweeId, {
+    await notifyUser(revieweeId, {
       type: "reviews",
       title: "New review received",
       body: `${user.full_name || "Someone"} left you a ${rating}-star review.`,

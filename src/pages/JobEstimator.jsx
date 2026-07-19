@@ -9,6 +9,7 @@ import PageHeader from "@/components/shared/PageHeader";
 import { useAuth } from "@/lib/AuthContext";
 import { estimateJobPrice, MARKET_HOURLY } from "@/lib/priceEstimator";
 import { SERVICE_CATEGORIES } from "@/lib/platformConstants";
+import { betaBadgeLabel } from "@/lib/plan";
 
 const initialForm = {
   service_type: "General",
@@ -74,6 +75,7 @@ export default function JobEstimator() {
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <PageHeader title="Job Price Estimator" subtitle="Build a market-aware price range for any job." />
+      {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
       <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-5">
         <section className="glass rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-white">Job inputs</h2></div>

@@ -37,7 +37,8 @@ export async function markAllRead(userId) {
   await Promise.all(rows.filter((n) => !n.read_at).map((n) => markRead(userId, n.id)));
 }
 
-export async function pushNotification(userId, { type, title, body, link, meta }) {
+export async function pushNotification(userId, { type, title, body, link, meta }, prefs = null) {
+  if (!userId || (prefs && prefs[type] === false)) return null;
   const payload = {
     user_id: userId,
     type,

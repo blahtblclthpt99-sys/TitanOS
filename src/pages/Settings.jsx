@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
+import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
 import {
   User, Building2, Bell, Shield, Palette, Lock, LogOut, ChevronRight, Check,
-  Trash2, Gift, Upload,
+  Trash2, Gift, Upload, ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +88,7 @@ export default function Settings() {
   const [uploading, setUploading] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [connectedProviders, setConnectedProviders] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -111,6 +113,16 @@ export default function Settings() {
       setThemePref(user.theme_pref || "system");
     }
   }, [user]);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      const identities = data.session?.user?.identities || [];
+      setConnectedProviders(identities.map((identity) => identity.provider).filter(Boolean));
+    }).catch(() => { if (active) setConnectedProviders([]); });
+    return () => { active = false; };
+  }, [user?.id]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -203,6 +215,7 @@ export default function Settings() {
     { id: "notifications", icon: Bell,      title: "Notifications", description: "Email and push preferences" },
     { id: "privacy",       icon: Lock,      title: "Privacy",       description: "Community visibility and sharing" },
     { id: "security",      icon: Shield,    title: "Security",      description: "Password and login settings" },
+    { id: "accounts",      icon: Lock,      title: "Connected accounts", description: "Google and email sign-in methods" },
     { id: "theme",         icon: Palette,   title: "Theme",         description: "Choose your display preference" },
   ];
 
@@ -271,6 +284,20 @@ export default function Settings() {
           <ChevronRight className="w-4 h-4 text-titan-indigo/50" />
         </motion.div>
       </Link>
+
+      {user?.role === "admin" && <Link to="/admin/moderation">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="glass rounded-2xl p-4 mb-3 border border-titan-amber/20 bg-titan-amber/5 flex items-center gap-4 hover:bg-titan-amber/10 transition-colors cursor-pointer">
+          <div className="w-10 h-10 rounded-xl bg-titan-amber/20 flex items-center justify-center flex-shrink-0">
+            <ShieldAlert className="w-5 h-5 text-titan-amber" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Marketplace moderation</p>
+            <p className="text-xs text-white/40">Review reports and remove unsafe listings.</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-titan-amber/50" />
+        </motion.div>
+      </Link>}
 
       {/* Beta Program Banner */}
       <Link to="/beta">
@@ -422,6 +449,24 @@ export default function Settings() {
             <FormField label="New password" type="password" autoComplete="new-password" value={passwordForm.password} onChange={e => setPassword((form) => ({ ...form, password: e.target.value }))} />
             <FormField label="Confirm new password" type="password" autoComplete="new-password" value={passwordForm.confirmPassword} onChange={e => setPassword((form) => ({ ...form, confirmPassword: e.target.value }))} />
             <Button onClick={savePassword} disabled={savingPanel === "security"} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "security" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "security" ? "Saving…" : "Change Password"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={activePanel === "accounts"} onOpenChange={closePanel}>
+        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-white text-lg">Connected accounts</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="rounded-xl border border-white/10 p-4">
+              <p className="text-sm font-semibold text-white">Email</p>
+              <p className="text-xs text-white/40 mt-1">{user?.email || "Email sign-in"}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div><p className="text-sm font-semibold text-white">Google</p><p className="text-xs text-white/40 mt-1">{connectedProviders.includes("google") ? "Connected" : "Sign in with Google available on Login"}</p></div>
+                {connectedProviders.includes("google") ? <Check className="w-5 h-5 text-emerald-400" /> : <Button size="sm" onClick={() => api.auth.loginWithProvider?.("google")} className="bg-titan-cyan text-black hover:bg-titan-cyan/90">Connect</Button>}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

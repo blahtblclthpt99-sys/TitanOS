@@ -61,6 +61,14 @@ async function localFallback(functionName, payload) {
     return { success: true, stub: true };
   }
 
+  if (functionName === "attachReferral") {
+    return { ok: true, matched: false, stub: true };
+  }
+
+  if (functionName === "markReferralPaying") {
+    return { ok: false, stub: true, error: "Billing hook unavailable offline" };
+  }
+
   if (
     functionName === "portalRequestOtp" ||
     functionName === "portalVerifyOtp" ||

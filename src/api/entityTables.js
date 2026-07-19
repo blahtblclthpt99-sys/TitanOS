@@ -22,6 +22,7 @@ export const ENTITY_TABLES = {
   MarketplaceReview: "marketplace_reviews",
   HireJob: "hire_jobs",
   HireApplication: "hire_applications",
+  HireSave: "hire_saves",
   CommunityPost: "community_posts",
   CommunityLike: "community_likes",
   CommunityComment: "community_comments",
@@ -29,6 +30,8 @@ export const ENTITY_TABLES = {
   Notification: "notifications",
   JobReview: "job_reviews",
   PriceEstimate: "price_estimates",
+  CustomerCommunication: "customer_communications",
+  CustomerFile: "customer_files",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

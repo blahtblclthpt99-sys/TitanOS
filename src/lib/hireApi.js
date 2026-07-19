@@ -1,6 +1,7 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
+import { notifyUser } from "@/lib/notify";
 
 const PREFIX = "titanos_hire";
 
@@ -73,13 +74,11 @@ export async function applyToHireJob(user, hireJobId, { message, bid_amount }) {
       await api.entities.HireJob.update(hireJobId, {
         application_count: (job.application_count || 0) + 1,
       });
-      await api.entities.Notification.create({
-        user_id: job.customer_id,
+      await notifyUser(job.customer_id, {
         type: "applications",
         title: "New job application",
         body: `${payload.worker_name} applied to "${job.title}"`,
         link: "/hire",
-        created_by_id: user.id,
       });
     } catch {
       /* optional */
@@ -110,6 +109,80 @@ export async function listMyApplications(userId) {
   }
 }
 
+export async function toggleSaveJob(userId, hireJobId) {
+  try {
+    const existing = await api.entities.HireSave.filter({ user_id: userId, hire_job_id: hireJobId });
+    if (existing.length) {
+      await api.entities.HireSave.delete(existing[0].id);
+      return false;
+    }
+    await api.entities.HireSave.create({ user_id: userId, hire_job_id: hireJobId, created_by_id: userId });
+    return true;
+  } catch {
+    const savedIds = readLocal(PREFIX, userId, "saved", []);
+    const index = savedIds.indexOf(hireJobId);
+    if (index >= 0) {
+      savedIds.splice(index, 1);
+      writeLocal(PREFIX, userId, "saved", savedIds);
+      return false;
+    }
+    savedIds.push(hireJobId);
+    writeLocal(PREFIX, userId, "saved", savedIds);
+    return true;
+  }
+}
+
+export async function listSavedJobIds(userId) {
+  if (!userId) return new Set();
+  try {
+    const rows = await api.entities.HireSave.filter({ user_id: userId });
+    return new Set(rows.map((row) => row.hire_job_id));
+  } catch {
+    return new Set(readLocal(PREFIX, userId, "saved", []));
+  }
+}
+
+export async function listSavedJobs(userId) {
+  const savedIds = await listSavedJobIds(userId);
+  if (!savedIds.size) return [];
+  const jobs = await listHireJobs({ status: "all" });
+  return jobs.filter((job) => savedIds.has(job.id));
+}
+
+export async function sendHireMessage(user, { hireJobId, recipientId, body }) {
+  const payload = {
+    hire_job_id: hireJobId,
+    listing_id: null,
+    thread_id: `hire_${hireJobId}_${[user.id, recipientId].sort().join("_")}`,
+    sender_id: user.id,
+    recipient_id: recipientId,
+    body: body.trim(),
+    created_by_id: user.id,
+  };
+  try {
+    return await api.entities.MarketplaceMessage.create(payload);
+  } catch {
+    const messages = readLocal(PREFIX, "global", "messages", []);
+    const message = { id: uid(), created_at: new Date().toISOString(), ...payload };
+    messages.push(message);
+    writeLocal(PREFIX, "global", "messages", messages);
+    return message;
+  }
+}
+
+export async function listHireMessages(userId, hireJobId) {
+  try {
+    const rows = await api.entities.MarketplaceMessage.filter({ hire_job_id: hireJobId });
+    return rows
+      .filter((message) => message.sender_id === userId || message.recipient_id === userId)
+      .sort((a, b) => new Date(a.created_date || a.created_at) - new Date(b.created_date || b.created_at));
+  } catch {
+    return readLocal(PREFIX, "global", "messages", [])
+      .filter((message) => message.hire_job_id === hireJobId && (message.sender_id === userId || message.recipient_id === userId))
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+}
+
 export async function hireApplicant(job, application) {
   try {
     await api.entities.HireApplication.update(application.id, { status: "accepted" });
@@ -117,13 +190,11 @@ export async function hireApplicant(job, application) {
       status: "hired",
       hired_worker_id: application.worker_id,
     });
-    await api.entities.Notification.create({
-      user_id: application.worker_id,
+    await notifyUser(application.worker_id, {
       type: "hires",
       title: "You're hired!",
       body: `You were hired for "${job.title}"`,
       link: "/hire",
-      created_by_id: job.customer_id,
     });
   } catch {
     /* local mode */

@@ -57,17 +57,40 @@ export default function CustomerDetail() {
   const [saving, setSaving] = useState(false);
   const [communications, setCommunications] = useState([]);
   const [communicationForm, setCommunicationForm] = useState({ type: "call", body: "" });
+  const [customerFiles, setCustomerFiles] = useState([]);
+  const [communicationFallback, setCommunicationFallback] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   useEffect(() => {
     if (customer) setForm(customer);
   }, [customer]);
 
   useEffect(() => {
-    try {
-      setCommunications(JSON.parse(localStorage.getItem(`titanos_comm_${id}`)) || []);
-    } catch {
-      setCommunications([]);
-    }
+    let active = true;
+    const loadCustomerData = async () => {
+      try {
+        const rows = await api.entities.CustomerCommunication.filter({ customer_id: id });
+        if (active) {
+          setCommunications(rows.sort((a, b) => new Date(b.created_at || b.created_date || b.date) - new Date(a.created_at || a.created_date || a.date)));
+          setCommunicationFallback(false);
+        }
+      } catch {
+        try {
+          if (active) setCommunications(JSON.parse(localStorage.getItem(`titanos_comm_${id}`)) || []);
+        } catch {
+          if (active) setCommunications([]);
+        }
+        if (active) setCommunicationFallback(true);
+      }
+      try {
+        const rows = await api.entities.CustomerFile.filter({ customer_id: id });
+        if (active) setCustomerFiles(rows);
+      } catch {
+        if (active) setCustomerFiles([]);
+      }
+    };
+    loadCustomerData();
+    return () => { active = false; };
   }, [id]);
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
@@ -117,13 +140,43 @@ export default function CustomerDetail() {
     ...invoices.map(invoice => ({ id: `invoice-${invoice.id}`, date: invoice.created_date, label: invoice.invoice_number || "Invoice", detail: invoice.status, icon: Receipt })),
   ].filter(item => item.date).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const addCommunication = () => {
+  const addCommunication = async () => {
     const body = communicationForm.body.trim();
     if (!body) return;
-    const next = [{ id: crypto.randomUUID?.() || String(Date.now()), date: new Date().toISOString(), type: communicationForm.type, body }, ...communications];
-    setCommunications(next);
-    localStorage.setItem(`titanos_comm_${id}`, JSON.stringify(next));
+    const entry = { id: crypto.randomUUID?.() || String(Date.now()), customer_id: id, date: new Date().toISOString(), type: communicationForm.type, body };
+    try {
+      const saved = await api.entities.CustomerCommunication.create(entry);
+      setCommunications((current) => [saved, ...current]);
+      setCommunicationFallback(false);
+    } catch {
+      const next = [entry, ...communications];
+      setCommunications(next);
+      setCommunicationFallback(true);
+      localStorage.setItem(`titanos_comm_${id}`, JSON.stringify(next));
+    }
     setCommunicationForm({ type: "call", body: "" });
+  };
+
+  const uploadCustomerFile = async (file) => {
+    if (!file) return;
+    setUploadingFile(true);
+    try {
+      const { file_url } = await api.integrations.Core.UploadFile({ file });
+      const saved = await api.entities.CustomerFile.create({
+        customer_id: id,
+        name: file.name,
+        file_url,
+        content_type: file.type,
+        created_by_id: customer.created_by_id,
+      });
+      setCustomerFiles((current) => [saved, ...current]);
+    } catch {
+      // CustomerFile is optional on older deployments; uploads remain accessible in the session.
+      const fileEntry = { id: `local-${Date.now()}`, name: file.name, file_url: URL.createObjectURL(file), content_type: file.type };
+      setCustomerFiles((current) => [fileEntry, ...current]);
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   return (
@@ -245,7 +298,20 @@ export default function CustomerDetail() {
 
           <div className="glass rounded-2xl p-5">
             <h2 className="text-base font-semibold text-white flex items-center gap-2 mb-3"><ImageIcon className="w-4 h-4 text-titan-cyan" /> Files & photos</h2>
-            {customer.photo_url ? <img src={customer.photo_url} alt={`${fullName} profile`} className="w-24 h-24 rounded-xl object-cover border border-white/10" /> : <p className="text-sm text-white/35">No customer photo yet. Job receipt attachments will appear here in a future update.</p>}
+            <label className="inline-flex mb-4 cursor-pointer">
+              <span className="inline-flex items-center rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70 hover:bg-white/5"><Plus className="w-3.5 h-3.5 mr-1.5" />{uploadingFile ? "Uploading…" : "Upload file"}</span>
+              <input type="file" className="sr-only" disabled={uploadingFile} onChange={(event) => { uploadCustomerFile(event.target.files?.[0]); event.target.value = ""; }} />
+            </label>
+            <div className="flex flex-wrap gap-3">
+              {customer.photo_url && <img src={customer.photo_url} alt={`${fullName} profile`} className="w-24 h-24 rounded-xl object-cover border border-white/10" />}
+              {customerFiles.map(file => (
+                <a key={file.id} href={file.file_url || file.url} target="_blank" rel="noreferrer" className="w-24 min-h-24 rounded-xl border border-white/10 bg-white/[0.03] p-2 text-xs text-white/65 hover:border-titan-cyan/40">
+                  {(file.content_type || "").startsWith("image/") && <img src={file.file_url || file.url} alt="" className="w-full h-14 object-cover rounded-lg mb-2" />}
+                  <span className="line-clamp-2">{file.name || "Attachment"}</span>
+                </a>
+              ))}
+              {!customer.photo_url && !customerFiles.length && <p className="text-sm text-white/35">No files or photos uploaded yet.</p>}
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6">
@@ -269,7 +335,7 @@ export default function CustomerDetail() {
               <Textarea value={communicationForm.body} onChange={event => setCommunicationForm(prev => ({ ...prev, body: event.target.value }))} placeholder="Log a call, email, or text…" className="min-h-11 bg-[#242427] border-white/5 text-white rounded-xl" />
               <Button onClick={addCommunication} className="bg-titan-cyan text-black hover:bg-titan-cyan/90 rounded-xl"><Plus className="w-4 h-4 mr-1" /> Add</Button>
             </div>
-            {communications.length ? <div className="space-y-2">{communications.map(entry => <div key={entry.id} className="rounded-xl bg-white/[0.03] p-3"><div className="flex justify-between gap-3 text-xs text-white/40 mb-1"><span className="capitalize">{entry.type}</span><span>{formatMonthDayYear(entry.date)}</span></div><p className="text-sm text-white/70 whitespace-pre-wrap">{entry.body}</p></div>)}</div> : <p className="text-sm text-white/35">No communications logged locally for this customer.</p>}
+            {communications.length ? <div className="space-y-2">{communications.map(entry => <div key={entry.id} className="rounded-xl bg-white/[0.03] p-3"><div className="flex justify-between gap-3 text-xs text-white/40 mb-1"><span className="capitalize">{entry.type}</span><span>{formatMonthDayYear(entry.date || entry.created_at || entry.created_date)}</span></div><p className="text-sm text-white/70 whitespace-pre-wrap">{entry.body}</p></div>)}</div> : <p className="text-sm text-white/35">{communicationFallback ? "No communications logged locally for this customer." : "No communications logged for this customer."}</p>}
           </section>
         </motion.div>
       )}

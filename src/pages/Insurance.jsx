@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Shield, Upload, FileText, Download, Trash2, Eye, Copy, Check } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { toast } from "@/components/ui/use-toast";
+import { betaBadgeLabel } from "@/lib/plan";
 
 export default function Insurance() {
   const [docs, setDocs] = useState(() => {
@@ -64,6 +65,7 @@ export default function Insurance() {
           </div>
         </div>
       </motion.div>
+      {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
 
       {/* Upload Area */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>

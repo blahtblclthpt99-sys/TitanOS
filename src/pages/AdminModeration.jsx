@@ -1,0 +1,102 @@
+import React, { useEffect, useState } from "react";
+import { Archive, Check, Loader2, ShieldAlert, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import { api } from "@/api/apiClient";
+import { useAuth } from "@/lib/AuthContext";
+
+function EmptyState({ children }) {
+  return <div className="glass rounded-2xl border border-white/8 p-8 text-center text-sm text-white/40">{children}</div>;
+}
+
+export default function AdminModeration() {
+  const { user, authChecked, isLoadingAuth } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [listings, setListings] = useState([]);
+  const [notes, setNotes] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [actingId, setActingId] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [openReports, activeListings] = await Promise.all([
+        api.entities.MarketplaceReport.filter({ status: "open" }).catch(() => []),
+        api.entities.MarketplaceListing.filter({ status: "active", moderated: false }).catch(() => []),
+      ]);
+      setReports(openReports);
+      setListings(activeListings);
+    } catch {
+      setReports([]);
+      setListings([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authChecked && user?.role === "admin") load();
+  }, [authChecked, user?.role]);
+
+  const dismiss = async (report) => {
+    if (actingId) return;
+    setActingId(report.id);
+    try {
+      await api.entities.MarketplaceReport.update(report.id, { status: "dismissed" });
+      setReports((current) => current.filter((item) => item.id !== report.id));
+      toast({ title: "Report dismissed" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't dismiss report" });
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const moderate = async (listing, status, report) => {
+    const key = report?.id || listing.id;
+    if (actingId) return;
+    setActingId(key);
+    const moderationNotes = notes[listing.id]?.trim() || `Admin action: listing ${status}.`;
+    try {
+      await api.entities.MarketplaceListing.update(listing.id, {
+        status,
+        moderated: true,
+        moderation_notes: moderationNotes,
+      });
+      if (report) await api.entities.MarketplaceReport.update(report.id, { status: "actioned" });
+      setReports((current) => current.filter((item) => item.id !== report?.id));
+      setListings((current) => current.filter((item) => item.id !== listing.id));
+      toast({ title: status === "removed" ? "Listing removed" : "Listing archived" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update listing" });
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Checking access" />;
+  if (user?.role !== "admin") return <div className="p-4 md:p-8 max-w-3xl mx-auto"><PageHeader title="Moderation" subtitle="Marketplace safety tools" /><EmptyState>Access denied.</EmptyState></div>;
+
+  return <div className="relative p-4 md:p-8 max-w-5xl mx-auto pb-32">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-titan-cyan/8 blur-[100px]" /></div>
+    <div className="relative">
+      <PageHeader title="Moderation" subtitle="Review marketplace reports and unmoderated listings" />
+      {loading ? <PageLoader variant="list" label="Loading moderation queue" /> : <div className="space-y-8">
+        <section>
+          <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-5 h-5 text-titan-amber" /><h2 className="font-semibold text-white">Open reports ({reports.length})</h2></div>
+          {reports.length ? <div className="space-y-3">{reports.map((report) => <article key={report.id} className="glass rounded-2xl border border-white/8 p-5"><div className="flex flex-col sm:flex-row sm:justify-between gap-3"><div><p className="text-sm font-semibold text-white">Listing: <span className="font-mono text-titan-cyan">{report.listing_id}</span></p><p className="text-sm text-white/65 mt-2"><span className="text-white/40">Reason:</span> {report.reason}</p>{report.details && <p className="text-sm text-white/50 mt-1">{report.details}</p>}<p className="text-xs text-white/35 mt-3">Reporter: {report.reporter_id} · {new Date(report.created_date || report.created_at).toLocaleString()}</p></div><Button onClick={() => dismiss(report)} disabled={!!actingId} variant="outline" className="border-white/10 text-white hover:bg-white/5 h-9"><Check className="w-4 h-4 mr-2" />{actingId === report.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Dismiss"}</Button></div>
+            <Textarea value={notes[report.listing_id] || ""} onChange={(event) => setNotes((current) => ({ ...current, [report.listing_id]: event.target.value }))} placeholder="Moderation notes (optional)" className="mt-4 bg-titan-surface2 border-white/10 text-white rounded-xl min-h-[72px]" />
+            <div className="flex flex-wrap gap-2 mt-3"><Button onClick={() => moderate({ id: report.listing_id }, "removed", report)} disabled={!!actingId} className="bg-red-500/85 hover:bg-red-500 text-white"><Trash2 className="w-4 h-4 mr-2" />Remove listing</Button><Button onClick={() => moderate({ id: report.listing_id }, "archived", report)} disabled={!!actingId} variant="outline" className="border-white/10 text-white"><Archive className="w-4 h-4 mr-2" />Archive listing</Button></div>
+          </article>)}</div> : <EmptyState>No open reports.</EmptyState>}
+        </section>
+        <section>
+          <div className="flex items-center gap-2 mb-3"><ShieldAlert className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-white">Unmoderated active listings ({listings.length})</h2></div>
+          {listings.length ? <div className="grid md:grid-cols-2 gap-3">{listings.map((listing) => <article key={listing.id} className="glass rounded-2xl border border-white/8 p-5"><p className="font-semibold text-white truncate">{listing.title || "Untitled listing"}</p><p className="text-xs font-mono text-titan-cyan mt-1">{listing.id}</p><p className="text-sm text-white/45 mt-3 line-clamp-2">{listing.description}</p><Textarea value={notes[listing.id] || ""} onChange={(event) => setNotes((current) => ({ ...current, [listing.id]: event.target.value }))} placeholder="Moderation notes (optional)" className="mt-4 bg-titan-surface2 border-white/10 text-white rounded-xl min-h-[72px]" /><div className="flex flex-wrap gap-2 mt-3"><Button onClick={() => moderate(listing, "removed")} disabled={!!actingId} className="bg-red-500/85 hover:bg-red-500 text-white"><Trash2 className="w-4 h-4 mr-2" />Remove</Button><Button onClick={() => moderate(listing, "archived")} disabled={!!actingId} variant="outline" className="border-white/10 text-white"><Archive className="w-4 h-4 mr-2" />Archive</Button></div></article>)}</div> : <EmptyState>No active listings need moderation.</EmptyState>}
+        </section>
+      </div>}
+    </div>
+  </div>;
+}

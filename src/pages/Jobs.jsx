@@ -16,6 +16,7 @@ import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
+import ReviewForm from "@/components/shared/ReviewForm";
 import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
 
@@ -54,6 +55,7 @@ export default function Jobs({ isActive = true }) {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [completingId, setCompletingId] = useState(null);
 
   const showForm = new URLSearchParams(location.search).get("new") === "1";
   const openForm  = () => navigate("?new=1");
@@ -136,6 +138,17 @@ export default function Jobs({ isActive = true }) {
     } finally { setBulkSaving(false); }
   };
 
+  const markComplete = async (job) => {
+    if (job.status === "completed" || completingId) return;
+    setCompletingId(job.id);
+    try {
+      await api.entities.Job.update(job.id, { status: "completed" });
+      setLocalJobs(prev => (prev ?? jobs).map(item => item.id === job.id ? { ...item, status: "completed" } : item));
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
   if (!isActive && !jobs.length) return null;
   if (loading && !jobs.length) return <PageLoader variant="list" label="Loading jobs" />;
   if (error) return <ErrorState title="Couldn't load jobs" onRetry={reload} />;
@@ -170,8 +183,26 @@ export default function Jobs({ isActive = true }) {
             {job.address && <span className="flex items-center gap-1 text-xs text-white/40 truncate max-w-[160px]"><MapPin className="w-3 h-3" />{job.address}</span>}
           </div>
         </div>
-        {job.amount > 0 && <p className="text-sm font-bold text-emerald-400 flex-shrink-0">${job.amount.toLocaleString()}</p>}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {job.amount > 0 && <p className="text-sm font-bold text-emerald-400">${job.amount.toLocaleString()}</p>}
+          {job.status !== "completed" && !bulkMode && (
+            <Button onClick={() => markComplete(job)} disabled={completingId === job.id} size="sm"
+              className="bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-300 border border-emerald-400/20 rounded-lg text-xs">
+              {completingId === job.id ? "Saving…" : "Complete"}
+            </Button>
+          )}
+        </div>
       </div>
+      {job.status === "completed" && !bulkMode && (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <ReviewForm
+            jobId={job.id}
+            revieweeId={job.customer_id ? `customer:${job.customer_id}` : ""}
+            reviewerRole="worker"
+            onSubmitted={reload}
+          />
+        </div>
+      )}
     </div>
   );
 

@@ -45,6 +45,9 @@ const TABLES = [
   "notifications",
   "job_reviews",
   "price_estimates",
+  "customer_communications",
+  "customer_files",
+  "hire_saves",
 ];
 
 function loadEnvFiles() {

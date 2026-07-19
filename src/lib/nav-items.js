@@ -18,6 +18,7 @@ import {
   UsersRound,
   Calculator,
   Bell,
+  ShieldAlert,
 } from "lucide-react";
 
 /** Full TitanOS navigation — field ops + marketplace platform. */
@@ -41,6 +42,7 @@ export const APP_NAV_ITEMS = [
   { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
   { icon: Settings, label: "Settings", path: "/settings", group: "account" },
+  { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "account" },
 ];
 
 export const MOBILE_TAB_ITEMS = [
@@ -68,7 +70,7 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Account",
-    paths: ["/settings"],
+    paths: ["/settings", "/admin/moderation"],
   },
 ];
 

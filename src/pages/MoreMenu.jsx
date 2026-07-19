@@ -3,18 +3,32 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageHeader from "@/components/shared/PageHeader";
 import { MORE_MENU_GROUPS, navItemsByPaths } from "@/lib/nav-items";
+import { useAuth } from "@/lib/AuthContext";
+import { betaBadgeLabel } from "@/lib/plan";
 
 export default function MoreMenu() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
       <PageHeader
         title="More"
-        subtitle="All TitanOS tools — fleet, tax, schedule, and more"
+        subtitle="All TitanOS tools — marketplace, hire, tax, and more"
       />
+      {betaBadgeLabel() && (
+        <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">
+          {betaBadgeLabel()}
+        </div>
+      )}
 
       <div className="space-y-6">
         {MORE_MENU_GROUPS.map((group, groupIndex) => {
-          const items = navItemsByPaths(group.paths);
+          const paths = group.paths.filter(
+            (path) => path !== "/admin/moderation" || isAdmin
+          );
+          const items = navItemsByPaths(paths);
+          if (!items.length) return null;
           return (
             <section key={group.title}>
               <h2 className="text-xs font-semibold uppercase tracking-widest text-white/35 mb-3 px-1">

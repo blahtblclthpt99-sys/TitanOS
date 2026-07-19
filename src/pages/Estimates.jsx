@@ -34,7 +34,59 @@ export default function Estimates() {
   const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("new") === "1") setShowForm(true);
+    const params = new URLSearchParams(window.location.search);
+    const openNew = params.get("new") === "1" || params.get("prefill") === "1";
+    if (!openNew) return;
+
+    setShowForm(true);
+    try {
+      const raw = sessionStorage.getItem("titanos_estimator_draft");
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const est = draft?.estimate;
+      const inputs = draft?.inputs || {};
+      if (!est) return;
+      setForm((prev) => ({
+        ...prev,
+        service_type: inputs.service_type || prev.service_type,
+        notes: prev.notes || `Suggested price from Job Estimator: $${Number(est.suggested_price || 0).toLocaleString()}`,
+      }));
+      setLineItems([
+        {
+          description: `${inputs.service_type || "Service"} — labor (${inputs.hours || 0} hrs)`,
+          quantity: 1,
+          unit_price: Number(est.labor_cost) || 0,
+          total: Number(est.labor_cost) || 0,
+        },
+        {
+          description: "Materials & equipment",
+          quantity: 1,
+          unit_price: Number(est.materials || 0) + Number(est.equipment || 0),
+          total: Number(est.materials || 0) + Number(est.equipment || 0),
+        },
+        {
+          description: "Suggested customer price adjustment",
+          quantity: 1,
+          unit_price: Math.max(
+            0,
+            Number(est.suggested_price || 0) -
+              Number(est.labor_cost || 0) -
+              Number(est.materials || 0) -
+              Number(est.equipment || 0)
+          ),
+          total: Math.max(
+            0,
+            Number(est.suggested_price || 0) -
+              Number(est.labor_cost || 0) -
+              Number(est.materials || 0) -
+              Number(est.equipment || 0)
+          ),
+        },
+      ].filter((line) => line.unit_price > 0));
+      sessionStorage.removeItem("titanos_estimator_draft");
+    } catch {
+      /* ignore bad draft */
+    }
   }, []);
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));

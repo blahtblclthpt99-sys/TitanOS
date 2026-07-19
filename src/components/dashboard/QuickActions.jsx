@@ -6,21 +6,21 @@ import {
   UserPlus,
   FileText,
   Receipt,
-  Truck,
-  ClipboardList,
-  Calendar,
-  DollarSign,
+  Calculator,
+  Store,
+  UserRoundSearch,
+  UsersRound,
 } from "lucide-react";
 
 const actions = [
   { icon: Plus, label: "New Job", sub: "Schedule work", path: "/jobs?new=1", color: "from-titan-cyan to-cyan-400" },
   { icon: UserPlus, label: "Add Customer", sub: "New client profile", path: "/customers?new=1", color: "from-titan-indigo to-purple-400" },
-  { icon: FileText, label: "Estimate", sub: "Build a quote", path: "/estimates?new=1", color: "from-titan-amber to-yellow-400" },
+  { icon: Calculator, label: "Price it", sub: "Job estimator", path: "/job-estimator", color: "from-titan-amber to-yellow-400" },
+  { icon: FileText, label: "Estimate", sub: "Build a quote", path: "/estimates?new=1", color: "from-orange-500 to-amber-400" },
   { icon: Receipt, label: "Invoice", sub: "Bill completed work", path: "/invoices?new=1", color: "from-titan-green to-emerald-400" },
-  { icon: Truck, label: "Fleet", sub: "Vehicles & status", path: "/fleet", color: "from-sky-500 to-blue-400" },
-  { icon: ClipboardList, label: "1099 Tax", sub: "Mileage & taxes", path: "/tax-center", color: "from-orange-500 to-amber-400" },
-  { icon: Calendar, label: "Schedule", sub: "Dispatch calendar", path: "/schedule", color: "from-fuchsia-500 to-pink-400" },
-  { icon: DollarSign, label: "Finances", sub: "Expenses & cash", path: "/finances", color: "from-emerald-500 to-teal-400" },
+  { icon: Store, label: "Marketplace", sub: "Free During Beta", path: "/marketplace", color: "from-sky-500 to-blue-400" },
+  { icon: UserRoundSearch, label: "Hire", sub: "Find workers", path: "/hire", color: "from-fuchsia-500 to-pink-400" },
+  { icon: UsersRound, label: "Community", sub: "Live job feed", path: "/community", color: "from-emerald-500 to-teal-400" },
 ];
 
 export default function QuickActions() {

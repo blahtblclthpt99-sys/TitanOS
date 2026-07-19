@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import AIGreeting from "@/components/dashboard/AIGreeting";
 import QuickActions from "@/components/dashboard/QuickActions";
+import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
 import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import { useNavigate } from "react-router-dom";
@@ -134,6 +135,8 @@ export default function Dashboard({ isActive = true }) {
       />
 
       <QuickActions />
+
+      <LiveActivityCard />
 
       {/* ── Revenue banner ──────────────────────────────────── */}
       <motion.div

@@ -40,7 +40,33 @@ export default function Invoices({ isActive = true }) {
   const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("new") === "1") setShowForm(true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+
+    setShowForm(true);
+    try {
+      const raw = sessionStorage.getItem("titanos_estimator_draft");
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const est = draft?.estimate;
+      const inputs = draft?.inputs || {};
+      if (!est) return;
+      setForm((prev) => ({
+        ...prev,
+        notes: prev.notes || `From Job Estimator (${inputs.service_type || "service"}): suggested $${Number(est.suggested_price || 0).toLocaleString()}`,
+      }));
+      setLineItems([
+        {
+          description: `${inputs.service_type || "Service"} — estimated job`,
+          quantity: 1,
+          unit_price: Number(est.suggested_price) || 0,
+          total: Number(est.suggested_price) || 0,
+        },
+      ]);
+      sessionStorage.removeItem("titanos_estimator_draft");
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));

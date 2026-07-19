@@ -30,6 +30,21 @@ const TABLES = [
   "beta_signups",
   "beta_feedbacks",
   "portal_sessions",
+  // Platform expansion (002)
+  "marketplace_listings",
+  "marketplace_favorites",
+  "marketplace_reports",
+  "marketplace_messages",
+  "marketplace_reviews",
+  "hire_jobs",
+  "hire_applications",
+  "community_posts",
+  "community_likes",
+  "community_comments",
+  "activity_events",
+  "notifications",
+  "job_reviews",
+  "price_estimates",
 ];
 
 function loadEnvFiles() {

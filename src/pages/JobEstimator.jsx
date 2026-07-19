@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import { useAuth } from "@/lib/AuthContext";
 import { estimateJobPrice, MARKET_HOURLY } from "@/lib/priceEstimator";
 import { SERVICE_CATEGORIES } from "@/lib/platformConstants";
 
@@ -25,6 +26,7 @@ const inputClass = "bg-[#1A1A1C] border-white/5 text-white rounded-xl h-10";
 
 export default function JobEstimator() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,8 +52,17 @@ export default function JobEstimator() {
     if (saving) return;
     setSaving(true);
     try {
-      if (typeof api.entities?.PriceEstimate?.create !== "function") throw new Error("Price estimates are not available yet.");
-      await api.entities.PriceEstimate.create({ ...form, ...estimate, created_at: new Date().toISOString() });
+      await api.entities.PriceEstimate.create({
+        user_id: user?.id || "",
+        service_type: form.service_type,
+        inputs: form,
+        low_estimate: estimate.low_estimate,
+        avg_estimate: estimate.avg_estimate,
+        premium_estimate: estimate.premium_estimate,
+        labor_cost: estimate.labor_cost,
+        profit_estimate: estimate.profit_estimate,
+        suggested_price: estimate.suggested_price,
+      });
       toast({ title: "Price estimate saved" });
     } catch (error) {
       toast({ title: "Couldn't save estimate", description: error.message || "Please try again.", variant: "destructive" });

@@ -4,7 +4,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 /** Resolve orphan referral rows that still have pending_lookup referrer. */
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
-  applyCors(res);
+  applyCors(res, req);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {

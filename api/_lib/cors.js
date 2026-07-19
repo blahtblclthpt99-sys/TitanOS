@@ -10,7 +10,13 @@ export function applyCors(res, req) {
   res.setHeader("Vary", "Origin");
 }
 
+/**
+ * Handle CORS preflight only. Returns true when the request was fully handled.
+ * Callers may use: if (handleOptions(req, res)) return;
+ */
 export function handleOptions(req, res) {
+  if (req.method !== "OPTIONS") return false;
   applyCors(res, req);
-  return res.status(204).end();
+  res.status(204).end();
+  return true;
 }

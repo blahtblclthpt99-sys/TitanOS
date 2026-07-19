@@ -147,6 +147,69 @@ function summaryPrompt(summary) {
   ].join("\n");
 }
 
+function detectConfirmIntent(question) {
+  const q = String(question || "").toLowerCase();
+  const customer =
+    q.match(/(?:for|with|customer)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/)?.[1] ||
+    q.match(/([A-Z][a-z]+)\s+(?:tomorrow|today|next)/)?.[1] ||
+    "";
+
+  if (/schedule\s+(a\s+)?job|book\s+(an?\s+)?appointment|add\s+(a\s+)?job/.test(q)) {
+    const date = /tomorrow/.test(q)
+      ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+      : /today/.test(q)
+        ? new Date().toISOString().slice(0, 10)
+        : new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    return {
+      type: "confirm",
+      intent: "schedule_job",
+      confirmationSummary: `Schedule a job${customer ? ` for ${customer}` : ""} on ${date}?`,
+      confirmationDetails: [
+        customer ? `Customer: ${customer}` : "Customer: (add name on confirm or edit after)",
+        `Date: ${date}`,
+        "Status: scheduled",
+      ],
+      params: {
+        customer_name: customer,
+        scheduled_date: date,
+        title: customer ? `Job for ${customer}` : "New job",
+        service_type: "General",
+      },
+    };
+  }
+
+  if (/create\s+(an?\s+)?estimate|draft\s+(an?\s+)?estimate|write\s+(an?\s+)?estimate/.test(q)) {
+    const amount = Number(q.match(/\$?\s*(\d{2,6})/)?.[1]) || 0;
+    return {
+      type: "confirm",
+      intent: "create_estimate",
+      confirmationSummary: `Create an estimate draft${customer ? ` for ${customer}` : ""}${amount ? ` around $${amount}` : ""}?`,
+      confirmationDetails: [
+        customer ? `Customer: ${customer}` : "Customer: (optional)",
+        amount ? `Total: $${amount}` : "Total: set after creation",
+      ],
+      params: { customer_name: customer, total: amount, title: "Service estimate" },
+    };
+  }
+
+  if (/create\s+(an?\s+)?invoice|send\s+(an?\s+)?invoice|bill\s+/.test(q)) {
+    const amount = Number(q.match(/\$?\s*(\d{2,6})/)?.[1]) || 0;
+    const send = /send/.test(q);
+    return {
+      type: "confirm",
+      intent: send ? "send_invoice" : "create_invoice",
+      confirmationSummary: `${send ? "Send" : "Create"} an invoice${customer ? ` for ${customer}` : ""}${amount ? ` for $${amount}` : ""}?`,
+      confirmationDetails: [
+        customer ? `Customer: ${customer}` : "Customer: (optional)",
+        amount ? `Amount: $${amount}` : "Amount: set after creation",
+      ],
+      params: { customer_name: customer, total: amount },
+    };
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   applyCors(res, req);
   if (req.method === "OPTIONS") return handleOptions(req, res);
@@ -171,19 +234,116 @@ export default async function handler(req, res) {
     const { messages = [], confirmedAction = null, businessData = null, businessSummary = null } =
       body;
 
-    if (confirmedAction) {
+    if (confirmedAction?.intent) {
+      // Delegate to executable office actions
+      try {
+        const { default: execute } = await import("./aiExecuteAction.js");
+        // Re-invoke logic inline to avoid nested HTTP
+        req.body = confirmedAction;
+        // Fall through: call shared insert logic by reusing handler pattern
+      } catch {
+        /* continue with inline */
+      }
+
+      const intent = confirmedAction.intent;
+      const params = confirmedAction.params || {};
+      const user = userData.user;
+
+      try {
+        if (intent === "schedule_job" || intent === "create_job") {
+          const row = {
+            title: params.title || `Job for ${params.customer_name || "Customer"}`,
+            customer_name: params.customer_name || "",
+            scheduled_date: params.scheduled_date || new Date().toISOString().slice(0, 10),
+            scheduled_time: params.scheduled_time || "09:00",
+            status: "scheduled",
+            service_type: params.service_type || "General",
+            notes: "Created by Titan AI",
+            created_by_id: user.id,
+            user_id: user.id,
+          };
+          const { data, error } = await admin.from("jobs").insert(row).select("*").maybeSingle();
+          if (error) throw error;
+          return res.status(200).json({
+            data: {
+              type: "done",
+              message: `Scheduled **${data.title}** for ${data.scheduled_date}. Open Jobs to fine-tune.`,
+              path: "/jobs",
+              id: data.id,
+            },
+          });
+        }
+        if (intent === "create_estimate") {
+          const total = Number(params.total) || 0;
+          const row = {
+            customer_name: params.customer_name || "",
+            status: "draft",
+            total,
+            line_items: [{ description: params.title || "Service", qty: 1, unit_price: total, total }],
+            notes: "Drafted by Titan AI",
+            created_by_id: user.id,
+            user_id: user.id,
+          };
+          const { data, error } = await admin.from("estimates").insert(row).select("*").maybeSingle();
+          if (error) throw error;
+          return res.status(200).json({
+            data: {
+              type: "done",
+              message: `Estimate draft ready${data.customer_name ? ` for **${data.customer_name}**` : ""} · $${total.toLocaleString()}.`,
+              path: "/estimates",
+              id: data.id,
+            },
+          });
+        }
+        if (intent === "create_invoice" || intent === "send_invoice") {
+          const total = Number(params.total) || 0;
+          const row = {
+            customer_name: params.customer_name || "",
+            status: intent === "send_invoice" ? "sent" : "draft",
+            total,
+            balance_due: total,
+            notes: "Created by Titan AI",
+            created_by_id: user.id,
+            user_id: user.id,
+          };
+          const { data, error } = await admin.from("invoices").insert(row).select("*").maybeSingle();
+          if (error) throw error;
+          return res.status(200).json({
+            data: {
+              type: "done",
+              message: `Invoice ${intent === "send_invoice" ? "sent" : "drafted"} · $${total.toLocaleString()}.`,
+              path: "/invoices",
+              id: data.id,
+            },
+          });
+        }
+      } catch (execErr) {
+        console.error("AI action execute error:", execErr);
+        return res.status(200).json({
+          data: {
+            type: "done",
+            message:
+              "I couldn't write that record automatically (permissions or schema). Open the matching screen — Jobs, Estimates, or Invoices — to finish in one tap.",
+          },
+        });
+      }
+
       return res.status(200).json({
         data: {
           type: "done",
-          message:
-            "Got it — finish that action in the matching screen (Jobs, Invoices, or Estimates) so your records stay accurate.",
+          message: "Action noted — open Jobs, Invoices, or Estimates to finish.",
         },
       });
     }
 
     const lastMessage =
-      messages.filter((m) => m.role === "user").slice(-1)[0]?.content || "";
+      messages.filter((m) => m.role === "user").slice(-1)[0]?.content || body.message || "";
     const summary = businessSummary || buildSummary(businessData || {});
+
+    const confirm = detectConfirmIntent(lastMessage);
+    if (confirm) {
+      return res.status(200).json({ data: confirm });
+    }
 
     // Fast path: answer common ops questions without calling OpenAI
     const local = answerLocally(lastMessage, summary);
@@ -208,7 +368,7 @@ export default async function handler(req, res) {
           message:
             `I'm Titan AI with your live snapshot: **${c.customers || 0}** customers, **${c.jobs || 0}** jobs, **${c.invoices || 0}** invoices.\n\n` +
             `Outstanding AR **${money(summary.outstandingTotal)}**, collected this month **${money(summary.collectedThisMonth)}**.\n\n` +
-            `Ask about today's jobs, who owes money, revenue, profit, or top customers — or open Jobs / Invoices to make changes.`,
+            `Ask about today's jobs, who owes money, revenue, profit, or top customers — or say "schedule a job" / "create an estimate" / "send an invoice".`,
         },
       });
     }
@@ -241,14 +401,13 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const errText = await response.text();
       console.error("OpenAI error:", errText.slice(0, 500));
-      // Graceful degrade to local snapshot instead of hard failing
       return res.status(200).json({
         data: {
           type: "response",
           source: "local",
           message:
             local ||
-            `AI provider is briefly unavailable. Snapshot: **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. Try a specific question like "today's jobs" or "who owes money?".`,
+            `AI provider is briefly unavailable. Snapshot: **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. Try "today's jobs" or "who owes money?".`,
         },
       });
     }

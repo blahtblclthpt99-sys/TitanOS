@@ -106,6 +106,10 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
   );
 
   return {
+    jobs,
+    invoices,
+    estimates,
+    customers,
     todayJobs,
     upcomingJobs,
     inProgressJobs,

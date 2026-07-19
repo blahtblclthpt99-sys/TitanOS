@@ -40,6 +40,7 @@ import {
   Siren,
   ShieldCheck,
   PhoneCall,
+  LayoutTemplate,
 } from "lucide-react";
 
 /**
@@ -70,6 +71,7 @@ export const APP_NAV_ITEMS = [
   { icon: UserCog, label: "Employees", path: "/employees", group: "field" },
   { icon: Package, label: "Inventory", path: "/inventory", group: "field" },
   { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "field" },
+  { icon: LayoutTemplate, label: "Service Templates", path: "/templates", group: "field" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "field" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "field" },
 
@@ -139,7 +141,7 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Field & team",
-    paths: ["/job-estimator", "/routes", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts"],
+    paths: ["/job-estimator", "/templates", "/routes", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts"],
   },
   {
     title: "Grow business",

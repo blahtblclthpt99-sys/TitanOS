@@ -67,6 +67,7 @@ const LocalDeals = lazy(() => import("@/pages/LocalDeals"));
 const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
 const Escrow = lazy(() => import("@/pages/Escrow"));
 const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
+const ServiceTemplates = lazy(() => import("@/pages/ServiceTemplates"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -104,6 +105,7 @@ const NON_TAB_ROUTES = {
   "/emergency": EmergencyJobs,
   "/escrow": Escrow,
   "/phone": PhoneReceptionist,
+  "/templates": ServiceTemplates,
 };
 
 function NonTabPage() {

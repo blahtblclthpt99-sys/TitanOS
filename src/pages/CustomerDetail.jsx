@@ -16,6 +16,8 @@ import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import FormField from "@/components/shared/FormField";
 import { formatMonthDayYear } from "@/lib/date-utils";
+import { buildBusinessTimeline } from "@/lib/businessTimeline";
+import BusinessTimeline from "@/components/timeline/BusinessTimeline";
 
 const COMMUNICATION_TYPES = ["call", "email", "text"];
 
@@ -134,11 +136,15 @@ export default function CustomerDetail() {
     if (invoice.status === "paid") return sum;
     return sum + Number(invoice.balance_due ?? invoice.total ?? 0);
   }, 0);
-  const timeline = [
-    ...jobs.map(job => ({ id: `job-${job.id}`, date: job.scheduled_date || job.created_date, label: job.title || "Job", detail: job.status, icon: Briefcase })),
-    ...estimates.map(estimate => ({ id: `estimate-${estimate.id}`, date: estimate.created_date, label: estimate.estimate_number || "Estimate", detail: estimate.status, icon: FileText })),
-    ...invoices.map(invoice => ({ id: `invoice-${invoice.id}`, date: invoice.created_date, label: invoice.invoice_number || "Invoice", detail: invoice.status, icon: Receipt })),
-  ].filter(item => item.date).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const timeline = buildBusinessTimeline({
+    jobs,
+    estimates,
+    invoices,
+    communications,
+    files: customerFiles,
+    customerId: id,
+    customerName: fullName,
+  });
 
   const addCommunication = async () => {
     const body = communicationForm.body.trim();
@@ -324,8 +330,13 @@ export default function CustomerDetail() {
           </div>
 
           <section className="glass rounded-2xl p-5">
-            <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4"><CalendarDays className="w-4 h-4 text-titan-cyan" /> Appointment & job history</h2>
-            {timeline.length ? <div className="space-y-3">{timeline.slice(0, 10).map(item => { const Icon = item.icon; return <div key={item.id} className="flex gap-3"><div className="w-8 h-8 rounded-lg bg-titan-cyan/10 flex items-center justify-center"><Icon className="w-4 h-4 text-titan-cyan" /></div><div><p className="text-sm text-foreground">{item.label}</p><p className="text-xs text-muted-foreground capitalize">{formatMonthDayYear(item.date)} · {item.detail}</p></div></div>; })}</div> : <p className="text-sm text-muted-foreground">No appointments or transactions recorded.</p>}
+            <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
+              <CalendarDays className="w-4 h-4 text-titan-cyan" /> Business Timeline
+            </h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Source of truth for this customer — estimates, jobs, check-ins, payments, messages, and files.
+            </p>
+            <BusinessTimeline events={timeline} empty="No appointments or transactions recorded." max={25} />
           </section>
 
           <section className="glass rounded-2xl p-5">

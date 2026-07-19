@@ -71,3 +71,14 @@ See `supabase/migrations/010_phase100.sql`.
 - Follow-up Email send via Resend (stub without key)
 - Leads CSV import; Reports cohorts + CSV export
 - Lead entity mapping fixed (`Lead` → `leads`)
+
+## Money & time focus — Business Timeline + AI leverage
+
+- **Business Timeline** on Home + Customer detail (jobs, estimates, invoices, payments, messages, files)
+- **AI Job Summary** on Complete (report + follow-up draft + maintenance tip)
+- **AI Price Optimizer** (ZIP, season, competition, job size) in Job Estimator
+- **Business Health** Titan Score widget on Command Center
+- **Executable Titan AI** actions: schedule job / create estimate / create invoice
+- **Service Templates** trade packs (10 trades) under Field & team
+- Before/after **Share** on job photos
+- Migration `011_job_summaries.sql` for completion summary columns

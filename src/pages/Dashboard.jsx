@@ -16,6 +16,8 @@ import {
   GripVertical,
   Bot,
   ArrowUpRight,
+  Award,
+  History,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,6 +25,9 @@ import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
 import HomeAdClips from "@/components/dashboard/HomeAdClips";
+import BusinessTimeline from "@/components/timeline/BusinessTimeline";
+import { buildHomeTimelineFeed } from "@/lib/businessTimeline";
+import { computeTitanScore } from "@/lib/titanScore";
 import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/date-utils";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -32,12 +37,14 @@ import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 const WIDGET_ORDER_KEY = "titanos-cc-widgets";
 const DEFAULT_WIDGETS = [
   "kpis",
+  "health",
   "schedule",
   "attention",
   "ai",
   "payments",
   "customers",
   "weather",
+  "timeline",
   "activity",
   "actions",
 ];
@@ -195,6 +202,19 @@ export default function Dashboard({ isActive = true }) {
     );
   }
   if (!data) return null;
+
+  const health = computeTitanScore({
+    invoices: data.invoices || [],
+    jobs: data.jobs || [],
+    customers: data.customers || [],
+    estimates: data.estimates || [],
+  });
+  const timelineEvents = buildHomeTimelineFeed({
+    jobs: data.jobs || [],
+    estimates: data.estimates || [],
+    invoices: data.invoices || [],
+    limit: 8,
+  });
 
   const revenueChange =
     data.prevMonthRevenue > 0
@@ -417,6 +437,26 @@ export default function Dashboard({ isActive = true }) {
         ) : (
           <p className="text-sm text-muted-foreground">Loading conditions…</p>
         )}
+      </WidgetShell>
+    ),
+    health: (
+      <WidgetShell key="health" id="health" title="Business Health" icon={Award} color="text-titan-cyan" linkTo="/titan-score" linkLabel="Full score" {...shellProps}>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-titan-cyan/15 flex flex-col items-center justify-center">
+            <span className="text-2xl font-bold text-titan-cyan">{health.score}</span>
+            <span className="text-[10px] text-muted-foreground">{health.grade}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-foreground font-medium">Titan Score</p>
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{health.tips[0]}</p>
+            <p className="text-xs text-emerald-400 mt-2">${health.revenue.toLocaleString()} collected · {health.stats.completedJobs} jobs done</p>
+          </div>
+        </div>
+      </WidgetShell>
+    ),
+    timeline: (
+      <WidgetShell key="timeline" id="timeline" title="Business Timeline" icon={History} color="text-primary" linkTo="/customers" linkLabel="Customers" {...shellProps}>
+        <BusinessTimeline events={timelineEvents} empty="Complete a job or send an invoice — your timeline starts here." max={8} />
       </WidgetShell>
     ),
     activity: (

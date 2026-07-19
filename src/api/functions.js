@@ -105,6 +105,15 @@ async function localFallback(functionName, payload) {
     return { success: true, stub: true, emailed: false };
   }
 
+  if (functionName === "aiExecuteAction") {
+    return {
+      data: {
+        type: "done",
+        message: "Action unavailable offline — open Jobs / Estimates / Invoices.",
+      },
+    };
+  }
+
   throw apiError(`Function "${functionName}" is unavailable offline`, 503);
 }
 

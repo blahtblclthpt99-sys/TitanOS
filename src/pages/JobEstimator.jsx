@@ -8,6 +8,8 @@ import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import { useAuth } from "@/lib/AuthContext";
 import { estimateJobPrice, MARKET_HOURLY } from "@/lib/priceEstimator";
+import { optimizePriceFactors, withPriceOptimization } from "@/lib/priceOptimizer";
+import { SERVICE_TEMPLATES, templateToEstimatorForm } from "@/lib/serviceTemplates";
 import { SERVICE_CATEGORIES } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
 import { generateAiEstimateDraft } from "@/lib/aiEstimate";
@@ -22,6 +24,9 @@ const initialForm = {
   difficulty: "standard",
   urgency: "normal",
   market_rate_factor: 1,
+  zip: "",
+  competition: "medium",
+  job_size: "standard",
 };
 
 const inputClass = "bg-card border-border text-foreground rounded-xl h-10";
@@ -29,15 +34,51 @@ const inputClass = "bg-card border-border text-foreground rounded-xl h-10";
 export default function JobEstimator() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("titanos_estimator_draft");
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.inputs) {
+        sessionStorage.removeItem("titanos_estimator_draft");
+        return { ...initialForm, ...parsed.inputs };
+      }
+    } catch {
+      /* ignore */
+    }
+    return initialForm;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
-  const estimate = useMemo(() => estimateJobPrice(form), [form]);
+
+  const optimization = useMemo(
+    () =>
+      optimizePriceFactors({
+        zip: form.zip,
+        service_type: form.service_type,
+        hours: form.hours,
+        job_size: form.job_size,
+        competition: form.competition,
+      }),
+    [form.zip, form.service_type, form.hours, form.job_size, form.competition]
+  );
+
+  const estimate = useMemo(() => {
+    const raw = estimateJobPrice({ ...form, market_rate_factor: optimization.market_rate_factor });
+    return withPriceOptimization(raw, optimization);
+  }, [form, optimization]);
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const changeService = (service_type) => setForm((current) => ({ ...current, service_type, labor_rate: MARKET_HOURLY[service_type] || MARKET_HOURLY.General }));
+  const applyTemplate = (id) => {
+    const t = SERVICE_TEMPLATES.find((row) => row.id === id);
+    const mapped = templateToEstimatorForm(t);
+    if (mapped) {
+      setForm((current) => ({ ...current, ...mapped }));
+      toast({ title: `${t.name} template applied`, description: "Checklist & pricing defaults loaded." });
+    }
+  };
   const draft = { inputs: form, estimate, created_at: new Date().toISOString() };
 
   const createDocument = (path) => {
@@ -96,6 +137,16 @@ export default function JobEstimator() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <PageHeader title="Job Price Estimator" subtitle="Build a market-aware price range for any job." />
       {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
+      <div className="flex flex-wrap gap-2 mb-5">
+        {SERVICE_TEMPLATES.slice(0, 8).map((t) => (
+          <button key={t.id} type="button" onClick={() => applyTemplate(t.id)} className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 text-foreground hover:border-titan-cyan/40">
+            {t.icon} {t.name}
+          </button>
+        ))}
+        <button type="button" onClick={() => navigate("/templates")} className="text-xs px-3 py-1.5 rounded-full border border-titan-cyan/30 text-titan-cyan">
+          All templates →
+        </button>
+      </div>
       <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-5">
         <section className="glass rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">Job inputs</h2></div>
@@ -108,11 +159,13 @@ export default function JobEstimator() {
             <Field label="Mileage"><Input type="number" min="0" value={form.mileage} onChange={(event) => update("mileage", event.target.value)} className={inputClass} /></Field>
             <Field label="Difficulty"><select value={form.difficulty} onChange={(event) => update("difficulty", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="easy">Easy</option><option value="standard">Standard</option><option value="hard">Hard</option><option value="expert">Expert</option></select></Field>
             <Field label="Urgency"><select value={form.urgency} onChange={(event) => update("urgency", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="normal">Normal</option><option value="soon">Soon</option><option value="same_day">Same day</option><option value="emergency">Emergency</option></select></Field>
+            <Field label="Job ZIP"><Input value={form.zip} onChange={(event) => update("zip", event.target.value)} placeholder="75201" className={inputClass} /></Field>
+            <Field label="Local competition"><select value={form.competition} onChange={(event) => update("competition", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="low">Low (charge more)</option><option value="medium">Average</option><option value="high">High (price tight)</option></select></Field>
+            <Field label="Job size"><select value={form.job_size} onChange={(event) => update("job_size", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="small">Small</option><option value="standard">Standard</option><option value="large">Large</option></select></Field>
           </div>
           <div className="mt-5 pt-4 border-t border-border">
-            <div className="flex justify-between text-sm mb-2"><label htmlFor="market-rate" className="text-foreground/85">Local market rate</label><span className="text-titan-cyan font-semibold">{Number(form.market_rate_factor).toFixed(2)}×</span></div>
-            <input id="market-rate" type="range" min="0.8" max="1.3" step="0.01" value={form.market_rate_factor} onChange={(event) => update("market_rate_factor", event.target.value)} className="w-full accent-[#00c7d9]" />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0.80× lower market</span><span>1.30× premium market</span></div>
+            <p className="text-xs font-semibold text-titan-cyan mb-1">AI Price Optimizer · {optimization.market_rate_factor.toFixed(2)}× market</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{estimate.why_price}</p>
           </div>
         </section>
 

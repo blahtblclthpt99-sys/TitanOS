@@ -25,6 +25,7 @@ import { checklistForService } from "@/lib/checklistTemplates";
 import { enqueueFollowUpsForJob } from "@/lib/followUpApi";
 import { toast } from "@/components/ui/use-toast";
 import { googleMapsLink, jobSiteCoords, openStreetMapEmbed } from "@/lib/geofence";
+import { generateJobSummary } from "@/lib/jobSummary";
 
 const PRIORITY_COLORS = {
   low: "text-muted-foreground", medium: "text-titan-cyan",
@@ -153,9 +154,34 @@ export default function Jobs({ isActive = true }) {
     if (job.status === "completed" || completingId) return;
     setCompletingId(job.id);
     try {
-      await api.entities.Job.update(job.id, { status: "completed" });
+      const photos = jobPhotos[job.id] || [];
+      const checklist = checklists[job.id] || job.checklist || [];
+      const summary = await generateJobSummary(job, { photos, checklist });
+      await api.entities.Job.update(job.id, {
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        completion_summary: summary.completion_report,
+        follow_up_draft: summary.follow_up_message,
+        customer_notes_draft: summary.customer_notes,
+        maintenance_reminder: summary.maintenance_reminder,
+      });
       if (user?.id) await enqueueFollowUpsForJob(user, job, customers.find((customer) => customer.id === job.customer_id));
-      setLocalJobs(prev => (prev ?? jobs).map(item => item.id === job.id ? { ...item, status: "completed" } : item));
+      setLocalJobs((prev) =>
+        (prev ?? jobs).map((item) =>
+          item.id === job.id
+            ? {
+                ...item,
+                status: "completed",
+                completion_summary: summary.completion_report,
+                follow_up_draft: summary.follow_up_message,
+              }
+            : item
+        )
+      );
+      toast({
+        title: "Job completed + AI summary ready",
+        description: summary.follow_up_message?.slice(0, 100) || summary.completion_report?.slice(0, 100),
+      });
     } finally {
       setCompletingId(null);
     }
@@ -273,11 +299,57 @@ export default function Jobs({ isActive = true }) {
             );
           })()}
           {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
-          {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-border" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
+          {!!jobPhotos[job.id]?.length && (
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {jobPhotos[job.id].map((photo) => (
+                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative">
+                    <img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-border" />
+                    <span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span>
+                  </a>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-border text-foreground text-xs"
+                onClick={() => {
+                  const after = jobPhotos[job.id].find((p) => p.kind === "after") || jobPhotos[job.id][0];
+                  const text = `Before & after from ${job.title || "our latest job"} — powered by TitanOS`;
+                  if (navigator.share) {
+                    navigator.share({ title: job.title || "Job gallery", text, url: after.url }).catch(() => {});
+                  } else {
+                    navigator.clipboard?.writeText(`${text}\n${after.url}`);
+                    toast({ title: "Gallery link copied" });
+                  }
+                }}
+              >
+                Share before/after
+              </Button>
+            </div>
+          )}
         </div>
       )}
       {job.status === "completed" && !bulkMode && (
-        <div className="mt-4 pt-4 border-t border-border">
+        <div className="mt-4 pt-4 border-t border-border space-y-3">
+          {(job.completion_summary || job.follow_up_draft) && (
+            <div className="rounded-xl bg-muted/50 p-3 text-xs text-foreground/90 space-y-2">
+              <p className="font-semibold text-titan-cyan">AI job summary</p>
+              {job.completion_summary && <p>{job.completion_summary}</p>}
+              {job.follow_up_draft && (
+                <button
+                  type="button"
+                  className="text-titan-cyan underline"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(job.follow_up_draft);
+                    toast({ title: "Follow-up copied" });
+                  }}
+                >
+                  Copy follow-up message
+                </button>
+              )}
+            </div>
+          )}
           <ReviewForm
             jobId={job.id}
             revieweeId={job.customer_id ? `customer:${job.customer_id}` : ""}

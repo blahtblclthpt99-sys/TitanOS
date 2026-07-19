@@ -15,6 +15,20 @@ export const ENTITY_TABLES = {
   BetaSignup: "beta_signups",
   BetaFeedback: "beta_feedbacks",
   PortalSession: "portal_sessions",
+  MarketplaceListing: "marketplace_listings",
+  MarketplaceFavorite: "marketplace_favorites",
+  MarketplaceReport: "marketplace_reports",
+  MarketplaceMessage: "marketplace_messages",
+  MarketplaceReview: "marketplace_reviews",
+  HireJob: "hire_jobs",
+  HireApplication: "hire_applications",
+  CommunityPost: "community_posts",
+  CommunityLike: "community_likes",
+  CommunityComment: "community_comments",
+  ActivityEvent: "activity_events",
+  Notification: "notifications",
+  JobReview: "job_reviews",
+  PriceEstimate: "price_estimates",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,9 +8,12 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import AuthLayout from "@/components/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { toast } from "@/components/ui/use-toast";
+import { attachReferralOnSignup } from "@/lib/referralApi";
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref") || "";
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,6 +22,18 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+
+  const finishSignup = async (userId) => {
+    if (refCode) {
+      try {
+        await api.auth.updateMe({ referred_by_code: refCode });
+      } catch {
+        /* columns may not exist until migration */
+      }
+      await attachReferralOnSignup({ userId, email, refCode });
+    }
+    navigate("/", { replace: true });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +50,8 @@ export default function Register() {
     try {
       const result = await api.auth.register({ email, password, fullName: fullName.trim() });
       if (result?.session) {
-        navigate("/", { replace: true });
+        const me = await api.auth.me().catch(() => null);
+        await finishSignup(me?.id || result?.user?.id);
         return;
       }
       setShowOtp(true);
@@ -54,7 +70,8 @@ export default function Register() {
       if (result?.access_token) {
         await api.auth.setToken(result.access_token);
       }
-      navigate("/", { replace: true });
+      const me = await api.auth.me().catch(() => null);
+      await finishSignup(me?.id);
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -115,7 +132,12 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="Create your TitanOS account" subtitle="Free to start — upgrade later if you want">
+    <AuthLayout title="Create your TitanOS account" subtitle="Free During Beta — all features included">
+      {refCode ? (
+        <p className="mb-4 text-xs text-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+          Referral code applied: <span className="font-mono font-semibold">{refCode}</span>
+        </p>
+      ) : null}
       {error && (
         <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100" role="alert">
           {error}

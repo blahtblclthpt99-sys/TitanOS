@@ -16,7 +16,16 @@ import { buildFinanceSummary, buildExpenseCategoryData } from "@/lib/finance-met
 const FinancesExpenseChart = lazy(() => import("@/components/charts/FinancesExpenseChart"));
 const EXPENSE_CATS = ["fuel","supplies","equipment","vehicle","insurance","marketing","payroll","rent","utilities","other"];
 
-const BLANK_EXPENSE = { description: "", amount: 0, category: "other", date: todayISO(), vendor: "", receipt_url: "" };
+const BLANK_EXPENSE = {
+  description: "",
+  amount: 0,
+  category: "other",
+  date: todayISO(),
+  vendor: "",
+  receipt_url: "",
+  is_tax_deductible: true,
+  business_use_percent: 100,
+};
 
 export default function Finances() {
   const { data: [invoices, expenses], loading, error, reload } = useEntityData([

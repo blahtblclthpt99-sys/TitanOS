@@ -36,6 +36,26 @@ async function buildUser(authUser, profile) {
       "",
     role: profile?.role || "user",
     is_pro: profile?.is_pro ?? false,
+    lifetime_premium: profile?.lifetime_premium ?? false,
+    paying_subscriber: profile?.paying_subscriber ?? false,
+    phone: profile?.phone || "",
+    username: profile?.username || "",
+    avatar_url: profile?.avatar_url || "",
+    bio: profile?.bio || "",
+    city: profile?.city || "",
+    state: profile?.state || "",
+    company_name: profile?.company_name || "",
+    company_address: profile?.company_address || "",
+    company_city: profile?.company_city || "",
+    company_state: profile?.company_state || "",
+    company_zip: profile?.company_zip || "",
+    company_logo_url: profile?.company_logo_url || "",
+    theme_pref: profile?.theme_pref || "system",
+    notification_prefs: profile?.notification_prefs || {},
+    privacy_prefs: profile?.privacy_prefs || {},
+    community_opt_in: profile?.community_opt_in ?? false,
+    referral_code: profile?.referral_code || "",
+    referred_by_code: profile?.referred_by_code || "",
     created_date: profile?.created_at || authUser.created_at,
     updated_date: profile?.updated_at || authUser.updated_at,
   };
@@ -236,12 +256,49 @@ export function createAuthModule() {
       const userId = authData.user?.id;
       if (!userId) throw apiError("Authentication required", 401);
 
-      if (updates.full_name !== undefined) {
+      const allowed = [
+        "full_name",
+        "phone",
+        "username",
+        "avatar_url",
+        "bio",
+        "city",
+        "state",
+        "company_name",
+        "company_address",
+        "company_city",
+        "company_state",
+        "company_zip",
+        "company_logo_url",
+        "theme_pref",
+        "notification_prefs",
+        "privacy_prefs",
+        "community_opt_in",
+        "referral_code",
+        "referred_by_code",
+      ];
+
+      const payload = {};
+      for (const key of allowed) {
+        if (updates[key] !== undefined) payload[key] = updates[key];
+      }
+
+      if (Object.keys(payload).length > 0) {
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({ full_name: updates.full_name })
+          .update(payload)
           .eq("id", userId);
         throwIfError(profileError);
+      }
+
+      if (updates.password) {
+        const { error: pwError } = await supabase.auth.updateUser({ password: updates.password });
+        throwIfError(pwError);
+      }
+
+      if (updates.email) {
+        const { error: emailError } = await supabase.auth.updateUser({ email: updates.email });
+        throwIfError(emailError);
       }
 
       return this.me();

@@ -9,6 +9,7 @@ import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import { useEntityData } from "@/hooks/useEntityData";
 import MileTracker from "@/components/tax/MileTracker";
+import BusinessExpenses from "@/components/tax/BusinessExpenses";
 import { getDateMonth, getDateYear } from "@/lib/date-utils";
 
 // IRS standard mileage rate 2024
@@ -85,7 +86,7 @@ export default function TaxCenter({ isActive = true }) {
   [expenses, yr]);
 
   // Deductible expenses (marked or all business expenses)
-  const deductibleExpenses = yearExpenses.filter(e => e.is_tax_deductible);
+  const deductibleExpenses = yearExpenses.filter(e => e.is_tax_deductible !== false);
   const totalDeductions = deductibleExpenses.reduce((s, e) => {
     const pct = (e.business_use_percent || 100) / 100;
     return s + (e.amount || 0) * pct;
@@ -127,7 +128,7 @@ export default function TaxCenter({ isActive = true }) {
   }, [deductibleExpenses]);
 
   // ── Non-deductible expenses (opportunity to tag) ─────────────────────
-  const untaggedCount = yearExpenses.filter(e => !e.is_tax_deductible).length;
+  const untaggedCount = yearExpenses.filter(e => e.is_tax_deductible === false).length;
 
   const years = [currentYear, currentYear - 1, currentYear - 2].map(String);
 
@@ -169,6 +170,8 @@ export default function TaxCenter({ isActive = true }) {
           </motion.div>
         ))}
       </div>
+
+      <BusinessExpenses taxYear={yr} onChanged={reload} />
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
 

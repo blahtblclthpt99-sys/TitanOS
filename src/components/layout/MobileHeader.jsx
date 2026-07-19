@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { MOBILE_ROOT_PATHS } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
+import NotificationBell from "@/components/shared/NotificationBell";
 
 function getTabRoot(pathname) {
   if (pathname.startsWith("/customers/")) return "/customers";
@@ -33,20 +34,21 @@ export default function MobileHeader() {
         height: "calc(env(safe-area-inset-top) + 3.5rem)",
       }}
     >
-      <div className="flex items-center h-14 w-full">
+      <div className="flex items-center h-14 w-full gap-2">
         {isRoot ? (
-          <span className="gradient-text font-bold text-lg tracking-tight">TitanOS</span>
+          <span className="gradient-text font-bold text-lg tracking-tight flex-1">TitanOS</span>
         ) : (
           <button
             type="button"
             onClick={handleBack}
             aria-label="Go back"
-            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors min-h-[44px] min-w-[44px] -ml-1"
+            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors min-h-[44px] min-w-[44px] -ml-1 flex-1"
           >
             <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             <span className="text-sm font-medium">Back</span>
           </button>
         )}
+        <NotificationBell />
       </div>
     </header>
   );

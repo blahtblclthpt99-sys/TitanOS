@@ -14,22 +14,30 @@ import {
   ClipboardList,
   Shield,
   Gift,
+  UserPlus,
+  UsersRound,
+  Calculator,
+  Bell,
 } from "lucide-react";
 
-/** Full TitanOS navigation — original product structure for field-service ops. */
+/** Full TitanOS navigation — field ops + marketplace platform. */
 export const APP_NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", group: "core" },
   { icon: Users, label: "Customers", path: "/customers", group: "core" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "core" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "ops" },
   { icon: FileText, label: "Estimates", path: "/estimates", group: "ops" },
+  { icon: Calculator, label: "Price Estimator", path: "/job-estimator", group: "ops" },
   { icon: Receipt, label: "Invoices", path: "/invoices", group: "ops" },
   { icon: DollarSign, label: "Finances", path: "/finances", group: "ops" },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "ops" },
   { icon: Truck, label: "Fleet", path: "/fleet", group: "ops" },
   { icon: BarChart3, label: "Reports", path: "/reports", group: "insights" },
   { icon: Bot, label: "AI Assistant", path: "/assistant", group: "insights" },
+  { icon: UsersRound, label: "Community", path: "/community", group: "insights" },
+  { icon: Bell, label: "Notifications", path: "/notifications", group: "insights" },
   { icon: Store, label: "Marketplace", path: "/marketplace", group: "growth" },
+  { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "growth" },
   { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
   { icon: Settings, label: "Settings", path: "/settings", group: "account" },
@@ -48,15 +56,15 @@ export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/customers", "/invoices", "/mor
 export const MORE_MENU_GROUPS = [
   {
     title: "Operations",
-    paths: ["/schedule", "/estimates", "/finances", "/tax-center", "/fleet"],
+    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet"],
   },
   {
     title: "Insights",
-    paths: ["/reports", "/assistant"],
+    paths: ["/reports", "/assistant", "/community", "/notifications"],
   },
   {
     title: "Growth",
-    paths: ["/marketplace", "/insurance", "/referral"],
+    paths: ["/marketplace", "/hire", "/insurance", "/referral"],
   },
   {
     title: "Account",

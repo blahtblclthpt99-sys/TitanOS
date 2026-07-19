@@ -41,6 +41,10 @@ const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Marketplace = lazy(() => import("@/pages/Marketplace"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
+const Hire = lazy(() => import("@/pages/Hire"));
+const Community = lazy(() => import("@/pages/Community"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -54,6 +58,10 @@ const NON_TAB_ROUTES = {
   "/marketplace": Marketplace,
   "/insurance": Insurance,
   "/referral": Referral,
+  "/hire": Hire,
+  "/community": Community,
+  "/notifications": Notifications,
+  "/job-estimator": JobEstimator,
 };
 
 function NonTabPage() {

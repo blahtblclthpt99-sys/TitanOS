@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { CreditCard } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { useEntityRecord } from "@/hooks/useEntityRecord";
 import { motion } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/shared/StatusBadge";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
@@ -13,6 +15,7 @@ const STATUS_OPTIONS = ["draft", "sent", "viewed", "paid", "partial", "overdue",
 
 export default function InvoiceDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { data: invoice, loading, error, reload } = useEntityRecord("Invoice", id);
   const [saving, setSaving] = useState(false);
 
@@ -104,6 +107,25 @@ export default function InvoiceDetail() {
             </div>
           )}
         </div>
+
+        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+          <div className="mb-4">
+            <Button
+              type="button"
+              className="w-full bg-titan-cyan text-black font-semibold h-11"
+              onClick={() => navigate("/payments", {
+                state: {
+                  amount: invoice.balance_due > 0 ? invoice.balance_due : invoice.total,
+                  customer_name: invoice.customer_name || "",
+                  invoice_id: invoice.id,
+                },
+              })}
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              Collect payment
+            </Button>
+          </div>
+        )}
 
         {/* Status update */}
         <div className="glass rounded-2xl p-5">

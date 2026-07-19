@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   FileText, DollarSign, TrendingDown, AlertCircle, Lightbulb, Calculator, Car,
-  Home, Phone, Utensils, Briefcase, Shield
+  Home, Phone, Utensils, Briefcase, Shield, ScanLine
 } from "lucide-react";
 import NativeSelect from "@/components/shared/NativeSelect";
 import PageLoader from "@/components/shared/PageLoader";
@@ -62,6 +63,7 @@ const QUARTERS = [
 ];
 
 export default function TaxCenter({ isActive = true }) {
+  const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(String(currentYear));
   const [expandedTip, setExpandedTip] = useState(null);
@@ -151,6 +153,20 @@ export default function TaxCenter({ isActive = true }) {
           className="w-28 bg-[#1A1A1C] border-white/10"
         />
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate("/receipts")}
+        className="mt-4 w-full glass rounded-2xl p-4 border border-white/8 flex items-center gap-3 text-left glass-hover"
+      >
+        <div className="w-10 h-10 rounded-xl bg-titan-cyan/10 flex items-center justify-center">
+          <ScanLine className="w-5 h-5 text-titan-cyan" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">Scan receipt for write-off</p>
+          <p className="text-xs text-white/40">OCR → deductible business expense</p>
+        </div>
+      </button>
 
       {/* ── Tax Summary Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 mb-8">

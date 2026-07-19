@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { CheckCircle2, CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,13 +14,38 @@ const PROVIDERS = ["stripe", "square", "paypal"];
 const EMPTY_FORM = { amount: "", customer_name: "", invoice_id: "", provider: "stripe" };
 const statusClass = { succeeded: "bg-emerald-400/15 text-emerald-300", failed: "bg-red-400/15 text-red-300", pending: "bg-titan-amber/15 text-titan-amber" };
 
+function formFromPrefill(source = {}) {
+  const amount = source.amount ?? source.balance_due ?? source.total;
+  return {
+    ...EMPTY_FORM,
+    amount: amount != null && amount !== "" ? String(amount) : "",
+    customer_name: source.customer_name || "",
+    invoice_id: source.invoice_id || source.id || "",
+    provider: source.provider || "stripe",
+  };
+}
+
 export default function Payments() {
+  const location = useLocation();
   const { user, authChecked } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fromQuery = {
+      amount: params.get("amount") || "",
+      customer_name: params.get("customer_name") || "",
+      invoice_id: params.get("invoice_id") || "",
+    };
+    const prefill = location.state?.invoice || location.state || fromQuery;
+    if (prefill?.amount || prefill?.customer_name || prefill?.invoice_id || prefill?.id) {
+      setForm(formFromPrefill(prefill));
+    }
+  }, [location.state, location.search]);
 
   const load = async () => {
     if (!user?.id) return;
@@ -79,7 +105,7 @@ export default function Payments() {
         return <article key={provider} className="glass rounded-2xl p-5 border border-white/8">
           <div className="flex items-center justify-between"><CreditCard className="w-5 h-5 text-titan-cyan" /><span className={`text-xs px-2 py-1 rounded-full ${connected ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-white/45"}`}>{connected ? "Connected" : "Not connected"}</span></div>
           <h2 className="text-lg font-semibold text-white capitalize mt-4">{provider}</h2>
-          <p className="text-xs text-white/40 mt-1 min-h-8">{provider === "stripe" ? "Live checkout requires STRIPE_SECRET_KEY on your server." : "Mark connected locally while provider setup is in beta."}</p>
+          <p className="text-xs text-white/40 mt-1 min-h-8">{provider === "stripe" ? "Stripe Checkout is live when your secret key is configured on the server." : "Mark connected locally while provider setup is in beta."}</p>
           <Button onClick={() => toggleProvider(provider)} disabled={saving} variant="outline" className="mt-4 w-full border-white/10 text-white">{connected ? "Disconnect" : "Connect"}</Button>
         </article>;
       })}

@@ -1,7 +1,8 @@
 import React, { useState, useRef, Suspense, lazy } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, TrendingDown, Receipt, Plus, Camera, X } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Receipt, Plus, Camera, X, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import NativeSelect from "@/components/shared/NativeSelect";
@@ -28,6 +29,7 @@ const BLANK_EXPENSE = {
 };
 
 export default function Finances() {
+  const navigate = useNavigate();
   const { data: [invoices, expenses], loading, error, reload } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 100] },
     { entity: "Expense", method: "list", args: ["-date", 100] },
@@ -82,6 +84,19 @@ export default function Finances() {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <PageHeader title="Finances" subtitle="Profit & loss overview" onAdd={() => setShowForm(true)} addLabel="Add Expense" />
+      <button
+        type="button"
+        onClick={() => navigate("/receipts")}
+        className="mb-6 w-full glass rounded-2xl p-4 border border-white/8 flex items-center gap-3 text-left glass-hover"
+      >
+        <div className="w-10 h-10 rounded-xl bg-titan-cyan/10 flex items-center justify-center">
+          <ScanLine className="w-5 h-5 text-titan-cyan" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">Scan a receipt</p>
+          <p className="text-xs text-white/40">OCR → tax-deductible expense</p>
+        </div>
+      </button>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {summaryCards.map((card, i) => (

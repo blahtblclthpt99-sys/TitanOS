@@ -61,6 +61,15 @@ async function localFallback(functionName, payload) {
     return { success: true, stub: true };
   }
 
+  if (functionName === "createPaymentLink") {
+    return {
+      payment: null,
+      setupRequired: true,
+      message: "Add STRIPE_SECRET_KEY on Vercel to enable live Stripe Checkout.",
+      stub: true,
+    };
+  }
+
   if (functionName === "attachReferral") {
     return { ok: true, matched: false, stub: true };
   }

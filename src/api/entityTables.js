@@ -38,6 +38,11 @@ export const ENTITY_TABLES = {
   JobPhoto: "job_photos",
   JobCheckin: "job_checkins",
   Contract: "contracts",
+  Company: "companies",
+  CompanyMember: "company_members",
+  PaymentAccount: "payment_accounts",
+  Payment: "payments",
+  ReceiptScan: "receipt_scans",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

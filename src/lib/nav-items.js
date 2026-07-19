@@ -21,6 +21,10 @@ import {
   ShieldAlert,
   CalendarCheck,
   FileSignature,
+  CreditCard,
+  Route,
+  ScanLine,
+  Building2,
 } from "lucide-react";
 
 /** Full TitanOS navigation — field ops + marketplace platform. */
@@ -37,6 +41,9 @@ export const APP_NAV_ITEMS = [
   { icon: Truck, label: "Fleet", path: "/fleet", group: "ops" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "ops" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "ops" },
+  { icon: Route, label: "Route Planner", path: "/routes", group: "ops" },
+  { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "ops" },
+  { icon: CreditCard, label: "Payments", path: "/payments", group: "growth" },
   { icon: BarChart3, label: "Reports", path: "/reports", group: "insights" },
   { icon: Bot, label: "AI Assistant", path: "/assistant", group: "insights" },
   { icon: UsersRound, label: "Community", path: "/community", group: "insights" },
@@ -45,6 +52,7 @@ export const APP_NAV_ITEMS = [
   { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "growth" },
   { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
+  { icon: Building2, label: "Companies", path: "/companies", group: "account" },
   { icon: Settings, label: "Settings", path: "/settings", group: "account" },
   { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "account" },
 ];
@@ -62,7 +70,7 @@ export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/customers", "/invoices", "/mor
 export const MORE_MENU_GROUPS = [
   {
     title: "Operations",
-    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/booking", "/contracts"],
+    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/booking", "/contracts", "/routes", "/receipts"],
   },
   {
     title: "Insights",
@@ -70,11 +78,11 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Growth",
-    paths: ["/marketplace", "/hire", "/insurance", "/referral"],
+    paths: ["/marketplace", "/hire", "/insurance", "/referral", "/payments"],
   },
   {
     title: "Account",
-    paths: ["/settings", "/admin/moderation"],
+    paths: ["/settings", "/companies", "/admin/moderation"],
   },
 ];
 

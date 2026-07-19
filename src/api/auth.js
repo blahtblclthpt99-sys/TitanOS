@@ -58,6 +58,7 @@ async function buildUser(authUser, profile) {
     referred_by_code: profile?.referred_by_code || "",
     verified_worker: profile?.verified_worker ?? false,
     verification_notes: profile?.verification_notes || "",
+    active_company_id: profile?.active_company_id || "",
     created_date: profile?.created_at || authUser.created_at,
     updated_date: profile?.updated_at || authUser.updated_at,
   };
@@ -280,6 +281,7 @@ export function createAuthModule() {
         "referred_by_code",
         "verified_worker",
         "verification_notes",
+        "active_company_id",
       ];
 
       const payload = {};

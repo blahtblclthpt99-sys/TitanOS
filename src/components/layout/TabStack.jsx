@@ -52,6 +52,13 @@ const Payments = lazy(() => import("@/pages/Payments"));
 const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
 const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
 const Companies = lazy(() => import("@/pages/Companies"));
+const Employees = lazy(() => import("@/pages/Employees"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const FollowUps = lazy(() => import("@/pages/FollowUps"));
+const Reputation = lazy(() => import("@/pages/Reputation"));
+const Credentials = lazy(() => import("@/pages/Credentials"));
+const Leads = lazy(() => import("@/pages/Leads"));
+const GrowthCoach = lazy(() => import("@/pages/GrowthCoach"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -76,6 +83,13 @@ const NON_TAB_ROUTES = {
   "/routes": RoutePlanner,
   "/receipts": ReceiptScanner,
   "/companies": Companies,
+  "/employees": Employees,
+  "/inventory": Inventory,
+  "/follow-ups": FollowUps,
+  "/reputation": Reputation,
+  "/credentials": Credentials,
+  "/leads": Leads,
+  "/growth-coach": GrowthCoach,
 };
 
 function NonTabPage() {

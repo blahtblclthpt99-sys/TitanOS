@@ -21,6 +21,8 @@ import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
 import { useAuth } from "@/lib/AuthContext";
 import { addJobPhoto, listJobPhotos, recordCheckin } from "@/lib/jobOpsApi";
+import { checklistForService } from "@/lib/checklistTemplates";
+import { enqueueFollowUpsForJob } from "@/lib/followUpApi";
 
 const PRIORITY_COLORS = {
   low: "text-white/30", medium: "text-titan-cyan",
@@ -62,6 +64,7 @@ export default function Jobs({ isActive = true }) {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [jobPhotos, setJobPhotos] = useState({});
   const [opsSaving, setOpsSaving] = useState(false);
+  const [checklists, setChecklists] = useState({});
 
   const showForm = new URLSearchParams(location.search).get("new") === "1";
   const openForm  = () => navigate("?new=1");
@@ -149,6 +152,7 @@ export default function Jobs({ isActive = true }) {
     setCompletingId(job.id);
     try {
       await api.entities.Job.update(job.id, { status: "completed" });
+      if (user?.id) await enqueueFollowUpsForJob(user, job, customers.find((customer) => customer.id === job.customer_id));
       setLocalJobs(prev => (prev ?? jobs).map(item => item.id === job.id ? { ...item, status: "completed" } : item));
     } finally {
       setCompletingId(null);
@@ -158,6 +162,7 @@ export default function Jobs({ isActive = true }) {
   const openOps = async (job) => {
     const nextId = expandedJobId === job.id ? null : job.id;
     setExpandedJobId(nextId);
+    if (nextId && !checklists[job.id]) setChecklists((current) => ({ ...current, [job.id]: job.checklist || checklistForService(job.service_type).map((label) => ({ label, done: false })) }));
     if (nextId && !jobPhotos[job.id]) {
       try {
         const photos = await listJobPhotos(job.id);
@@ -181,6 +186,11 @@ export default function Jobs({ isActive = true }) {
       const photo = await addJobPhoto(user, { jobId: job.id, kind, url: file_url });
       setJobPhotos((current) => ({ ...current, [job.id]: [photo, ...(current[job.id] || [])] }));
     } finally { setOpsSaving(false); }
+  };
+  const toggleChecklist = async (job, index) => {
+    const items = (checklists[job.id] || []).map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item);
+    setChecklists((current) => ({ ...current, [job.id]: items }));
+    await api.entities.Job.update(job.id, { checklist: items });
   };
 
   if (!isActive && !jobs.length) return null;
@@ -235,6 +245,7 @@ export default function Jobs({ isActive = true }) {
             <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-white/15 text-white"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
             {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-white/15 text-xs text-white/75 hover:bg-white/5"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
           </div>
+          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-white/65 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-white/25"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
           {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-white/10" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
         </div>
       )}

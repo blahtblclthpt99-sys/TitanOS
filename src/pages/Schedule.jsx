@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Calendar, Clock, User } from "lucide-react";
 import { addDays, addWeeks, format } from "date-fns";
@@ -17,6 +17,7 @@ import {
   getWeekDays,
   isToday,
 } from "@/lib/date-utils";
+import { fetchOpenMeteo } from "@/lib/weatherApi";
 
 const STATUS_BORDER = {
   scheduled:   "border-l-titan-cyan",
@@ -31,6 +32,12 @@ export default function Schedule() {
   ]);
 
   const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [weather, setWeather] = useState(null);
+  useEffect(() => {
+    const loadWeather = (lat = 41.88, lon = -87.63) => fetchOpenMeteo(lat, lon).then(setWeather);
+    if (navigator.geolocation) navigator.geolocation.getCurrentPosition((position) => loadWeather(position.coords.latitude, position.coords.longitude), () => loadWeather(), { timeout: 5000 });
+    else loadWeather();
+  }, []);
 
   const weekDays = getWeekDays(currentDate);
   const navigateWeek = (dir) => setCurrentDate((prev) => addWeeks(prev, dir));
@@ -71,6 +78,7 @@ export default function Schedule() {
           </button>
         </div>
       </div>
+      {weather && <div className="glass rounded-2xl px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="font-semibold text-titan-cyan">{weather.temp}° · {weather.label}</span><span className="text-white/55">Wind {weather.wind} mph</span>{weather.warning && <span className="text-titan-amber">{weather.warning}</span>}</div>}
 
       <div className="hidden md:grid grid-cols-7 gap-2">
         {weekDays.map((day) => {

@@ -25,6 +25,7 @@ import {
   Route,
   ScanLine,
   Building2,
+  Package, UserCog, MessageSquare, Star, BadgeCheck, ContactRound, Sparkles,
 } from "lucide-react";
 
 /** Full TitanOS navigation — field ops + marketplace platform. */
@@ -39,6 +40,13 @@ export const APP_NAV_ITEMS = [
   { icon: DollarSign, label: "Finances", path: "/finances", group: "ops" },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "ops" },
   { icon: Truck, label: "Fleet", path: "/fleet", group: "ops" },
+  { icon: UserCog, label: "Employees", path: "/employees", group: "ops" },
+  { icon: Package, label: "Inventory", path: "/inventory", group: "ops" },
+  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "growth" },
+  { icon: Star, label: "Reputation", path: "/reputation", group: "growth" },
+  { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "ops" },
+  { icon: ContactRound, label: "Leads", path: "/leads", group: "growth" },
+  { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "insights" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "ops" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "ops" },
   { icon: Route, label: "Route Planner", path: "/routes", group: "ops" },
@@ -70,15 +78,15 @@ export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/customers", "/invoices", "/mor
 export const MORE_MENU_GROUPS = [
   {
     title: "Operations",
-    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/booking", "/contracts", "/routes", "/receipts"],
+    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts", "/routes", "/receipts"],
   },
   {
     title: "Insights",
-    paths: ["/reports", "/assistant", "/community", "/notifications"],
+    paths: ["/reports", "/assistant", "/growth-coach", "/community", "/notifications"],
   },
   {
     title: "Growth",
-    paths: ["/marketplace", "/hire", "/insurance", "/referral", "/payments"],
+    paths: ["/marketplace", "/hire", "/insurance", "/referral", "/payments", "/leads", "/follow-ups", "/reputation"],
   },
   {
     title: "Account",

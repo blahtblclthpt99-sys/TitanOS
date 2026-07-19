@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calculator, FilePlus2, Loader2, Receipt, Save } from "lucide-react";
+import { Calculator, FilePlus2, Loader2, Receipt, Save, Sparkles } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { estimateJobPrice, MARKET_HOURLY } from "@/lib/priceEstimator";
 import { SERVICE_CATEGORIES } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
+import { generateAiEstimateDraft } from "@/lib/aiEstimate";
 
 const initialForm = {
   service_type: "General",
@@ -31,6 +32,7 @@ export default function JobEstimator() {
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [askingAi, setAskingAi] = useState(false);
   const estimate = useMemo(() => estimateJobPrice(form), [form]);
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -71,6 +73,14 @@ export default function JobEstimator() {
       setSaving(false);
     }
   };
+  const askAi = async () => {
+    setAskingAi(true);
+    try {
+      const draft = await generateAiEstimateDraft(`${form.service_type}, ${form.hours} hours, ${form.difficulty} difficulty`, { user: user?.full_name });
+      if (Object.keys(draft.fields).length) setForm((current) => ({ ...current, ...draft.fields }));
+      toast({ title: "AI estimate ready", description: draft.text });
+    } finally { setAskingAi(false); }
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
@@ -105,6 +115,7 @@ export default function JobEstimator() {
             <Metric label="Labor Cost" value={estimate.labor_cost} />
           </div>
           <div className="grid gap-2 mt-5">
+            <Button onClick={askAi} disabled={askingAi} variant="outline" className="border-titan-cyan/30 text-titan-cyan rounded-xl"><Sparkles className="w-4 h-4 mr-2" />{askingAi ? "Asking AI…" : "Ask AI for estimate"}</Button>
             <Button onClick={() => createDocument("/estimates?prefill=1")} disabled={submitting} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl"><FilePlus2 className="w-4 h-4 mr-2" />Create Estimate</Button>
             <Button onClick={() => createDocument("/invoices?new=1")} disabled={submitting} variant="outline" className="border-white/10 text-white rounded-xl"><Receipt className="w-4 h-4 mr-2" />Create Invoice</Button>
             <Button onClick={saveEstimate} disabled={saving} variant="ghost" className="text-white/65 hover:text-white rounded-xl">{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}{saving ? "Saving…" : "Save price estimate"}</Button>

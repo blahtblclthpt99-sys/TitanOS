@@ -43,6 +43,12 @@ export const ENTITY_TABLES = {
   PaymentAccount: "payment_accounts",
   Payment: "payments",
   ReceiptScan: "receipt_scans",
+  Equipment: "equipment",
+  InventoryItem: "inventory_items",
+  FollowUpRule: "follow_up_rules",
+  FollowUpQueue: "follow_up_queue",
+  Credential: "credentials",
+  Lead: "leads",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

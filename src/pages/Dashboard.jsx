@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
+import HomeAdClips from "@/components/dashboard/HomeAdClips";
 import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/date-utils";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -448,6 +449,8 @@ export default function Dashboard({ isActive = true }) {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto pb-36">
+      <HomeAdClips />
+
       {/* Command Center hero */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-1">Business Command Center</p>

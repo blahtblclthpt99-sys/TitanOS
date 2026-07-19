@@ -76,12 +76,24 @@ export function fileToDataUrl(file) {
 }
 
 /**
- * Attempt Tesseract-less parse: if user pastes text, use that.
- * For images, return empty text so UI can ask for optional paste / still create expense.
+ * Extract receipt text via paste, or vision OCR API when an image is provided.
  */
 export async function extractTextFromReceipt({ file, pastedText }) {
   if (pastedText?.trim()) return pastedText.trim();
   if (!file) return "";
-  // No heavy OCR dependency in bundle — return empty for image-only; API can enhance later.
+
+  try {
+    const { api } = await import("@/api/apiClient");
+    const dataUrl = await fileToDataUrl(file);
+    const base64 = String(dataUrl).split(",")[1] || "";
+    const res = await api.functions.invoke("receiptVisionOcr", {
+      image_base64: base64,
+      mime_type: file.type || "image/jpeg",
+    });
+    const text = res?.text || res?.data?.text || "";
+    if (text.trim()) return text.trim();
+  } catch {
+    /* fall through */
+  }
   return "";
 }

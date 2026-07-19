@@ -106,3 +106,32 @@ export function mapsDirectionsUrl(orderedJobs = []) {
     waypoints ? `&waypoints=${waypoints}` : ""
   }`;
 }
+
+/** Prefer Mapbox Optimized Trips API (server) when available; else nearest-neighbor. */
+export async function optimizeWithProvider(jobs = [], { startId = null } = {}) {
+  const local = optimizeJobRoute(jobs, { startId });
+  try {
+    const { api } = await import("@/api/apiClient");
+    const stops = jobs.map((j) => ({
+      id: j.id,
+      label: j.title || j.customer_name || "Stop",
+      address: j.address || `${j.city || ""} ${j.state || ""}`.trim(),
+      lat: j.site_lat ?? j.checkin_lat ?? j.lat ?? j.latitude,
+      lng: j.site_lng ?? j.checkin_lng ?? j.lng ?? j.longitude,
+    }));
+    const res = await api.functions.invoke("directionsOptimize", { stops });
+    const data = res?.data || res;
+    if (!data?.ordered?.length) return local;
+    const byId = Object.fromEntries(jobs.map((j) => [j.id, j]));
+    const ordered = data.ordered.map((s) => byId[s.id] || s).filter(Boolean);
+    if (ordered.length < 2) return local;
+    return {
+      ordered,
+      totalMiles: data.totalMiles ?? local.totalMiles,
+      legs: data.legs || local.legs,
+      method: data.method || "provider",
+    };
+  } catch {
+    return local;
+  }
+}

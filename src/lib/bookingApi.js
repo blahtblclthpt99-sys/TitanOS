@@ -1,6 +1,7 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { notifyUser } from "@/lib/notify";
+import { brandedBookingUrl } from "@/lib/bookingSubdomain";
 
 const PREFIX = "titanos_booking";
 
@@ -147,8 +148,7 @@ export async function saveAvailability(user, slots) {
 }
 
 export function bookingPublicUrl(slug) {
-  if (typeof window === "undefined") return `/book/${slug}`;
-  return `${window.location.origin}/book/${slug}`;
+  return brandedBookingUrl(slug) || `/book/${slug}`;
 }
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

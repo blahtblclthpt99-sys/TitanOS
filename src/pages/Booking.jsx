@@ -98,7 +98,8 @@ export default function Booking() {
         <p className="text-xs text-muted-foreground uppercase tracking-wider">Your booking website</p>
         <p className="text-sm text-foreground break-all font-medium">{bookingPublicUrl(page.slug)}</p>
         <p className="text-xs text-muted-foreground">
-          Public page for customers — claim your slug below. Custom domains like <span className="text-foreground">{page.slug || "you"}.titanos.app</span> can map to this same page.
+          Customers can book at <span className="text-foreground">{bookingPublicUrl(page.slug)}</span>.
+          On production DNS, <span className="text-foreground">{page.slug || "you"}.titanos.app</span> resolves to the same page automatically.
         </p>
         <label className="block text-sm text-muted-foreground">
           Booking slug

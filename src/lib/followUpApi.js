@@ -42,3 +42,26 @@ export async function markQueueSent(userId, id) {
   try { return await api.entities.FollowUpQueue.update(id, patch); }
   catch { const item = { ...read(userId, "queue").find((row) => row.id === id), ...patch }; write(userId, "queue", read(userId, "queue").map((row) => row.id === id ? item : row)); return item; }
 }
+
+/** Email the follow-up (Resend when configured) and mark queue item sent. */
+export async function sendFollowUpNow(user, row, customerEmail = "") {
+  try {
+    const res = await api.functions.invoke("sendFollowUp", {
+      queue_id: row.id,
+      user_id: user.id,
+      to: customerEmail || row.customer_email || "",
+      subject: `Follow-up from ${user.full_name || "your service provider"}`,
+      body: row.message,
+    });
+    const patch = { status: "sent", sent_at: new Date().toISOString(), channel: "email" };
+    try {
+      return { ...(await api.entities.FollowUpQueue.update(row.id, patch)), send: res };
+    } catch {
+      const item = { ...row, ...patch };
+      write(user.id, "queue", read(user.id, "queue").map((q) => (q.id === row.id ? item : q)));
+      return { ...item, send: res };
+    }
+  } catch {
+    return markQueueSent(user.id, row.id);
+  }
+}

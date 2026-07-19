@@ -33,6 +33,7 @@ export default function JobEstimator() {
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
   const estimate = useMemo(() => estimateJobPrice(form), [form]);
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -76,10 +77,19 @@ export default function JobEstimator() {
   const askAi = async () => {
     setAskingAi(true);
     try {
-      const draft = await generateAiEstimateDraft(`${form.service_type}, ${form.hours} hours, ${form.difficulty} difficulty`, { user: user?.full_name });
-      if (Object.keys(draft.fields).length) setForm((current) => ({ ...current, ...draft.fields }));
-      toast({ title: "AI estimate ready", description: draft.text });
-    } finally { setAskingAi(false); }
+      const prompt = aiPrompt.trim() || `${form.service_type}, ${form.hours} hours, ${form.difficulty} difficulty`;
+      const draft = await generateAiEstimateDraft(prompt, { user: user?.full_name });
+      if (Object.keys(draft.fields || {}).length) setForm((current) => ({ ...current, ...draft.fields }));
+      const range = draft.market_range;
+      toast({
+        title: "AI estimate ready",
+        description: range
+          ? `${draft.text} Line items: ${(draft.line_items || []).length}.`
+          : draft.text,
+      });
+    } finally {
+      setAskingAi(false);
+    }
   };
 
   return (
@@ -115,6 +125,15 @@ export default function JobEstimator() {
             <Metric label="Labor Cost" value={estimate.labor_cost} />
           </div>
           <div className="grid gap-2 mt-5">
+            <label className="block text-sm text-muted-foreground text-left">
+              Describe the job in plain English
+              <Input
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g. Pressure wash a 2-story house driveway and sidewalk"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
             <Button onClick={askAi} disabled={askingAi} variant="outline" className="border-titan-cyan/30 text-titan-cyan rounded-xl"><Sparkles className="w-4 h-4 mr-2" />{askingAi ? "Asking AI…" : "Ask AI for estimate"}</Button>
             <Button onClick={() => createDocument("/estimates?prefill=1")} disabled={submitting} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl"><FilePlus2 className="w-4 h-4 mr-2" />Create Estimate</Button>
             <Button onClick={() => createDocument("/invoices?new=1")} disabled={submitting} variant="outline" className="border-border text-foreground rounded-xl"><Receipt className="w-4 h-4 mr-2" />Create Invoice</Button>

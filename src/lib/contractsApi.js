@@ -57,18 +57,22 @@ export async function getContractByToken(token) {
   }
 }
 
-export async function signContract(contract, { role, signature }) {
+export async function signContract(contract, { role, signature, signatureImage = "" }) {
   const updates =
     role === "customer"
       ? {
           customer_signature: signature,
+          customer_signature_image: signatureImage || null,
           status: contract.owner_signature ? "signed" : "sent",
           signed_at: contract.owner_signature ? new Date().toISOString() : null,
+          signed_user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
         }
       : {
           owner_signature: signature,
+          owner_signature_image: signatureImage || null,
           status: contract.customer_signature ? "signed" : "sent",
           signed_at: contract.customer_signature ? new Date().toISOString() : null,
+          signed_user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
         };
 
   try {

@@ -81,12 +81,28 @@ async function localFallback(functionName, payload) {
   if (
     functionName === "portalRequestOtp" ||
     functionName === "portalVerifyOtp" ||
-    functionName === "portalGetData"
+    functionName === "portalGetData" ||
+    functionName === "portalAcceptEstimate" ||
+    functionName === "portalPayInvoice" ||
+    functionName === "portalLeaveReview"
   ) {
     throw apiError(
       "Customer portal API is not available on this host yet. Core TitanOS app features still work.",
       503
     );
+  }
+
+  if (functionName === "receiptVisionOcr") {
+    return { text: "", source: "stub", message: "Vision OCR unavailable offline" };
+  }
+
+  if (functionName === "directionsOptimize") {
+    return { ordered: payload.stops || [], totalMiles: 0, legs: [], method: "stub" };
+  }
+
+  if (functionName === "sendFollowUp") {
+    console.info("[sendFollowUp local stub]", payload);
+    return { success: true, stub: true, emailed: false };
   }
 
   throw apiError(`Function "${functionName}" is unavailable offline`, 503);

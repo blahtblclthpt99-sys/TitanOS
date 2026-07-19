@@ -23,6 +23,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { addJobPhoto, listJobPhotos, recordCheckin } from "@/lib/jobOpsApi";
 import { checklistForService } from "@/lib/checklistTemplates";
 import { enqueueFollowUpsForJob } from "@/lib/followUpApi";
+import { toast } from "@/components/ui/use-toast";
+import { googleMapsLink, jobSiteCoords, openStreetMapEmbed } from "@/lib/geofence";
 
 const PRIORITY_COLORS = {
   low: "text-muted-foreground", medium: "text-titan-cyan",
@@ -174,8 +176,23 @@ export default function Jobs({ isActive = true }) {
   const checkin = async (job, eventType) => {
     if (!user?.id || opsSaving) return;
     setOpsSaving(true);
-    try { await recordCheckin(user, { jobId: job.id, eventType }); }
-    finally { setOpsSaving(false); }
+    try {
+      const result = await recordCheckin(user, { jobId: job.id, eventType, job });
+      const g = result?.geofence;
+      if (g?.ok === true) {
+        toast({ title: "Checked in on-site", description: `${g.meters}m from job site` });
+      } else if (g?.ok === false) {
+        toast({ title: "Checked in (outside geofence)", description: `${g.meters}m away — site radius ${g.radius}m`, variant: "destructive" });
+      } else if (g?.reason === "no_site_coords") {
+        toast({ title: eventType === "check_in" ? "Checked in" : "Checked out", description: "No site coords on job — GPS logged if available" });
+      } else {
+        toast({ title: eventType === "check_in" ? "Checked in" : "Checked out" });
+      }
+    } catch (err) {
+      toast({ title: "Check-in failed", description: err.message, variant: "destructive" });
+    } finally {
+      setOpsSaving(false);
+    }
   };
 
   const uploadPhoto = async (job, kind, file) => {
@@ -245,6 +262,16 @@ export default function Jobs({ isActive = true }) {
             <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-border text-foreground"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
             {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
           </div>
+          {(() => {
+            const site = jobSiteCoords(job);
+            if (!site) return <p className="text-xs text-muted-foreground mt-2">Add site lat/lng on the job for geofence proof.</p>;
+            return (
+              <div className="mt-3 rounded-xl overflow-hidden border border-border">
+                <iframe title="Job site map" src={openStreetMapEmbed(site.lat, site.lng)} className="w-full h-36 border-0" loading="lazy" />
+                <a href={googleMapsLink(site.lat, site.lng)} target="_blank" rel="noreferrer" className="block text-xs text-titan-cyan px-3 py-2 bg-muted/40">Open site in Maps · geofence {job.geofence_m || 150}m</a>
+              </div>
+            );
+          })()}
           {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
           {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-border" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
         </div>

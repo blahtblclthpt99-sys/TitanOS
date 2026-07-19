@@ -1,5 +1,6 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
+import { evaluateGeofence } from "@/lib/geofence";
 
 const PREFIX = "titanos_jobops";
 
@@ -38,10 +39,11 @@ export async function listCheckins(jobId) {
   }
 }
 
-export async function recordCheckin(user, { jobId, eventType, note }) {
+export async function recordCheckin(user, { jobId, eventType, note, job = null, requireGeofence = false }) {
   let lat = null;
   let lng = null;
   let accuracy_m = null;
+  let geofence = null;
   try {
     const pos = await new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject(new Error("Geolocation unavailable"));
@@ -53,7 +55,16 @@ export async function recordCheckin(user, { jobId, eventType, note }) {
     lat = pos.coords.latitude;
     lng = pos.coords.longitude;
     accuracy_m = pos.coords.accuracy;
-  } catch {
+    if (job) {
+      geofence = evaluateGeofence(job, { lat, lng });
+      if (requireGeofence && geofence.ok === false) {
+        const err = new Error(`Outside job site (${geofence.meters}m > ${geofence.radius}m)`);
+        err.geofence = geofence;
+        throw err;
+      }
+    }
+  } catch (error) {
+    if (error?.geofence) throw error;
     /* allow check-in without GPS */
   }
 
@@ -64,17 +75,20 @@ export async function recordCheckin(user, { jobId, eventType, note }) {
     lat,
     lng,
     accuracy_m,
-    note: note || "",
+    note: note || (geofence?.ok === false ? `Outside geofence ${geofence.meters}m` : geofence?.ok ? `On-site ${geofence.meters}m` : ""),
     created_by_id: user.id,
+    geofence_ok: geofence?.ok ?? null,
+    geofence_m: geofence?.meters ?? null,
   };
 
   try {
-    return await api.entities.JobCheckin.create(payload);
+    const row = await api.entities.JobCheckin.create(payload);
+    return { ...row, geofence };
   } catch {
     const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
     const all = readLocal(PREFIX, jobId, "checkins", []);
     all.unshift(row);
     writeLocal(PREFIX, jobId, "checkins", all);
-    return row;
+    return { ...row, geofence };
   }
 }

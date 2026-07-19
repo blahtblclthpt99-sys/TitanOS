@@ -10,6 +10,7 @@ import Spinner from "@/components/shared/Spinner";
 import PathNormalizer from "./lib/PathNormalizer";
 import { normalizeAppPath, shouldUseHashRouter } from "@/lib/routing";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
+import { resolveBookingSlugFromHost } from "@/lib/bookingSubdomain";
 
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -125,6 +126,17 @@ function AppShellGate() {
 }
 
 function AuthenticatedApp() {
+  const location = useLocation();
+  const bookingSlug = resolveBookingSlugFromHost(
+    typeof window !== "undefined" ? window.location.hostname : ""
+  );
+  if (
+    bookingSlug &&
+    !normalizeAppPath(location.pathname).startsWith("/book/")
+  ) {
+    return <Navigate to={`/book/${bookingSlug}`} replace />;
+  }
+
   return (
     <PathNormalizer>
       <AppShellGate />

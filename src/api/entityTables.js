@@ -54,6 +54,9 @@ export const ENTITY_TABLES = {
   EscrowHold: "escrow_holds",
   MarketingAsset: "marketing_assets",
   PhoneScript: "phone_scripts",
+  Lead: "leads",
+  InsuranceDoc: "insurance_docs",
+  PortalAction: "portal_actions",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

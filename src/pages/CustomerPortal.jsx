@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
-import { Briefcase, FileText, Receipt, LogOut, Clock, CheckCircle, AlertCircle, XCircle, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Briefcase, FileText, Receipt, LogOut, Clock, CheckCircle, AlertCircle, XCircle,
+  Loader2, ArrowLeft, Star, CreditCard, CalendarPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const STATUS_CONFIG = {
   scheduled:   { label: "Scheduled",   icon: Clock,         color: "text-titan-cyan",   bg: "bg-titan-cyan/10"  },
@@ -33,16 +37,11 @@ function StatusBadge({ status }) {
 }
 
 function Card({ children, className = "" }) {
-  return (
-    <div className={`bg-card border border-white/8 rounded-2xl p-4 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`bg-card border border-white/8 rounded-2xl p-4 ${className}`}>{children}</div>;
 }
 
-// ─── Login Screen (email + OTP verification) ────────────────────────────────
 function PortalLogin({ onLogin }) {
-  const [step, setStep] = useState("email"); // "email" | "code"
+  const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,7 +55,7 @@ function PortalLogin({ onLogin }) {
     try {
       await api.functions.invoke("portalRequestOtp", { email: email.trim() });
       setStep("code");
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -72,7 +71,7 @@ function PortalLogin({ onLogin }) {
       const res = await api.functions.invoke("portalVerifyOtp", { email: email.trim(), otp_code: code.trim() });
       onLogin(res.data.token, res.data.customer);
     } catch (err) {
-      setError(err?.response?.data?.error || "Invalid or expired code. Please try again.");
+      setError(err?.response?.data?.error || err?.message || "Invalid or expired code. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -80,12 +79,7 @@ function PortalLogin({ onLogin }) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm"
-      >
-        {/* Logo */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-titan-cyan/10 border border-titan-cyan/30 mb-4">
             <span className="text-titan-cyan font-bold text-xl">T</span>
@@ -95,27 +89,15 @@ function PortalLogin({ onLogin }) {
             {step === "email" ? "Enter your email to view your account" : "Enter the code we sent to your email"}
           </p>
         </div>
-
         <Card>
           {step === "email" ? (
             <form onSubmit={handleSendCode} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Email Address</label>
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600"
-                  autoFocus
-                />
+                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600" autoFocus />
               </div>
               {error && <p className="text-red-400 text-xs">{error}</p>}
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90"
-              >
+              <Button type="submit" disabled={loading} className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Verification Code"}
               </Button>
             </form>
@@ -123,47 +105,25 @@ function PortalLogin({ onLogin }) {
             <form onSubmit={handleVerifyCode} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Verification Code</label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="123456"
-                  value={code}
-                  onChange={e => setCode(e.target.value)}
-                  className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600 tracking-widest text-center"
-                  autoFocus
-                  maxLength={6}
-                />
-                <p className="text-gray-600 text-xs mt-2">
-                  If an account exists for {email}, a 6-digit code was sent. It expires in 10 minutes.
-                </p>
+                <Input type="text" inputMode="numeric" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600 tracking-widest text-center" autoFocus maxLength={6} />
+                <p className="text-gray-600 text-xs mt-2">If an account exists for {email}, a 6-digit code was sent. It expires in 10 minutes.</p>
               </div>
               {error && <p className="text-red-400 text-xs">{error}</p>}
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90"
-              >
+              <Button type="submit" disabled={loading} className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify & Continue"}
               </Button>
-              <button
-                type="button"
-                onClick={() => { setStep("email"); setCode(""); setError(""); }}
-                className="w-full flex items-center justify-center gap-1 text-gray-400 hover:text-white text-xs transition-colors"
-              >
+              <button type="button" onClick={() => { setStep("email"); setCode(""); setError(""); }} className="w-full flex items-center justify-center gap-1 text-gray-400 hover:text-white text-xs transition-colors">
                 <ArrowLeft className="w-3 h-3" /> Use a different email
               </button>
             </form>
           )}
         </Card>
-        <p className="text-center text-gray-600 text-xs mt-6">
-          Powered by TitanOS Field Service
-        </p>
+        <p className="text-center text-gray-600 text-xs mt-6">Powered by TitanOS Field Service</p>
       </motion.div>
     </div>
   );
 }
 
-// ─── Portal Dashboard ─────────────────────────────────────────────────────────
 function PortalDashboard({ token, initialCustomer, onLogout }) {
   const [customer, setCustomer] = useState(initialCustomer);
   const [jobs, setJobs] = useState([]);
@@ -172,101 +132,130 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState("jobs");
+  const [busyId, setBusyId] = useState(null);
+  const [actionMsg, setActionMsg] = useState("");
+  const [reviewDraft, setReviewDraft] = useState({});
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setLoadError("");
-      try {
-        const res = await api.functions.invoke("portalGetData", { token });
-        setCustomer(res.data.customer);
-        setJobs(res.data.jobs || []);
-        setEstimates(res.data.estimates || []);
-        setInvoices(res.data.invoices || []);
-      } catch (err) {
-        setLoadError("Your session expired. Please sign in again.");
-        setTimeout(onLogout, 1500);
-      } finally {
-        setLoading(false);
+  const reload = async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const res = await api.functions.invoke("portalGetData", { token });
+      const data = res.data || res;
+      setCustomer(data.customer);
+      setJobs(data.jobs || []);
+      setEstimates(data.estimates || []);
+      setInvoices(data.invoices || []);
+    } catch {
+      setLoadError("Your session expired. Please sign in again.");
+      setTimeout(onLogout, 1500);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { reload(); }, [token]);
+
+  const acceptEstimate = async (est, decision) => {
+    setBusyId(est.id);
+    setActionMsg("");
+    try {
+      const res = await api.functions.invoke("portalAcceptEstimate", { token, estimate_id: est.id, decision });
+      const updated = res.estimate || res.data?.estimate;
+      if (updated) setEstimates((rows) => rows.map((e) => (e.id === est.id ? { ...e, ...updated } : e)));
+      setActionMsg(decision === "declined" ? "Estimate declined." : "Estimate accepted — thank you!");
+    } catch (err) {
+      setActionMsg(err.message || "Could not update estimate.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const payInvoice = async (inv) => {
+    setBusyId(inv.id);
+    setActionMsg("");
+    try {
+      const res = await api.functions.invoke("portalPayInvoice", { token, invoice_id: inv.id });
+      const data = res.data || res;
+      if (data.url) {
+        window.location.href = data.url;
+        return;
       }
-    };
-    load();
-  }, [token]);
+      if (data.invoice) setInvoices((rows) => rows.map((i) => (i.id === inv.id ? { ...i, ...data.invoice } : i)));
+      setActionMsg(data.message || "Payment recorded.");
+    } catch (err) {
+      setActionMsg(err.message || "Could not start payment.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const leaveReview = async (job) => {
+    const draft = reviewDraft[job.id] || { rating: 5, comment: "" };
+    setBusyId(job.id);
+    setActionMsg("");
+    try {
+      await api.functions.invoke("portalLeaveReview", {
+        token,
+        job_id: job.id,
+        rating: draft.rating,
+        comment: draft.comment,
+      });
+      setActionMsg("Review submitted — thank you!");
+      setReviewDraft((d) => ({ ...d, [job.id]: { rating: 5, comment: "" } }));
+    } catch (err) {
+      setActionMsg(err.message || "Could not submit review.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const tabs = [
-    { id: "jobs",      label: "Jobs",      icon: Briefcase, count: jobs.length },
-    { id: "estimates", label: "Estimates", icon: FileText,  count: estimates.filter(e => ["sent","viewed","draft"].includes(e.status)).length },
-    { id: "invoices",  label: "Invoices",  icon: Receipt,   count: invoices.filter(i => ["sent","overdue","partial"].includes(i.status)).length },
+    { id: "jobs", label: "Jobs", icon: Briefcase, count: jobs.length },
+    { id: "estimates", label: "Estimates", icon: FileText, count: estimates.filter((e) => ["sent", "viewed", "draft"].includes(e.status)).length },
+    { id: "invoices", label: "Invoices", icon: Receipt, count: invoices.filter((i) => ["sent", "overdue", "partial"].includes(i.status)).length },
   ];
-
-  const activeEstimates = estimates.filter(e => ["sent","viewed","draft","accepted"].includes(e.status));
+  const activeEstimates = estimates.filter((e) => ["sent", "viewed", "draft", "accepted", "declined"].includes(e.status));
 
   return (
     <div className="min-h-screen bg-[#0A0A0B]">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-[#0A0A0B]/80 backdrop-blur border-b border-white/8 px-4 py-3 flex items-center justify-between">
         <div>
           <h1 className="text-white font-semibold text-base">Hi, {customer?.first_name} 👋</h1>
           <p className="text-gray-500 text-xs">{customer?.email}</p>
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-1 text-gray-400 hover:text-white text-xs transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
+        <button onClick={onLogout} className="flex items-center gap-1 text-gray-400 hover:text-white text-xs transition-colors">
+          <LogOut className="w-4 h-4" /> Sign out
         </button>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-        {loadError && (
-          <Card className="text-center py-6">
-            <p className="text-red-400 text-sm">{loadError}</p>
-          </Card>
-        )}
+        {actionMsg && <Card className="text-sm text-titan-cyan">{actionMsg}</Card>}
+        {loadError && <Card className="text-center py-6"><p className="text-red-400 text-sm">{loadError}</p></Card>}
 
-        {/* Tabs */}
         <div className="flex gap-2 bg-card rounded-xl p-1">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  activeTab === tab.id
-                    ? "bg-titan-cyan text-black"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === tab.id ? "bg-titan-cyan text-black" : "text-gray-400 hover:text-white"}`}>
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}
-                {tab.count > 0 && (
-                  <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${
-                    activeTab === tab.id ? "bg-black/20" : "bg-white/10"
-                  }`}>{tab.count}</span>
-                )}
+                {tab.count > 0 && <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab.id ? "bg-black/20" : "bg-white/10"}`}>{tab.count}</span>}
               </button>
             );
           })}
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 text-titan-cyan animate-spin" />
-          </div>
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-titan-cyan animate-spin" /></div>
         ) : (
           <>
-            {/* JOBS TAB */}
             {activeTab === "jobs" && (
               <div className="space-y-3">
                 {jobs.length === 0 ? (
-                  <Card className="text-center py-8">
-                    <Briefcase className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-400 text-sm">No jobs on record</p>
-                  </Card>
-                ) : jobs.map(job => (
-                  <Card key={job.id} className="space-y-2">
+                  <Card className="text-center py-8"><Briefcase className="w-8 h-8 text-gray-600 mx-auto mb-2" /><p className="text-gray-400 text-sm">No jobs on record</p></Card>
+                ) : jobs.map((job) => (
+                  <Card key={job.id} className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-white font-medium text-sm">{job.title}</p>
@@ -282,24 +271,32 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                           {job.scheduled_time && ` at ${job.scheduled_time}`}
                         </span>
                       )}
-                      {job.amount > 0 && (
-                        <span className="ml-auto font-medium text-white">${job.amount.toFixed(2)}</span>
-                      )}
+                      {job.amount > 0 && <span className="ml-auto font-medium text-white">${Number(job.amount).toFixed(2)}</span>}
                     </div>
+                    {job.status === "completed" && (
+                      <div className="space-y-2 pt-2 border-t border-white/5">
+                        <p className="text-xs text-gray-400 flex items-center gap-1"><Star className="w-3 h-3 text-titan-amber" /> Leave a review</p>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button key={n} type="button" onClick={() => setReviewDraft((d) => ({ ...d, [job.id]: { ...(d[job.id] || { comment: "" }), rating: n } }))} className={`text-lg ${(reviewDraft[job.id]?.rating || 5) >= n ? "text-titan-amber" : "text-gray-600"}`}>★</button>
+                          ))}
+                        </div>
+                        <Textarea rows={2} placeholder="How did we do?" value={reviewDraft[job.id]?.comment || ""} onChange={(e) => setReviewDraft((d) => ({ ...d, [job.id]: { rating: d[job.id]?.rating || 5, comment: e.target.value } }))} className="bg-[#0A0A0B] border-white/10 text-white text-sm" />
+                        <Button size="sm" disabled={busyId === job.id} onClick={() => leaveReview(job)} className="bg-titan-cyan text-black">
+                          {busyId === job.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Submit review"}
+                        </Button>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
             )}
 
-            {/* ESTIMATES TAB */}
             {activeTab === "estimates" && (
               <div className="space-y-3">
                 {activeEstimates.length === 0 ? (
-                  <Card className="text-center py-8">
-                    <FileText className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-400 text-sm">No estimates to review</p>
-                  </Card>
-                ) : activeEstimates.map(est => (
+                  <Card className="text-center py-8"><FileText className="w-8 h-8 text-gray-600 mx-auto mb-2" /><p className="text-gray-400 text-sm">No estimates to review</p></Card>
+                ) : activeEstimates.map((est) => (
                   <Card key={est.id} className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -308,7 +305,7 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                       </div>
                       <StatusBadge status={est.status} />
                     </div>
-                    {est.line_items && est.line_items.length > 0 && (
+                    {est.line_items?.length > 0 && (
                       <div className="text-xs text-gray-500 space-y-1">
                         {est.line_items.map((li, idx) => (
                           <div key={idx} className="flex justify-between">
@@ -319,32 +316,34 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                       </div>
                     )}
                     <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
-                      {est.valid_until && (
-                        <span className="text-gray-500">Valid until {new Date(est.valid_until).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                      )}
+                      {est.valid_until && <span className="text-gray-500">Valid until {new Date(est.valid_until).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
                       <span className="font-semibold text-white ml-auto">${(est.total || 0).toFixed(2)}</span>
                     </div>
+                    {["sent", "viewed", "draft"].includes(est.status) && (
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" disabled={busyId === est.id} onClick={() => acceptEstimate(est, "accepted")} className="flex-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                          {busyId === est.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Accept"}
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={busyId === est.id} onClick={() => acceptEstimate(est, "declined")} className="flex-1 border-white/15 text-gray-300">
+                          Decline
+                        </Button>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
             )}
 
-            {/* INVOICES TAB */}
             {activeTab === "invoices" && (
               <div className="space-y-3">
                 {invoices.length === 0 ? (
-                  <Card className="text-center py-8">
-                    <Receipt className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-400 text-sm">No invoices on record</p>
-                  </Card>
-                ) : invoices.map(inv => (
+                  <Card className="text-center py-8"><Receipt className="w-8 h-8 text-gray-600 mx-auto mb-2" /><p className="text-gray-400 text-sm">No invoices on record</p></Card>
+                ) : invoices.map((inv) => (
                   <Card key={inv.id} className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-white font-medium text-sm">{inv.invoice_number || "Invoice"}</p>
-                        {inv.due_date && (
-                          <p className="text-gray-500 text-xs">Due {new Date(inv.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-                        )}
+                        {inv.due_date && <p className="text-gray-500 text-xs">Due {new Date(inv.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>}
                       </div>
                       <StatusBadge status={inv.status} />
                     </div>
@@ -352,16 +351,33 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                       <span className="text-gray-500">Total</span>
                       <span className="font-semibold text-white">${(inv.total || 0).toFixed(2)}</span>
                     </div>
-                    {inv.balance_due > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-red-400">Balance due</span>
-                        <span className="font-bold text-red-400">${inv.balance_due.toFixed(2)}</span>
-                      </div>
+                    {(inv.balance_due > 0 || ["sent", "overdue", "partial"].includes(inv.status)) && inv.status !== "paid" && (
+                      <>
+                        {inv.balance_due > 0 && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-red-400">Balance due</span>
+                            <span className="font-bold text-red-400">${Number(inv.balance_due).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Button size="sm" disabled={busyId === inv.id} onClick={() => payInvoice(inv)} className="w-full bg-titan-cyan text-black mt-1">
+                          {busyId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CreditCard className="w-3.5 h-3.5 mr-1" /> Pay now</>}
+                        </Button>
+                      </>
+                    )}
+                    {inv.status === "paid" && (
+                      <a className="inline-flex items-center gap-1 text-xs text-titan-cyan" href={`data:text/plain,Receipt for ${inv.invoice_number || "invoice"} — $${inv.total || 0} paid`} download={`${inv.invoice_number || "receipt"}.txt`}>
+                        Download receipt
+                      </a>
                     )}
                   </Card>
                 ))}
               </div>
             )}
+
+            <Card className="flex items-center gap-3 text-sm text-gray-400">
+              <CalendarPlus className="w-4 h-4 text-titan-cyan flex-none" />
+              <p>Need another appointment? Ask your provider for their TitanOS booking link.</p>
+            </Card>
           </>
         )}
       </div>
@@ -369,7 +385,6 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
   );
 }
 
-// ─── Main Portal Page ─────────────────────────────────────────────────────────
 export default function CustomerPortal() {
   const [session, setSession] = useState(() => {
     try {

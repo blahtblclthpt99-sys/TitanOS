@@ -44,3 +44,30 @@ All notable improvements from the production refactor. Functionality, routes, AP
 - Created useEntityRecord; migrated CustomerDetail and InvoiceDetail
 - Removed useToast.js, utils/index.ts, MileageTrip.json
 - Removed @stripe/*, @hello-pangea/dnd, react-hot-toast from package.json
+
+## 1.4.9 — Business Command Center & Grow tools
+
+See `release/PLAY_RELEASE_NOTES.txt` for the Google Play “What’s new” copy.
+
+- Home dashboard redesign with drag-and-drop widgets
+- Expanded Home “For you” clips reel (tips + featured marketplace ads)
+- Titan Score, AI Marketing, Loyalty, Local Deals, Emergency Jobs
+- Payment Protection (escrow), Phone Receptionist, Voice commands
+- Smart Schedule tips and brand booking URL
+- Dark charcoal theme and collapsible sidebar / Quick Create
+
+## 1.5.0 — Final ~33% Business OS depth
+
+See `supabase/migrations/010_phase100.sql`.
+
+- Customer Portal: accept/decline estimates, pay invoices, leave reviews
+- Branded booking host resolve (`slug.titanos.app` → `/book/slug`)
+- Full AI estimate builder (line items + market range + plain-English prompt)
+- Route Planner provider optimize (Mapbox when keyed) + local fallback
+- Receipt vision OCR API hook (OpenAI when keyed)
+- GPS check-in geofence + job site map embed
+- Contract canvas e-sign + signature image audit fields
+- Insurance docs synced to Supabase (migrates legacy localStorage)
+- Follow-up Email send via Resend (stub without key)
+- Leads CSV import; Reports cohorts + CSV export
+- Lead entity mapping fixed (`Lead` → `leads`)

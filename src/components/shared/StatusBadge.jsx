@@ -7,7 +7,7 @@ const PRESETS = {
   completed:   "bg-emerald-500/15 text-emerald-400",
   cancelled:   "bg-red-400/15 text-red-400",
   // Invoice statuses
-  draft:       "bg-white/10 text-white/50",
+  draft:       "bg-muted text-muted-foreground",
   sent:        "bg-titan-cyan/15 text-titan-cyan",
   viewed:      "bg-titan-indigo/15 text-titan-indigo",
   paid:        "bg-emerald-500/15 text-emerald-400",
@@ -16,18 +16,18 @@ const PRESETS = {
   // Customer statuses
   lead:        "bg-titan-amber/15 text-titan-amber",
   active:      "bg-emerald-500/15 text-emerald-400",
-  inactive:    "bg-white/10 text-white/40",
+  inactive:    "bg-muted text-muted-foreground",
   vip:         "bg-titan-indigo/15 text-titan-indigo",
   // Estimate
   accepted:    "bg-emerald-500/15 text-emerald-400",
   declined:    "bg-red-400/15 text-red-400",
-  expired:     "bg-white/10 text-white/40",
+  expired:     "bg-muted text-muted-foreground",
 };
 
 export default function StatusBadge({ status }) {
   const label = status?.replace(/_/g, " ") ?? "—";
   return (
-    <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize tracking-wide ${PRESETS[status] || "bg-white/10 text-white/40"}`}>
+    <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize tracking-wide ${PRESETS[status] || "bg-muted text-muted-foreground"}`}>
       {label}
     </span>
   );

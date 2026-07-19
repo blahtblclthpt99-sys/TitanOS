@@ -82,13 +82,13 @@ export default function Reports() {
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.bg}`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </div>
-            <p className="text-2xl font-bold text-white tabular-nums">{card.value}</p>
-            <p className="text-sm text-white/40 mt-1">{card.label}</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">{card.value}</p>
+            <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
           </motion.div>
         ))}
       </div>
 
-      <Suspense fallback={<div className="h-96 rounded-2xl bg-white/5 animate-pulse mb-6" aria-busy="true" aria-label="Loading charts" />}>
+      <Suspense fallback={<div className="h-96 rounded-2xl bg-muted animate-pulse mb-6" aria-busy="true" aria-label="Loading charts" />}>
         <ReportsCharts
           monthlyData={monthlyData}
           serviceData={serviceData}

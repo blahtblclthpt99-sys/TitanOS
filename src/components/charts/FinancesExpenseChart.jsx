@@ -6,8 +6,8 @@ const COLORS = ["#00C7D9", "#7C5BFA", "#F59E0B", "#22C55E", "#EF4444", "#EC4899"
 function ChartTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass rounded-xl px-3 py-2 border border-white/10 text-xs">
-      <p className="text-white/50 capitalize">{payload[0].name}</p>
+    <div className="glass rounded-xl px-3 py-2 border border-border text-xs">
+      <p className="text-muted-foreground capitalize">{payload[0].name}</p>
       <p className="text-titan-cyan font-semibold">${payload[0].value?.toLocaleString()}</p>
     </div>
   );
@@ -18,8 +18,8 @@ export default function FinancesExpenseChart({ categoryData, expenseCount }) {
 
   return (
     <div className="glass rounded-2xl p-6">
-      <h3 className="text-base font-semibold text-white mb-1">Expenses by Category</h3>
-      <p className="text-xs text-white/40 mb-4">{expenseCount} transactions recorded</p>
+      <h3 className="text-base font-semibold text-foreground mb-1">Expenses by Category</h3>
+      <p className="text-xs text-muted-foreground mb-4">{expenseCount} transactions recorded</p>
       <div className="h-44">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -47,7 +47,7 @@ export default function FinancesExpenseChart({ categoryData, expenseCount }) {
               className="w-2 h-2 rounded-full flex-shrink-0"
               style={{ backgroundColor: COLORS[i % COLORS.length] }}
             />
-            <span className="text-xs text-white/50 capitalize">{item.name}</span>
+            <span className="text-xs text-muted-foreground capitalize">{item.name}</span>
           </div>
         ))}
       </div>

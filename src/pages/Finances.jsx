@@ -87,14 +87,14 @@ export default function Finances() {
       <button
         type="button"
         onClick={() => navigate("/receipts")}
-        className="mb-6 w-full glass rounded-2xl p-4 border border-white/8 flex items-center gap-3 text-left glass-hover"
+        className="mb-6 w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover"
       >
         <div className="w-10 h-10 rounded-xl bg-titan-cyan/10 flex items-center justify-center">
           <ScanLine className="w-5 h-5 text-titan-cyan" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-white">Scan a receipt</p>
-          <p className="text-xs text-white/40">OCR → tax-deductible expense</p>
+          <p className="text-sm font-semibold text-foreground">Scan a receipt</p>
+          <p className="text-xs text-muted-foreground">OCR → tax-deductible expense</p>
         </div>
       </button>
 
@@ -105,8 +105,8 @@ export default function Finances() {
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.bg}`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </div>
-            <p className="text-2xl font-bold text-white tabular-nums">{card.value}</p>
-            <p className="text-sm text-white/40 mt-1">{card.label}</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">{card.value}</p>
+            <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
           </motion.div>
         ))}
       </div>
@@ -122,17 +122,17 @@ export default function Finances() {
           </Suspense>
         ) : (
           <div className="glass rounded-2xl p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
-            <TrendingDown className="w-8 h-8 text-white/10 mb-3" />
-            <p className="text-sm text-white/30">No expense data yet</p>
+            <TrendingDown className="w-8 h-8 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">No expense data yet</p>
           </div>
         )}
 
         <div className="glass rounded-2xl p-6">
-          <h3 className="text-base font-semibold text-white mb-1">Recent Expenses</h3>
-          <p className="text-xs text-white/40 mb-4">Last {Math.min(expenses.length, 8)} entries</p>
+          <h3 className="text-base font-semibold text-foreground mb-1">Recent Expenses</h3>
+          <p className="text-xs text-muted-foreground mb-4">Last {Math.min(expenses.length, 8)} entries</p>
           {expenses.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">
-              <p className="text-sm text-white/30">No expenses recorded</p>
+              <p className="text-sm text-muted-foreground">No expenses recorded</p>
               <button onClick={() => setShowForm(true)} className="text-xs text-titan-cyan mt-2 hover:text-titan-cyan/80 transition-colors flex items-center gap-1">
                 <Plus className="w-3 h-3" /> Add your first expense
               </button>
@@ -140,10 +140,10 @@ export default function Finances() {
           ) : (
             <div className="space-y-2">
               {expenses.slice(0, 8).map(exp => (
-                <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.05] transition-colors">
+                <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-white/[0.05] transition-colors">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{exp.description}</p>
-                    <p className="text-xs text-white/30 capitalize">{exp.category}{exp.vendor ? ` · ${exp.vendor}` : ""} · {formatMonthDay(exp.date)}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{exp.category}{exp.vendor ? ` · ${exp.vendor}` : ""} · {formatMonthDay(exp.date)}</p>
                   </div>
                   <p className="text-sm font-semibold text-red-400 flex-shrink-0 ml-3 tabular-nums">-${(exp.amount || 0).toLocaleString()}</p>
                 </div>
@@ -154,8 +154,8 @@ export default function Finances() {
       </div>
 
       <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) setForm(BLANK_EXPENSE); }}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Add Expense</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Add Expense</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Description" value={form.description} onChange={e => f("description", e.target.value)} placeholder="e.g. Fuel fill-up" />
             <div className="grid grid-cols-2 gap-3">
@@ -175,24 +175,24 @@ export default function Finances() {
 
             {/* Receipt Upload */}
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Receipt Photo</label>
+              <label className="text-xs text-muted-foreground mb-2 block">Receipt Photo</label>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReceiptUpload} />
               {form.receipt_url ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/10">
+                <div className="relative rounded-xl overflow-hidden border border-border">
                   <img src={form.receipt_url} alt="Receipt" className="w-full h-40 object-cover" />
                   <button onClick={() => f("receipt_url", "")}
                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors">
-                    <X className="w-4 h-4 text-white" />
+                    <X className="w-4 h-4 text-foreground" />
                   </button>
                 </div>
               ) : (
                 <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  className="w-full h-24 rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50">
+                  className="w-full h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50">
                   {uploading ? (
                     <div className="w-5 h-5 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin" />
                   ) : <>
-                    <Camera className="w-5 h-5 text-white/30" />
-                    <span className="text-xs text-white/30">Tap to attach receipt</span>
+                    <Camera className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Tap to attach receipt</span>
                   </>}
                 </button>
               )}

@@ -92,12 +92,12 @@ export default function Customers({ isActive = true }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-semibold text-white truncate">{c.first_name} {c.last_name}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{c.first_name} {c.last_name}</p>
             <StatusBadge status={c.status} />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {c.phone && <span className="flex items-center gap-1 text-xs text-white/35"><Phone className="w-3 h-3" />{c.phone}</span>}
-            {c.email && <span className="flex items-center gap-1 text-xs text-white/35"><Mail className="w-3 h-3" />{c.email}</span>}
+            {c.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" />{c.phone}</span>}
+            {c.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="w-3 h-3" />{c.email}</span>}
           </div>
         </div>
         {c.lifetime_value > 0 && (
@@ -114,15 +114,15 @@ export default function Customers({ isActive = true }) {
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search customers…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-[#1A1A1C] border-white/5 text-white rounded-xl h-11 placeholder:text-white/20" />
+            className="pl-11 bg-[#1A1A1C] border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "lead", "active", "vip", "inactive"].map(s => (
             <button key={s} onClick={() => setStatus(s)}
               className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-white/40 border border-white/5 hover:text-white/70"
+                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-muted-foreground border border-border hover:text-foreground/70"
               }`}>
               {s === "all" ? "All" : s}
             </button>
@@ -133,7 +133,7 @@ export default function Customers({ isActive = true }) {
       {filtered.length === 0 && !search && statusFilter === "all" ? (
         <EmptyState icon={Users} title="No customers yet" description="Add your first customer to start tracking relationships." onAction={openForm} actionLabel="Add Customer" />
       ) : filtered.length === 0 ? (
-        <p className="text-center text-white/30 py-16 text-sm">No customers match your filter.</p>
+        <p className="text-center text-muted-foreground py-16 text-sm">No customers match your filter.</p>
       ) : shouldVirtualize(filtered.length) ? (
         <VirtualList
           items={filtered}
@@ -151,8 +151,8 @@ export default function Customers({ isActive = true }) {
       )}
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Add Customer</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Add Customer</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="First Name" value={form.first_name} onChange={e => f("first_name", e.target.value)} />

@@ -18,16 +18,16 @@ export default function ConfirmationCard({ summary, details = [], onConfirm, onC
 
       {/* Summary */}
       <div className="px-4 pt-3 pb-1">
-        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_strong]:text-white [&_p]:text-white/80 [&_p]:my-0">
+        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_strong]:text-foreground [&_p]:text-foreground/80 [&_p]:my-0">
           {summary}
         </ReactMarkdown>
       </div>
 
       {/* Details */}
       {details.length > 0 && (
-        <div className="px-4 py-3 space-y-1.5 border-t border-white/5 mt-2">
+        <div className="px-4 py-3 space-y-1.5 border-t border-border mt-2">
           {details.map((line, i) => (
-            <ReactMarkdown key={i} className="text-xs prose prose-sm prose-invert max-w-none [&_strong]:text-white/90 [&_p]:text-white/50 [&_p]:my-0">
+            <ReactMarkdown key={i} className="text-xs prose prose-sm prose-invert max-w-none [&_strong]:text-foreground/90 [&_p]:text-muted-foreground [&_p]:my-0">
               {line}
             </ReactMarkdown>
           ))}
@@ -35,7 +35,7 @@ export default function ConfirmationCard({ summary, details = [], onConfirm, onC
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 px-4 py-3 border-t border-white/5">
+      <div className="flex gap-2 px-4 py-3 border-t border-border">
         <button
           onClick={onConfirm}
           disabled={loading}
@@ -50,7 +50,7 @@ export default function ConfirmationCard({ summary, details = [], onConfirm, onC
         <button
           onClick={onCancel}
           disabled={loading}
-          className="flex items-center justify-center gap-1 px-4 h-9 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-sm font-medium transition-all disabled:opacity-40"
+          className="flex items-center justify-center gap-1 px-4 h-9 rounded-xl bg-muted hover:bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-all disabled:opacity-40"
         >
           <X className="w-4 h-4" /> Cancel
         </button>

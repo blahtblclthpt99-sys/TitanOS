@@ -16,6 +16,14 @@ export const todayISO = () => format(new Date(), "yyyy-MM-dd");
 
 export const currentMonthKey = () => format(new Date(), "yyyy-MM");
 
+export const thisWeekRange = () => {
+  const start = startOfWeek(new Date(), { weekStartsOn: 0 });
+  return {
+    start: format(start, "yyyy-MM-dd"),
+    end: format(addDays(start, 6), "yyyy-MM-dd"),
+  };
+};
+
 export const addDaysISO = (days, from = new Date()) =>
   format(addDays(from, days), "yyyy-MM-dd");
 

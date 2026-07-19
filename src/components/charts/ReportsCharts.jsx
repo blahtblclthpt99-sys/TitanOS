@@ -6,8 +6,8 @@ const COLORS = ["#00C7D9","#7C5BFA","#F59E0B","#22C55E","#EF4444","#EC4899","#3B
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass rounded-xl px-3 py-2 border border-white/10 text-xs">
-      <p className="text-white/50">{label}</p>
+    <div className="glass rounded-xl px-3 py-2 border border-border text-xs">
+      <p className="text-muted-foreground">{label}</p>
       <p className="text-titan-cyan font-semibold">${payload[0].value?.toLocaleString()}</p>
     </div>
   );
@@ -24,11 +24,11 @@ export default function ReportsCharts({
   return (
     <>
       <div className="glass rounded-2xl p-6 mb-6">
-        <h3 className="text-base font-semibold text-white mb-1">Revenue vs Expenses</h3>
-        <p className="text-xs text-white/40 mb-6">Last 6 months</p>
+        <h3 className="text-base font-semibold text-foreground mb-1">Revenue vs Expenses</h3>
+        <p className="text-xs text-muted-foreground mb-6">Last 6 months</p>
         {!hasMonthly ? (
           <div className="h-48 flex items-center justify-center">
-            <p className="text-sm text-white/30">No data yet</p>
+            <p className="text-sm text-muted-foreground">No data yet</p>
           </div>
         ) : (
           <div className="h-52">
@@ -48,11 +48,11 @@ export default function ReportsCharts({
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="glass rounded-2xl p-6">
-          <h3 className="text-base font-semibold text-white mb-1">Revenue by Service</h3>
-          <p className="text-xs text-white/40 mb-4">Where the money comes from</p>
+          <h3 className="text-base font-semibold text-foreground mb-1">Revenue by Service</h3>
+          <p className="text-xs text-muted-foreground mb-4">Where the money comes from</p>
           {!hasService ? (
             <div className="h-40 flex items-center justify-center">
-              <p className="text-sm text-white/30">No job data yet</p>
+              <p className="text-sm text-muted-foreground">No job data yet</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -61,10 +61,10 @@ export default function ReportsCharts({
                 return (
                   <div key={item.name}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/60 capitalize">{item.name}</span>
-                      <span className="text-white font-semibold tabular-nums">${item.value.toLocaleString()}</span>
+                      <span className="text-muted-foreground capitalize">{item.name}</span>
+                      <span className="text-foreground font-semibold tabular-nums">${item.value.toLocaleString()}</span>
                     </div>
-                    <div className="h-1.5 bg-white/5 rounded-full">
+                    <div className="h-1.5 bg-muted rounded-full">
                       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }} />
                     </div>
                   </div>
@@ -75,11 +75,11 @@ export default function ReportsCharts({
         </div>
 
         <div className="glass rounded-2xl p-6">
-          <h3 className="text-base font-semibold text-white mb-1">Expenses by Category</h3>
-          <p className="text-xs text-white/40 mb-4">Where money goes</p>
+          <h3 className="text-base font-semibold text-foreground mb-1">Expenses by Category</h3>
+          <p className="text-xs text-muted-foreground mb-4">Where money goes</p>
           {!hasExpCat ? (
             <div className="h-40 flex items-center justify-center">
-              <p className="text-sm text-white/30">No expense data yet</p>
+              <p className="text-sm text-muted-foreground">No expense data yet</p>
             </div>
           ) : (
             <>
@@ -97,7 +97,7 @@ export default function ReportsCharts({
                 {expCatData.map((item, i) => (
                   <div key={item.name} className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span className="text-xs text-white/50 capitalize">{item.name}</span>
+                    <span className="text-xs text-muted-foreground capitalize">{item.name}</span>
                   </div>
                 ))}
               </div>

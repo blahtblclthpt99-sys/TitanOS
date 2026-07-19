@@ -50,7 +50,7 @@ export default function FeatureDetail() {
   }, []);
 
   return (
-    <div className="min-h-svh bg-[#0A0A0B] px-4 py-12 text-white">
+    <div className="min-h-svh bg-background px-4 py-12 text-foreground">
       <div className="mx-auto max-w-lg text-center">
         <Link to="/" className="mb-8 inline-flex items-center gap-2 font-semibold">
           <span className="text-titan-cyan" aria-hidden>
@@ -59,7 +59,7 @@ export default function FeatureDetail() {
           Titan OS
         </Link>
         <h1 className="mt-6 text-3xl font-bold tracking-tight">{feature.title}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/50">{feature.desc}</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{feature.desc}</p>
         <Button
           asChild
           className="mt-8 h-12 rounded-2xl bg-titan-cyan px-6 text-sm font-bold text-black hover:bg-titan-cyan/90"
@@ -69,7 +69,7 @@ export default function FeatureDetail() {
           </Link>
         </Button>
         <div className="mt-4">
-          <Link to="/#features" className="text-xs text-white/35 hover:text-white/60">
+          <Link to="/#features" className="text-xs text-muted-foreground hover:text-foreground/60">
             ← All features
           </Link>
         </div>

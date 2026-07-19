@@ -25,7 +25,7 @@ import { checklistForService } from "@/lib/checklistTemplates";
 import { enqueueFollowUpsForJob } from "@/lib/followUpApi";
 
 const PRIORITY_COLORS = {
-  low: "text-white/30", medium: "text-titan-cyan",
+  low: "text-muted-foreground", medium: "text-titan-cyan",
   high: "text-titan-amber", urgent: "text-red-400",
 };
 
@@ -209,22 +209,22 @@ export default function Jobs({ isActive = true }) {
           <div className="flex-shrink-0 mt-1">
             {selected.has(job.id)
               ? <CheckSquare className="w-4 h-4 text-titan-cyan" />
-              : <Square className="w-4 h-4 text-white/25" />}
+              : <Square className="w-4 h-4 text-muted-foreground" />}
           </div>
         )}
         <div className="w-1 h-14 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: job.color || "#00C7D9" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-semibold text-white truncate">{job.title}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
             <StatusBadge status={job.status} />
             <span className={`text-xs font-semibold ${PRIORITY_COLORS[job.priority]}`}>● {job.priority}</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {job.customer_name && <span className="flex items-center gap-1 text-xs text-white/40"><User className="w-3 h-3" />{job.customer_name}</span>}
-            {job.assigned_name && <span className="flex items-center gap-1 text-xs text-white/40"><UserCheck className="w-3 h-3" />{job.assigned_name}</span>}
-            <span className="flex items-center gap-1 text-xs text-white/40"><Calendar className="w-3 h-3" />{formatMonthDay(job.scheduled_date)}</span>
-            {job.scheduled_time && <span className="flex items-center gap-1 text-xs text-white/40"><Clock className="w-3 h-3" />{job.scheduled_time}</span>}
-            {job.address && <span className="flex items-center gap-1 text-xs text-white/40 truncate max-w-[160px]"><MapPin className="w-3 h-3" />{job.address}</span>}
+            {job.customer_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="w-3 h-3" />{job.customer_name}</span>}
+            {job.assigned_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><UserCheck className="w-3 h-3" />{job.assigned_name}</span>}
+            <span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="w-3 h-3" />{formatMonthDay(job.scheduled_date)}</span>
+            {job.scheduled_time && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="w-3 h-3" />{job.scheduled_time}</span>}
+            {job.address && <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[160px]"><MapPin className="w-3 h-3" />{job.address}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -235,22 +235,22 @@ export default function Jobs({ isActive = true }) {
               {completingId === job.id ? "Saving…" : "Complete"}
             </Button>
           )}
-          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-white/10 text-white/70 rounded-lg text-xs">Field ops</Button>}
+          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/70 rounded-lg text-xs">Field ops</Button>}
         </div>
       </div>
       {(expandedJobId === job.id || ["in_progress", "completed"].includes(job.status)) && !bulkMode && (
-        <div className="mt-4 pt-4 border-t border-white/5">
+        <div className="mt-4 pt-4 border-t border-border">
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => checkin(job, "check_in")} disabled={opsSaving} size="sm" className="bg-titan-cyan/15 text-titan-cyan border border-titan-cyan/20"><LogIn className="w-4 h-4 mr-1" />Check in</Button>
-            <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-white/15 text-white"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
-            {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-white/15 text-xs text-white/75 hover:bg-white/5"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
+            <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-border text-foreground"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
+            {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-border text-xs text-foreground/75 hover:bg-muted"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
           </div>
-          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-white/65 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-white/25"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
-          {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-white/10" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
+          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/65 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
+          {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-border" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
         </div>
       )}
       {job.status === "completed" && !bulkMode && (
-        <div className="mt-4 pt-4 border-t border-white/5">
+        <div className="mt-4 pt-4 border-t border-border">
           <ReviewForm
             jobId={job.id}
             revieweeId={job.customer_id ? `customer:${job.customer_id}` : ""}
@@ -268,14 +268,14 @@ export default function Jobs({ isActive = true }) {
 
       <div className="flex items-start justify-between mb-6">
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Jobs</h1>
-          <p className="text-sm text-white/40 mt-1">{jobs.length} total</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Jobs</h1>
+          <p className="text-sm text-muted-foreground mt-1">{jobs.length} total</p>
         </motion.div>
         <div className="flex items-center gap-2">
           {!bulkMode && (
             <button
               onClick={() => setBulkMode(true)}
-              className="flex items-center gap-1.5 text-xs text-white/40 hover:text-titan-cyan border border-white/10 hover:border-titan-cyan/30 rounded-xl px-3 py-2 transition-all"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-titan-cyan border border-border hover:border-titan-cyan/30 rounded-xl px-3 py-2 transition-all"
             >
               <CheckSquare className="w-3.5 h-3.5" /> Bulk Edit
             </button>
@@ -289,15 +289,15 @@ export default function Jobs({ isActive = true }) {
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-[#1A1A1C] border-white/5 text-white rounded-xl h-11 placeholder:text-white/20" />
+            className="pl-11 bg-[#1A1A1C] border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "scheduled", "in_progress", "completed", "cancelled"].map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                filter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-white/40 border border-white/5 hover:text-white/70"
+                filter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-[#1A1A1C] text-muted-foreground border border-border hover:text-foreground/70"
               }`}>
               {s === "all" ? "All" : s.replace("_", " ")}
             </button>
@@ -308,13 +308,13 @@ export default function Jobs({ isActive = true }) {
       {/* Bulk mode header */}
       {bulkMode && (
         <div className="flex items-center gap-3 mb-4 p-3 bg-titan-cyan/5 border border-titan-cyan/20 rounded-2xl">
-          <button onClick={toggleAll} className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors">
+          <button onClick={toggleAll} className="flex items-center gap-2 text-sm text-foreground/70 hover:text-foreground transition-colors">
             {selected.size === filtered.length && filtered.length > 0
               ? <CheckSquare className="w-4 h-4 text-titan-cyan" />
               : <Square className="w-4 h-4" />}
             {selected.size > 0 ? `${selected.size} selected` : "Select all"}
           </button>
-          <button onClick={exitBulk} className="ml-auto text-white/40 hover:text-white transition-colors">
+          <button onClick={exitBulk} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -323,7 +323,7 @@ export default function Jobs({ isActive = true }) {
       {filtered.length === 0 && !search && filter === "all" ? (
         <EmptyState icon={Briefcase} title="No jobs yet" description="Create your first job to start tracking work." onAction={openForm} actionLabel="New Job" />
       ) : filtered.length === 0 ? (
-        <p className="text-center text-white/30 py-16 text-sm">No jobs match your filter.</p>
+        <p className="text-center text-muted-foreground py-16 text-sm">No jobs match your filter.</p>
       ) : shouldVirtualize(filtered.length) ? (
         <VirtualList
           items={filtered}
@@ -348,9 +348,9 @@ export default function Jobs({ isActive = true }) {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-[#1A1A1C] border border-white/10 rounded-2xl shadow-2xl px-4 py-3"
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-[#1A1A1C] border border-border rounded-2xl shadow-2xl px-4 py-3"
           >
-            <span className="text-xs text-white/50 mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>
+            <span className="text-xs text-muted-foreground mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>
 
             {/* Status dropdown */}
             <div className="relative">
@@ -361,10 +361,10 @@ export default function Jobs({ isActive = true }) {
                 Set Status <ChevronDown className="w-3 h-3" />
               </button>
               {showBulkStatus && (
-                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-white/10 rounded-xl overflow-hidden shadow-xl min-w-[140px]">
+                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-border rounded-xl overflow-hidden shadow-xl min-w-[140px]">
                   {JOB_STATUSES.map(s => (
                     <button key={s} onClick={() => bulkUpdateStatus(s)}
-                      className="w-full text-left px-4 py-2.5 text-xs text-white/80 hover:bg-white/5 hover:text-white capitalize transition-colors">
+                      className="w-full text-left px-4 py-2.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground capitalize transition-colors">
                       {s.replace("_", " ")}
                     </button>
                   ))}
@@ -381,28 +381,28 @@ export default function Jobs({ isActive = true }) {
                 Assign To <ChevronDown className="w-3 h-3" />
               </button>
               {showBulkAssign && (
-                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-white/10 rounded-xl overflow-hidden shadow-xl min-w-[160px]">
+                <div className="absolute bottom-full mb-2 left-0 bg-[#242427] border border-border rounded-xl overflow-hidden shadow-xl min-w-[160px]">
                   {(employees || []).filter(e => e.status === "active").map(emp => (
                     <button key={emp.id} onClick={() => bulkAssign(emp)}
-                      className="w-full text-left px-4 py-2.5 text-xs text-white/80 hover:bg-white/5 hover:text-white transition-colors">
+                      className="w-full text-left px-4 py-2.5 text-xs text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                       {emp.name}
                     </button>
                   ))}
                   {(employees || []).filter(e => e.status === "active").length === 0 && (
-                    <p className="px-4 py-3 text-xs text-white/30">No active employees</p>
+                    <p className="px-4 py-3 text-xs text-muted-foreground">No active employees</p>
                   )}
                 </div>
               )}
             </div>
 
-            {bulkSaving && <span className="text-xs text-white/40 ml-1">Saving…</span>}
+            {bulkSaving && <span className="text-xs text-muted-foreground ml-1">Saving…</span>}
           </motion.div>
         )}
       </AnimatePresence>
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-white text-lg">New Job</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">New Job</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Job Title" value={form.title} onChange={e => f("title", e.target.value)} placeholder="e.g. Full house cleaning" />
             <FormField label="Customer">
@@ -435,9 +435,9 @@ export default function Jobs({ isActive = true }) {
             </div>
             <FormField label="Address" value={form.address} onChange={e => f("address", e.target.value)} />
             <div className="flex flex-col gap-1">
-              <label className="text-white/50 text-xs font-medium">Description</label>
+              <label className="text-muted-foreground text-xs font-medium">Description</label>
               <Textarea value={form.description} onChange={e => f("description", e.target.value)}
-                className="bg-[#242427] border-white/5 text-white rounded-xl min-h-[80px]" />
+                className="bg-[#242427] border-border text-foreground rounded-xl min-h-[80px]" />
             </div>
             <Button onClick={handleSave} disabled={saving || !form.title} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 disabled:opacity-50">
               {saving ? "Creating…" : "Create Job"}

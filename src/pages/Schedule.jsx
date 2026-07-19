@@ -57,28 +57,28 @@ export default function Schedule() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Schedule</h1>
-          <p className="text-sm text-white/40 mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Schedule</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {formatMonthDay(weekDays[0])} – {formatMonthDayYear(weekEnd)}
             {totalThisWeek > 0 && <span className="ml-2 text-titan-cyan">· {totalThisWeek} job{totalThisWeek !== 1 ? "s" : ""}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}
-            className="border-white/10 text-white/60 hover:text-white rounded-xl text-xs h-8">
+            className="border-border text-muted-foreground hover:text-foreground rounded-xl text-xs h-8">
             Today
           </Button>
           <button type="button" onClick={() => navigateWeek(-1)} aria-label="Previous week"
-            className="p-2 rounded-xl bg-white/5 text-white/40 border border-white/5 hover:text-white hover:bg-white/10 transition-all">
+            className="p-2 rounded-xl bg-muted text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button type="button" onClick={() => navigateWeek(1)} aria-label="Next week"
-            className="p-2 rounded-xl bg-white/5 text-white/40 border border-white/5 hover:text-white hover:bg-white/10 transition-all">
+            className="p-2 rounded-xl bg-muted text-muted-foreground border border-border hover:text-foreground hover:bg-muted transition-all">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
-      {weather && <div className="glass rounded-2xl px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="font-semibold text-titan-cyan">{weather.temp}° · {weather.label}</span><span className="text-white/55">Wind {weather.wind} mph</span>{weather.warning && <span className="text-titan-amber">{weather.warning}</span>}</div>}
+      {weather && <div className="glass rounded-2xl px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="font-semibold text-titan-cyan">{weather.temp}° · {weather.label}</span><span className="text-muted-foreground">Wind {weather.wind} mph</span>{weather.warning && <span className="text-titan-amber">{weather.warning}</span>}</div>}
 
       <div className="hidden md:grid grid-cols-7 gap-2">
         {weekDays.map((day) => {
@@ -87,16 +87,16 @@ export default function Schedule() {
           return (
             <div key={formatISO(day)}>
               <div className={`text-center py-2.5 mb-2 rounded-xl ${today ? "bg-titan-cyan/10" : ""}`}>
-                <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">{formatShortDay(day)}</p>
-                <p className={`text-lg font-bold mt-0.5 ${today ? "text-titan-cyan" : "text-white/70"}`}>{formatDayNum(day)}</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{formatShortDay(day)}</p>
+                <p className={`text-lg font-bold mt-0.5 ${today ? "text-titan-cyan" : "text-foreground/70"}`}>{formatDayNum(day)}</p>
               </div>
               <div className="space-y-1 min-h-[120px]">
                 {dayJobs.map((job) => (
                   <motion.div key={job.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    className={`p-2 rounded-lg border-l-2 bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
-                    <p className="text-[11px] font-medium text-white truncate leading-tight">{job.title}</p>
+                    className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-white/[0.06] transition-colors cursor-pointer ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
+                    <p className="text-[11px] font-medium text-foreground truncate leading-tight">{job.title}</p>
                     {job.scheduled_time && (
-                      <span className="flex items-center gap-1 text-[10px] text-white/35 mt-0.5">
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                         <Clock className="w-2.5 h-2.5" />{job.scheduled_time}
                       </span>
                     )}
@@ -114,12 +114,12 @@ export default function Schedule() {
           const today = isToday(day);
           return (
             <div key={formatISO(day)}>
-              <div className={`flex items-center gap-3 mb-2 px-1 ${today ? "text-titan-cyan" : "text-white/40"}`}>
+              <div className={`flex items-center gap-3 mb-2 px-1 ${today ? "text-titan-cyan" : "text-muted-foreground"}`}>
                 <span className="text-xs font-semibold uppercase tracking-wider">{format(day, "EEE, MMM d")}</span>
                 {today && <span className="text-[10px] bg-titan-cyan/15 text-titan-cyan px-2 py-0.5 rounded-full font-semibold">Today</span>}
               </div>
               {dayJobs.length === 0 ? (
-                <p className="text-xs text-white/20 pl-1 pb-2">No jobs</p>
+                <p className="text-xs text-muted-foreground pl-1 pb-2">No jobs</p>
               ) : (
                 <div className="space-y-2">
                   {dayJobs.map((job) => (
@@ -127,15 +127,15 @@ export default function Schedule() {
                       className={`glass rounded-xl p-3 border-l-2 ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{job.title}</p>
+                          <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
                           <div className="flex items-center gap-3 mt-1">
                             {job.scheduled_time && (
-                              <span className="flex items-center gap-1 text-xs text-white/40">
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Clock className="w-3 h-3" />{job.scheduled_time}
                               </span>
                             )}
                             {job.customer_name && (
-                              <span className="flex items-center gap-1 text-xs text-white/40 truncate">
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
                                 <User className="w-3 h-3 flex-shrink-0" />{job.customer_name}
                               </span>
                             )}

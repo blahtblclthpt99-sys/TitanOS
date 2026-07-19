@@ -24,7 +24,7 @@ const initialForm = {
   market_rate_factor: 1,
 };
 
-const inputClass = "bg-[#1A1A1C] border-white/5 text-white rounded-xl h-10";
+const inputClass = "bg-[#1A1A1C] border-border text-foreground rounded-xl h-10";
 
 export default function JobEstimator() {
   const navigate = useNavigate();
@@ -88,7 +88,7 @@ export default function JobEstimator() {
       {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
       <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-5">
         <section className="glass rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-white">Job inputs</h2></div>
+          <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">Job inputs</h2></div>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Service type"><select value={form.service_type} onChange={(event) => changeService(event.target.value)} className={`${inputClass} px-3 w-full`}>{SERVICE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></Field>
             <Field label="Hours"><Input type="number" min="0" step="0.25" value={form.hours} onChange={(event) => update("hours", event.target.value)} className={inputClass} /></Field>
@@ -99,17 +99,17 @@ export default function JobEstimator() {
             <Field label="Difficulty"><select value={form.difficulty} onChange={(event) => update("difficulty", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="easy">Easy</option><option value="standard">Standard</option><option value="hard">Hard</option><option value="expert">Expert</option></select></Field>
             <Field label="Urgency"><select value={form.urgency} onChange={(event) => update("urgency", event.target.value)} className={`${inputClass} px-3 w-full`}><option value="normal">Normal</option><option value="soon">Soon</option><option value="same_day">Same day</option><option value="emergency">Emergency</option></select></Field>
           </div>
-          <div className="mt-5 pt-4 border-t border-white/5">
-            <div className="flex justify-between text-sm mb-2"><label htmlFor="market-rate" className="text-white/65">Local market rate</label><span className="text-titan-cyan font-semibold">{Number(form.market_rate_factor).toFixed(2)}×</span></div>
+          <div className="mt-5 pt-4 border-t border-border">
+            <div className="flex justify-between text-sm mb-2"><label htmlFor="market-rate" className="text-foreground/65">Local market rate</label><span className="text-titan-cyan font-semibold">{Number(form.market_rate_factor).toFixed(2)}×</span></div>
             <input id="market-rate" type="range" min="0.8" max="1.3" step="0.01" value={form.market_rate_factor} onChange={(event) => update("market_rate_factor", event.target.value)} className="w-full accent-[#00c7d9]" />
-            <div className="flex justify-between text-xs text-white/30 mt-1"><span>0.80× lower market</span><span>1.30× premium market</span></div>
+            <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0.80× lower market</span><span>1.30× premium market</span></div>
           </div>
         </section>
 
         <section className="glass rounded-2xl p-5 h-fit">
-          <h2 className="font-semibold text-white mb-4">Recommended range</h2>
-          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-white/70"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-white/[0.04] rounded-xl p-3 text-center"><p className="text-xs text-white/40">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
-          <div className="space-y-3 border-t border-white/5 pt-4">
+          <h2 className="font-semibold text-foreground mb-4">Recommended range</h2>
+          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/70"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-white/[0.04] rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
+          <div className="space-y-3 border-t border-border pt-4">
             <Metric label="Suggested Customer Price" value={estimate.suggested_price} prominent />
             <Metric label="Estimated Profit" value={estimate.profit_estimate} positive={estimate.profit_estimate >= 0} />
             <Metric label="Labor Cost" value={estimate.labor_cost} />
@@ -117,8 +117,8 @@ export default function JobEstimator() {
           <div className="grid gap-2 mt-5">
             <Button onClick={askAi} disabled={askingAi} variant="outline" className="border-titan-cyan/30 text-titan-cyan rounded-xl"><Sparkles className="w-4 h-4 mr-2" />{askingAi ? "Asking AI…" : "Ask AI for estimate"}</Button>
             <Button onClick={() => createDocument("/estimates?prefill=1")} disabled={submitting} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl"><FilePlus2 className="w-4 h-4 mr-2" />Create Estimate</Button>
-            <Button onClick={() => createDocument("/invoices?new=1")} disabled={submitting} variant="outline" className="border-white/10 text-white rounded-xl"><Receipt className="w-4 h-4 mr-2" />Create Invoice</Button>
-            <Button onClick={saveEstimate} disabled={saving} variant="ghost" className="text-white/65 hover:text-white rounded-xl">{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}{saving ? "Saving…" : "Save price estimate"}</Button>
+            <Button onClick={() => createDocument("/invoices?new=1")} disabled={submitting} variant="outline" className="border-border text-foreground rounded-xl"><Receipt className="w-4 h-4 mr-2" />Create Invoice</Button>
+            <Button onClick={saveEstimate} disabled={saving} variant="ghost" className="text-foreground/65 hover:text-foreground rounded-xl">{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}{saving ? "Saving…" : "Save price estimate"}</Button>
           </div>
         </section>
       </div>
@@ -127,9 +127,9 @@ export default function JobEstimator() {
 }
 
 function Field({ label, children }) {
-  return <label className="text-xs text-white/50 grid gap-2">{label}{children}</label>;
+  return <label className="text-xs text-muted-foreground grid gap-2">{label}{children}</label>;
 }
 
 function Metric({ label, value, positive, prominent = false }) {
-  return <div className="flex items-center justify-between gap-3"><span className={prominent ? "text-white font-semibold" : "text-white/50 text-sm"}>{label}</span><span className={`${prominent ? "text-lg text-titan-cyan" : positive ? "text-titan-cyan" : "text-white"} font-bold`}>${Number(value).toLocaleString()}</span></div>;
+  return <div className="flex items-center justify-between gap-3"><span className={prominent ? "text-foreground font-semibold" : "text-muted-foreground text-sm"}>{label}</span><span className={`${prominent ? "text-lg text-titan-cyan" : positive ? "text-titan-cyan" : "text-foreground"} font-bold`}>${Number(value).toLocaleString()}</span></div>;
 }

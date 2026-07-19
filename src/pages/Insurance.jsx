@@ -60,8 +60,8 @@ export default function Insurance() {
             <Shield className="w-5 h-5 text-titan-cyan" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Liability Insurance</h1>
-            <p className="text-sm text-white/40">Upload and share your certificate of insurance with clients</p>
+            <h1 className="text-2xl font-bold text-foreground">Liability Insurance</h1>
+            <p className="text-sm text-muted-foreground">Upload and share your certificate of insurance with clients</p>
           </div>
         </div>
       </motion.div>
@@ -73,16 +73,16 @@ export default function Insurance() {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="w-full h-36 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50 mb-6"
+          className="w-full h-36 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-3 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50 mb-6"
         >
           {uploading ? (
             <div className="w-6 h-6 border-2 border-titan-cyan border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <Upload className="w-7 h-7 text-white/30" />
+              <Upload className="w-7 h-7 text-muted-foreground" />
               <div className="text-center">
-                <p className="text-sm font-medium text-white/60">Tap to upload insurance document</p>
-                <p className="text-xs text-white/30 mt-1">PDF, JPG, or PNG</p>
+                <p className="text-sm font-medium text-muted-foreground">Tap to upload insurance document</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF, JPG, or PNG</p>
               </div>
             </>
           )}
@@ -93,8 +93,8 @@ export default function Insurance() {
       {docs.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
           className="text-center py-16">
-          <Shield className="w-12 h-12 text-white/10 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No insurance documents uploaded yet</p>
+          <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No insurance documents uploaded yet</p>
         </motion.div>
       ) : (
         <div className="space-y-3">
@@ -110,35 +110,35 @@ export default function Insurance() {
                 <FileText className="w-5 h-5 text-titan-indigo" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{doc.name}</p>
-                <p className="text-xs text-white/30 mt-0.5">{doc.size} · Uploaded {doc.uploaded}</p>
+                <p className="text-sm font-medium text-foreground truncate">{doc.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{doc.size} · Uploaded {doc.uploaded}</p>
               </div>
               <div className="flex items-center gap-2">
                 <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                  <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" title="View">
-                    <Eye className="w-4 h-4 text-white/50" />
+                  <button className="w-8 h-8 rounded-lg bg-muted hover:bg-muted flex items-center justify-center transition-colors" title="View">
+                    <Eye className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </a>
                 <button
                   onClick={() => handleCopyLink(doc)}
-                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg bg-muted hover:bg-muted flex items-center justify-center transition-colors"
                   title="Copy shareable link"
                 >
                   {copied === doc.id
                     ? <Check className="w-4 h-4 text-titan-cyan" />
-                    : <Copy className="w-4 h-4 text-white/50" />}
+                    : <Copy className="w-4 h-4 text-muted-foreground" />}
                 </button>
                 <a href={doc.url} download={doc.name}>
-                  <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" title="Download">
-                    <Download className="w-4 h-4 text-white/50" />
+                  <button className="w-8 h-8 rounded-lg bg-muted hover:bg-muted flex items-center justify-center transition-colors" title="Download">
+                    <Download className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </a>
                 <button
                   onClick={() => handleDelete(doc.id)}
-                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg bg-muted hover:bg-red-500/10 flex items-center justify-center transition-colors"
                   title="Delete"
                 >
-                  <Trash2 className="w-4 h-4 text-white/30 hover:text-red-400" />
+                  <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-400" />
                 </button>
               </div>
             </motion.div>

@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
+import { applyTheme, setStoredTheme } from "@/lib/theme";
 
 const NOTIFICATION_OPTIONS = [
   ["messages", "Messages", "New messages and replies"],
@@ -42,7 +43,7 @@ const PRIVACY_OPTIONS = [
   ["share_completed_jobs", "Share completed jobs", "Allow completed work to appear in Community."],
 ];
 
-const inputClass = "bg-[#242427] border-white/5 text-white rounded-xl focus:ring-1 focus:ring-titan-cyan/40";
+const inputClass = "bg-[#242427] border-border text-foreground rounded-xl focus:ring-1 focus:ring-titan-cyan/40";
 
 function ToggleRow({ checked, label, description, onChange }) {
   return (
@@ -51,13 +52,13 @@ function ToggleRow({ checked, label, description, onChange }) {
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="w-full flex items-center gap-3 text-left rounded-xl p-3 hover:bg-white/[0.03] transition-colors"
+      className="w-full flex items-center gap-3 text-left rounded-xl p-3 hover:bg-muted/60 transition-colors"
     >
       <span className="flex-1">
-        <span className="block text-sm font-medium text-white">{label}</span>
-        <span className="block text-xs text-white/40 mt-0.5">{description}</span>
+        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
       </span>
-      <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${checked ? "bg-titan-cyan" : "bg-white/10"}`}>
+      <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${checked ? "bg-titan-cyan" : "bg-muted"}`}>
         <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : ""}`} />
       </span>
     </button>
@@ -125,15 +126,15 @@ export default function Settings() {
   }, [user?.id]);
 
   useEffect(() => {
+    setStoredTheme(themePref);
+    applyTheme(themePref);
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = () => {
-      const isDark = themePref === "dark" || (themePref === "system" && media.matches);
-      document.documentElement.classList.toggle("dark", isDark);
+    const onChange = () => {
+      if (themePref === "system") applyTheme("system");
     };
-    applyTheme();
     if (themePref === "system") {
-      media.addEventListener?.("change", applyTheme);
-      return () => media.removeEventListener?.("change", applyTheme);
+      media.addEventListener?.("change", onChange);
+      return () => media.removeEventListener?.("change", onChange);
     }
   }, [themePref]);
 
@@ -238,11 +239,11 @@ export default function Settings() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           className="glass rounded-2xl p-5 mb-6 flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-white">{user.full_name?.[0]?.toUpperCase() || "U"}</span>}
+            {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-foreground">{user.full_name?.[0]?.toUpperCase() || "U"}</span>}
           </div>
           <div className="min-w-0">
-            <p className="text-base font-semibold text-white truncate">{user.full_name}</p>
-            <p className="text-sm text-white/40 truncate">{user.email}</p>
+            <p className="text-base font-semibold text-foreground truncate">{user.full_name}</p>
+            <p className="text-sm text-muted-foreground truncate">{user.email}</p>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-titan-cyan/10 text-titan-cyan font-semibold capitalize mt-1 inline-block">{user.role}</span>
           </div>
         </motion.div>
@@ -258,14 +259,14 @@ export default function Settings() {
             onClick={() => setPanel(section.id)}
             className="w-full glass rounded-2xl p-4 glass-hover transition-all duration-200 text-left flex items-center gap-4 group"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 group-hover:bg-white/10 transition-colors">
-              <section.icon className="w-5 h-5 text-white/50" />
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-muted transition-colors">
+              <section.icon className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">{section.title}</p>
-              <p className="text-xs text-white/40">{section.description}</p>
+              <p className="text-sm font-semibold text-foreground">{section.title}</p>
+              <p className="text-xs text-muted-foreground">{section.description}</p>
             </div>
-            <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/40 transition-colors flex-shrink-0" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground/40 transition-colors flex-shrink-0" />
           </motion.button>
         ))}
       </div>
@@ -278,8 +279,8 @@ export default function Settings() {
             <Gift className="w-5 h-5 text-titan-indigo" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-white">Refer a friend</p>
-            <p className="text-xs text-white/40">Refer 3 paying subscribers after launch → Lifetime Premium</p>
+            <p className="text-sm font-semibold text-foreground">Refer a friend</p>
+            <p className="text-xs text-muted-foreground">Refer 3 paying subscribers after launch → Lifetime Premium</p>
           </div>
           <ChevronRight className="w-4 h-4 text-titan-indigo/50" />
         </motion.div>
@@ -292,8 +293,8 @@ export default function Settings() {
             <ShieldAlert className="w-5 h-5 text-titan-amber" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-white">Marketplace moderation</p>
-            <p className="text-xs text-white/40">Review reports and remove unsafe listings.</p>
+            <p className="text-sm font-semibold text-foreground">Marketplace moderation</p>
+            <p className="text-xs text-muted-foreground">Review reports and remove unsafe listings.</p>
           </div>
           <ChevronRight className="w-4 h-4 text-titan-amber/50" />
         </motion.div>
@@ -307,8 +308,8 @@ export default function Settings() {
             <Bell className="w-5 h-5 text-titan-cyan" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-white">{betaBadgeLabel() || "Public Beta"}</p>
-            <p className="text-xs text-white/40">Free During Beta! All features included.</p>
+            <p className="text-sm font-semibold text-foreground">{betaBadgeLabel() || "Public Beta"}</p>
+            <p className="text-xs text-muted-foreground">Free During Beta! All features included.</p>
           </div>
           <ChevronRight className="w-4 h-4 text-titan-cyan/50" />
         </motion.div>
@@ -327,8 +328,8 @@ export default function Settings() {
             <Trash2 className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">Delete Account</p>
-            <p className="text-xs text-white/40 mt-0.5">Account deletion requests are being prepared. For now, this securely signs you out so you can contact support.</p>
+            <p className="text-sm font-semibold text-foreground">Delete Account</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Account deletion requests are being prepared. For now, this securely signs you out so you can contact support.</p>
           </div>
         </div>
         <Button onClick={() => setShowDeleteConfirm(true)} variant="outline"
@@ -338,10 +339,10 @@ export default function Settings() {
       </motion.div>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="bg-[#1A1A1C] border-white/5 text-white rounded-2xl max-w-md">
+        <AlertDialogContent className="bg-[#1A1A1C] border-border text-foreground rounded-2xl max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription className="text-white/50">
+            <AlertDialogTitle className="text-foreground">Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
               Account deletion is not yet automated. Confirming below securely signs you out; contact support to complete a permanent deletion request.
               <br /><br />
               Type <span className="font-mono text-red-400">DELETE</span> to confirm:
@@ -351,17 +352,17 @@ export default function Settings() {
             value={deleteConfirmText}
             onChange={e => setDeleteConfirmText(e.target.value)}
             placeholder="Type DELETE to confirm"
-            className="bg-[#242427] border-white/10 text-white rounded-xl font-mono"
+            className="bg-[#242427] border-border text-foreground rounded-xl font-mono"
           />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteConfirmText("")}
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl">
+              className="bg-muted border-border text-foreground hover:bg-muted rounded-xl">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleteConfirmText !== "DELETE"}
               onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); logout("/login"); }}
-              className="bg-red-500 hover:bg-red-600 text-white rounded-xl disabled:opacity-40">
+              className="bg-red-500 hover:bg-red-600 text-foreground rounded-xl disabled:opacity-40">
               Sign Out and Continue
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -370,15 +371,15 @@ export default function Settings() {
 
       {/* Profile Panel */}
       <Dialog open={activePanel === "profile"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-white text-lg">Edit Profile</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Edit Profile</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 overflow-hidden flex items-center justify-center">
-                {profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-white/40" />}
+              <div className="w-14 h-14 rounded-2xl bg-muted overflow-hidden flex items-center justify-center">
+                {profileForm.avatar_url ? <img src={profileForm.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-muted-foreground" />}
               </div>
               <label className="cursor-pointer">
-                <span className="inline-flex h-9 items-center rounded-xl border border-white/10 px-3 text-xs text-white/70 hover:bg-white/5"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "avatar_url" ? "Uploading…" : "Upload photo"}</span>
+                <span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/70 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "avatar_url" ? "Uploading…" : "Upload photo"}</span>
                 <input type="file" accept="image/*" className="sr-only" disabled={uploading === "avatar_url"} onChange={(event) => uploadImage(event.target.files?.[0], "avatar_url")} />
               </label>
             </div>
@@ -405,12 +406,12 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "company"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-white text-lg">Company</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Company</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 overflow-hidden flex items-center justify-center">{companyForm.company_logo_url ? <img src={companyForm.company_logo_url} alt="" className="w-full h-full object-cover" /> : <Building2 className="w-5 h-5 text-white/40" />}</div>
-              <label className="cursor-pointer"><span className="inline-flex h-9 items-center rounded-xl border border-white/10 px-3 text-xs text-white/70 hover:bg-white/5"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "company_logo_url" ? "Uploading…" : "Upload logo"}</span><input type="file" accept="image/*" className="sr-only" disabled={uploading === "company_logo_url"} onChange={(event) => uploadImage(event.target.files?.[0], "company_logo_url")} /></label>
+              <div className="w-14 h-14 rounded-2xl bg-muted overflow-hidden flex items-center justify-center">{companyForm.company_logo_url ? <img src={companyForm.company_logo_url} alt="" className="w-full h-full object-cover" /> : <Building2 className="w-5 h-5 text-muted-foreground" />}</div>
+              <label className="cursor-pointer"><span className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-xs text-foreground/70 hover:bg-muted"><Upload className="w-3.5 h-3.5 mr-2" />{uploading === "company_logo_url" ? "Uploading…" : "Upload logo"}</span><input type="file" accept="image/*" className="sr-only" disabled={uploading === "company_logo_url"} onChange={(event) => uploadImage(event.target.files?.[0], "company_logo_url")} /></label>
             </div>
             <FormField label="Company logo URL" value={companyForm.company_logo_url || ""} onChange={e => setCompany(f => ({ ...f, company_logo_url: e.target.value }))} />
             <FormField label="Company name" value={companyForm.company_name || ""} onChange={e => setCompany(f => ({ ...f, company_name: e.target.value }))} />
@@ -423,16 +424,16 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "notifications"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-white text-lg">Notifications</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Notifications</DialogTitle></DialogHeader>
           <div className="space-y-1 mt-2">{NOTIFICATION_OPTIONS.map(([key, label, description]) => <ToggleRow key={key} checked={notificationPrefs[key] ?? true} label={label} description={description} onChange={(value) => setNotificationPrefs((prefs) => ({ ...prefs, [key]: value }))} />)}</div>
           <Button onClick={() => save("notifications", { notification_prefs: notificationPrefs }, "Your notification preferences have been updated.")} disabled={savingPanel === "notifications"} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "notifications" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "notifications" ? "Saving…" : "Save Changes"}</Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={activePanel === "privacy"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Privacy</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Privacy</DialogTitle></DialogHeader>
           <div className="space-y-1 mt-2">
             <ToggleRow checked={privacyForm.community_opt_in} label="Join the Community" description="Enable Community features for your account." onChange={(value) => setPrivacy((form) => ({ ...form, community_opt_in: value }))} />
             <ToggleRow
@@ -448,10 +449,10 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "security"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Security</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Security</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
-            <p className="text-xs text-white/40">Choose a password with at least 8 characters.</p>
+            <p className="text-xs text-muted-foreground">Choose a password with at least 8 characters.</p>
             <FormField label="New password" type="password" autoComplete="new-password" value={passwordForm.password} onChange={e => setPassword((form) => ({ ...form, password: e.target.value }))} />
             <FormField label="Confirm new password" type="password" autoComplete="new-password" value={passwordForm.confirmPassword} onChange={e => setPassword((form) => ({ ...form, confirmPassword: e.target.value }))} />
             <Button onClick={savePassword} disabled={savingPanel === "security"} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "security" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "security" ? "Saving…" : "Change Password"}</Button>
@@ -460,16 +461,16 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "accounts"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Connected accounts</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Connected accounts</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
-            <div className="rounded-xl border border-white/10 p-4">
-              <p className="text-sm font-semibold text-white">Email</p>
-              <p className="text-xs text-white/40 mt-1">{user?.email || "Email sign-in"}</p>
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-sm font-semibold text-foreground">Email</p>
+              <p className="text-xs text-muted-foreground mt-1">{user?.email || "Email sign-in"}</p>
             </div>
-            <div className="rounded-xl border border-white/10 p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center justify-between gap-3">
-                <div><p className="text-sm font-semibold text-white">Google</p><p className="text-xs text-white/40 mt-1">{connectedProviders.includes("google") ? "Connected" : "Sign in with Google available on Login"}</p></div>
+                <div><p className="text-sm font-semibold text-foreground">Google</p><p className="text-xs text-muted-foreground mt-1">{connectedProviders.includes("google") ? "Connected" : "Sign in with Google available on Login"}</p></div>
                 {connectedProviders.includes("google") ? <Check className="w-5 h-5 text-emerald-400" /> : <Button size="sm" onClick={() => api.auth.loginWithProvider?.("google")} className="bg-titan-cyan text-black hover:bg-titan-cyan/90">Connect</Button>}
               </div>
             </div>
@@ -478,10 +479,10 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "theme"} onOpenChange={closePanel}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white text-lg">Theme</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground text-lg">Theme</DialogTitle></DialogHeader>
           <div className="grid grid-cols-3 gap-2 mt-2">
-            {["system", "light", "dark"].map((option) => <button key={option} type="button" onClick={() => setThemePref(option)} className={`rounded-xl border px-3 py-4 text-sm font-medium capitalize transition-colors ${themePref === option ? "border-titan-cyan bg-titan-cyan/10 text-titan-cyan" : "border-white/10 text-white/60 hover:bg-white/5"}`}>{option}</button>)}
+            {["system", "light", "dark"].map((option) => <button key={option} type="button" onClick={() => setThemePref(option)} className={`rounded-xl border px-3 py-4 text-sm font-medium capitalize transition-colors ${themePref === option ? "border-titan-cyan bg-titan-cyan/10 text-titan-cyan" : "border-border text-muted-foreground hover:bg-muted"}`}>{option}</button>)}
           </div>
           <Button onClick={() => save("theme", { theme_pref: themePref }, "Your theme preference has been updated.")} disabled={savingPanel === "theme"} className="w-full mt-4 bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "theme" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "theme" ? "Saving…" : "Save Theme"}</Button>
         </DialogContent>

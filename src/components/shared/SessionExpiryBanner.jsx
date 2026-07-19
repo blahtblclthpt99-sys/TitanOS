@@ -17,7 +17,7 @@ export default function SessionExpiryBanner() {
     >
       <div className="max-w-3xl mx-auto glass border border-titan-amber/30 bg-titan-amber/10 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg">
         <Clock className="w-4 h-4 text-titan-amber flex-shrink-0" aria-hidden="true" />
-        <p className="text-sm text-white flex-1">
+        <p className="text-sm text-foreground flex-1">
           Your session expires in{" "}
           <span className="font-semibold text-titan-amber">
             {minutesRemaining} minute{minutesRemaining === 1 ? "" : "s"}
@@ -36,7 +36,7 @@ export default function SessionExpiryBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss session warning"
-          className="text-white/40 hover:text-white transition-colors p-1"
+          className="text-muted-foreground hover:text-foreground transition-colors p-1"
         >
           <X className="w-4 h-4" />
         </button>

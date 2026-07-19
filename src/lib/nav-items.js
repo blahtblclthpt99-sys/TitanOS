@@ -25,14 +25,21 @@ import {
   Route,
   ScanLine,
   Building2,
-  Package, UserCog, MessageSquare, Star, BadgeCheck, ContactRound, Sparkles,
+  Package,
+  UserCog,
+  MessageSquare,
+  Star,
+  BadgeCheck,
+  ContactRound,
+  Sparkles,
+  User,
 } from "lucide-react";
 
 /** Full TitanOS navigation — field ops + marketplace platform. */
 export const APP_NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/", group: "core" },
-  { icon: Users, label: "Customers", path: "/customers", group: "core" },
+  { icon: LayoutDashboard, label: "Command Center", path: "/", group: "core" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "core" },
+  { icon: Users, label: "Customers", path: "/customers", group: "core" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "ops" },
   { icon: FileText, label: "Estimates", path: "/estimates", group: "ops" },
   { icon: Calculator, label: "Price Estimator", path: "/job-estimator", group: "ops" },
@@ -65,33 +72,50 @@ export const APP_NAV_ITEMS = [
   { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "account" },
 ];
 
+export const NAV_GROUP_LABELS = {
+  core: "Workspace",
+  ops: "Operations",
+  growth: "Growth",
+  insights: "Insights",
+  account: "Account",
+};
+
+/** Mobile bottom tabs — Home, Jobs, Marketplace, Messages (Community), Profile */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Users, label: "Clients", path: "/customers" },
-  { icon: Receipt, label: "Invoices", path: "/invoices" },
+  { icon: Store, label: "Market", path: "/marketplace" },
+  { icon: UsersRound, label: "Messages", path: "/community" },
+  { icon: User, label: "Profile", path: "/settings" },
 ];
 
 /** Paths that keep the bottom tab bar “selected root” chrome (no Back). */
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/customers", "/invoices", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/marketplace", "/community", "/settings", "/more"];
 
 export const MORE_MENU_GROUPS = [
   {
     title: "Operations",
-    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts", "/routes", "/receipts"],
+    paths: ["/schedule", "/estimates", "/job-estimator", "/invoices", "/customers", "/finances", "/tax-center", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts", "/routes", "/receipts"],
   },
   {
     title: "Insights",
-    paths: ["/reports", "/assistant", "/growth-coach", "/community", "/notifications"],
+    paths: ["/reports", "/assistant", "/growth-coach", "/notifications"],
   },
   {
     title: "Growth",
-    paths: ["/marketplace", "/hire", "/insurance", "/referral", "/payments", "/leads", "/follow-ups", "/reputation"],
+    paths: ["/hire", "/insurance", "/referral", "/payments", "/leads", "/follow-ups", "/reputation"],
   },
   {
     title: "Account",
-    paths: ["/settings", "/companies", "/admin/moderation"],
+    paths: ["/companies", "/admin/moderation", "/more"],
   },
+];
+
+export const QUICK_CREATE_ACTIONS = [
+  { label: "Create Estimate", path: "/estimates?new=1", icon: FileText },
+  { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
+  { label: "Invoice", path: "/invoices?new=1", icon: Receipt },
+  { label: "Customer", path: "/customers?new=1", icon: Users },
 ];
 
 export function navItemsByPaths(paths) {

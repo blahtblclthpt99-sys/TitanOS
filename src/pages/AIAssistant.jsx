@@ -205,7 +205,7 @@ export default function AIAssistant() {
         <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
           <div className="glass rounded-2xl rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3">
             <div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0" />
-            <span className="text-xs text-white/50">Executing…</span>
+            <span className="text-xs text-muted-foreground">Executing…</span>
           </div>
         </motion.div>
       );
@@ -233,7 +233,7 @@ export default function AIAssistant() {
     return (
       <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
         <div className="glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
-          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-white/80 [&_li]:text-white/80 [&_strong]:text-white [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground/80 [&_li]:text-foreground/80 [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
             {msg.content}
           </ReactMarkdown>
         </div>
@@ -250,27 +250,27 @@ export default function AIAssistant() {
         maxHeight: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
       }}
     >
-      <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-white/5 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">
-            <Bot className="w-5 h-5 text-white" />
+            <Bot className="w-5 h-5 text-foreground" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-white leading-tight">Titan AI</h1>
+            <h1 className="text-base font-bold text-foreground leading-tight">Titan AI</h1>
             <div className="flex items-center gap-1.5">
               {dataLoading ? (
-                <span className="text-xs text-white/30">Loading snapshot…</span>
+                <span className="text-xs text-muted-foreground">Loading snapshot…</span>
               ) : dataError ? (
                 <>
                   <span className="text-xs text-red-400">Data unavailable</span>
-                  <button onClick={loadBusinessData} className="text-white/30 hover:text-white/60 transition-colors">
+                  <button onClick={loadBusinessData} className="text-muted-foreground hover:text-foreground/60 transition-colors">
                     <RefreshCw className="w-3 h-3" />
                   </button>
                 </>
               ) : (
                 <>
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs text-white/40">
+                  <span className="text-xs text-muted-foreground">
                     Live · {businessSummary?.counts?.customers || 0} customers ·{" "}
                     {businessSummary?.counts?.jobs || 0} jobs
                   </span>
@@ -282,7 +282,7 @@ export default function AIAssistant() {
         {messages.length > 0 && (
           <button
             onClick={clearChat}
-            className="text-white/25 hover:text-white/60 transition-colors p-2 rounded-xl hover:bg-white/5"
+            className="text-muted-foreground hover:text-foreground/60 transition-colors p-2 rounded-xl hover:bg-muted"
             title="New conversation"
           >
             <RotateCcw className="w-4 h-4" />
@@ -300,8 +300,8 @@ export default function AIAssistant() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center mb-5 ai-pulse">
               <Sparkles className="w-8 h-8 text-titan-cyan" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">What can I do for you?</h2>
-            <p className="text-sm text-white/40 mb-8 max-w-sm leading-relaxed">
+            <h2 className="text-xl font-bold text-foreground mb-2">What can I do for you?</h2>
+            <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
               Ask about today&apos;s jobs, who owes money, revenue, or profit — answers use your live TitanOS data.
             </p>
             <div className="grid grid-cols-2 gap-2 w-full max-w-md">
@@ -310,7 +310,7 @@ export default function AIAssistant() {
                   key={s.label}
                   onClick={() => sendMessage(s.prompt)}
                   disabled={loading}
-                  className="text-left px-4 py-3 rounded-xl glass glass-hover text-sm text-white/60 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+                  className="text-left px-4 py-3 rounded-xl glass glass-hover text-sm text-muted-foreground hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
                 >
                   <Zap className="w-3 h-3 inline mr-2 text-titan-cyan" />
                   {s.label}
@@ -326,7 +326,7 @@ export default function AIAssistant() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="px-4 md:px-8 pb-6 pt-3 border-t border-white/5 flex-shrink-0">
+      <div className="px-4 md:px-8 pb-6 pt-3 border-t border-border flex-shrink-0">
         {confirming && (
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-titan-amber mb-3">
             Confirm or cancel the action above before sending a new message.
@@ -339,7 +339,7 @@ export default function AIAssistant() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !isInputDisabled && sendMessage()}
             placeholder={confirming ? "Waiting for confirmation…" : "Ask Titan anything…"}
-            className="bg-[#1A1A1C] border-white/5 text-white rounded-2xl h-12 pl-5 placeholder:text-white/20 focus:ring-1 focus:ring-titan-cyan/30 disabled:opacity-50"
+            className="bg-[#1A1A1C] border-border text-foreground rounded-2xl h-12 pl-5 placeholder:text-muted-foreground focus:ring-1 focus:ring-titan-cyan/30 disabled:opacity-50"
             disabled={isInputDisabled}
           />
           <button

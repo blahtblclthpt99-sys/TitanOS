@@ -12,19 +12,23 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import PageNotFound from "@/lib/PageNotFound";
 import { normalizeAppPath } from "@/lib/routing";
 
-const TAB_PATHS = ["/", "/jobs", "/customers", "/invoices", "/more"];
+const TAB_PATHS = ["/", "/jobs", "/marketplace", "/community", "/settings", "/more"];
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
+const MarketplaceTab = lazy(() => import("@/pages/Marketplace"));
+const CommunityTab = lazy(() => import("@/pages/Community"));
+const SettingsTab = lazy(() => import("@/pages/Settings"));
 
 const TAB_COMPONENTS = {
   "/": Dashboard,
   "/jobs": Jobs,
-  "/customers": Customers,
-  "/invoices": Invoices,
+  "/marketplace": MarketplaceTab,
+  "/community": CommunityTab,
+  "/settings": SettingsTab,
   "/more": MoreMenu,
 };
 
@@ -36,13 +40,10 @@ const Finances = lazy(() => import("@/pages/Finances"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
 const Reports = lazy(() => import("@/pages/Reports"));
-const Settings = lazy(() => import("@/pages/Settings"));
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
-const Marketplace = lazy(() => import("@/pages/Marketplace"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
-const Community = lazy(() => import("@/pages/Community"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -67,13 +68,12 @@ const NON_TAB_ROUTES = {
   "/fleet": Fleet,
   "/tax-center": TaxCenter,
   "/reports": Reports,
-  "/settings": Settings,
+  "/customers": Customers,
+  "/invoices": Invoices,
   "/assistant": AIAssistant,
-  "/marketplace": Marketplace,
   "/insurance": Insurance,
   "/referral": Referral,
   "/hire": Hire,
-  "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
   "/admin/moderation": AdminModeration,

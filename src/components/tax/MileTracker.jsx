@@ -73,8 +73,8 @@ export default function MileTracker({ taxYear }) {
             <Car className="w-5 h-5 text-titan-cyan" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white">Mile Tracker</h3>
-            <p className="text-xs text-white/40">{taxYear} · IRS rate $0.67/mile</p>
+            <h3 className="text-base font-semibold text-foreground">Mile Tracker</h3>
+            <p className="text-xs text-muted-foreground">{taxYear} · IRS rate $0.67/mile</p>
           </div>
         </div>
         <Button onClick={() => setShowForm(true)}
@@ -88,29 +88,29 @@ export default function MileTracker({ taxYear }) {
         <div className="rounded-xl bg-titan-cyan/5 border border-titan-cyan/15 p-4">
           <div className="flex items-center gap-2 mb-1">
             <Navigation className="w-3.5 h-3.5 text-titan-cyan" />
-            <span className="text-xs text-white/40">Total Miles</span>
+            <span className="text-xs text-muted-foreground">Total Miles</span>
           </div>
-          <p className="text-2xl font-bold text-white tabular-nums">{totalMiles.toLocaleString()}</p>
-          <p className="text-xs text-white/30 mt-0.5">{trips.length} trip{trips.length !== 1 ? "s" : ""} logged</p>
+          <p className="text-2xl font-bold text-foreground tabular-nums">{totalMiles.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{trips.length} trip{trips.length !== 1 ? "s" : ""} logged</p>
         </div>
         <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-4">
           <div className="flex items-center gap-2 mb-1">
             <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-xs text-white/40">Tax Deduction</span>
+            <span className="text-xs text-muted-foreground">Tax Deduction</span>
           </div>
           <p className="text-2xl font-bold text-emerald-400 tabular-nums">${totalDeduction.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-          <p className="text-xs text-white/30 mt-0.5">saved from your tax bill</p>
+          <p className="text-xs text-muted-foreground mt-0.5">saved from your tax bill</p>
         </div>
       </div>
 
       {/* Trip list */}
       {loading ? (
-        <div className="text-center py-8 text-white/30 text-sm">Loading trips…</div>
+        <div className="text-center py-8 text-muted-foreground text-sm">Loading trips…</div>
       ) : trips.length === 0 ? (
-        <div className="text-center py-10 border border-dashed border-white/10 rounded-xl">
-          <Car className="w-8 h-8 text-white/20 mx-auto mb-3" />
-          <p className="text-sm text-white/30">No trips logged for {taxYear}</p>
-          <p className="text-xs text-white/20 mt-1">Every business mile at $0.67 = real tax savings</p>
+        <div className="text-center py-10 border border-dashed border-border rounded-xl">
+          <Car className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No trips logged for {taxYear}</p>
+          <p className="text-xs text-muted-foreground mt-1">Every business mile at $0.67 = real tax savings</p>
           <button onClick={() => setShowForm(true)}
             className="mt-4 text-xs text-titan-cyan hover:text-titan-cyan/80 transition-colors">
             Log your first trip →
@@ -122,28 +122,28 @@ export default function MileTracker({ taxYear }) {
             {trips.map(t => (
               <motion.div key={t.id}
                 initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 group">
+                className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border group">
                 <div className="w-8 h-8 rounded-lg bg-titan-cyan/10 flex items-center justify-center flex-shrink-0">
                   <Car className="w-3.5 h-3.5 text-titan-cyan" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white truncate">{t.purpose}</p>
-                    {t.customer_name && <span className="text-xs text-white/30 truncate">· {t.customer_name}</span>}
+                    <p className="text-sm font-medium text-foreground truncate">{t.purpose}</p>
+                    {t.customer_name && <span className="text-xs text-muted-foreground truncate">· {t.customer_name}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-white/35">{formatMonthDay(t.date)}</p>
+                    <p className="text-xs text-muted-foreground">{formatMonthDay(t.date)}</p>
                     {t.from_location && t.to_location && (
-                      <p className="text-xs text-white/25 truncate">{t.from_location} → {t.to_location}</p>
+                      <p className="text-xs text-muted-foreground truncate">{t.from_location} → {t.to_location}</p>
                     )}
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-white tabular-nums">{t.miles} mi</p>
+                  <p className="text-sm font-semibold text-foreground tabular-nums">{t.miles} mi</p>
                   <p className="text-xs text-emerald-400 tabular-nums">${(t.miles * MILEAGE_RATE).toFixed(2)}</p>
                 </div>
                 <button onClick={() => handleDelete(t.id)} disabled={deleting === t.id}
-                  className="ml-1 text-white/15 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 min-w-[32px] min-h-[32px] flex items-center justify-center">
+                  className="ml-1 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 min-w-[32px] min-h-[32px] flex items-center justify-center">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </motion.div>
@@ -154,48 +154,48 @@ export default function MileTracker({ taxYear }) {
 
       {/* Log Trip Dialog */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setForm(BLANK); setShowForm(false); } }}>
-        <DialogContent className="bg-[#1A1A1C] border-white/5 text-white max-w-sm rounded-2xl">
-          <DialogHeader><DialogTitle className="text-white">Log Business Trip</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#1A1A1C] border-border text-foreground max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-foreground">Log Business Trip</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-white/50 text-xs font-medium block mb-1">Date</label>
+                <label className="text-muted-foreground text-xs font-medium block mb-1">Date</label>
                 <Input type="date" value={form.date} onChange={e => f("date", e.target.value)}
-                  className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                  className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
               </div>
               <div>
-                <label className="text-white/50 text-xs font-medium block mb-1">Miles <span className="text-titan-cyan">*</span></label>
+                <label className="text-muted-foreground text-xs font-medium block mb-1">Miles <span className="text-titan-cyan">*</span></label>
                 <Input type="number" placeholder="0.0" value={form.miles} onChange={e => f("miles", e.target.value)}
-                  className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                  className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
               </div>
             </div>
             <div>
-              <label className="text-white/50 text-xs font-medium block mb-1">Purpose <span className="text-titan-cyan">*</span></label>
+              <label className="text-muted-foreground text-xs font-medium block mb-1">Purpose <span className="text-titan-cyan">*</span></label>
               <Input placeholder="e.g. Client visit, Supply run" value={form.purpose} onChange={e => f("purpose", e.target.value)}
-                className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
-              <label className="text-white/50 text-xs font-medium block mb-1">From</label>
+              <label className="text-muted-foreground text-xs font-medium block mb-1">From</label>
               <Input placeholder="Starting location" value={form.from_location} onChange={e => f("from_location", e.target.value)}
-                className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
-              <label className="text-white/50 text-xs font-medium block mb-1">To</label>
+              <label className="text-muted-foreground text-xs font-medium block mb-1">To</label>
               <Input placeholder="Destination" value={form.to_location} onChange={e => f("to_location", e.target.value)}
-                className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
             </div>
             <div>
-              <label className="text-white/50 text-xs font-medium block mb-1">Client / Customer</label>
+              <label className="text-muted-foreground text-xs font-medium block mb-1">Client / Customer</label>
               <Input placeholder="Optional" value={form.customer_name} onChange={e => f("customer_name", e.target.value)}
-                className="bg-[#242427] border-white/5 text-white rounded-xl h-10" />
+                className="bg-[#242427] border-border text-foreground rounded-xl h-10" />
             </div>
 
             {/* Live deduction preview */}
             {form.miles > 0 && (
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-center">
-                <p className="text-xs text-white/50">This trip saves you</p>
+                <p className="text-xs text-muted-foreground">This trip saves you</p>
                 <p className="text-xl font-bold text-emerald-400">${(parseFloat(form.miles) * MILEAGE_RATE).toFixed(2)}</p>
-                <p className="text-xs text-white/30">in tax deductions</p>
+                <p className="text-xs text-muted-foreground">in tax deductions</p>
               </div>
             )}
 

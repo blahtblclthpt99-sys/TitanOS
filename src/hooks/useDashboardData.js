@@ -7,6 +7,8 @@ import {
   currentMonthKey,
   prevMonthRange,
   relativeTime,
+  thisWeekRange,
+  addDaysISO,
 } from "@/lib/date-utils";
 
 import { DASHBOARD_QUERIES } from "@/lib/dashboard-queries";
@@ -14,13 +16,24 @@ import { DASHBOARD_QUERIES } from "@/lib/dashboard-queries";
 function buildDashboardData(jobs, invoices, estimates, customers, employees) {
   const today = todayISO();
   const { start: prevMonthStart, end: prevMonthEnd } = prevMonthRange();
+  const { start: weekStart, end: weekEnd } = thisWeekRange();
+  const nextWeekEnd = addDaysISO(7);
 
-  const todayJobs = jobs.filter((j) => j.scheduled_date === today);
+  const todayJobs = jobs
+    .filter((j) => j.scheduled_date === today)
+    .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || ""));
+  const upcomingJobs = jobs
+    .filter((j) => j.scheduled_date > today && j.scheduled_date <= nextWeekEnd && j.status !== "cancelled")
+    .sort((a, b) => (a.scheduled_date || "").localeCompare(b.scheduled_date || ""))
+    .slice(0, 6);
   const inProgressJobs = jobs.filter((j) => j.status === "in_progress");
   const overdueInv = invoices.filter((i) => i.status === "overdue");
   const pendingInv = invoices.filter((i) => ["sent", "viewed"].includes(i.status));
   const pendingEst = estimates.filter((e) => ["sent", "viewed"].includes(e.status));
-  const recentCust = customers.slice(0, 3);
+  const recentCust = customers.slice(0, 5);
+  const recentPaid = invoices
+    .filter((i) => i.status === "paid")
+    .slice(0, 5);
 
   const thisMonthKey = currentMonthKey();
   const thisMonthPaid = invoices.filter(
@@ -30,8 +43,13 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
     const d = (i.created_date || "").slice(0, 10);
     return i.status === "paid" && d >= prevMonthStart && d <= prevMonthEnd;
   });
+  const weekPaid = invoices.filter((i) => {
+    const d = (i.created_date || i.paid_at || "").slice(0, 10);
+    return i.status === "paid" && d >= weekStart && d <= weekEnd;
+  });
   const monthRevenue = thisMonthPaid.reduce((s, i) => s + (i.total || 0), 0);
   const prevMonthRevenue = prevMonthPaid.reduce((s, i) => s + (i.total || 0), 0);
+  const weekRevenue = weekPaid.reduce((s, i) => s + (i.total || 0), 0);
 
   const todayRevenue = todayJobs
     .filter((j) => j.status === "completed")
@@ -89,18 +107,21 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
 
   return {
     todayJobs,
+    upcomingJobs,
     inProgressJobs,
     overdueInv,
     pendingInv,
     pendingEst,
     monthRevenue,
     prevMonthRevenue,
+    weekRevenue,
     todayRevenue,
     pipelineToday,
     overdueTotal,
     outstandingTotal,
     nextActions,
     recentCust,
+    recentPaid,
     topPendingEst: pendingEst[0] || null,
     totalCustomers: customers.length,
     activeEmployees: employees.filter((e) => e.status === "active").length,

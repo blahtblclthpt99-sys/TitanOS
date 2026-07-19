@@ -155,7 +155,7 @@ export default function Payments() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
       <PageHeader title="Payments" subtitle="Connect providers and collect customer payments" />
-      <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-white/70">
+      <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/70">
         <span className="text-titan-cyan font-semibold">
           Your plan: {plan.name} · {plan.feeLabel} fee
         </span>
@@ -175,19 +175,19 @@ export default function Payments() {
         {PROVIDERS.map((provider) => {
           const connected = accounts.find((account) => account.provider === provider)?.is_connected;
           return (
-            <article key={provider} className="glass rounded-2xl p-5 border border-white/8">
+            <article key={provider} className="glass rounded-2xl p-5 border border-border">
               <div className="flex items-center justify-between">
                 <CreditCard className="w-5 h-5 text-titan-cyan" />
                 <span
                   className={`text-xs px-2 py-1 rounded-full ${
-                    connected ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-white/45"
+                    connected ? "bg-emerald-400/15 text-emerald-300" : "bg-muted text-foreground/45"
                   }`}
                 >
                   {connected ? "Connected" : "Not connected"}
                 </span>
               </div>
-              <h2 className="text-lg font-semibold text-white capitalize mt-4">{provider}</h2>
-              <p className="text-xs text-white/40 mt-1 min-h-8">
+              <h2 className="text-lg font-semibold text-foreground capitalize mt-4">{provider}</h2>
+              <p className="text-xs text-muted-foreground mt-1 min-h-8">
                 {provider === "stripe"
                   ? "Stripe Checkout is live when your secret key is configured on the server."
                   : "Mark connected locally while provider setup is in beta."}
@@ -196,7 +196,7 @@ export default function Payments() {
                 onClick={() => toggleProvider(provider)}
                 disabled={saving}
                 variant="outline"
-                className="mt-4 w-full border-white/10 text-white"
+                className="mt-4 w-full border-border text-foreground"
               >
                 {connected ? "Disconnect" : "Connect"}
               </Button>
@@ -206,8 +206,8 @@ export default function Payments() {
       </section>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        <form onSubmit={submit} className="glass rounded-2xl p-6 border border-white/8 lg:col-span-2 space-y-4">
-          <h2 className="font-semibold text-white">Create payment link</h2>
+        <form onSubmit={submit} className="glass rounded-2xl p-6 border border-border lg:col-span-2 space-y-4">
+          <h2 className="font-semibold text-foreground">Create payment link</h2>
           <Input
             required
             type="number"
@@ -216,19 +216,19 @@ export default function Payments() {
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
             placeholder="Amount ($)"
-            className="bg-titan-surface2 border-white/10 text-white"
+            className="bg-titan-surface2 border-border text-foreground"
           />
           {feePreview && (
-            <div className="rounded-xl bg-white/[0.03] border border-white/8 p-3 text-xs text-white/55 space-y-1">
+            <div className="rounded-xl bg-muted/50 border border-border p-3 text-xs text-muted-foreground space-y-1">
               <div className="flex justify-between">
                 <span>Invoice amount</span>
-                <span className="text-white">{formatMoney(feePreview.base)}</span>
+                <span className="text-foreground">{formatMoney(feePreview.base)}</span>
               </div>
               <div className="flex justify-between">
                 <span>TitanOS fee ({feePreview.percentLabel})</span>
                 <span className="text-titan-cyan">{formatMoney(feePreview.fee)}</span>
               </div>
-              <div className="flex justify-between font-semibold text-white border-t border-white/8 pt-1">
+              <div className="flex justify-between font-semibold text-foreground border-t border-border pt-1">
                 <span>Customer pays</span>
                 <span>{formatMoney(feePreview.total)}</span>
               </div>
@@ -239,13 +239,13 @@ export default function Payments() {
             value={form.customer_name}
             onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
             placeholder="Customer name"
-            className="bg-titan-surface2 border-white/10 text-white"
+            className="bg-titan-surface2 border-border text-foreground"
           />
           <Input
             value={form.invoice_id}
             onChange={(e) => setForm({ ...form, invoice_id: e.target.value })}
             placeholder="Invoice ID (optional)"
-            className="bg-titan-surface2 border-white/10 text-white"
+            className="bg-titan-surface2 border-border text-foreground"
           />
           <NativeSelect
             value={form.provider}
@@ -258,10 +258,10 @@ export default function Payments() {
           </Button>
         </form>
 
-        <section className="glass rounded-2xl p-6 border border-white/8 lg:col-span-3">
-          <h2 className="font-semibold text-white mb-4">Payment history</h2>
+        <section className="glass rounded-2xl p-6 border border-border lg:col-span-3">
+          <h2 className="font-semibold text-foreground mb-4">Payment history</h2>
           {loading ? (
-            <p className="text-sm text-white/40">Loading payments…</p>
+            <p className="text-sm text-muted-foreground">Loading payments…</p>
           ) : payments.length ? (
             <div className="space-y-3">
               {payments.map((payment) => {
@@ -271,13 +271,13 @@ export default function Payments() {
                 return (
                   <div
                     key={payment.id}
-                    className="rounded-xl bg-white/[0.03] p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+                    className="rounded-xl bg-muted/50 p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
                   >
                     <div>
-                      <p className="font-medium text-white">
+                      <p className="font-medium text-foreground">
                         {payment.customer_name || "Customer"} · {formatMoney(total)}
                       </p>
-                      <p className="text-xs text-white/40 mt-1 capitalize">
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">
                         {payment.provider}
                         {payment.invoice_id ? ` · ${payment.invoice_id}` : ""}
                         {fee > 0 ? ` · fee ${formatMoney(fee)} on ${formatMoney(base)}` : ""}
@@ -320,7 +320,7 @@ export default function Payments() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-white/40">No payment links yet.</p>
+            <p className="text-sm text-muted-foreground">No payment links yet.</p>
           )}
         </section>
       </div>

@@ -1,7 +1,7 @@
 import React from "react";
 
 function SkeletonBox({ className = "" }) {
-  return <div className={`bg-white/5 rounded-xl animate-pulse ${className}`} aria-hidden="true" />;
+  return <div className={`bg-muted rounded-xl animate-pulse ${className}`} aria-hidden="true" />;
 }
 
 export function DashboardSkeleton() {

@@ -41,11 +41,11 @@ export default function QuickActions() {
             <div
               className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${action.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-lg`}
             >
-              <action.icon className="w-5 h-5 text-white" />
+              <action.icon className="w-5 h-5 text-foreground" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white leading-tight">{action.label}</p>
-              <p className="text-xs text-white/35 mt-0.5 leading-tight">{action.sub}</p>
+              <p className="text-sm font-semibold text-foreground leading-tight">{action.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{action.sub}</p>
             </div>
           </Link>
         </motion.div>

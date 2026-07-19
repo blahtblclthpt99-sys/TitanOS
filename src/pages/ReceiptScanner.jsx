@@ -52,17 +52,17 @@ export default function ReceiptScanner() {
 
   return <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
     <PageHeader title="Receipt Scanner" subtitle="Turn receipts into tax-deductible expenses" />
-    <div className="glass rounded-2xl p-6 border border-white/8 space-y-5">
+    <div className="glass rounded-2xl p-6 border border-border space-y-5">
       <input ref={inputRef} type="file" accept="image/*" onChange={selectFile} className="hidden" />
-      {preview ? <img src={preview} alt="Receipt preview" className="w-full max-h-72 object-contain rounded-xl bg-black/20" /> : <button onClick={() => inputRef.current?.click()} className="w-full h-36 rounded-xl border border-dashed border-white/15 hover:border-titan-cyan/50 flex flex-col items-center justify-center gap-2"><Camera className="w-7 h-7 text-titan-cyan" /><span className="text-sm text-white/50">Upload receipt image</span></button>}
-      {preview && <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} className="border-white/10 text-white">Choose another image</Button>}
-      <Textarea value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={4} placeholder="Optional: paste OCR text from the receipt" className="bg-titan-surface2 border-white/10 text-white" />
+      {preview ? <img src={preview} alt="Receipt preview" className="w-full max-h-72 object-contain rounded-xl bg-black/20" /> : <button onClick={() => inputRef.current?.click()} className="w-full h-36 rounded-xl border border-dashed border-border hover:border-titan-cyan/50 flex flex-col items-center justify-center gap-2"><Camera className="w-7 h-7 text-titan-cyan" /><span className="text-sm text-muted-foreground">Upload receipt image</span></button>}
+      {preview && <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} className="border-border text-foreground">Choose another image</Button>}
+      <Textarea value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={4} placeholder="Optional: paste OCR text from the receipt" className="bg-titan-surface2 border-border text-foreground" />
       <Button type="button" onClick={parse} disabled={parsing || (!file && !pastedText.trim())} className="w-full bg-titan-cyan text-black font-semibold">{parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ScanLine className="w-4 h-4 mr-2" />Parse receipt</>}</Button>
     </div>
-    <div className="glass rounded-2xl p-6 mt-6 border border-white/8 space-y-4">
-      <h2 className="font-semibold text-white">Review expense</h2>
-      <Input value={receipt.vendor} onChange={(event) => change("vendor", event.target.value)} placeholder="Vendor" className="bg-titan-surface2 border-white/10 text-white" />
-      <div className="grid sm:grid-cols-2 gap-4"><Input type="number" step="0.01" min="0" value={receipt.amount} onChange={(event) => change("amount", event.target.value)} placeholder="Amount ($)" className="bg-titan-surface2 border-white/10 text-white" /><Input type="date" value={receipt.date} onChange={(event) => change("date", event.target.value)} className="bg-titan-surface2 border-white/10 text-white" /></div>
+    <div className="glass rounded-2xl p-6 mt-6 border border-border space-y-4">
+      <h2 className="font-semibold text-foreground">Review expense</h2>
+      <Input value={receipt.vendor} onChange={(event) => change("vendor", event.target.value)} placeholder="Vendor" className="bg-titan-surface2 border-border text-foreground" />
+      <div className="grid sm:grid-cols-2 gap-4"><Input type="number" step="0.01" min="0" value={receipt.amount} onChange={(event) => change("amount", event.target.value)} placeholder="Amount ($)" className="bg-titan-surface2 border-border text-foreground" /><Input type="date" value={receipt.date} onChange={(event) => change("date", event.target.value)} className="bg-titan-surface2 border-border text-foreground" /></div>
       <NativeSelect value={receipt.category} onValueChange={(category) => change("category", category)} placeholder="Category" options={EXPENSE_CATEGORIES.map((item) => ({ value: item.id, label: item.label }))} />
       <Button onClick={save} disabled={saving || !receipt.vendor || !Number(receipt.amount)} className="w-full bg-titan-cyan text-black font-semibold">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save deductible expense"}</Button>
     </div>

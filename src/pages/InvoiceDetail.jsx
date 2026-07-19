@@ -38,7 +38,7 @@ export default function InvoiceDetail() {
     );
   }
   if (!invoice) {
-    return <div className="p-8 text-white/40 text-center" role="status">Invoice not found.</div>;
+    return <div className="p-8 text-muted-foreground text-center" role="status">Invoice not found.</div>;
   }
 
   return (
@@ -48,20 +48,20 @@ export default function InvoiceDetail() {
         <div className="glass rounded-2xl p-6 mb-4">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <p className="text-xs text-white/40 mb-1">Invoice</p>
-              <h1 className="text-2xl font-bold text-white">{invoice.invoice_number || "Draft"}</h1>
-              <p className="text-sm text-white/50 mt-1">{invoice.customer_name}</p>
+              <p className="text-xs text-muted-foreground mb-1">Invoice</p>
+              <h1 className="text-2xl font-bold text-foreground">{invoice.invoice_number || "Draft"}</h1>
+              <p className="text-sm text-muted-foreground mt-1">{invoice.customer_name}</p>
             </div>
             <StatusBadge status={invoice.status} />
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm border-t border-white/5 pt-4">
+          <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
             <div>
-              <p className="text-white/40 text-xs mb-1">Due Date</p>
-              <p className="text-white font-medium">{invoice.due_date ? formatMonthDayYear(invoice.due_date) : "—"}</p>
+              <p className="text-muted-foreground text-xs mb-1">Due Date</p>
+              <p className="text-foreground font-medium">{invoice.due_date ? formatMonthDayYear(invoice.due_date) : "—"}</p>
             </div>
             <div>
-              <p className="text-white/40 text-xs mb-1">Created</p>
-              <p className="text-white font-medium">{formatMonthDayYear(invoice.created_date)}</p>
+              <p className="text-muted-foreground text-xs mb-1">Created</p>
+              <p className="text-foreground font-medium">{formatMonthDayYear(invoice.created_date)}</p>
             </div>
           </div>
         </div>
@@ -69,15 +69,15 @@ export default function InvoiceDetail() {
         {/* Line items */}
         {invoice.line_items?.length > 0 && (
           <div className="glass rounded-2xl p-5 mb-4">
-            <p className="text-xs text-white/40 font-medium mb-3">Line Items</p>
+            <p className="text-xs text-muted-foreground font-medium mb-3">Line Items</p>
             <div className="space-y-3">
               {invoice.line_items.map((item, i) => (
                 <div key={i} className="flex justify-between items-center gap-4 min-h-[44px]">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{item.description}</p>
-                    <p className="text-xs text-white/40">{item.quantity} × ${(item.unit_price || 0).toFixed(2)}</p>
+                    <p className="text-sm text-foreground truncate">{item.description}</p>
+                    <p className="text-xs text-muted-foreground">{item.quantity} × ${(item.unit_price || 0).toFixed(2)}</p>
                   </div>
-                  <p className="text-sm font-semibold text-white tabular-nums flex-shrink-0">${(item.total || 0).toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-foreground tabular-nums flex-shrink-0">${(item.total || 0).toFixed(2)}</p>
                 </div>
               ))}
             </div>
@@ -87,17 +87,17 @@ export default function InvoiceDetail() {
         {/* Totals */}
         <div className="glass rounded-2xl p-5 mb-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-white/40">Subtotal</span>
-            <span className="text-white tabular-nums">${(invoice.subtotal || 0).toFixed(2)}</span>
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-foreground tabular-nums">${(invoice.subtotal || 0).toFixed(2)}</span>
           </div>
           {invoice.tax_amount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-white/40">Tax ({invoice.tax_rate}%)</span>
-              <span className="text-white tabular-nums">${invoice.tax_amount.toFixed(2)}</span>
+              <span className="text-muted-foreground">Tax ({invoice.tax_rate}%)</span>
+              <span className="text-foreground tabular-nums">${invoice.tax_amount.toFixed(2)}</span>
             </div>
           )}
-          <div className="flex justify-between text-lg font-bold border-t border-white/5 pt-2">
-            <span className="text-white">Total</span>
+          <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
+            <span className="text-foreground">Total</span>
             <span className="text-titan-cyan tabular-nums">${(invoice.total || 0).toFixed(2)}</span>
           </div>
           {invoice.balance_due > 0 && invoice.balance_due !== invoice.total && (
@@ -129,12 +129,12 @@ export default function InvoiceDetail() {
 
         {/* Status update */}
         <div className="glass rounded-2xl p-5">
-          <p className="text-xs text-white/40 font-medium mb-3">Update Status</p>
+          <p className="text-xs text-muted-foreground font-medium mb-3">Update Status</p>
           <Select value={invoice.status} onValueChange={updateStatus} disabled={saving}>
-            <SelectTrigger className="bg-[#242427] border-white/5 text-white rounded-xl h-11">
+            <SelectTrigger className="bg-[#242427] border-border text-foreground rounded-xl h-11">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#242427] border-white/10">
+            <SelectContent className="bg-[#242427] border-border">
               {STATUS_OPTIONS.map(s => (
                 <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
               ))}
@@ -144,8 +144,8 @@ export default function InvoiceDetail() {
 
         {invoice.notes && (
           <div className="glass rounded-2xl p-5 mt-4">
-            <p className="text-xs text-white/40 font-medium mb-2">Notes</p>
-            <p className="text-sm text-white/70">{invoice.notes}</p>
+            <p className="text-xs text-muted-foreground font-medium mb-2">Notes</p>
+            <p className="text-sm text-foreground/70">{invoice.notes}</p>
           </div>
         )}
       </motion.div>

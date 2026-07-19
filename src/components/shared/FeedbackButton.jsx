@@ -90,11 +90,11 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
           setOpen(true);
           setError("");
         }}
-        className="fixed bottom-[9.75rem] md:bottom-28 right-4 md:right-8 z-[60] w-12 h-12 rounded-2xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-lg flex items-center justify-center border border-white/10"
+        className="fixed bottom-[9.75rem] md:bottom-28 right-4 md:right-8 z-[60] w-12 h-12 rounded-2xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-lg flex items-center justify-center border border-border"
         aria-label="Send feedback"
         title="Send feedback"
       >
-        <MessageSquare className="w-5 h-5 text-white" />
+        <MessageSquare className="w-5 h-5 text-foreground" />
       </button>
 
       <AnimatePresence>
@@ -115,21 +115,21 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-[#1A1A1C] border border-white/10 rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-[#1A1A1C] border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden" />
+              <div className="w-10 h-1 bg-muted rounded-full mx-auto mb-4 md:hidden" />
 
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-bold text-white">Send Feedback</h3>
-                  <p className="text-xs text-white/40">Help us improve TitanOS</p>
+                  <h3 className="text-sm font-bold text-foreground">Send Feedback</h3>
+                  <p className="text-xs text-muted-foreground">Help us improve TitanOS</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors text-white/40"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -140,8 +140,8 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                   <div className="w-12 h-12 rounded-2xl bg-titan-cyan/10 flex items-center justify-center mx-auto mb-3">
                     <Check className="w-6 h-6 text-titan-cyan" />
                   </div>
-                  <p className="text-sm font-semibold text-white">Thank you!</p>
-                  <p className="text-xs text-white/40 mt-1">Your feedback has been sent.</p>
+                  <p className="text-sm font-semibold text-foreground">Thank you!</p>
+                  <p className="text-xs text-muted-foreground mt-1">Your feedback has been sent.</p>
                 </div>
               ) : (
                 <>
@@ -154,7 +154,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                         className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                           type === t.id
                             ? `${t.bg} border-current ${t.color}`
-                            : "border-white/5 text-white/30 hover:text-white/50"
+                            : "border-border text-muted-foreground hover:text-foreground/50"
                         }`}
                       >
                         <t.icon className="w-4 h-4" />
@@ -174,7 +174,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                           : "Share your thoughts, suggestions, or anything on your mind..."
                     }
                     rows={4}
-                    className="w-full bg-[#242427] border border-white/10 text-white rounded-xl p-3 text-sm placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
+                    className="w-full bg-[#242427] border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
                   />
 
                   {error ? (
@@ -187,7 +187,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                     type="button"
                     onClick={handleSubmit}
                     disabled={loading || !message.trim()}
-                    className="w-full bg-titan-indigo hover:bg-titan-indigo/90 text-white font-semibold rounded-xl h-10 text-sm gap-2 disabled:opacity-40"
+                    className="w-full bg-titan-indigo hover:bg-titan-indigo/90 text-foreground font-semibold rounded-xl h-10 text-sm gap-2 disabled:opacity-40"
                   >
                     {loading ? (
                       "Sending…"

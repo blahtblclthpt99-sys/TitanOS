@@ -7,7 +7,7 @@ import NavBadge from "@/components/shared/NavBadge";
 import { MOBILE_TAB_ITEMS, MORE_MENU_GROUPS } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 
-const MORE_PATHS = MORE_MENU_GROUPS.flatMap((g) => g.paths);
+const MORE_PATHS = MORE_MENU_GROUPS.flatMap((g) => g.paths).filter((p) => p !== "/more");
 
 export default function MobileNav() {
   const location = useLocation();
@@ -26,11 +26,11 @@ export default function MobileNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/5"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border shadow-soft"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Main navigation"
     >
-      <div className="flex items-center justify-around h-16 px-1" role="tablist">
+      <div className="flex items-center justify-around h-16 px-0.5" role="tablist">
         {MOBILE_TAB_ITEMS.map((item) => {
           const isActive = isRouteActive(pathname, item.path);
           return (
@@ -42,15 +42,18 @@ export default function MobileNav() {
               aria-label={item.label}
               aria-selected={isActive}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 select-none min-w-[56px] min-h-[44px] justify-center ${
-                isActive ? "text-titan-cyan" : "text-white/40"
+              className={`relative flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl transition-all duration-200 select-none min-w-[56px] min-h-[44px] justify-center ${
+                isActive ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <item.icon className="w-5 h-5" aria-hidden="true" />
+              <item.icon className={`w-5 h-5 ${isActive ? "scale-105" : ""}`} aria-hidden="true" />
               <NavBadge count={badges[item.path]} className="absolute top-0 right-0.5" />
               <span className="text-[10px] font-medium" aria-hidden="true">
                 {item.label}
               </span>
+              {isActive && (
+                <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary" aria-hidden="true" />
+              )}
             </button>
           );
         })}
@@ -62,8 +65,8 @@ export default function MobileNav() {
           aria-label="More features"
           aria-selected={moreActive}
           aria-current={moreActive ? "page" : undefined}
-          className={`relative flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 select-none min-w-[56px] min-h-[44px] justify-center ${
-            moreActive ? "text-titan-cyan" : "text-white/40"
+          className={`relative flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl transition-all duration-200 select-none min-w-[52px] min-h-[44px] justify-center ${
+            moreActive ? "text-primary" : "text-muted-foreground"
           }`}
         >
           <LayoutGrid className="w-5 h-5" aria-hidden="true" />

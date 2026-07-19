@@ -31,7 +31,7 @@ export default function MoreMenu() {
           if (!items.length) return null;
           return (
             <section key={group.title}>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-white/35 mb-3 px-1">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 px-1">
                 {group.title}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -49,7 +49,7 @@ export default function MoreMenu() {
                       <div className="w-10 h-10 rounded-xl bg-titan-cyan/15 flex items-center justify-center">
                         <item.icon className="w-5 h-5 text-titan-cyan" aria-hidden="true" />
                       </div>
-                      <span className="text-sm font-semibold text-white leading-snug">
+                      <span className="text-sm font-semibold text-foreground leading-snug">
                         {item.label}
                       </span>
                     </Link>

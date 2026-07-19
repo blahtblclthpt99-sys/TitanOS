@@ -9,6 +9,9 @@ function getTabRoot(pathname) {
   if (pathname.startsWith("/customers/")) return "/customers";
   if (pathname.startsWith("/invoices/")) return "/invoices";
   if (pathname.startsWith("/jobs/")) return "/jobs";
+  if (pathname.startsWith("/marketplace")) return "/marketplace";
+  if (pathname.startsWith("/community")) return "/community";
+  if (pathname.startsWith("/settings")) return "/settings";
   return "/";
 }
 
@@ -28,7 +31,7 @@ export default function MobileHeader() {
 
   return (
     <header
-      className="md:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-white/5 flex items-center px-4"
+      className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border flex items-center px-4"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         height: "calc(env(safe-area-inset-top) + 3.5rem)",
@@ -42,7 +45,7 @@ export default function MobileHeader() {
             type="button"
             onClick={handleBack}
             aria-label="Go back"
-            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors min-h-[44px] min-w-[44px] -ml-1 flex-1"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] -ml-1 flex-1"
           >
             <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             <span className="text-sm font-medium">Back</span>

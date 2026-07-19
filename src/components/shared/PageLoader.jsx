@@ -21,7 +21,7 @@ export default function PageLoader({ variant = "list", label = "Loading" }) {
   if (variant === "list") {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto" aria-busy="true" aria-live="polite" aria-label={label}>
-        <div className="h-10 w-48 bg-white/5 rounded-xl animate-pulse mb-6" />
+        <div className="h-10 w-48 bg-muted rounded-xl animate-pulse mb-6" />
         <ListSkeleton count={6} />
       </div>
     );

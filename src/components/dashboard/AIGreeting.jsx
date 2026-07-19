@@ -66,10 +66,10 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
     >
       {/* Greeting line */}
       <div className="mb-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-white">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
           {greeting}, {name} 👋
         </h1>
-        <p className="text-white/40 text-sm mt-1">Here's what's happening in your business today.</p>
+        <p className="text-muted-foreground text-sm mt-1">Here's what's happening in your business today.</p>
       </div>
 
       {/* Titan AI Brief Card */}
@@ -90,11 +90,11 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
           {/* Card header */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0 ai-pulse">
-              <Sparkles className="w-4 h-4 text-white" />
+              <Sparkles className="w-4 h-4 text-foreground" />
             </div>
             <div>
               <p className="text-xs font-bold text-titan-cyan uppercase tracking-widest leading-none">Titan AI</p>
-              <p className="text-xs text-white/30 leading-none mt-0.5">Daily Brief</p>
+              <p className="text-xs text-muted-foreground leading-none mt-0.5">Daily Brief</p>
             </div>
           </div>
 
@@ -110,7 +110,7 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
                 className="w-full flex items-start gap-2.5 text-left group"
               >
                 <span className="text-base leading-snug flex-shrink-0">{line.emoji}</span>
-                <span className="text-sm text-white/80 group-hover:text-white transition-colors leading-snug">{line.text}</span>
+                <span className="text-sm text-foreground/80 group-hover:text-foreground transition-colors leading-snug">{line.text}</span>
               </motion.button>
             ))}
           </div>
@@ -125,14 +125,14 @@ export default function AIGreeting({ jobCount, pipelineToday, overdueInvoices, o
               style={{ background: "rgba(124,91,250,0.12)", border: "1px solid rgba(124,91,250,0.2)" }}
             >
               <p className="text-xs text-titan-indigo font-semibold uppercase tracking-wider mb-1">💡 Recommendation</p>
-              <p className="text-sm text-white/80 leading-snug">{recommendation}</p>
+              <p className="text-sm text-foreground/80 leading-snug">{recommendation}</p>
             </motion.div>
           )}
 
           {/* CTA */}
           <button
             onClick={() => navigate("/assistant")}
-            className="flex items-center gap-1.5 text-xs font-semibold text-titan-cyan hover:text-white transition-colors group"
+            className="flex items-center gap-1.5 text-xs font-semibold text-titan-cyan hover:text-foreground transition-colors group"
           >
             Open Titan AI Assistant
             <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />

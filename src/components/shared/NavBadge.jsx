@@ -5,7 +5,7 @@ export default function NavBadge({ count, className = "" }) {
 
   return (
     <span
-      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white leading-none ${className}`}
+      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-foreground leading-none ${className}`}
       aria-label={`${count} notifications`}
     >
       {label}

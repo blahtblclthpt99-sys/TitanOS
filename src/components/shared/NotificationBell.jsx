@@ -21,5 +21,5 @@ export default function NotificationBell({ className = "" }) {
     return () => { active = false; clearInterval(poll); };
   }, [user?.id]);
 
-  return <Link to="/notifications" aria-label={count ? `${count} unread notifications` : "Notifications"} className={`relative inline-flex w-10 h-10 items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/5 transition-colors ${className}`}><Bell className="w-5 h-5" /><NavBadge count={count} className="absolute -right-1 -top-1" /></Link>;
+  return <Link to="/notifications" aria-label={count ? `${count} unread notifications` : "Notifications"} className={`relative inline-flex w-10 h-10 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ${className}`}><Bell className="w-5 h-5" /><NavBadge count={count} className="absolute -right-1 -top-1" /></Link>;
 }

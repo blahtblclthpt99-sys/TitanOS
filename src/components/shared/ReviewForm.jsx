@@ -47,7 +47,7 @@ export default function ReviewForm({
 
   return (
     <form onSubmit={submit} className="glass rounded-2xl p-4 space-y-3">
-      <p className="text-sm font-semibold text-white">Leave a rating</p>
+      <p className="text-sm font-semibold text-foreground">Leave a rating</p>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
@@ -58,7 +58,7 @@ export default function ReviewForm({
             aria-label={`${n} stars`}
           >
             <Star
-              className={`w-5 h-5 ${n <= rating ? "text-titan-amber fill-titan-amber" : "text-white/20"}`}
+              className={`w-5 h-5 ${n <= rating ? "text-titan-amber fill-titan-amber" : "text-muted-foreground"}`}
             />
           </button>
         ))}
@@ -67,7 +67,7 @@ export default function ReviewForm({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder="Share how the job went…"
-        className="bg-[#242427] border-white/10 text-white rounded-xl min-h-[80px]"
+        className="bg-[#242427] border-border text-foreground rounded-xl min-h-[80px]"
       />
       <Button
         type="submit"

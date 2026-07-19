@@ -1,6 +1,6 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
-import { calcPlatformFee, PLATFORM_FEE_RATE } from "@/lib/platformFee";
+import { calcPlatformFee } from "@/lib/platformFee";
 
 const PREFIX = "titanos_pay";
 
@@ -45,7 +45,7 @@ export async function listPayments(userId) {
 }
 
 export async function createPaymentLink(user, { amount, customer_name, invoice_id, provider = "stripe", note }) {
-  const { base, fee, total } = calcPlatformFee(amount);
+  const { base, fee, total, rate, percentLabel, planId } = calcPlatformFee(amount, user);
 
   try {
     const result = await api.functions.invoke("createPaymentLink", {
@@ -61,7 +61,10 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
         ...data.payment,
         base_amount: data.payment.base_amount ?? base,
         platform_fee: data.payment.platform_fee ?? fee,
+        platform_fee_rate: data.payment.platform_fee_rate ?? rate,
         amount_total: data.payment.amount_total ?? data.payment.amount ?? total,
+        plan: data.payment.plan ?? planId,
+        fee_label: data.fee?.label ?? percentLabel,
       };
     }
   } catch {
@@ -75,12 +78,14 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
     amount: total,
     base_amount: base,
     platform_fee: fee,
-    platform_fee_rate: PLATFORM_FEE_RATE,
+    platform_fee_rate: rate,
     amount_total: total,
     provider,
     status: "pending",
     checkout_url: "",
-    note: note || `Includes TitanOS platform fee 0.76% ($${fee.toFixed(2)}). Total $${total.toFixed(2)}.`,
+    note:
+      note ||
+      `TitanOS ${planId} fee ${percentLabel} ($${fee.toFixed(2)}). Total $${total.toFixed(2)}.`,
     created_by_id: user.id,
   };
 
@@ -93,9 +98,9 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
         ...legacy,
         note: `${legacy.note} base=$${base_amount} fee=$${platform_fee}`,
       });
-      return { ...row, base_amount, platform_fee, platform_fee_rate, amount_total };
+      return { ...row, base_amount, platform_fee, platform_fee_rate, amount_total, plan: planId, fee_label: percentLabel };
     } catch {
-      const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
+      const row = { id: uid(), created_at: new Date().toISOString(), ...payload, plan: planId, fee_label: percentLabel };
       const all = readLocal(PREFIX, user.id, "payments", []);
       all.unshift(row);
       writeLocal(PREFIX, user.id, "payments", all);

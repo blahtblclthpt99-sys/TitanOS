@@ -2,6 +2,7 @@ import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
 import { notifyUser } from "@/lib/notify";
+import { assertWithinFreeLimit } from "@/lib/plan";
 
 const PREFIX = "titanos_hire";
 
@@ -33,6 +34,17 @@ function filterJobs(rows, { category, state, search, status }) {
 }
 
 export async function createHireJob(user, data) {
+  try {
+    const mine = await api.entities.HireJob.filter({ customer_id: user.id, status: "open" });
+    assertWithinFreeLimit(user, "hirePosts", mine?.length || 0);
+  } catch (error) {
+    if (error?.message?.includes("Free plan allows")) throw error;
+    const localMine = readLocal(PREFIX, "global", "jobs", []).filter(
+      (row) => row.customer_id === user.id && row.status === "open"
+    );
+    assertWithinFreeLimit(user, "hirePosts", localMine.length);
+  }
+
   const payload = {
     customer_id: user.id,
     customer_name: user.full_name || user.username || "Customer",

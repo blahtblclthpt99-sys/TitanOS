@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { CheckCircle2, CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import PageHeader from "@/components/shared/PageHeader";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { useAuth } from "@/lib/AuthContext";
 import { betaBadgeLabel } from "@/lib/plan";
-import { calcPlatformFee, formatMoney, PLATFORM_FEE_PERCENT_LABEL } from "@/lib/platformFee";
+import { calcPlatformFee, formatMoney } from "@/lib/platformFee";
+import { getPlanConfig } from "@/lib/plan";
 import { createPaymentLink, listPaymentAccounts, listPayments, markPaymentStatus, upsertPaymentAccount } from "@/lib/paymentsApi";
 
 const PROVIDERS = ["stripe", "square", "paypal"];
@@ -116,11 +117,12 @@ export default function Payments() {
       setPayments((current) => [payment, ...current]);
       setForm(EMPTY_FORM);
       const fee = Number(payment.platform_fee || 0);
+      const feeLabel = payment.fee_label || getPlanConfig(user).feeLabel;
       toast({
         title: "Payment link created",
         description: payment.checkout_url
           ? fee
-            ? `Includes ${PLATFORM_FEE_PERCENT_LABEL} TitanOS fee (${formatMoney(fee)}). Opening checkout…`
+            ? `Includes ${feeLabel} TitanOS fee (${formatMoney(fee)}). Opening checkout…`
             : "Opening checkout…"
           : "It is saved as pending.",
       });
@@ -147,15 +149,26 @@ export default function Payments() {
     }
   };
 
-  const feePreview = Number(form.amount) > 0 ? calcPlatformFee(form.amount) : null;
+  const plan = getPlanConfig(user);
+  const feePreview = Number(form.amount) > 0 ? calcPlatformFee(form.amount, user) : null;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
       <PageHeader title="Payments" subtitle="Connect providers and collect customer payments" />
       <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-white/70">
-        <span className="text-titan-cyan font-semibold">TitanOS fee: {PLATFORM_FEE_PERCENT_LABEL}</span>
-        {" "}is added on every payment collected through the app
-        {betaBadgeLabel() ? ` · ${betaBadgeLabel()} still unlocks features` : ""}.
+        <span className="text-titan-cyan font-semibold">
+          Your plan: {plan.name} · {plan.feeLabel} fee
+        </span>
+        {" "}on every payment collected through the app
+        {plan.id === "free" ? (
+          <>
+            {" · "}
+            <Link to="/pricing" className="text-titan-cyan underline-offset-2 hover:underline">
+              Upgrade to lower fees
+            </Link>
+          </>
+        ) : null}
+        {betaBadgeLabel() ? ` · ${betaBadgeLabel()}` : ""}.
       </div>
 
       <section className="grid md:grid-cols-3 gap-4 mb-7">
@@ -212,7 +225,7 @@ export default function Payments() {
                 <span className="text-white">{formatMoney(feePreview.base)}</span>
               </div>
               <div className="flex justify-between">
-                <span>TitanOS fee ({PLATFORM_FEE_PERCENT_LABEL})</span>
+                <span>TitanOS fee ({feePreview.percentLabel})</span>
                 <span className="text-titan-cyan">{formatMoney(feePreview.fee)}</span>
               </div>
               <div className="flex justify-between font-semibold text-white border-t border-white/8 pt-1">

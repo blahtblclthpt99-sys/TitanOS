@@ -1,7 +1,7 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid, withEntityFallback } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
-import { isMarketplaceFree } from "@/lib/plan";
+import { assertWithinFreeLimit, getPlanConfig } from "@/lib/plan";
 
 const PREFIX = "titanos_listings";
 const PAGE_SIZE = 12;
@@ -75,9 +75,18 @@ export async function getListing(id) {
 }
 
 export async function createListing(user, data) {
-  if (!isMarketplaceFree(user)) {
-    // Hook for future paid listing creation limits
+  try {
+    const mine = await api.entities.MarketplaceListing.filter({ seller_id: user.id, status: "active" });
+    assertWithinFreeLimit(user, "listings", mine?.length || 0);
+  } catch (error) {
+    if (error?.message?.includes("Free plan allows")) throw error;
+    const localMine = readLocal(PREFIX, "global", "all", []).filter(
+      (row) => row.seller_id === user.id && row.status === "active"
+    );
+    assertWithinFreeLimit(user, "listings", localMine.length);
   }
+
+  const plan = getPlanConfig(user);
   const payload = {
     seller_id: user.id,
     seller_name: user.full_name || user.username || user.email,
@@ -94,6 +103,7 @@ export async function createListing(user, data) {
     contact_phone: data.contact_phone || user.phone || "",
     contact_email: data.contact_email || user.email || "",
     status: data.status || "active",
+    is_featured: Boolean(plan.featuredProfile && data.is_featured),
     created_by_id: user.id,
   };
 

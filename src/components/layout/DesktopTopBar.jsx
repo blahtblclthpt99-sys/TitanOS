@@ -84,7 +84,7 @@ export default function DesktopTopBar() {
             setSearchOpen(true);
             setTimeout(() => searchRef.current?.querySelector("input")?.focus(), 50);
           }}
-          className={`w-full flex items-center gap-2 h-11 px-3.5 rounded-xl border border-border bg-card text-muted-foreground shadow-soft hover:border-primary/30 transition-colors text-left ${
+          className={`w-full flex items-center gap-2 h-11 px-3.5 rounded-xl border border-border bg-muted text-muted-foreground shadow-soft hover:border-primary/30 transition-colors text-left ${
             searchOpen ? "ring-2 ring-ring border-primary/40" : ""
           }`}
         >

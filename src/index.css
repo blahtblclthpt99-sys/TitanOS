@@ -5,32 +5,32 @@
 @tailwind utilities;
 
 @layer base {
-  /* Light — premium business OS (default) */
+  /* Light — soft grey canvas, white cards, dark readable text */
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 210 25% 94%;
+    --foreground: 222 47% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 222 47% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 50%;
+    --popover-foreground: 222 47% 8%;
+    --primary: 217 91% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 214 32% 94%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 30% 96%;
-    --muted-foreground: 215 22% 28%;
-    --accent: 214 95% 93%;
-    --accent-foreground: 217 91% 35%;
-    --destructive: 0 72% 55%;
+    --secondary: 210 18% 90%;
+    --secondary-foreground: 222 47% 8%;
+    --muted: 210 18% 90%;
+    --muted-foreground: 215 25% 22%;
+    --accent: 214 80% 92%;
+    --accent-foreground: 217 91% 30%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
+    --success: 160 84% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
-    --border: 214 25% 90%;
-    --input: 214 25% 90%;
-    --ring: 217 91% 50%;
-    --chart-1: 217 91% 50%;
+    --warning: 38 92% 42%;
+    --warning-foreground: 222 47% 8%;
+    --border: 214 16% 82%;
+    --input: 210 18% 90%;
+    --ring: 217 91% 45%;
+    --chart-1: 217 91% 45%;
     --chart-2: 221 70% 40%;
     --chart-3: 38 92% 50%;
     --chart-4: 160 84% 39%;
@@ -40,27 +40,27 @@
     --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 32% 22%;
-    --sidebar-primary: 217 91% 50%;
+    --sidebar-background: 210 20% 96%;
+    --sidebar-foreground: 222 40% 14%;
+    --sidebar-primary: 217 91% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 95% 96%;
-    --sidebar-accent-foreground: 217 91% 35%;
-    --sidebar-border: 214 25% 92%;
-    --sidebar-ring: 217 91% 50%;
+    --sidebar-accent: 210 18% 90%;
+    --sidebar-accent-foreground: 217 91% 30%;
+    --sidebar-border: 214 16% 84%;
+    --sidebar-ring: 217 91% 45%;
     /* Brand aliases (electric blue keeps titan-cyan class names working) */
-    --titan-cyan: #2563EB;
-    --titan-amber: #F59E0B;
-    --titan-indigo: #1D4ED8;
+    --titan-cyan: #1D4ED8;
+    --titan-amber: #D97706;
+    --titan-indigo: #1E3A8A;
     --titan-navy: #0B1F3A;
     --titan-royal: #1E3A8A;
     --titan-electric: #2563EB;
-    --titan-surface-0: #F7F9FC;
+    --titan-surface-0: #E8EDF3;
     --titan-surface-1: #FFFFFF;
-    --titan-surface-2: #EEF2F7;
+    --titan-surface-2: #DDE3EB;
     --sidebar-width: 72px;
-    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
-    --shadow-lift: 0 4px 12px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(37, 99, 235, 0.08);
+    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.07);
+    --shadow-lift: 0 4px 12px rgba(15, 23, 42, 0.1), 0 16px 40px rgba(37, 99, 235, 0.08);
   }
 
   /* Charcoal dark — never pure black */
@@ -75,17 +75,17 @@
     --primary-foreground: 222 47% 11%;
     --secondary: 222 16% 16%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 222 16% 16%;
-    --muted-foreground: 214 20% 78%;
+    --muted: 222 14% 20%;
+    --muted-foreground: 214 25% 88%;
     --accent: 217 40% 18%;
-    --accent-foreground: 213 94% 72%;
+    --accent-foreground: 213 94% 78%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 84% 42%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 11%;
-    --border: 222 14% 20%;
+    --border: 222 14% 24%;
     --input: 222 14% 20%;
     --ring: 213 94% 58%;
     --chart-1: 213 94% 58%;
@@ -140,7 +140,21 @@
     -webkit-user-select: none;
   }
   h1, h2, h3 {
-    @apply font-heading tracking-tight;
+    @apply font-heading tracking-tight text-foreground;
+  }
+
+  /* Soft-grey text fields — readable dark text on light grey */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]),
+  textarea,
+  select {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground) / 0.75) !important;
+    opacity: 1;
   }
 }
 
@@ -160,13 +174,14 @@
   background: hsl(var(--muted-foreground) / 0.35);
 }
 
-/* Soft card surface — light glass / dark glass */
+/* Soft card surface — solid enough for readable text */
 .glass {
-  background: hsl(var(--card) / 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.9);
+  background: hsl(var(--card));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border));
   box-shadow: var(--shadow-soft);
+  color: hsl(var(--foreground));
 }
 
 .glass-hover:hover {

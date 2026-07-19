@@ -33,7 +33,7 @@ export default function NativeSelect({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex h-9 w-full items-center justify-between rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-[#00C7D9] ${className}`}
+        className={`flex h-11 w-full items-center justify-between rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring ${className}`}
       >
         <span className={selected ? "text-foreground" : "text-muted-foreground"}>
           {selected ? selected.label : placeholder}

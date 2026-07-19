@@ -1,8 +1,11 @@
 // Inspired by react-hot-toast library
 import { useState, useEffect } from "react";
 
-const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_LIMIT = 5;
+/** How long a toast stays visible before auto-dismiss. */
+const TOAST_DURATION = 4000;
+/** Delay after dismiss before DOM removal (exit animation). */
+const TOAST_REMOVE_DELAY = 400;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -19,6 +22,15 @@ function genId() {
 }
 
 const toastTimeouts = new Map();
+const durationTimeouts = new Map();
+
+function clearDurationTimeout(toastId) {
+  const timeout = durationTimeouts.get(toastId);
+  if (timeout) {
+    clearTimeout(timeout);
+    durationTimeouts.delete(toastId);
+  }
+}
 
 const addToRemoveQueue = (toastId) => {
   if (toastTimeouts.has(toastId)) {
@@ -34,14 +46,6 @@ const addToRemoveQueue = (toastId) => {
   }, TOAST_REMOVE_DELAY);
 
   toastTimeouts.set(toastId, timeout);
-};
-
-const _clearFromRemoveQueue = (toastId) => {
-  const timeout = toastTimeouts.get(toastId);
-  if (timeout) {
-    clearTimeout(timeout);
-    toastTimeouts.delete(toastId);
-  }
 };
 
 export const reducer = (state, action) => {
@@ -63,12 +67,12 @@ export const reducer = (state, action) => {
     case actionTypes.DISMISS_TOAST: {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
+        clearDurationTimeout(toastId);
         addToRemoveQueue(toastId);
       } else {
         state.toasts.forEach((toast) => {
+          clearDurationTimeout(toast.id);
           addToRemoveQueue(toast.id);
         });
       }
@@ -92,6 +96,7 @@ export const reducer = (state, action) => {
           toasts: [],
         };
       }
+      clearDurationTimeout(action.toastId);
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -110,13 +115,13 @@ function dispatch(action) {
   });
 }
 
-function toast({ ...props }) {
+function toast({ duration = TOAST_DURATION, ...props }) {
   const id = genId();
 
-  const update = (props) =>
+  const update = (next) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
-      toast: { ...props, id },
+      toast: { ...next, id },
     });
 
   const dismiss = () =>
@@ -127,12 +132,18 @@ function toast({ ...props }) {
     toast: {
       ...props,
       id,
+      duration,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss();
       },
     },
   });
+
+  if (duration !== Infinity && Number(duration) > 0) {
+    const timeout = setTimeout(dismiss, Number(duration));
+    durationTimeouts.set(id, timeout);
+  }
 
   return {
     id,
@@ -161,4 +172,4 @@ function useToast() {
   };
 }
 
-export { useToast, toast }; 
+export { useToast, toast, TOAST_DURATION };

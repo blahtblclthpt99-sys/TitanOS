@@ -35,11 +35,37 @@ function apiCandidates(path) {
 }
 
 async function uploadFile({ file }) {
-  const ext = file.name.split(".").pop() || "bin";
-  const path = `${crypto.randomUUID()}.${ext}`;
+  if (!file) throw apiError("No file provided");
+  const allowed = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "application/pdf",
+  ]);
+  const type = file.type || "";
+  const extGuess = (file.name.split(".").pop() || "").toLowerCase();
+  const extOk = ["jpg", "jpeg", "png", "webp", "gif", "pdf"].includes(extGuess);
+  if (!allowed.has(type) && !(type === "" && extOk)) {
+    throw apiError("Only JPEG, PNG, WebP, GIF, or PDF uploads are allowed");
+  }
+  if (type === "" && !extOk) {
+    throw apiError("File type could not be verified");
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    throw apiError("File must be 12MB or smaller");
+  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) throw apiError("Sign in required to upload", 401);
+
+  const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("titanos-uploads").upload(path, file, {
     cacheControl: "3600",
     upsert: false,
+    contentType: type || undefined,
   });
   throwIfError(error);
   const { data } = supabase.storage.from("titanos-uploads").getPublicUrl(path);

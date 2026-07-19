@@ -1,5 +1,6 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { requireUser } from "../_lib/auth.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -8,10 +9,22 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const auth = await requireUser(req, res);
+  if (!auth) return;
+
   try {
     const { to, subject, body, from_name: fromName } = readJson(req);
     if (!to || !subject || !body) {
       return res.status(400).json({ error: "to, subject, and body are required" });
+    }
+
+    // Basic abuse controls
+    const recipients = Array.isArray(to) ? to : [to];
+    if (recipients.length > 5) {
+      return res.status(400).json({ error: "Too many recipients" });
+    }
+    if (String(body).length > 20000 || String(subject).length > 200) {
+      return res.status(400).json({ error: "Message too large" });
     }
 
     const resendKey = process.env.RESEND_API_KEY;
@@ -24,9 +37,10 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>",
-          to: [to],
+          to: recipients,
           subject,
           text: body,
+          tags: [{ name: "user_id", value: auth.user.id.slice(0, 36) }],
         }),
       });
       if (!response.ok) {
@@ -37,7 +51,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    console.log("[sendEmail stub]", { to, subject, fromName, body: String(body).slice(0, 120) });
+    console.log("[sendEmail stub]", {
+      user: auth.user.id,
+      to,
+      subject,
+      fromName,
+      body: String(body).slice(0, 120),
+    });
     return res.status(200).json({ success: true, stub: true });
   } catch (error) {
     console.error("sendEmail error:", error);

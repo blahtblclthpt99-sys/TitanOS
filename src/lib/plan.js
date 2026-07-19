@@ -143,15 +143,19 @@ export function resolvePlan(user) {
 
   const raw = String(user.plan_tier || user.account_type || "").toLowerCase();
   if (raw === "customer" || user.account_type === "customer") return "customer";
-  if (raw === "business" || raw === "pro" || user.is_pro === true) return "business";
+  // Explicit business tier only — do NOT treat legacy is_pro as Business (undercharges fees)
+  if (raw === "business") return "business";
   if (
     raw === "worker_premium" ||
     raw === "premium" ||
+    raw === "pro" ||
     user.paying_subscriber === true ||
     user.lifetime_premium === true
   ) {
     return "worker_premium";
   }
+  // Legacy is_pro without a paid tier → Premium worker, not Business
+  if (user.is_pro === true) return "worker_premium";
   if (raw === "worker_free" || raw === "free" || raw === "worker") return "worker_free";
 
   // Default field users are workers on the free tier

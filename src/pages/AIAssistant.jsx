@@ -233,7 +233,22 @@ export default function AIAssistant() {
     return (
       <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
         <div className="glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
-          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+          <ReactMarkdown
+            className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"
+            components={{
+              a: ({ href, children }) => {
+                const safe =
+                  typeof href === "string" &&
+                  (href.startsWith("https://") || href.startsWith("http://") || href.startsWith("/"));
+                if (!safe) return <span>{children}</span>;
+                return (
+                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-titan-cyan underline">
+                    {children}
+                  </a>
+                );
+              },
+            }}
+          >
             {msg.content}
           </ReactMarkdown>
         </div>

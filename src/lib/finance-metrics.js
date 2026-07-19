@@ -1,25 +1,31 @@
 /** Shared invoice/expense financial calculations used across Finances and Reports. */
 
-export function sumPaidRevenue(invoices) {
-  return invoices
+const OPEN_INVOICE_STATUSES = new Set(["sent", "viewed", "overdue", "partial", "open", "pending", "unpaid"]);
+
+export function sumPaidRevenue(invoices = []) {
+  return (invoices || [])
     .filter((i) => i.status === "paid")
-    .reduce((sum, i) => sum + (i.total || 0), 0);
+    .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 }
 
-export function sumExpenses(expenses) {
-  return expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+export function sumExpenses(expenses = []) {
+  return (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 }
 
-export function sumOutstanding(invoices) {
-  return invoices
-    .filter((i) => ["sent", "viewed", "overdue"].includes(i.status))
-    .reduce((sum, i) => sum + (i.balance_due || 0), 0);
+export function sumOutstanding(invoices = []) {
+  return (invoices || [])
+    .filter((i) => OPEN_INVOICE_STATUSES.has(String(i.status || "").toLowerCase()))
+    .reduce((sum, i) => {
+      const due = i.balance_due;
+      if (due != null && due !== "" && !Number.isNaN(Number(due))) return sum + Number(due);
+      return sum + (Number(i.total) || 0);
+    }, 0);
 }
 
-export function buildExpenseCategoryData(expenses) {
-  const byCategory = expenses.reduce((acc, e) => {
+export function buildExpenseCategoryData(expenses = []) {
+  const byCategory = (expenses || []).reduce((acc, e) => {
     const key = e.category || "other";
-    acc[key] = (acc[key] || 0) + (e.amount || 0);
+    acc[key] = (acc[key] || 0) + (Number(e.amount) || 0);
     return acc;
   }, {});
 

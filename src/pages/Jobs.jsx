@@ -182,6 +182,12 @@ export default function Jobs({ isActive = true }) {
         title: "Job completed + AI summary ready",
         description: summary.follow_up_message?.slice(0, 100) || summary.completion_report?.slice(0, 100),
       });
+    } catch (err) {
+      toast({
+        title: "Couldn't complete job",
+        description: err.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setCompletingId(null);
     }

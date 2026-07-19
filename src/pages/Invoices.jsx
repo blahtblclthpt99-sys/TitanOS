@@ -17,6 +17,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import { useEntityData } from "@/hooks/useEntityData";
 import { addDaysISO, formatMonthDayYear } from "@/lib/date-utils";
+import { toast } from "@/components/ui/use-toast";
 
 const BLANK_FORM = {
   customer_id: "", customer_name: "", notes: "", tax_rate: 0,
@@ -97,7 +98,16 @@ export default function Invoices({ isActive = true }) {
       setLineItems([{ ...BLANK_LINE }]);
       setShowForm(false);
       reload();
-    } finally { setSaving(false); }
+      toast({ title: "Invoice created" });
+    } catch (err) {
+      toast({
+        title: "Couldn't save invoice",
+        description: err.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = invoices

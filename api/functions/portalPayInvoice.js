@@ -1,4 +1,4 @@
-import { getSupabaseAdmin, readJson, toEntityRow } from "../_lib/supabase.js";
+import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 
 async function requirePortalSession(admin, token) {
@@ -37,71 +37,51 @@ export default async function handler(req, res) {
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     const origin = process.env.APP_ORIGIN || "https://titanos-web.vercel.app";
 
-    if (stripeKey && amount > 0) {
-      const params = new URLSearchParams();
-      params.append("mode", "payment");
-      params.append("success_url", `${origin}/portal?paid=1`);
-      params.append("cancel_url", `${origin}/portal?paid=0`);
-      params.append("line_items[0][price_data][currency]", "usd");
-      params.append("line_items[0][price_data][product_data][name]", invoice.invoice_number || "Invoice");
-      params.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
-      params.append("line_items[0][quantity]", "1");
-      params.append("metadata[invoice_id]", invoiceId);
-      params.append("metadata[customer_id]", auth.session.customer_id);
-
-      const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${stripeKey}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params,
+    if (!stripeKey) {
+      return res.status(503).json({
+        error: "Payments are not configured yet. Ask your provider to enable Stripe Checkout.",
+        setupRequired: true,
       });
-      const session = await response.json();
-      if (!response.ok) {
-        console.error("Stripe portal pay error:", session);
-        return res.status(502).json({ error: "Could not create checkout session" });
-      }
-
-      await admin.from("portal_actions").insert({
-        customer_id: auth.session.customer_id,
-        action: "pay_invoice_checkout",
-        entity_type: "invoice",
-        entity_id: invoiceId,
-        meta: { amount, checkout_id: session.id },
-      });
-
-      return res.status(200).json({ url: session.url, checkout: true });
+    }
+    if (!(amount > 0)) {
+      return res.status(400).json({ error: "Invoice has no balance due" });
     }
 
-    // Stub / offline: mark paid when Stripe is not configured (demo + beta)
-    const { data: updated, error } = await admin
-      .from("invoices")
-      .update({
-        status: "paid",
-        balance_due: 0,
-        amount_paid: amount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", invoiceId)
-      .select("*")
-      .maybeSingle();
-    if (error) throw error;
+    const params = new URLSearchParams();
+    params.append("mode", "payment");
+    params.append("success_url", `${origin}/portal?paid=1`);
+    params.append("cancel_url", `${origin}/portal?paid=0`);
+    params.append("line_items[0][price_data][currency]", "usd");
+    params.append("line_items[0][price_data][product_data][name]", invoice.invoice_number || "Invoice");
+    params.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
+    params.append("line_items[0][quantity]", "1");
+    params.append("metadata[invoice_id]", invoiceId);
+    params.append("metadata[customer_id]", auth.session.customer_id);
+
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    });
+    const session = await response.json();
+    if (!response.ok) {
+      console.error("Stripe portal pay error:", session);
+      return res.status(502).json({ error: "Could not create checkout session" });
+    }
 
     await admin.from("portal_actions").insert({
       customer_id: auth.session.customer_id,
-      action: "pay_invoice_stub",
+      action: "pay_invoice_checkout",
       entity_type: "invoice",
       entity_id: invoiceId,
-      meta: { amount, stub: !stripeKey },
+      meta: { amount, checkout_id: session.id },
     });
 
-    return res.status(200).json({
-      invoice: toEntityRow(updated),
-      checkout: false,
-      stub: !stripeKey,
-      message: stripeKey ? "Paid" : "Marked paid (Stripe not configured — demo mode)",
-    });
+    // Never mark paid here — only Stripe webhook / verified payment may close the invoice.
+    return res.status(200).json({ url: session.url, checkout: true });
   } catch (error) {
     console.error("portalPayInvoice error:", error);
     return res.status(500).json({ error: "Something went wrong. Please try again." });

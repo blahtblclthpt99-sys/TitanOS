@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { requireUser } from "../_lib/auth.js";
 
 /** Resolve orphan referral rows that still have pending_lookup referrer. */
 export default async function handler(req, res) {
@@ -7,11 +8,17 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const auth = await requireUser(req, res);
+  if (!auth) return;
+
   try {
     const admin = getSupabaseAdmin();
     const body = readJson(req);
-    const { userId, email, refCode } = body;
-    if (!userId || !refCode) return res.status(400).json({ error: "userId and refCode required" });
+    // Never trust client-supplied userId — bind to JWT subject
+    const userId = auth.user.id;
+    const email = auth.user.email || body.email;
+    const { refCode } = body;
+    if (!refCode) return res.status(400).json({ error: "refCode required" });
 
     const { data: owner } = await admin
       .from("profiles")

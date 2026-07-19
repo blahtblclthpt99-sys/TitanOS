@@ -16,15 +16,17 @@ function resolvePlanFromProfile(profile, authUser) {
   if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
   const raw = String(profile?.plan_tier || profile?.account_type || "").toLowerCase();
   if (raw === "customer" || profile?.account_type === "customer") return "customer";
-  if (raw === "business" || raw === "pro" || profile?.is_pro) return "business";
+  if (raw === "business") return "business";
   if (
     raw === "worker_premium" ||
     raw === "premium" ||
+    raw === "pro" ||
     profile?.paying_subscriber ||
     profile?.lifetime_premium
   ) {
     return "worker_premium";
   }
+  if (profile?.is_pro) return "worker_premium";
   return "worker_free";
 }
 

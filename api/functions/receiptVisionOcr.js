@@ -1,5 +1,6 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { requireUser } from "../_lib/auth.js";
 
 /**
  * Vision OCR for receipts. Uses OpenAI when OPENAI_API_KEY is set;
@@ -10,6 +11,9 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const auth = await requireUser(req, res);
+  if (!auth) return;
+
   try {
     const { image_base64: imageBase64, mime_type: mimeType = "image/jpeg", pasted_text: pastedText } = readJson(req);
     if (pastedText?.trim()) {
@@ -17,6 +21,9 @@ export default async function handler(req, res) {
     }
     if (!imageBase64) {
       return res.status(400).json({ error: "image_base64 or pasted_text required" });
+    }
+    if (String(imageBase64).length > 6_000_000) {
+      return res.status(400).json({ error: "Image too large" });
     }
 
     const openAiKey = process.env.OPENAI_API_KEY;

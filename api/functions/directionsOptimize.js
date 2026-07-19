@@ -1,5 +1,6 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { requireUser } from "../_lib/auth.js";
 
 function haversineMiles(a, b) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -51,6 +52,9 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const auth = await requireUser(req, res);
+  if (!auth) return;
+
   try {
     const { stops = [] } = readJson(req);
     const normalized = (Array.isArray(stops) ? stops : [])
@@ -61,7 +65,8 @@ export default async function handler(req, res) {
         lng: s.lng != null ? Number(s.lng) : null,
         address: s.address || "",
       }))
-      .filter((s) => s.label || s.address);
+      .filter((s) => s.label || s.address)
+      .slice(0, 25);
 
     const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
     const withCoords = normalized.filter((s) => s.lat != null && s.lng != null && !Number.isNaN(s.lat));

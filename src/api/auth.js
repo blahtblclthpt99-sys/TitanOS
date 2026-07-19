@@ -38,6 +38,8 @@ async function buildUser(authUser, profile) {
     is_pro: profile?.is_pro ?? false,
     lifetime_premium: profile?.lifetime_premium ?? false,
     paying_subscriber: profile?.paying_subscriber ?? false,
+    plan_tier: profile?.plan_tier || "",
+    account_type: profile?.account_type || "",
     phone: profile?.phone || "",
     username: profile?.username || "",
     avatar_url: profile?.avatar_url || "",
@@ -282,6 +284,8 @@ export function createAuthModule() {
         "verified_worker",
         "verification_notes",
         "active_company_id",
+        "plan_tier",
+        "account_type",
       ];
 
       const payload = {};

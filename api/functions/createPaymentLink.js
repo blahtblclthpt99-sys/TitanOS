@@ -2,17 +2,30 @@ import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 
 const PLAN_FEES = {
-  free: { rate: 0.075, label: "7.5%" },
-  premium: { rate: 0.029, label: "2.9%" },
-  pro: { rate: 0.025, label: "2.5%" },
+  customer: { rate: 0, label: "0%" },
+  worker_free: { rate: 0.08, label: "8%" },
+  worker_premium: { rate: 0.025, label: "2.5%" },
+  business: { rate: 0.015, label: "1.5%" },
+  // aliases
+  free: { rate: 0.08, label: "8%" },
+  premium: { rate: 0.025, label: "2.5%" },
+  pro: { rate: 0.015, label: "1.5%" },
 };
 
 function resolvePlanFromProfile(profile, authUser) {
-  if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "pro";
-  if (profile?.lifetime_premium || profile?.is_pro) return "pro";
-  if (profile?.paying_subscriber || profile?.plan_tier === "premium") return "premium";
-  if (profile?.plan_tier === "pro") return "pro";
-  return "free";
+  if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
+  const raw = String(profile?.plan_tier || profile?.account_type || "").toLowerCase();
+  if (raw === "customer" || profile?.account_type === "customer") return "customer";
+  if (raw === "business" || raw === "pro" || profile?.is_pro) return "business";
+  if (
+    raw === "worker_premium" ||
+    raw === "premium" ||
+    profile?.paying_subscriber ||
+    profile?.lifetime_premium
+  ) {
+    return "worker_premium";
+  }
+  return "worker_free";
 }
 
 function calcPlatformFee(amount, planId) {
@@ -45,7 +58,7 @@ export default async function handler(req, res) {
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("role, is_pro, lifetime_premium, paying_subscriber, plan_tier")
+      .select("role, is_pro, lifetime_premium, paying_subscriber, plan_tier, account_type")
       .eq("id", user.id)
       .maybeSingle();
 

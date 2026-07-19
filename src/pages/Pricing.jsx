@@ -2,12 +2,14 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  Briefcase,
+  Building2,
   Check,
   Download,
   Rocket,
   Smartphone,
   Sparkles,
-  Star,
+  UserRound,
   Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -16,62 +18,90 @@ import { openPlayStore } from "@/lib/app-download";
 import { PLANS, betaBadgeLabel } from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
 
-const FREE_FEATURES = [
-  `Transaction fee ${PLANS.free.feeLabel}`,
-  "Basic CRM (customers, jobs, schedule)",
-  "Estimates & invoices (limited)",
-  `Up to ${PLANS.free.maxActiveListings} active marketplace listings`,
-  `Up to ${PLANS.free.maxActiveHirePosts} open hire posts`,
-  "Expense & tax basics",
+const CARDS = [
+  {
+    plan: PLANS.customer,
+    icon: UserRound,
+    features: [
+      "Free to join",
+      "Hire local professionals",
+      "No monthly subscription",
+      "No platform fee to hire",
+      "Message & book workers",
+    ],
+    cta: { to: "/register", label: "Join free" },
+    highlighted: false,
+  },
+  {
+    plan: PLANS.worker_free,
+    icon: Briefcase,
+    features: [
+      `${PLANS.worker_free.feeLabel} fee on payments you collect`,
+      "No monthly cost to start",
+      `Up to ${PLANS.worker_free.maxActiveListings} marketplace listings`,
+      "Basic CRM, estimates & invoices",
+      "Upgrade anytime as you book more work",
+    ],
+    cta: { to: "/register", label: "Start as a worker" },
+    highlighted: false,
+  },
+  {
+    plan: PLANS.worker_premium,
+    icon: Sparkles,
+    features: [
+      `${PLANS.worker_premium.feeLabel} transaction fee`,
+      "Unlimited listings & hire visibility",
+      "Featured profile + search priority",
+      "AI assistant, booking page, analytics",
+      "Expanded photo & document storage",
+    ],
+    cta: { to: "/register", label: "Go Premium" },
+    highlighted: true,
+  },
+  {
+    plan: PLANS.business,
+    icon: Building2,
+    features: [
+      `${PLANS.business.feeLabel} transaction fee (lowest)`,
+      "Built for crews & multi-company ops",
+      "Everything in Worker Premium",
+      "Priority placement & storage",
+      "Best value as volume grows",
+    ],
+    cta: { to: "/register", label: "Get Business" },
+    highlighted: false,
+  },
 ];
 
-const PREMIUM_FEATURES = [
-  `Lower transaction fee ${PLANS.premium.feeLabel}`,
-  "Unlimited estimates & invoices",
-  "Unlimited marketplace listings & hire posts",
-  "Featured profile placement",
-  "Priority in search results",
-  "Advanced analytics & reports",
-  "AI business assistant",
-  "Custom booking page",
-  "Expanded photo & document storage",
-];
-
-const PRO_FEATURES_LIST = [
-  `Lowest transaction fee ${PLANS.pro.feeLabel}`,
-  "Everything in Premium",
-  "Highest search priority",
-  "Priority storage & support",
-  "Best for growing multi-crew teams",
-];
-
-function PlanCard({ plan, features, highlighted, cta, delay }) {
+function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`w-full glass rounded-3xl p-6 sm:p-8 border ${
+      className={`w-full glass rounded-3xl p-6 border ${
         highlighted ? "border-titan-cyan/40 titan-glow" : "border-white/10"
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-6">
+      <div className="flex items-start justify-between gap-3 mb-5">
         <div>
+          <p className="text-[11px] uppercase tracking-wider text-white/35 mb-1">{plan.audience}</p>
           <div className="flex items-center gap-2 mb-1">
-            {highlighted ? <Sparkles className="w-4 h-4 text-titan-cyan" /> : <Star className="w-4 h-4 text-white/40" />}
-            <h2 className="text-xl font-bold text-white">{plan.name}</h2>
+            <Icon className={`w-4 h-4 ${highlighted ? "text-titan-cyan" : "text-white/45"}`} />
+            <h2 className="text-lg font-bold text-white">{plan.name}</h2>
           </div>
-          <p className="text-xs text-white/40">{plan.feeLabel} on in-app transactions</p>
+          <p className="text-xs text-white/45 leading-relaxed">{plan.blurb}</p>
         </div>
-        <div className="text-right">
-          <span className="text-3xl font-bold text-titan-cyan">
+        <div className="text-right shrink-0">
+          <span className="text-2xl font-bold text-titan-cyan">
             {plan.priceMonthly === 0 ? "$0" : formatMoney(plan.priceMonthly)}
           </span>
-          <p className="text-xs text-white/40 mt-0.5">{plan.priceMonthly === 0 ? "forever" : "per month"}</p>
+          <p className="text-xs text-white/40 mt-0.5">{plan.priceMonthly === 0 ? "to start" : "/ month"}</p>
+          <p className="text-[11px] text-white/35 mt-1">{plan.feeLabel} fee</p>
         </div>
       </div>
 
-      <div className="space-y-2.5 mb-6">
+      <div className="space-y-2 mb-6">
         {features.map((f) => (
           <div key={f} className="flex items-start gap-2.5">
             <div className="w-5 h-5 rounded-full bg-titan-cyan/15 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -84,7 +114,7 @@ function PlanCard({ plan, features, highlighted, cta, delay }) {
 
       <Button
         asChild
-        className={`w-full rounded-2xl h-12 text-sm font-semibold gap-2 ${
+        className={`w-full rounded-2xl h-11 text-sm font-semibold gap-2 ${
           highlighted
             ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black"
             : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
@@ -109,43 +139,25 @@ export default function Pricing() {
           </div>
         )}
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
-          Simple plans for<br />
-          <span className="gradient-text">field pros</span>
+          Launch pricing that<br />
+          <span className="gradient-text">grows with you</span>
         </h1>
         <p className="text-white/50 text-base sm:text-lg max-w-xl mx-auto">
-          Start free with a {PLANS.free.feeLabel} transaction fee. Upgrade to Premium or Pro to cut fees and unlock growth tools.
+          Customers hire free. Workers start at $0 with an {PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.
         </p>
       </motion.div>
 
-      <div className="w-full max-w-5xl grid md:grid-cols-3 gap-5 mb-8">
-        <PlanCard
-          plan={PLANS.free}
-          features={FREE_FEATURES}
-          highlighted={false}
-          cta={{ to: "/register", label: "Start Free" }}
-          delay={0.05}
-        />
-        <PlanCard
-          plan={PLANS.premium}
-          features={PREMIUM_FEATURES}
-          highlighted
-          cta={{ to: "/register", label: "Get Premium" }}
-          delay={0.1}
-        />
-        <PlanCard
-          plan={PLANS.pro}
-          features={PRO_FEATURES_LIST}
-          highlighted={false}
-          cta={{ to: "/register", label: "Get Pro" }}
-          delay={0.15}
-        />
+      <div className="w-full max-w-6xl grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+        {CARDS.map((card, index) => (
+          <PlanCard key={card.plan.id} {...card} delay={0.05 + index * 0.05} />
+        ))}
       </div>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="w-full max-w-5xl glass rounded-2xl p-5 border border-titan-indigo/20 mb-8"
+        transition={{ delay: 0.3 }}
+        className="w-full max-w-6xl glass rounded-2xl p-5 border border-titan-indigo/20 mb-5"
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-titan-indigo/30 to-titan-cyan/20 flex items-center justify-center flex-shrink-0">
@@ -153,7 +165,7 @@ export default function Pricing() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white mb-0.5">TitanOS for Android</p>
-            <p className="text-xs text-white/40">Same plans on mobile — install from Google Play</p>
+            <p className="text-xs text-white/40">Same launch pricing on mobile via Google Play</p>
           </div>
           <Button
             onClick={openPlayStore}
@@ -168,17 +180,17 @@ export default function Pricing() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="w-full max-w-5xl glass rounded-2xl p-5 border border-white/5"
+        transition={{ delay: 0.35 }}
+        className="w-full max-w-6xl glass rounded-2xl p-5 border border-white/5"
       >
         <div className="flex items-start gap-3">
           <Zap className="w-5 h-5 text-titan-amber flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-white mb-1">How fees work</p>
+            <p className="text-sm font-semibold text-white mb-1">Why this structure</p>
             <p className="text-xs text-white/50 leading-relaxed">
-              When you collect payment through TitanOS, your plan fee is added on checkout
-              (Free {PLANS.free.feeLabel}, Premium {PLANS.premium.feeLabel}, Pro {PLANS.pro.feeLabel}).
-              Refer 3 paying subscribers for lifetime Premium.
+              New users can try the platform with no upfront cost. Professionals get a clear incentive to upgrade as they book more work.
+              Fees apply when you collect payment through TitanOS — Customer {PLANS.customer.feeLabel}, Worker Free {PLANS.worker_free.feeLabel},
+              Worker Premium {PLANS.worker_premium.feeLabel}, Business {PLANS.business.feeLabel}. Pricing can adjust as the network grows.
             </p>
           </div>
         </div>

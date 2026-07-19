@@ -1,8 +1,8 @@
 import { getPlanConfig, PLANS } from "@/lib/plan";
 
-/** @deprecated Prefer getFeeRateForPlan / calcPlatformFee(amount, user) */
-export const PLATFORM_FEE_RATE = PLANS.free.feeRate;
-export const PLATFORM_FEE_PERCENT_LABEL = PLANS.free.feeLabel;
+/** @deprecated Prefer calcPlatformFee(amount, user) */
+export const PLATFORM_FEE_RATE = PLANS.worker_free.feeRate;
+export const PLATFORM_FEE_PERCENT_LABEL = PLANS.worker_free.feeLabel;
 
 export function getFeeRateForPlan(planIdOrUser) {
   return getPlanConfig(planIdOrUser).feeRate;
@@ -14,9 +14,9 @@ export function getFeeLabelForPlan(planIdOrUser) {
 
 /**
  * @param {number|string} amount
- * @param {object|string} [userOrPlanId] - user object or plan id (defaults to free)
+ * @param {object|string} [userOrPlanId]
  */
-export function calcPlatformFee(amount, userOrPlanId = "free") {
+export function calcPlatformFee(amount, userOrPlanId = "worker_free") {
   const plan = getPlanConfig(userOrPlanId);
   const rate = plan.feeRate;
   const base = Math.round((Number(amount) || 0) * 100) / 100;

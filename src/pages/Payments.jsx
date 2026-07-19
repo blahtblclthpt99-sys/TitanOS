@@ -160,11 +160,11 @@ export default function Payments() {
           Your plan: {plan.name} · {plan.feeLabel} fee
         </span>
         {" "}on every payment collected through the app
-        {plan.id === "free" ? (
+        {plan.id === "worker_free" ? (
           <>
             {" · "}
             <Link to="/pricing" className="text-titan-cyan underline-offset-2 hover:underline">
-              Upgrade to lower fees
+              Upgrade to cut fees to 2.5%
             </Link>
           </>
         ) : null}

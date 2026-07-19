@@ -1,5 +1,6 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
+import { calcPlatformFee, PLATFORM_FEE_RATE } from "@/lib/platformFee";
 
 const PREFIX = "titanos_pay";
 
@@ -44,17 +45,25 @@ export async function listPayments(userId) {
 }
 
 export async function createPaymentLink(user, { amount, customer_name, invoice_id, provider = "stripe", note }) {
-  // Prefer server checkout when Stripe key present
+  const { base, fee, total } = calcPlatformFee(amount);
+
   try {
     const result = await api.functions.invoke("createPaymentLink", {
-      amount: Number(amount),
+      amount: base,
       customer_name,
       invoice_id,
       provider,
       note,
     });
     const data = result?.data || result;
-    if (data?.payment) return data.payment;
+    if (data?.payment) {
+      return {
+        ...data.payment,
+        base_amount: data.payment.base_amount ?? base,
+        platform_fee: data.payment.platform_fee ?? fee,
+        amount_total: data.payment.amount_total ?? data.payment.amount ?? total,
+      };
+    }
   } catch {
     /* fall through to local pending payment */
   }
@@ -63,22 +72,35 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
     user_id: user.id,
     invoice_id: invoice_id || null,
     customer_name: customer_name || "",
-    amount: Number(amount) || 0,
+    amount: total,
+    base_amount: base,
+    platform_fee: fee,
+    platform_fee_rate: PLATFORM_FEE_RATE,
+    amount_total: total,
     provider,
     status: "pending",
     checkout_url: "",
-    note: note || "Connect Stripe in Payments to enable live checkout links.",
+    note: note || `Includes TitanOS platform fee 0.76% ($${fee.toFixed(2)}). Total $${total.toFixed(2)}.`,
     created_by_id: user.id,
   };
 
   try {
     return await api.entities.Payment.create(payload);
   } catch {
-    const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
-    const all = readLocal(PREFIX, user.id, "payments", []);
-    all.unshift(row);
-    writeLocal(PREFIX, user.id, "payments", all);
-    return row;
+    try {
+      const { base_amount, platform_fee, platform_fee_rate, amount_total, ...legacy } = payload;
+      const row = await api.entities.Payment.create({
+        ...legacy,
+        note: `${legacy.note} base=$${base_amount} fee=$${platform_fee}`,
+      });
+      return { ...row, base_amount, platform_fee, platform_fee_rate, amount_total };
+    } catch {
+      const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
+      const all = readLocal(PREFIX, user.id, "payments", []);
+      all.unshift(row);
+      writeLocal(PREFIX, user.id, "payments", all);
+      return row;
+    }
   }
 }
 

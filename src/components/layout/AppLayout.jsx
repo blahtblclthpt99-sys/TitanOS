@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import MobileHeader from "./MobileHeader";
@@ -10,6 +10,8 @@ import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
 
 export default function AppLayout() {
+  const feedbackRef = useRef(null);
+
   useEffect(() => {
     const apply = (dark) => document.documentElement.classList.toggle("dark", dark);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -39,8 +41,8 @@ export default function AppLayout() {
       >
         <TabStack />
       </main>
-      <FloatingAIButton />
-      <FeedbackButton />
+      <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
+      <FeedbackButton ref={feedbackRef} />
       <AppDownloadBanner />
     </div>
   );

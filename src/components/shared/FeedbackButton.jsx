@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useImperativeHandle, forwardRef } from "react";
 import { MessageSquare, X, Bug, Lightbulb, Star, Send, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/apiClient";
@@ -11,33 +11,72 @@ const TYPES = [
   { id: "general", label: "General Feedback", icon: Star, color: "text-titan-cyan", bg: "bg-titan-cyan/10" },
 ];
 
-export default function FeedbackButton() {
+function saveFeedbackLocally(payload) {
+  try {
+    const pending = JSON.parse(localStorage.getItem("titanos_beta_feedback") || "[]");
+    pending.push({ ...payload, saved_at: new Date().toISOString() });
+    localStorage.setItem("titanos_beta_feedback", JSON.stringify(pending));
+  } catch {
+    // ignore
+  }
+}
+
+const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("general");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useImperativeHandle(ref, () => ({
+    open: () => {
+      setOpen(true);
+      setError("");
+    },
+  }));
 
   const handleSubmit = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || loading) return;
     setLoading(true);
+    setError("");
+
+    const payload = {
+      type,
+      message: message.trim(),
+      email: user?.email || undefined,
+      status: "new",
+      page: typeof window !== "undefined" ? window.location.pathname : undefined,
+    };
+
     try {
-      await api.entities.BetaFeedback.create({ type, message, email: user?.email || undefined, status: "new" });
-      await api.integrations.Core.SendEmail({
-        to: "hello@titanos.app",
-        subject: `[${type.toUpperCase()}] TitanOS Beta Feedback`,
-        body: `Type: ${type}\nUser: ${user?.email || "Unknown"}\n\nMessage:\n${message}`,
-      });
+      try {
+        await api.entities.BetaFeedback.create(payload);
+      } catch {
+        saveFeedbackLocally(payload);
+      }
+
+      try {
+        await api.integrations.Core.SendEmail({
+          to: "hello@titanos.app",
+          subject: `[${type.toUpperCase()}] TitanOS Feedback`,
+          body: `Type: ${type}\nUser: ${user?.email || "Unknown"}\nPage: ${payload.page || "/"}\n\nMessage:\n${payload.message}`,
+        });
+      } catch {
+        /* optional */
+      }
+
       setSubmitted(true);
       setTimeout(() => {
         setOpen(false);
         setSubmitted(false);
         setMessage("");
         setType("general");
-      }, 2000);
-    } catch {
-      // silently fail — don't block UI
+        setError("");
+      }, 1800);
+    } catch (err) {
+      setError(err?.message || "Could not send feedback. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -45,17 +84,19 @@ export default function FeedbackButton() {
 
   return (
     <>
-      {/* Floating trigger */}
       <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-[5.5rem] md:bottom-6 right-4 md:right-6 z-50 w-12 h-12 rounded-2xl bg-titan-indigo hover:bg-titan-indigo/90 transition-all shadow-lg flex items-center justify-center"
+        type="button"
+        onClick={() => {
+          setOpen(true);
+          setError("");
+        }}
+        className="fixed bottom-[9.75rem] md:bottom-28 right-4 md:right-8 z-[60] w-12 h-12 rounded-2xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-lg flex items-center justify-center border border-white/10"
         aria-label="Send feedback"
         title="Send feedback"
       >
         <MessageSquare className="w-5 h-5 text-white" />
       </button>
 
-      {/* Feedback sheet */}
       <AnimatePresence>
         {open && (
           <>
@@ -63,18 +104,21 @@ export default function FeedbackButton() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-sm"
               onClick={() => setOpen(false)}
             />
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Send feedback"
               initial={{ opacity: 0, y: 40, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-auto md:right-6 md:bottom-24 md:left-auto md:w-[360px] z-50 bg-[#1A1A1C] border border-white/10 rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-[#1A1A1C] border border-white/10 rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Handle for mobile */}
               <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden" />
 
               <div className="flex items-center justify-between mb-4">
@@ -82,7 +126,11 @@ export default function FeedbackButton() {
                   <h3 className="text-sm font-bold text-white">Send Feedback</h3>
                   <p className="text-xs text-white/40">Help us improve TitanOS</p>
                 </div>
-                <button onClick={() => setOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors text-white/40">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors text-white/40"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -97,13 +145,17 @@ export default function FeedbackButton() {
                 </div>
               ) : (
                 <>
-                  {/* Type selector */}
                   <div className="flex gap-2 mb-4">
-                    {TYPES.map(t => (
+                    {TYPES.map((t) => (
                       <button
+                        type="button"
                         key={t.id}
                         onClick={() => setType(t.id)}
-                        className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all ${type === t.id ? `${t.bg} border-current ${t.color}` : "border-white/5 text-white/30 hover:text-white/50"}`}
+                        className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          type === t.id
+                            ? `${t.bg} border-current ${t.color}`
+                            : "border-white/5 text-white/30 hover:text-white/50"
+                        }`}
                       >
                         <t.icon className="w-4 h-4" />
                         <span className="text-[10px] leading-tight text-center">{t.label}</span>
@@ -113,22 +165,37 @@ export default function FeedbackButton() {
 
                   <textarea
                     value={message}
-                    onChange={e => setMessage(e.target.value)}
+                    onChange={(e) => setMessage(e.target.value)}
                     placeholder={
-                      type === "bug" ? "Describe what happened and how to reproduce it..." :
-                      type === "feature" ? "What feature would make TitanOS better for you?" :
-                      "Share your thoughts, suggestions, or anything on your mind..."
+                      type === "bug"
+                        ? "Describe what happened and how to reproduce it..."
+                        : type === "feature"
+                          ? "What feature would make TitanOS better for you?"
+                          : "Share your thoughts, suggestions, or anything on your mind..."
                     }
                     rows={4}
                     className="w-full bg-[#242427] border border-white/10 text-white rounded-xl p-3 text-sm placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
                   />
 
+                  {error ? (
+                    <p className="text-xs text-red-400 mb-3" role="alert">
+                      {error}
+                    </p>
+                  ) : null}
+
                   <Button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={loading || !message.trim()}
                     className="w-full bg-titan-indigo hover:bg-titan-indigo/90 text-white font-semibold rounded-xl h-10 text-sm gap-2 disabled:opacity-40"
                   >
-                    {loading ? "Sending…" : <><Send className="w-4 h-4" /> Send Feedback</>}
+                    {loading ? (
+                      "Sending…"
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" /> Send Feedback
+                      </>
+                    )}
                   </Button>
                 </>
               )}
@@ -138,4 +205,6 @@ export default function FeedbackButton() {
       </AnimatePresence>
     </>
   );
-}
+});
+
+export default FeedbackButton;

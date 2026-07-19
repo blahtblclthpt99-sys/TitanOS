@@ -11,6 +11,29 @@ function throwIfError(error) {
   throw apiError(error.message || "Request failed");
 }
 
+function apiCandidates(path) {
+  const urls = [];
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (configured) urls.push(`${configured}${path}`);
+
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".vercel.app") ||
+      hostname.endsWith("titanfieldos.com")
+    ) {
+      urls.push(`${origin}${path}`);
+      urls.push(path);
+    }
+    // Capacitor / static hosts: always allow production API
+    urls.push(`https://titanos-web.vercel.app${path}`);
+  }
+
+  return [...new Set(urls)];
+}
+
 async function uploadFile({ file }) {
   const ext = file.name.split(".").pop() || "bin";
   const path = `${crypto.randomUUID()}.${ext}`;
@@ -25,19 +48,30 @@ async function uploadFile({ file }) {
 
 async function sendEmail(payload) {
   const token = (await supabase.auth.getSession()).data.session?.access_token;
-  const response = await fetch("/api/functions/sendEmail", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw apiError(body.error || "Failed to send email", response.status);
+  const path = "/api/functions/sendEmail";
+  let lastError;
+
+  for (const url of apiCandidates(path)) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw apiError(body.error || "Failed to send email", response.status);
+      }
+      return body;
+    } catch (err) {
+      lastError = err;
+    }
   }
-  return body;
+
+  throw lastError || apiError("Failed to send email", 503);
 }
 
 export function createIntegrationsModule() {

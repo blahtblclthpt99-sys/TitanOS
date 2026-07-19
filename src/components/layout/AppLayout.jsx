@@ -6,6 +6,7 @@ import DesktopTopBar from "./DesktopTopBar";
 import QuickCreateFAB from "./QuickCreateFAB";
 import TabStack from "./TabStack";
 import FloatingAIButton from "@/components/shared/FloatingAIButton";
+import FloatingVoiceButton from "@/components/shared/FloatingVoiceButton";
 import AppDownloadBanner from "@/components/shared/AppDownloadBanner";
 import FeedbackButton from "@/components/shared/FeedbackButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
@@ -50,6 +51,7 @@ export default function AppLayout() {
         </div>
       </main>
       <QuickCreateFAB />
+      <FloatingVoiceButton />
       <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
       <FeedbackButton ref={feedbackRef} />
       <AppDownloadBanner />

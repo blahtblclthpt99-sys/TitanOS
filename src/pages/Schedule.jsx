@@ -18,6 +18,8 @@ import {
   isToday,
 } from "@/lib/date-utils";
 import { fetchOpenMeteo } from "@/lib/weatherApi";
+import { buildSmartScheduleTips } from "@/lib/smartSchedule";
+import { useNavigate } from "react-router-dom";
 
 const STATUS_BORDER = {
   scheduled:   "border-l-titan-cyan",
@@ -27,6 +29,7 @@ const STATUS_BORDER = {
 };
 
 export default function Schedule() {
+  const navigate = useNavigate();
   const { data: [jobs], loading, error, reload } = useEntityData([
     { entity: "Job", method: "list", args: ["-scheduled_date", 100] },
   ]);
@@ -79,6 +82,21 @@ export default function Schedule() {
         </div>
       </div>
       {weather && <div className="glass rounded-2xl px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="font-semibold text-titan-cyan">{weather.temp}° · {weather.label}</span><span className="text-muted-foreground">Wind {weather.wind} mph</span>{weather.warning && <span className="text-titan-amber">{weather.warning}</span>}</div>}
+      {!loading && (
+        <div className="grid sm:grid-cols-2 gap-2 mb-5">
+          {buildSmartScheduleTips(jobs, weather).map((tip) => (
+            <button
+              key={tip.text}
+              type="button"
+              onClick={() => tip.path && navigate(tip.path)}
+              className="glass rounded-xl px-4 py-3 text-left text-sm text-foreground hover:border-primary/30 border border-transparent transition-colors"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Smart schedule</span>
+              <p className="mt-1">{tip.text}</p>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="hidden md:grid grid-cols-7 gap-2">
         {weekDays.map((day) => {

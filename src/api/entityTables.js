@@ -48,7 +48,12 @@ export const ENTITY_TABLES = {
   FollowUpRule: "follow_up_rules",
   FollowUpQueue: "follow_up_queue",
   Credential: "credentials",
-  Lead: "leads",
+  LoyaltyMember: "loyalty_members",
+  LoyaltyEvent: "loyalty_events",
+  EmergencyJob: "emergency_jobs",
+  EscrowHold: "escrow_holds",
+  MarketingAsset: "marketing_assets",
+  PhoneScript: "phone_scripts",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

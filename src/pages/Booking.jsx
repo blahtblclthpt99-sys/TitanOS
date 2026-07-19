@@ -94,7 +94,25 @@ export default function Booking() {
         {user?.verified_worker && <p className="flex items-center gap-1.5 text-xs text-titan-cyan"><ShieldCheck className="w-4 h-4" /> Verified provider badge shown publicly</p>}
         <Button disabled={saving} type="submit" className="w-full bg-titan-cyan text-black">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save booking page"}</Button>
       </form>
-      <aside className="glass rounded-3xl p-5 border border-border h-fit"><p className="text-xs text-muted-foreground uppercase tracking-wider">Shareable link</p><p className="text-sm text-foreground mt-2 break-all">{bookingPublicUrl(page.slug)}</p><Button onClick={copyLink} variant="outline" className="mt-4 w-full border-border text-foreground"><Copy className="w-4 h-4 mr-2" />Copy link</Button></aside>
+      <aside className="glass rounded-3xl p-5 border border-border h-fit space-y-3">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider">Your booking website</p>
+        <p className="text-sm text-foreground break-all font-medium">{bookingPublicUrl(page.slug)}</p>
+        <p className="text-xs text-muted-foreground">
+          Public page for customers — claim your slug below. Custom domains like <span className="text-foreground">{page.slug || "you"}.titanos.app</span> can map to this same page.
+        </p>
+        <label className="block text-sm text-muted-foreground">
+          Booking slug
+          <Input
+            value={form.slug || ""}
+            onChange={(e) => update("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+            className={`mt-1 ${inputClass}`}
+            placeholder="your-business"
+          />
+        </label>
+        <Button onClick={copyLink} variant="outline" className="w-full border-border text-foreground">
+          <Copy className="w-4 h-4 mr-2" />Copy link
+        </Button>
+      </aside>
     </div>
     <section className="glass rounded-3xl p-5 md:p-7 border border-border mt-5"><div className="flex justify-between gap-4 items-center"><h2 className="font-semibold text-foreground">Availability</h2><Button onClick={saveSlots} disabled={savingAvailability} className="bg-titan-cyan text-black">{savingAvailability ? "Saving…" : "Save availability"}</Button></div><div className="mt-4 space-y-2">{slots.map((slot, index) => <div key={slot.weekday} className="flex flex-wrap gap-3 items-center rounded-xl bg-white/[.03] p-3"><label className="w-24 flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={slot.is_open} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, is_open: e.target.checked } : item))} className="accent-cyan-400" />{WEEKDAYS[slot.weekday]}</label><Input type="time" disabled={!slot.is_open} value={slot.start_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, start_time: e.target.value } : item))} className={`${inputClass} w-32`} /><span className="text-muted-foreground">to</span><Input type="time" disabled={!slot.is_open} value={slot.end_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, end_time: e.target.value } : item))} className={`${inputClass} w-32`} /></div>)}</div></section>
     <section className="mt-5"><h2 className="font-semibold text-foreground mb-3">Incoming requests</h2><div className="space-y-3">{requests.length ? requests.map((request) => <article key={request.id} className="glass rounded-2xl p-4 border border-border flex flex-col sm:flex-row sm:items-center gap-3"><div className="flex-1"><p className="font-medium text-foreground">{request.customer_name} <span className="text-xs text-titan-cyan">· {request.service}</span></p><p className="text-xs text-foreground/45 mt-1">{request.preferred_date || "Flexible"} {request.preferred_time} · {request.customer_phone || request.customer_email || "No contact"}</p>{request.notes && <p className="text-sm text-muted-foreground mt-2">{request.notes}</p>}</div><div className="flex gap-2 items-center"><span className="text-xs capitalize text-foreground/45">{request.status}</span>{request.status === "new" && <><Button onClick={() => updateRequest(request, "accepted")} disabled={saving} className="h-8 bg-emerald-500/20 text-emerald-300">Accept</Button><Button onClick={() => updateRequest(request, "declined")} disabled={saving} variant="outline" className="h-8 border-border text-foreground">Decline</Button></>}</div></article>) : <p className="glass rounded-2xl p-6 text-sm text-muted-foreground">No booking requests yet.</p>}</div></section>

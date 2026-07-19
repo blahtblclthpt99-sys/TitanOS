@@ -60,6 +60,13 @@ const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
 const Leads = lazy(() => import("@/pages/Leads"));
 const GrowthCoach = lazy(() => import("@/pages/GrowthCoach"));
+const TitanScore = lazy(() => import("@/pages/TitanScore"));
+const MarketingStudio = lazy(() => import("@/pages/MarketingStudio"));
+const Loyalty = lazy(() => import("@/pages/Loyalty"));
+const LocalDeals = lazy(() => import("@/pages/LocalDeals"));
+const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
+const Escrow = lazy(() => import("@/pages/Escrow"));
+const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -90,6 +97,13 @@ const NON_TAB_ROUTES = {
   "/credentials": Credentials,
   "/leads": Leads,
   "/growth-coach": GrowthCoach,
+  "/titan-score": TitanScore,
+  "/marketing": MarketingStudio,
+  "/loyalty": Loyalty,
+  "/deals": LocalDeals,
+  "/emergency": EmergencyJobs,
+  "/escrow": Escrow,
+  "/phone": PhoneReceptionist,
 };
 
 function NonTabPage() {

@@ -33,6 +33,13 @@ import {
   ContactRound,
   Sparkles,
   User,
+  Award,
+  Megaphone,
+  Heart,
+  Tag,
+  Siren,
+  ShieldCheck,
+  PhoneCall,
 } from "lucide-react";
 
 /**
@@ -51,6 +58,7 @@ export const APP_NAV_ITEMS = [
   // Money
   { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
   { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
+  { icon: ShieldCheck, label: "Payment Protection", path: "/escrow", group: "money" },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "money" },
   { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "money" },
   { icon: BarChart3, label: "Reports", path: "/reports", group: "money" },
@@ -72,11 +80,17 @@ export const APP_NAV_ITEMS = [
   { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "growth" },
   { icon: Star, label: "Reputation", path: "/reputation", group: "growth" },
   { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "growth" },
+  { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "growth" },
+  { icon: Award, label: "Titan Score", path: "/titan-score", group: "growth" },
+  { icon: Heart, label: "Loyalty", path: "/loyalty", group: "growth" },
+  { icon: Tag, label: "Local Deals", path: "/deals", group: "growth" },
+  { icon: Siren, label: "Emergency Jobs", path: "/emergency", group: "growth" },
   { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
 
   // Connect
   { icon: Bot, label: "AI Assistant", path: "/assistant", group: "connect" },
+  { icon: PhoneCall, label: "Phone Receptionist", path: "/phone", group: "connect" },
   { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
   { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
 
@@ -121,7 +135,7 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Money",
-    paths: ["/finances", "/payments", "/tax-center", "/receipts", "/reports"],
+    paths: ["/finances", "/payments", "/escrow", "/tax-center", "/receipts", "/reports"],
   },
   {
     title: "Field & team",
@@ -129,11 +143,11 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Grow business",
-    paths: ["/marketplace", "/hire", "/leads", "/follow-ups", "/reputation", "/growth-coach", "/insurance", "/referral"],
+    paths: ["/marketplace", "/hire", "/leads", "/follow-ups", "/reputation", "/growth-coach", "/marketing", "/titan-score", "/loyalty", "/deals", "/emergency", "/insurance", "/referral"],
   },
   {
     title: "Connect",
-    paths: ["/assistant", "/community", "/notifications"],
+    paths: ["/assistant", "/phone", "/community", "/notifications"],
   },
   {
     title: "Account",

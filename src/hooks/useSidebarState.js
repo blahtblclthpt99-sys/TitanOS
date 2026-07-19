@@ -16,7 +16,7 @@ export function useSidebarState() {
     writeStorage(SIDEBAR_STORAGE_KEY, String(expanded));
     document.documentElement.style.setProperty(
       "--sidebar-width",
-      expanded ? "220px" : "72px"
+      expanded ? "260px" : "72px"
     );
   }, [expanded]);
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Briefcase, Search, Clock, MapPin, User, Calendar, CheckSquare, Square, X, ChevronDown, UserCheck, Plus } from "lucide-react";
+import { Briefcase, Search, Clock, MapPin, User, Calendar, CheckSquare, Square, X, ChevronDown, UserCheck, Plus, Camera, LogIn, LogOut } from "lucide-react";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import ReviewForm from "@/components/shared/ReviewForm";
 import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
+import { useAuth } from "@/lib/AuthContext";
+import { addJobPhoto, listJobPhotos, recordCheckin } from "@/lib/jobOpsApi";
 
 const PRIORITY_COLORS = {
   low: "text-white/30", medium: "text-titan-cyan",
@@ -37,6 +39,7 @@ const JOB_STATUSES = ["scheduled", "in_progress", "completed", "cancelled"];
 export default function Jobs({ isActive = true }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { data: [jobs, customers, employees], loading, error, reload } = useEntityData([
     { entity: "Job",      method: "list", args: ["-scheduled_date", 100] },
     { entity: "Customer", method: "list", args: ["-created_date",   100] },
@@ -56,6 +59,9 @@ export default function Jobs({ isActive = true }) {
   const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [completingId, setCompletingId] = useState(null);
+  const [expandedJobId, setExpandedJobId] = useState(null);
+  const [jobPhotos, setJobPhotos] = useState({});
+  const [opsSaving, setOpsSaving] = useState(false);
 
   const showForm = new URLSearchParams(location.search).get("new") === "1";
   const openForm  = () => navigate("?new=1");
@@ -149,6 +155,34 @@ export default function Jobs({ isActive = true }) {
     }
   };
 
+  const openOps = async (job) => {
+    const nextId = expandedJobId === job.id ? null : job.id;
+    setExpandedJobId(nextId);
+    if (nextId && !jobPhotos[job.id]) {
+      try {
+        const photos = await listJobPhotos(job.id);
+        setJobPhotos((current) => ({ ...current, [job.id]: photos }));
+      } catch { setJobPhotos((current) => ({ ...current, [job.id]: [] })); }
+    }
+  };
+
+  const checkin = async (job, eventType) => {
+    if (!user?.id || opsSaving) return;
+    setOpsSaving(true);
+    try { await recordCheckin(user, { jobId: job.id, eventType }); }
+    finally { setOpsSaving(false); }
+  };
+
+  const uploadPhoto = async (job, kind, file) => {
+    if (!user?.id || !file || opsSaving) return;
+    setOpsSaving(true);
+    try {
+      const { file_url } = await api.integrations.Core.UploadFile({ file });
+      const photo = await addJobPhoto(user, { jobId: job.id, kind, url: file_url });
+      setJobPhotos((current) => ({ ...current, [job.id]: [photo, ...(current[job.id] || [])] }));
+    } finally { setOpsSaving(false); }
+  };
+
   if (!isActive && !jobs.length) return null;
   if (loading && !jobs.length) return <PageLoader variant="list" label="Loading jobs" />;
   if (error) return <ErrorState title="Couldn't load jobs" onRetry={reload} />;
@@ -191,8 +225,19 @@ export default function Jobs({ isActive = true }) {
               {completingId === job.id ? "Saving…" : "Complete"}
             </Button>
           )}
+          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-white/10 text-white/70 rounded-lg text-xs">Field ops</Button>}
         </div>
       </div>
+      {(expandedJobId === job.id || ["in_progress", "completed"].includes(job.status)) && !bulkMode && (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => checkin(job, "check_in")} disabled={opsSaving} size="sm" className="bg-titan-cyan/15 text-titan-cyan border border-titan-cyan/20"><LogIn className="w-4 h-4 mr-1" />Check in</Button>
+            <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-white/15 text-white"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
+            {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-white/15 text-xs text-white/75 hover:bg-white/5"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
+          </div>
+          {!!jobPhotos[job.id]?.length && <div className="flex flex-wrap gap-2 mt-3">{jobPhotos[job.id].map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="relative"><img src={photo.url} alt={`${photo.kind || "Job"} photo`} className="w-16 h-16 object-cover rounded-lg border border-white/10" /><span className="absolute bottom-0 left-0 right-0 text-[9px] text-center bg-black/60 capitalize">{photo.kind}</span></a>)}</div>}
+        </div>
+      )}
       {job.status === "completed" && !bulkMode && (
         <div className="mt-4 pt-4 border-t border-white/5">
           <ReviewForm

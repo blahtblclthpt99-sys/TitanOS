@@ -9,7 +9,7 @@ import {
   Calculator,
   Store,
   UserRoundSearch,
-  UsersRound,
+  CalendarCheck,
 } from "lucide-react";
 
 const actions = [
@@ -20,7 +20,7 @@ const actions = [
   { icon: Receipt, label: "Invoice", sub: "Bill completed work", path: "/invoices?new=1", color: "from-titan-green to-emerald-400" },
   { icon: Store, label: "Marketplace", sub: "Free During Beta", path: "/marketplace", color: "from-sky-500 to-blue-400" },
   { icon: UserRoundSearch, label: "Hire", sub: "Find workers", path: "/hire", color: "from-fuchsia-500 to-pink-400" },
-  { icon: UsersRound, label: "Community", sub: "Live job feed", path: "/community", color: "from-emerald-500 to-teal-400" },
+  { icon: CalendarCheck, label: "Booking", sub: "Shareable page", path: "/booking", color: "from-emerald-500 to-teal-400" },
 ];
 
 export default function QuickActions() {

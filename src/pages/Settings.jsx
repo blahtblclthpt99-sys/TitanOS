@@ -435,6 +435,12 @@ export default function Settings() {
           <DialogHeader><DialogTitle className="text-white text-lg">Privacy</DialogTitle></DialogHeader>
           <div className="space-y-1 mt-2">
             <ToggleRow checked={privacyForm.community_opt_in} label="Join the Community" description="Enable Community features for your account." onChange={(value) => setPrivacy((form) => ({ ...form, community_opt_in: value }))} />
+            <ToggleRow
+              checked={Boolean(user?.verified_worker)}
+              label="Show Verified Worker badge"
+              description="Display a verification badge on your booking page (admin may revoke)."
+              onChange={(value) => save("privacy", { ...privacyForm, verified_worker: value }, value ? "Verified badge enabled." : "Verified badge hidden.")}
+            />
             {PRIVACY_OPTIONS.map(([key, label, description]) => <ToggleRow key={key} checked={privacyForm.privacy_prefs?.[key] ?? false} label={label} description={description} onChange={(value) => setPrivacy((form) => ({ ...form, privacy_prefs: { ...form.privacy_prefs, [key]: value } }))} />)}
           </div>
           <Button onClick={() => save("privacy", privacyForm, "Your privacy preferences have been updated.")} disabled={savingPanel === "privacy"} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 gap-2">{savedPanel === "privacy" ? <><Check className="w-4 h-4" /> Saved</> : savingPanel === "privacy" ? "Saving…" : "Save Changes"}</Button>

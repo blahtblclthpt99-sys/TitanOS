@@ -19,6 +19,8 @@ import {
   Calculator,
   Bell,
   ShieldAlert,
+  CalendarCheck,
+  FileSignature,
 } from "lucide-react";
 
 /** Full TitanOS navigation — field ops + marketplace platform. */
@@ -33,6 +35,8 @@ export const APP_NAV_ITEMS = [
   { icon: DollarSign, label: "Finances", path: "/finances", group: "ops" },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "ops" },
   { icon: Truck, label: "Fleet", path: "/fleet", group: "ops" },
+  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "ops" },
+  { icon: FileSignature, label: "Contracts", path: "/contracts", group: "ops" },
   { icon: BarChart3, label: "Reports", path: "/reports", group: "insights" },
   { icon: Bot, label: "AI Assistant", path: "/assistant", group: "insights" },
   { icon: UsersRound, label: "Community", path: "/community", group: "insights" },
@@ -58,7 +62,7 @@ export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/customers", "/invoices", "/mor
 export const MORE_MENU_GROUPS = [
   {
     title: "Operations",
-    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet"],
+    paths: ["/schedule", "/estimates", "/job-estimator", "/finances", "/tax-center", "/fleet", "/booking", "/contracts"],
   },
   {
     title: "Insights",

@@ -32,6 +32,12 @@ export const ENTITY_TABLES = {
   PriceEstimate: "price_estimates",
   CustomerCommunication: "customer_communications",
   CustomerFile: "customer_files",
+  BookingPage: "booking_pages",
+  BookingRequest: "booking_requests",
+  AvailabilitySlot: "availability_slots",
+  JobPhoto: "job_photos",
+  JobCheckin: "job_checkins",
+  Contract: "contracts",
 };
 
 const META_COLUMNS = new Set(["id", "created_at", "updated_at", "created_by_id"]);

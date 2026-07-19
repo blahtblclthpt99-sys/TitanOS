@@ -56,6 +56,8 @@ async function buildUser(authUser, profile) {
     community_opt_in: profile?.community_opt_in ?? false,
     referral_code: profile?.referral_code || "",
     referred_by_code: profile?.referred_by_code || "",
+    verified_worker: profile?.verified_worker ?? false,
+    verification_notes: profile?.verification_notes || "",
     created_date: profile?.created_at || authUser.created_at,
     updated_date: profile?.updated_at || authUser.updated_at,
   };
@@ -276,6 +278,8 @@ export function createAuthModule() {
         "community_opt_in",
         "referral_code",
         "referred_by_code",
+        "verified_worker",
+        "verification_notes",
       ];
 
       const payload = {};

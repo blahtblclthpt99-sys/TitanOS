@@ -46,6 +46,8 @@ const Community = lazy(() => import("@/pages/Community"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
+const Booking = lazy(() => import("@/pages/Booking"));
+const Contracts = lazy(() => import("@/pages/Contracts"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -64,6 +66,8 @@ const NON_TAB_ROUTES = {
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
   "/admin/moderation": AdminModeration,
+  "/booking": Booking,
+  "/contracts": Contracts,
 };
 
 function NonTabPage() {

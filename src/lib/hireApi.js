@@ -26,6 +26,9 @@ function filterJobs(rows, { category, state, search, status }) {
       j.description?.toLowerCase().includes(q) ||
       j.city?.toLowerCase().includes(q)
     );
+  }).sort((a, b) => {
+    const priority = (job) => (job.is_same_day ? 2 : 0) + (job.is_urgent ? 1 : 0);
+    return priority(b) - priority(a);
   });
 }
 
@@ -42,6 +45,8 @@ export async function createHireJob(user, data) {
     budget_max: Number(data.budget_max) || null,
     deadline: data.deadline || null,
     images: data.images || [],
+    is_same_day: Boolean(data.is_same_day),
+    is_urgent: Boolean(data.is_urgent),
     status: "open",
     application_count: 0,
     created_by_id: user.id,

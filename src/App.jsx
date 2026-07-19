@@ -27,6 +27,9 @@ const ThankYou = lazy(() => import("@/pages/ThankYou"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
 
+const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
+const PublicSign = lazy(() => import("@/pages/PublicSign"));
+
 /** Marketing + auth screens that must not use the app shell. */
 const PUBLIC_EXACT = new Set([
   "/pricing",
@@ -47,6 +50,8 @@ function isPublicPath(pathname) {
   const p = normalizeAppPath(pathname);
   if (PUBLIC_EXACT.has(p)) return true;
   if (p.startsWith("/features/")) return true;
+  if (p.startsWith("/book/")) return true;
+  if (p.startsWith("/sign/")) return true;
   return false;
 }
 
@@ -111,6 +116,8 @@ function AppShellGate() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/book/:slug" element={<PublicBooking />} />
+        <Route path="/sign/:token" element={<PublicSign />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </Suspense>

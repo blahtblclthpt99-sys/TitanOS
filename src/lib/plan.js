@@ -38,6 +38,9 @@ export const PRO_FEATURES = Object.freeze({
   routeOptimization: "route_optimization",
   gpsCheckIn: "gps_check_in",
   ocrReceipts: "ocr_receipts",
+  bookingPages: "booking_pages",
+  digitalContracts: "digital_contracts",
+  multiCompany: "multi_company",
 });
 
 export function resolvePlan(user) {

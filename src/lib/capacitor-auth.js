@@ -5,6 +5,9 @@ import { Capacitor } from "@capacitor/core";
 /**
  * When Google OAuth returns to com.titanos.myapp://auth/callback?...
  * close the system browser and route into the SPA hash router.
+ *
+ * Prefer hash navigation (no full reload) so in-memory auth client + PKCE
+ * storage stay intact when the process was not killed.
  */
 export function installNativeAuthDeepLinks() {
   if (!Capacitor.isNativePlatform()) return () => {};
@@ -18,8 +21,14 @@ export function installNativeAuthDeepLinks() {
         } catch {
           // Browser may already be closed
         }
-        const target = `/#/auth/callback${parsed.search || ""}${parsed.hash || ""}`;
-        window.location.replace(target);
+
+        const query = parsed.search || "";
+        const hashTarget = `#/auth/callback${query}`;
+
+        // Soft navigate when possible (preserves Preferences + JS heap)
+        if (window.location.hash !== hashTarget) {
+          window.location.hash = `/auth/callback${query}`;
+        }
       }
     } catch {
       // ignore malformed deep links

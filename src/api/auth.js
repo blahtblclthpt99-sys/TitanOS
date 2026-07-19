@@ -207,6 +207,9 @@ export function createAuthModule() {
       if (!data?.url) throw apiError("Could not start sign-in. Try again.", 400);
 
       if (isNative) {
+        // Give async Preferences storage a tick to flush the PKCE verifier
+        // before leaving the WebView for the system browser.
+        await new Promise((r) => setTimeout(r, 50));
         await Browser.open({ url: data.url, presentationStyle: "popover" });
       } else {
         window.location.assign(data.url);

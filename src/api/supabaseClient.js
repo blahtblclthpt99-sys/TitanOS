@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
+import { createAuthStorage } from "@/lib/auth-storage";
 
 // Vite uses VITE_*; Supabase dashboard snippets often use NEXT_PUBLIC_* / PUBLISHABLE_KEY.
 const supabaseUrl =
@@ -17,12 +19,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+/**
+ * detectSessionInUrl must stay false:
+ * AuthCallback exchanges the PKCE code once. Auto-detect + callback = double
+ * exchange → "PKCE code verifier not found in storage" (also triggered by React StrictMode).
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
     flowType: "pkce",
+    storage: createAuthStorage(),
+    // Keep native sessions on device storage even if WebView is cleared mid-OAuth
+    storageKey: Capacitor.isNativePlatform()
+      ? "titanos-auth-native"
+      : "titanos-auth",
   },
 });
 

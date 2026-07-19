@@ -30,6 +30,34 @@ function collectParams() {
   };
 }
 
+/** Prevent double exchange (React StrictMode remount / rapid re-entry). */
+let exchangeInflight = null;
+let exchangedCode = "";
+
+async function exchangeCodeOnce(code) {
+  if (exchangedCode === code) {
+    return supabase.auth.getSession();
+  }
+  if (exchangeInflight) return exchangeInflight;
+
+  exchangeInflight = (async () => {
+    const result = await supabase.auth.exchangeCodeForSession(code);
+    if (!result.error) exchangedCode = code;
+    return result;
+  })().finally(() => {
+    exchangeInflight = null;
+  });
+
+  return exchangeInflight;
+}
+
+function friendlyAuthError(message) {
+  if (/code verifier|pkce/i.test(message || "")) {
+    return "Google sign-in could not finish (session lost mid-login). Close extra tabs, then try Continue with Google again.";
+  }
+  return message || "Sign-in failed";
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -47,8 +75,12 @@ export default function AuthCallback() {
 
       try {
         if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+          const { error: exchangeError } = await exchangeCodeOnce(code);
+          if (exchangeError) {
+            // Another attempt may have already created the session
+            const { data } = await supabase.auth.getSession();
+            if (!data.session) throw exchangeError;
+          }
         } else if (accessToken && refreshToken) {
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -56,16 +88,22 @@ export default function AuthCallback() {
           });
           if (sessionError) throw sessionError;
         } else {
-          // detectSessionInUrl may already have established a session
           const { data, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) throw sessionError;
           if (!data.session) {
             throw new Error("No session returned. Try again or use email login.");
           }
         }
+
+        // Clean OAuth params from the URL so refreshes don't re-run exchange
+        if (typeof window !== "undefined" && window.history?.replaceState) {
+          const clean = `${window.location.pathname}${window.location.hash.split("?")[0] || ""}`;
+          window.history.replaceState({}, document.title, clean || "/");
+        }
+
         if (!cancelled) navigate(from, { replace: true });
       } catch (err) {
-        if (!cancelled) setError(err.message || "Sign-in failed");
+        if (!cancelled) setError(friendlyAuthError(err.message));
       }
     };
 

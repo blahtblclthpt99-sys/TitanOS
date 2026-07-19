@@ -60,6 +60,11 @@
   body {
     @apply bg-[#0A0A0B] text-white font-body antialiased;
     overscroll-behavior: none;
+    /* Android 15 edge-to-edge: keep root full-bleed; layouts pad with safe-area */
+    min-height: 100dvh;
+  }
+  #root {
+    min-height: 100dvh;
   }
   button, a[role="button"], nav a {
     user-select: none;

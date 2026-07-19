@@ -51,7 +51,7 @@ npm run android:sign
 ```
 
 Upload **`release/TitanOS.aab`** only (not the APK, not Base44 files).  
-Bump `versionCode` in `android/app/build.gradle` before every upload (current: **6** / **1.4.1**).
+Bump `versionCode` in `android/app/build.gradle` before every upload (current: **7** / **1.4.2**).
 
 ## If the app installs but login / Google sign-in fails
 

@@ -11,6 +11,16 @@ export function getSupabaseAdmin() {
   });
 }
 
+export function getSupabaseAnonKey() {
+  return (
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    ""
+  );
+}
+
 export function readJson(req) {
   if (req.body && typeof req.body === "object") {
     return req.body;

@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
 
@@ -39,6 +41,78 @@ async function buildUser(authUser, profile) {
   };
 }
 
+async function assertOAuthProviderEnabled(provider) {
+  const base = import.meta.env.VITE_SUPABASE_URL;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!base || !anon) return;
+  try {
+    const res = await fetch(`${base}/auth/v1/settings`, {
+      headers: { apikey: anon, Authorization: `Bearer ${anon}` },
+    });
+    if (!res.ok) return;
+    const settings = await res.json();
+    const key = provider === "azure" ? "azure" : provider;
+    if (settings?.external && settings.external[key] === false) {
+      const label = provider === "google" ? "Google" : provider;
+      throw apiError(
+        `${label} sign-in is not enabled yet in Supabase. Use email, or finish GOOGLE_AUTH.md setup.`,
+        400
+      );
+    }
+  } catch (err) {
+    if (err?.status) throw err;
+    // Network hiccup — let OAuth attempt proceed
+  }
+}
+
+async function registerViaServer({ email, password, fullName }) {
+  const bases = [];
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (configured) bases.push(configured);
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
+      bases.push(origin);
+    }
+    // Always allow production API as last resort (Capacitor / IONOS)
+    bases.push("https://titanos-web.vercel.app");
+  }
+
+  let lastError;
+  for (const base of [...new Set(bases)]) {
+    try {
+      const response = await fetch(`${base}/api/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, fullName }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw apiError(body.error || "Registration failed", response.status);
+      }
+      if (body.session?.access_token && body.session?.refresh_token) {
+        const { error } = await supabase.auth.setSession({
+          access_token: body.session.access_token,
+          refresh_token: body.session.refresh_token,
+        });
+        throwIfError(error);
+      }
+      return {
+        session: body.session || null,
+        user: body.user || null,
+        needsEmailVerification: Boolean(body.needsEmailVerification),
+      };
+    } catch (err) {
+      lastError = err;
+      // Only fall through on network / unavailable host
+      if (err?.status && err.status !== 404 && err.status !== 502 && err.status !== 503) {
+        throw err;
+      }
+    }
+  }
+  throw lastError || apiError("Registration unavailable", 503);
+}
+
 export function createAuthModule() {
   return {
     async me() {
@@ -56,20 +130,36 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: getAuthRedirectTo("/auth/callback"),
-          data: fullName ? { full_name: fullName } : undefined,
-        },
-      });
-      throwIfError(error);
-      return {
-        session: data.session,
-        user: data.user,
-        needsEmailVerification: !data.session,
-      };
+      // Prefer server register — avoids Supabase built-in mailer rate limits
+      // and confirms the account immediately for Play testers.
+      try {
+        return await registerViaServer({ email, password, fullName });
+      } catch (serverError) {
+        // Fall back to direct Supabase signup when API is unavailable
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: getAuthRedirectTo("/auth/callback"),
+            data: fullName ? { full_name: fullName } : undefined,
+          },
+        });
+        if (error) {
+          if (/rate limit/i.test(error.message || "")) {
+            throw apiError(
+              serverError?.message ||
+                "Sign-up is temporarily limited. Try again in a few minutes, or use Google once it is enabled.",
+              429
+            );
+          }
+          throwIfError(error);
+        }
+        return {
+          session: data.session,
+          user: data.user,
+          needsEmailVerification: !data.session,
+        };
+      }
     },
 
     async verifyOtp({ email, otpCode }) {
@@ -95,16 +185,33 @@ export function createAuthModule() {
     },
 
     async loginWithProvider(provider) {
+      await assertOAuthProviderEnabled(provider);
+
       const redirectTo = getAuthRedirectTo("/auth/callback");
-      const options = { redirectTo };
+      const isNative = Capacitor.isNativePlatform();
+      const options = {
+        redirectTo,
+        // Always get the URL first so we can open Browser on native,
+        // and avoid a blank 400 page if the provider was just disabled.
+        skipBrowserRedirect: true,
+      };
       if (provider === "google") {
         options.queryParams = { access_type: "offline", prompt: "select_account" };
       }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options,
       });
       throwIfError(error);
+      if (!data?.url) throw apiError("Could not start sign-in. Try again.", 400);
+
+      if (isNative) {
+        await Browser.open({ url: data.url, presentationStyle: "popover" });
+      } else {
+        window.location.assign(data.url);
+      }
+
       return data;
     },
 

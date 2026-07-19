@@ -101,12 +101,23 @@ async function main() {
     process.exit(1);
   }
 
-  const { data: oauth, error: oauthError } = await anon.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: "http://localhost:5173/auth/callback", skipBrowserRedirect: true },
+  const settingsRes = await fetch(`${url}/auth/v1/settings`, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
   });
-  if (oauthError) warn("Google Auth", oauthError.message);
-  else ok("Google Auth", "provider returns OAuth URL");
+  const settings = settingsRes.ok ? await settingsRes.json() : null;
+  if (settings?.external?.google) {
+    ok("Google Auth", "provider enabled");
+  } else {
+    warn("Google Auth", "disabled in Supabase — see GOOGLE_AUTH.md");
+  }
+
+  // Public signup often hits built-in mailer rate limits; server /api/register bypasses that.
+  warn(
+    "Public email signup",
+    settings?.mailer_autoconfirm
+      ? "autoconfirm ON"
+      : "autoconfirm OFF (use /api/register on Vercel)"
+  );
 
   if (admin) {
     const { data: bucketList, error: bucketError } = await admin.storage.listBuckets();
@@ -116,10 +127,11 @@ async function main() {
   }
 
   console.log("\nPlay / OAuth redirects to allow in Supabase Auth:");
+  console.log("  https://titanos-web.vercel.app/auth/callback");
   console.log("  http://localhost:5173/auth/callback");
-  console.log("  https://YOUR_DOMAIN/auth/callback");
   console.log("  com.titanos.myapp://auth/callback");
-  console.log("\nUpload to Play Console: release/TitanOS.aab (com.titanos.myapp)");
+  console.log("\nOptional: node scripts/fix-supabase-auth.mjs (needs SUPABASE_ACCESS_TOKEN)");
+  console.log("Upload to Play Console: release/TitanOS.aab (com.titanos.myapp)");
 }
 
 main().catch((error) => {

@@ -4,34 +4,44 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/api/supabaseClient";
 import AuthLayout from "@/components/AuthLayout";
 
+function collectParams() {
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash || "";
+
+  // Hash router: /#/auth/callback?code=...
+  const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+  const hashParams = new URLSearchParams(hashQuery);
+
+  // Implicit / fragment tokens sometimes land in the hash itself
+  const frag = hash.replace(/^#/, "");
+  const fragParams = new URLSearchParams(
+    frag.includes("=") && !frag.startsWith("/") ? frag : ""
+  );
+
+  const get = (key) =>
+    params.get(key) || hashParams.get(key) || fragParams.get(key) || "";
+
+  return {
+    code: get("code"),
+    accessToken: get("access_token"),
+    refreshToken: get("refresh_token"),
+    oauthError: get("error_description") || get("error"),
+    from: get("from") || "/",
+  };
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const finish = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const hash = window.location.hash || "";
-      const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
-      const hashParams = new URLSearchParams(hashQuery.replace(/^#/, ""));
-      const fragParams = new URLSearchParams(
-        window.location.hash.replace(/^#/, "").replace(/^\/?auth\/callback\?/, "")
-      );
+    let cancelled = false;
 
-      const code = params.get("code") || hashParams.get("code") || fragParams.get("code");
-      const accessToken =
-        params.get("access_token") || hashParams.get("access_token") || fragParams.get("access_token");
-      const refreshToken =
-        params.get("refresh_token") || hashParams.get("refresh_token") || fragParams.get("refresh_token");
-      const oauthError =
-        params.get("error_description") ||
-        params.get("error") ||
-        hashParams.get("error_description") ||
-        fragParams.get("error_description");
-      const from = params.get("from") || hashParams.get("from") || "/";
+    const finish = async () => {
+      const { code, accessToken, refreshToken, oauthError, from } = collectParams();
 
       if (oauthError) {
-        setError(oauthError);
+        if (!cancelled) setError(oauthError);
         return;
       }
 
@@ -46,19 +56,23 @@ export default function AuthCallback() {
           });
           if (sessionError) throw sessionError;
         } else {
+          // detectSessionInUrl may already have established a session
           const { data, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) throw sessionError;
           if (!data.session) {
             throw new Error("No session returned. Try again or use email login.");
           }
         }
-        navigate(from, { replace: true });
+        if (!cancelled) navigate(from, { replace: true });
       } catch (err) {
-        setError(err.message || "Sign-in failed");
+        if (!cancelled) setError(err.message || "Sign-in failed");
       }
     };
 
     finish();
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   return (

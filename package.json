@@ -1,7 +1,7 @@
 {
   "name": "titanos",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.4.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,11 +17,13 @@
     "ionos:package": "powershell -ExecutionPolicy Bypass -File scripts/package-ionos-web.ps1",
     "dealforge:package": "powershell -ExecutionPolicy Bypass -File dealnest/scripts/package-website.ps1",
     "cap:sync": "npm run build && npx cap sync android",
-    "supabase:check": "node scripts/check-supabase-setup.mjs"
+    "supabase:check": "node scripts/check-supabase-setup.mjs",
+    "auth:check": "node scripts/check-auth.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
     "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/splash-screen": "^8.0.1",

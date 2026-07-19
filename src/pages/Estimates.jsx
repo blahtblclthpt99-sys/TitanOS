@@ -3,7 +3,6 @@ import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
 import { FileText, Search, Plus, Trash2 } from "lucide-react";
 import DeleteButton from "@/components/shared/DeleteButton";
-import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

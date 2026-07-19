@@ -81,7 +81,7 @@ export default function Settings() {
   const [companyForm, setCompany] = useState({});
   const [notificationPrefs, setNotificationPrefs] = useState({});
   const [privacyForm, setPrivacy] = useState({ community_opt_in: false, privacy_prefs: {} });
-  const [themePref, setThemePref] = useState("system");
+  const [themePref, setThemePref] = useState("dark");
   const [passwordForm, setPassword] = useState({ password: "", confirmPassword: "" });
   const [savingPanel, setSavingPanel] = useState(null);
   const savingRef = useRef(false);
@@ -111,7 +111,7 @@ export default function Settings() {
         community_opt_in: user.community_opt_in ?? false,
         privacy_prefs: user.privacy_prefs || {},
       });
-      setThemePref(user.theme_pref || "system");
+      setThemePref(user.theme_pref || "dark");
     }
   }, [user]);
 

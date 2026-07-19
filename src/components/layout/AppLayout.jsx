@@ -16,7 +16,9 @@ export default function AppLayout() {
   const feedbackRef = useRef(null);
 
   useEffect(() => {
-    applyTheme(getStoredTheme());
+    // Prefer dark charcoal OS look unless the user explicitly chose light/system
+    const pref = getStoredTheme();
+    applyTheme(pref);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {
       if (getStoredTheme() === "system") applyTheme("system");

@@ -122,7 +122,7 @@ export default function Sidebar() {
       className="hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40 shadow-soft"
       aria-label="Sidebar"
     >
-      <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
+      <div className="flex items-center h-16 px-3 border-b border-sidebar-border gap-1">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-navy to-titan-electric flex items-center justify-center flex-shrink-0 shadow-soft">
           <Zap className="w-5 h-5 text-white" aria-hidden="true" />
         </div>
@@ -132,12 +132,23 @@ export default function Sidebar() {
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
-              className="ml-3 font-bold text-lg text-foreground whitespace-nowrap overflow-hidden"
+              className="ml-2 font-bold text-lg text-foreground whitespace-nowrap overflow-hidden flex-1"
             >
               TitanOS
             </motion.span>
           )}
         </AnimatePresence>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-expanded={expanded}
+          aria-keyshortcuts="Control+B Meta+B"
+          title="Toggle sidebar (Ctrl+B)"
+          className="ml-auto flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex-shrink-0"
+        >
+          {expanded ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+        </button>
       </div>
 
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto" aria-label="Main navigation">
@@ -207,25 +218,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        aria-expanded={expanded}
-        aria-keyshortcuts="Control+B Meta+B"
-        title="Toggle sidebar (Ctrl+B)"
-        className="flex items-center justify-center gap-2 h-12 border-t border-sidebar-border text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-3"
-      >
-        {expanded ? (
-          <>
-            <ChevronLeft className="w-4 h-4" />
-            <span className="text-xs font-medium">Collapse</span>
-          </>
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-      </button>
     </motion.aside>
   );
 }

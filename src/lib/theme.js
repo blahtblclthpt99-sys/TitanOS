@@ -6,9 +6,9 @@ const STORAGE_KEY = "titanos-theme";
 
 export function getStoredTheme() {
   try {
-    return localStorage.getItem(STORAGE_KEY) || "system";
+    return localStorage.getItem(STORAGE_KEY) || "dark";
   } catch {
-    return "system";
+    return "dark";
   }
 }
 

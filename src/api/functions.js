@@ -14,12 +14,6 @@ async function getAccessToken() {
 function functionsBaseUrl() {
   const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
   if (configured) return configured;
-  // Relative /api only works on Vercel/local proxy — not IONOS static or Capacitor.
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    const isLocalWeb = host === "localhost" || host === "127.0.0.1";
-    if (isLocalWeb && !window.Capacitor) return "";
-  }
   return "";
 }
 
@@ -42,15 +36,18 @@ async function postJson(url, payload, token) {
 /** Local fallbacks so the app still responds when serverless API is unavailable. */
 async function localFallback(functionName, payload) {
   if (functionName === "titanAI") {
+    const { answerFromSummary } = await import("@/lib/ai-business-summary");
     const last =
       (payload.messages || []).filter((m) => m.role === "user").slice(-1)[0]?.content || "";
+    const summary = payload.businessSummary || null;
+    const local = answerFromSummary(last, summary);
     return {
       data: {
         type: "response",
+        source: "local",
         message:
-          `I heard: "${last || "…"}". ` +
-          "Titan AI needs the API host configured (VITE_API_BASE_URL). " +
-          "Everything else in TitanOS works without it — use Jobs, Customers, and Invoices in the app.",
+          local ||
+          "Titan AI is offline on this host. Connect to the web app (titanos-web.vercel.app) or check VITE_API_BASE_URL.",
       },
     };
   }
@@ -78,22 +75,35 @@ async function localFallback(functionName, payload) {
   throw apiError(`Function "${functionName}" is unavailable offline`, 503);
 }
 
+function candidateUrls(path) {
+  const urls = [];
+  const base = functionsBaseUrl();
+  if (base) urls.push(`${base}${path}`);
+
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    // Same-origin /api on Vercel / custom domains
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".vercel.app") ||
+      hostname.endsWith("titanfieldos.com") ||
+      hostname === "titanos-web.vercel.app"
+    ) {
+      urls.push(`${origin}${path}`);
+      urls.push(path);
+    }
+  }
+
+  return [...new Set(urls)];
+}
+
 export function createFunctionsModule() {
   return {
     async invoke(functionName, payload = {}) {
       const token = await getAccessToken();
-      const base = functionsBaseUrl();
       const path = `/api/functions/${functionName}`;
-
-      // Prefer configured API host, then same-origin /api (Vercel), then local fallback.
-      const candidates = [];
-      if (base) candidates.push(`${base}${path}`);
-      if (!base && typeof window !== "undefined") {
-        const host = window.location.hostname;
-        if (host === "localhost" || host === "127.0.0.1") {
-          candidates.push(path);
-        }
-      }
+      const candidates = candidateUrls(path);
 
       let lastError;
       for (const url of candidates) {

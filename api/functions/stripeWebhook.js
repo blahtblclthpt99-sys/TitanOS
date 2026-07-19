@@ -27,6 +27,58 @@ async function readRawBody(req) {
   return null;
 }
 
+async function markPaymentStatus(admin, { paymentId, sessionId, status, extraNote }) {
+  const now = new Date().toISOString();
+  if (paymentId) {
+    const { data: existing } = await admin
+      .from("payments")
+      .select("id, status, note")
+      .eq("id", paymentId)
+      .maybeSingle();
+    if (existing?.status === "succeeded" && status !== "succeeded") return existing;
+    if (existing?.status === status) return existing;
+    const patch = { status, updated_at: now };
+    if (extraNote) patch.note = `${existing?.note || ""} · ${extraNote}`.trim();
+    await admin.from("payments").update(patch).eq("id", paymentId);
+    return { id: paymentId, status };
+  }
+  if (sessionId) {
+    const { data: byExt } = await admin
+      .from("payments")
+      .select("id, status, note")
+      .eq("external_id", sessionId)
+      .maybeSingle();
+    if (!byExt) return null;
+    if (byExt.status === "succeeded" && status !== "succeeded") return byExt;
+    if (byExt.status === status) return byExt;
+    const patch = { status, updated_at: now };
+    if (extraNote) patch.note = `${byExt.note || ""} · ${extraNote}`.trim();
+    await admin.from("payments").update(patch).eq("id", byExt.id);
+    return { ...byExt, status };
+  }
+  return null;
+}
+
+async function markInvoicePaid(admin, invoiceId, amountTotal) {
+  if (!invoiceId) return;
+  const { data: inv } = await admin
+    .from("invoices")
+    .select("id, status")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!inv || inv.status === "paid") return;
+  await admin
+    .from("invoices")
+    .update({
+      status: "paid",
+      balance_due: 0,
+      amount_paid: amountTotal,
+      paid_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", invoiceId);
+}
+
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
@@ -61,34 +113,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid signature" });
     }
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data?.object || {};
-      const invoiceId = session.metadata?.invoice_id;
-      const paymentId = session.metadata?.payment_id;
-      const admin = getSupabaseAdmin();
-      const amountTotal = (session.amount_total || 0) / 100;
+    const admin = getSupabaseAdmin();
+    const session = event.data?.object || {};
+    const invoiceId =
+      session.metadata?.invoice_id || session.client_reference_id || null;
+    const paymentId = session.metadata?.payment_id || null;
+    const sessionId = session.id || null;
+    const amountTotal = (session.amount_total || 0) / 100;
 
-      if (invoiceId) {
-        await admin
-          .from("invoices")
-          .update({
-            status: "paid",
-            balance_due: 0,
-            amount_paid: amountTotal,
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", invoiceId);
-      }
-      if (paymentId) {
-        await admin
-          .from("payments")
-          .update({ status: "succeeded", updated_at: new Date().toISOString() })
-          .eq("id", paymentId);
-      }
+    if (event.type === "checkout.session.completed") {
+      await markInvoicePaid(admin, invoiceId, amountTotal);
+      await markPaymentStatus(admin, {
+        paymentId,
+        sessionId,
+        status: "succeeded",
+      });
+    } else if (
+      event.type === "checkout.session.expired" ||
+      event.type === "checkout.session.async_payment_failed"
+    ) {
+      await markPaymentStatus(admin, {
+        paymentId,
+        sessionId,
+        status: "canceled",
+        extraNote: `Stripe ${event.type}`,
+      });
+    } else if (
+      event.type === "payment_intent.payment_failed" ||
+      event.type === "charge.failed"
+    ) {
+      const piMeta = session.metadata || {};
+      await markPaymentStatus(admin, {
+        paymentId: piMeta.payment_id || paymentId,
+        sessionId: null,
+        status: "failed",
+        extraNote: `Stripe ${event.type}: ${session.last_payment_error?.message || "failed"}`,
+      });
     }
 
-    return res.status(200).json({ received: true });
+    return res.status(200).json({ received: true, type: event.type });
   } catch (error) {
     console.error("stripeWebhook error:", error);
     return res.status(500).json({ error: "Webhook handler failed" });

@@ -56,7 +56,9 @@ export default async function handler(req, res) {
     params.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
     params.append("line_items[0][quantity]", "1");
     params.append("metadata[invoice_id]", invoiceId);
+    params.append("client_reference_id", invoiceId);
     params.append("metadata[customer_id]", auth.session.customer_id);
+    params.append("metadata[source]", "portal");
 
     const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",

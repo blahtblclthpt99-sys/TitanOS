@@ -82,3 +82,11 @@ See `supabase/migrations/010_phase100.sql`.
 - **Service Templates** trade packs (10 trades) under Field & team
 - Before/after **Share** on job photos
 - Migration `011_job_summaries.sql` for completion summary columns
+
+## 1.5.0 (Play AAB 15) — Production readiness + settlement fix
+
+- Payment Checkout now embeds `invoice_id` / `payment_id` for webhook settlement
+- Webhook handles expired/failed payment events; refuses unverified bodies
+- Health probe (`/api/functions/health`); ops load/backup/outage harnesses
+- See `PRODUCTION_READINESS.md` — storm load PASS at 500 concurrent
+- Android `versionCode` **15** / `versionName` **1.5.0**

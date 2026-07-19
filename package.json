@@ -18,7 +18,14 @@
     "dealforge:package": "powershell -ExecutionPolicy Bypass -File dealnest/scripts/package-website.ps1",
     "cap:sync": "npm run build && npx cap sync android",
     "supabase:check": "node scripts/check-supabase-setup.mjs",
-    "auth:check": "node scripts/check-auth.mjs"
+    "auth:check": "node scripts/check-auth.mjs",
+    "ops:load": "node scripts/load-test.mjs",
+    "ops:load:smoke": "node scripts/load-test.mjs --profile smoke",
+    "ops:load:spike": "node scripts/load-test.mjs --profile spike",
+    "ops:payments": "node scripts/payment-failure-scenarios.mjs",
+    "ops:backup": "node scripts/backup-restore-drill.mjs --export",
+    "ops:outage": "node scripts/outage-recovery-drill.mjs",
+    "ops:readiness": "node scripts/payment-failure-scenarios.mjs && node scripts/backup-restore-drill.mjs --export && node scripts/outage-recovery-drill.mjs && node scripts/load-test.mjs --profile storm"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

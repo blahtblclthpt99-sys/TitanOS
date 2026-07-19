@@ -209,6 +209,10 @@ android/capacitor-cordova-android-plugins/build/
 
 # Large binaries / release artifacts (keep out of git)
 release/
+
+# Ops drill artifacts (keep runbooks; ignore dumps/results)
+ops/results/
+ops/backups/*.json
 *.apk
 *.aab
 *.zip

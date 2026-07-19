@@ -73,9 +73,64 @@ export default async function handler(req, res) {
     const currency = (body.currency || "usd").toLowerCase();
     const origin = req.headers.origin || process.env.VITE_APP_URL || "https://titanos-web.vercel.app";
 
+    const feeNote = `TitanOS ${planId} fee ${label} ($${fee.toFixed(2)}). Total charged $${total.toFixed(2)}.`;
+    const insertPayload = {
+      user_id: user.id,
+      invoice_id: body.invoice_id || null,
+      customer_name: body.customer_name || "",
+      amount: total,
+      base_amount: base,
+      platform_fee: fee,
+      platform_fee_rate: rate,
+      amount_total: total,
+      currency,
+      provider,
+      status: "pending",
+      external_id: null,
+      checkout_url: "",
+      note: body.note ? `${body.note} · ${feeNote}` : feeNote,
+      created_by_id: user.id,
+    };
+
+    // Insert payment first so Stripe metadata can carry payment_id for reliable webhook settlement.
+    let { data: payment, error } = await admin
+      .from("payments")
+      .insert(insertPayload)
+      .select("*")
+      .single();
+
+    if (error && /base_amount|platform_fee|amount_total|column/i.test(error.message || "")) {
+      const legacy = {
+        user_id: insertPayload.user_id,
+        invoice_id: insertPayload.invoice_id,
+        customer_name: insertPayload.customer_name,
+        amount: total,
+        currency,
+        provider,
+        status: "pending",
+        external_id: null,
+        checkout_url: "",
+        note: insertPayload.note,
+        created_by_id: user.id,
+      };
+      const retry = await admin.from("payments").insert(legacy).select("*").single();
+      payment = retry.data
+        ? {
+            ...retry.data,
+            base_amount: base,
+            platform_fee: fee,
+            platform_fee_rate: rate,
+            amount_total: total,
+            plan: planId,
+          }
+        : null;
+      error = retry.error;
+    }
+
+    if (error) return res.status(400).json({ error: error.message });
+
     let checkoutUrl = "";
     let externalId = null;
-    let status = "pending";
 
     if (provider === "stripe" && process.env.STRIPE_SECRET_KEY) {
       const params = new URLSearchParams();
@@ -101,11 +156,16 @@ export default async function handler(req, res) {
         params.set("line_items[1][quantity]", "1");
       }
 
-      if (body.invoice_id) params.set("client_reference_id", body.invoice_id);
+      if (body.invoice_id) {
+        params.set("client_reference_id", body.invoice_id);
+        params.set("metadata[invoice_id]", body.invoice_id);
+      }
+      if (payment?.id) params.set("metadata[payment_id]", payment.id);
       params.set("metadata[platform_fee_rate]", String(rate));
       params.set("metadata[plan]", planId);
       params.set("metadata[base_amount]", String(base));
       params.set("metadata[platform_fee]", String(fee));
+      params.set("metadata[user_id]", user.id);
 
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
         method: "POST",
@@ -117,67 +177,34 @@ export default async function handler(req, res) {
       });
       const session = await stripeRes.json();
       if (!stripeRes.ok) {
+        await admin
+          .from("payments")
+          .update({
+            status: "failed",
+            note: `${insertPayload.note} · Stripe error: ${session.error?.message || "unknown"}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", payment.id);
         return res.status(400).json({ error: session.error?.message || "Stripe error" });
       }
       checkoutUrl = session.url;
       externalId = session.id;
-      status = "pending";
+
+      const { data: updated, error: updErr } = await admin
+        .from("payments")
+        .update({
+          external_id: externalId,
+          checkout_url: checkoutUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", payment.id)
+        .select("*")
+        .single();
+      if (!updErr && updated) payment = { ...payment, ...updated };
+      else {
+        payment = { ...payment, external_id: externalId, checkout_url: checkoutUrl };
+      }
     }
-
-    const feeNote = `TitanOS ${planId} fee ${label} ($${fee.toFixed(2)}). Total charged $${total.toFixed(2)}.`;
-    const insertPayload = {
-      user_id: user.id,
-      invoice_id: body.invoice_id || null,
-      customer_name: body.customer_name || "",
-      amount: total,
-      base_amount: base,
-      platform_fee: fee,
-      platform_fee_rate: rate,
-      amount_total: total,
-      currency,
-      provider,
-      status,
-      external_id: externalId,
-      checkout_url: checkoutUrl,
-      note: body.note ? `${body.note} · ${feeNote}` : feeNote,
-      created_by_id: user.id,
-    };
-
-    let { data: payment, error } = await admin
-      .from("payments")
-      .insert(insertPayload)
-      .select("*")
-      .single();
-
-    if (error && /base_amount|platform_fee|amount_total|column/i.test(error.message || "")) {
-      const legacy = {
-        user_id: insertPayload.user_id,
-        invoice_id: insertPayload.invoice_id,
-        customer_name: insertPayload.customer_name,
-        amount: total,
-        currency,
-        provider,
-        status,
-        external_id: externalId,
-        checkout_url: checkoutUrl,
-        note: insertPayload.note,
-        created_by_id: user.id,
-      };
-      const retry = await admin.from("payments").insert(legacy).select("*").single();
-      payment = retry.data
-        ? {
-            ...retry.data,
-            base_amount: base,
-            platform_fee: fee,
-            platform_fee_rate: rate,
-            amount_total: total,
-            plan: planId,
-          }
-        : null;
-      error = retry.error;
-    }
-
-    if (error) return res.status(400).json({ error: error.message });
 
     return res.status(200).json({
       payment: { ...payment, plan: planId },

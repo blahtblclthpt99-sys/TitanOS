@@ -43,6 +43,16 @@ export async function markQueueSent(userId, id) {
   catch { const item = { ...read(userId, "queue").find((row) => row.id === id), ...patch }; write(userId, "queue", read(userId, "queue").map((row) => row.id === id ? item : row)); return item; }
 }
 
+export async function deleteRule(userId, id) {
+  try { await api.entities.FollowUpRule.delete(id); }
+  catch { write(userId, "rules", read(userId, "rules").filter((row) => row.id !== id)); }
+}
+
+export async function deleteQueueItem(userId, id) {
+  try { await api.entities.FollowUpQueue.delete(id); }
+  catch { write(userId, "queue", read(userId, "queue").filter((row) => row.id !== id)); }
+}
+
 /** Email the follow-up (Resend when configured) and mark queue item sent. */
 export async function sendFollowUpNow(user, row, customerEmail = "") {
   try {

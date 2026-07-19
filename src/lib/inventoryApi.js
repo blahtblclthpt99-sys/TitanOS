@@ -20,3 +20,8 @@ export async function updateInventoryItem(userId, id, values) {
   try { return await api.entities.InventoryItem.update(id, row); }
   catch { const updated = { ...local(userId).find((item) => item.id === id), ...row }; save(userId, local(userId).map((item) => item.id === id ? updated : item)); return updated; }
 }
+
+export async function deleteInventoryItem(userId, id) {
+  try { await api.entities.InventoryItem.delete(id); }
+  catch { save(userId, local(userId).filter((item) => item.id !== id)); }
+}

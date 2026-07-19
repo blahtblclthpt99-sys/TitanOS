@@ -139,6 +139,19 @@ export async function listComments(postId) {
   }
 }
 
+export async function deleteCommunityPost(userId, id) {
+  try {
+    await api.entities.CommunityPost.delete(id);
+  } catch {
+    writeLocal(
+      PREFIX,
+      "global",
+      "posts",
+      readLocal(PREFIX, "global", "posts", []).filter((row) => row.id !== id)
+    );
+  }
+}
+
 export async function publishActivity(event) {
   const payload = {
     ...event,

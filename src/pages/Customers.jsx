@@ -3,6 +3,8 @@ import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Users, Search, Phone, Mail } from "lucide-react";
+import DeleteButton from "@/components/shared/DeleteButton";
+import { toast } from "@/components/ui/use-toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Input } from "@/components/ui/input";
@@ -103,6 +105,15 @@ export default function Customers({ isActive = true }) {
         {c.lifetime_value > 0 && (
           <p className="text-sm font-semibold text-emerald-400 flex-shrink-0">${c.lifetime_value.toLocaleString()}</p>
         )}
+        <DeleteButton
+          label={`${c.first_name || ""} ${c.last_name || ""}`.trim() || "this contact"}
+          onDelete={async () => {
+            await api.entities.Customer.delete(c.id);
+            setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
+            reload();
+            toast({ title: "Contact deleted" });
+          }}
+        />
       </div>
     </div>
   );

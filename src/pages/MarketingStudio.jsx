@@ -9,10 +9,12 @@ import { toast } from "@/components/ui/use-toast";
 import {
   CHANNELS,
   createMarketingAsset,
+  deleteMarketingAsset,
   generateMarketingCopy,
   listMarketingAssets,
   updateMarketingAsset,
 } from "@/lib/marketingApi";
+import DeleteButton from "@/components/shared/DeleteButton";
 
 export default function MarketingStudio() {
   const { user } = useAuth();
@@ -114,6 +116,13 @@ export default function MarketingStudio() {
                 {row.status !== "ready" && (
                   <Button size="sm" onClick={() => markReady(row)}>Mark ready</Button>
                 )}
+                <DeleteButton
+                  label={row.title || "this asset"}
+                  onDelete={async () => {
+                    await deleteMarketingAsset(user.id, row.id);
+                    setSaved((prev) => prev.filter((item) => item.id !== row.id));
+                  }}
+                />
               </div>
             </article>
           ))

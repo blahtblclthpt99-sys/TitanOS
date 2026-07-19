@@ -116,3 +116,16 @@ export async function markPaymentStatus(id, status) {
     return { id, status };
   }
 }
+
+export async function deletePayment(userId, id) {
+  try {
+    await api.entities.Payment.delete(id);
+  } catch {
+    writeLocal(
+      PREFIX,
+      userId,
+      "payments",
+      readLocal(PREFIX, userId, "payments", []).filter((row) => row.id !== id)
+    );
+  }
+}

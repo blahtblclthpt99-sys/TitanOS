@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
 import { FileText, Search, Plus, Trash2 } from "lucide-react";
+import DeleteButton from "@/components/shared/DeleteButton";
+import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -129,7 +131,7 @@ export default function Estimates() {
   if (error) return <ErrorState title="Couldn't load estimates" onRetry={reload} />;
 
   const renderEstimateRow = (est) => (
-    <div className="glass rounded-2xl p-4 glass-hover cursor-pointer">
+    <div className="glass rounded-2xl p-4 glass-hover">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -138,7 +140,16 @@ export default function Estimates() {
           </div>
           <p className="text-xs text-muted-foreground">{est.customer_name} · {formatMonthDayYear(est.created_date)}</p>
         </div>
-        <p className="text-lg font-bold text-foreground flex-shrink-0">${(est.total || 0).toLocaleString()}</p>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <p className="text-lg font-bold text-foreground">${(est.total || 0).toLocaleString()}</p>
+          <DeleteButton
+            label={est.estimate_number || "this estimate"}
+            onDelete={async () => {
+              await api.entities.Estimate.delete(est.id);
+              reload();
+            }}
+          />
+        </div>
       </div>
     </div>
   );

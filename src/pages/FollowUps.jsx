@@ -5,7 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
-import { createRule, listQueue, listRules, markQueueSent, seedDefaultFollowUpRules, sendFollowUpNow } from "@/lib/followUpApi";
+import DeleteButton from "@/components/shared/DeleteButton";
+import {
+  createRule,
+  deleteQueueItem,
+  deleteRule,
+  listQueue,
+  listRules,
+  markQueueSent,
+  seedDefaultFollowUpRules,
+  sendFollowUpNow,
+} from "@/lib/followUpApi";
 
 export default function FollowUps() {
   const { user } = useAuth();
@@ -69,10 +79,19 @@ export default function FollowUps() {
         <section className="glass rounded-2xl p-5">
           <h2 className="font-semibold text-foreground mb-3">Automation rules</h2>
           {rules.map((rule) => (
-            <div key={rule.id} className="py-3 border-b border-border text-sm">
-              <span className="text-foreground">{rule.name}</span>
-              <span className="float-right text-titan-cyan">{rule.delay_days} days</span>
-              <p className="text-xs text-muted-foreground mt-1">{rule.message_template}</p>
+            <div key={rule.id} className="py-3 border-b border-border text-sm flex gap-2 items-start">
+              <div className="flex-1 min-w-0">
+                <span className="text-foreground">{rule.name}</span>
+                <span className="float-right text-titan-cyan">{rule.delay_days} days</span>
+                <p className="text-xs text-muted-foreground mt-1">{rule.message_template}</p>
+              </div>
+              <DeleteButton
+                label={`rule “${rule.name}”`}
+                onDelete={async () => {
+                  await deleteRule(user.id, rule.id);
+                  setRules((prev) => prev.filter((r) => r.id !== rule.id));
+                }}
+              />
             </div>
           ))}
           <form onSubmit={add} className="flex gap-2 mt-4">
@@ -91,13 +110,20 @@ export default function FollowUps() {
                 <p className="text-xs text-muted-foreground">{row.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(row.scheduled_for).toLocaleDateString()}</p>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 items-end">
                 <Button onClick={() => emailSend(row)} size="sm" disabled={sendingId === row.id} className="bg-titan-cyan text-black">
                   <Mail className="w-4 h-4" />{sendingId === row.id ? "…" : "Email"}
                 </Button>
                 <Button onClick={() => sent(row)} size="sm" variant="outline" className="border-border text-foreground">
                   <Check className="w-4 h-4" />Sent
                 </Button>
+                <DeleteButton
+                  label="this follow-up"
+                  onDelete={async () => {
+                    await deleteQueueItem(user.id, row.id);
+                    setQueue((prev) => prev.filter((item) => item.id !== row.id));
+                  }}
+                />
               </div>
             </div>
           ))}

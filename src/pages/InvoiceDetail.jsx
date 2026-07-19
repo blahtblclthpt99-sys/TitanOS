@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/shared/StatusBadge";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import DeleteButton from "@/components/shared/DeleteButton";
 import { formatMonthDayYear } from "@/lib/date-utils";
+import { toast } from "@/components/ui/use-toast";
 
 const STATUS_OPTIONS = ["draft", "sent", "viewed", "paid", "partial", "overdue", "cancelled"];
 
@@ -52,7 +54,17 @@ export default function InvoiceDetail() {
               <h1 className="text-2xl font-bold text-foreground">{invoice.invoice_number || "Draft"}</h1>
               <p className="text-sm text-muted-foreground mt-1">{invoice.customer_name}</p>
             </div>
-            <StatusBadge status={invoice.status} />
+            <div className="flex items-center gap-2">
+              <StatusBadge status={invoice.status} />
+              <DeleteButton
+                label={invoice.invoice_number || "this invoice"}
+                onDelete={async () => {
+                  await api.entities.Invoice.delete(id);
+                  toast({ title: "Invoice deleted" });
+                  navigate("/invoices", { replace: true });
+                }}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
             <div>

@@ -3,6 +3,7 @@ import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Receipt, Search, Plus, Trash2 } from "lucide-react";
+import DeleteButton from "@/components/shared/DeleteButton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -131,11 +132,20 @@ export default function Invoices({ isActive = true }) {
           </div>
           <p className="text-xs text-muted-foreground">{inv.customer_name} · Due {formatMonthDayYear(inv.due_date)}</p>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-lg font-bold text-foreground">${(inv.total || 0).toLocaleString()}</p>
-          {inv.balance_due > 0 && inv.balance_due !== inv.total && (
-            <p className="text-xs text-titan-amber">Bal: ${inv.balance_due.toLocaleString()}</p>
-          )}
+        <div className="text-right flex-shrink-0 flex items-center gap-1">
+          <div>
+            <p className="text-lg font-bold text-foreground">${(inv.total || 0).toLocaleString()}</p>
+            {inv.balance_due > 0 && inv.balance_due !== inv.total && (
+              <p className="text-xs text-titan-amber">Bal: ${inv.balance_due.toLocaleString()}</p>
+            )}
+          </div>
+          <DeleteButton
+            label={inv.invoice_number || "this invoice"}
+            onDelete={async () => {
+              await api.entities.Invoice.delete(inv.id);
+              reload();
+            }}
+          />
         </div>
       </div>
     </div>

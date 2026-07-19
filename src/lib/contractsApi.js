@@ -129,3 +129,16 @@ export function contractPublicUrl(token) {
   if (typeof window === "undefined") return `/sign/${token}`;
   return `${window.location.origin}/sign/${token}`;
 }
+
+export async function deleteContract(ownerId, id) {
+  try {
+    await api.entities.Contract.delete(id);
+  } catch {
+    writeLocal(
+      PREFIX,
+      ownerId,
+      "all",
+      readLocal(PREFIX, ownerId, "all", []).filter((row) => row.id !== id)
+    );
+  }
+}

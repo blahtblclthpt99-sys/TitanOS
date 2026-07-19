@@ -3,6 +3,7 @@ import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Briefcase, Search, Clock, MapPin, User, Calendar, CheckSquare, Square, X, ChevronDown, UserCheck, Plus, Camera, LogIn, LogOut } from "lucide-react";
+import DeleteButton from "@/components/shared/DeleteButton";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Input } from "@/components/ui/input";
@@ -285,6 +286,16 @@ export default function Jobs({ isActive = true }) {
             </Button>
           )}
           {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/90 rounded-lg text-xs">Field ops</Button>}
+          {!bulkMode && (
+            <DeleteButton
+              label={job.title || "this job"}
+              onDelete={async () => {
+                await api.entities.Job.delete(job.id);
+                setLocalJobs((prev) => (prev ?? jobs).filter((j) => j.id !== job.id));
+                reload();
+              }}
+            />
+          )}
         </div>
       </div>
       {(expandedJobId === job.id || ["in_progress", "completed"].includes(job.status)) && !bulkMode && (

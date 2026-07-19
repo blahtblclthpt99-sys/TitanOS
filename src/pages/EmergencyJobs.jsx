@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/shared/PageHeader";
 import {
   createEmergencyJob,
+  deleteEmergencyJob,
   listEmergencyJobs,
   updateEmergencyJob,
 } from "@/lib/emergencyJobsApi";
+import DeleteButton from "@/components/shared/DeleteButton";
 
 export default function EmergencyJobs() {
   const { user } = useAuth();
@@ -74,6 +76,13 @@ export default function EmergencyJobs() {
               {row.status === "open" && (
                 <Button size="sm" onClick={() => claim(row)}>Mark claimed</Button>
               )}
+              <DeleteButton
+                label={row.title}
+                onDelete={async () => {
+                  await deleteEmergencyJob(user.id, row.id);
+                  setRows((prev) => prev.filter((r) => r.id !== row.id));
+                }}
+              />
             </div>
           </article>
         ))}

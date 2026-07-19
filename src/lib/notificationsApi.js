@@ -37,6 +37,19 @@ export async function markAllRead(userId) {
   await Promise.all(rows.filter((n) => !n.read_at).map((n) => markRead(userId, n.id)));
 }
 
+export async function deleteNotification(userId, notificationId) {
+  try {
+    await api.entities.Notification.delete(notificationId);
+  } catch {
+    writeLocal(
+      PREFIX,
+      userId,
+      "inbox",
+      readLocal(PREFIX, userId, "inbox", []).filter((n) => n.id !== notificationId)
+    );
+  }
+}
+
 export async function pushNotification(userId, { type, title, body, link, meta }, prefs = null) {
   if (!userId || (prefs && prefs[type] === false)) return null;
   const payload = {

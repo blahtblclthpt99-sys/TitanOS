@@ -7,9 +7,11 @@ import PageHeader from "@/components/shared/PageHeader";
 import {
   confirmEscrowSide,
   createEscrowHold,
+  deleteEscrowHold,
   listEscrowHolds,
   updateEscrowHold,
 } from "@/lib/escrowApi";
+import DeleteButton from "@/components/shared/DeleteButton";
 
 export default function Escrow() {
   const { user } = useAuth();
@@ -63,9 +65,18 @@ export default function Escrow() {
                 <p className="font-semibold text-foreground">{row.customer_name}</p>
                 <p className="text-sm text-muted-foreground">{row.job_title || "Protected job"}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xl font-bold text-foreground">${Number(row.amount || 0).toLocaleString()}</p>
-                <p className="text-xs capitalize text-primary">{row.status}</p>
+              <div className="text-right flex items-start gap-1">
+                <div>
+                  <p className="text-xl font-bold text-foreground">${Number(row.amount || 0).toLocaleString()}</p>
+                  <p className="text-xs capitalize text-primary">{row.status}</p>
+                </div>
+                <DeleteButton
+                  label={`escrow for ${row.customer_name}`}
+                  onDelete={async () => {
+                    await deleteEscrowHold(user.id, row.id);
+                    setRows((prev) => prev.filter((r) => r.id !== row.id));
+                  }}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 mt-3 text-xs">

@@ -10,7 +10,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { betaBadgeLabel } from "@/lib/plan";
 import { calcPlatformFee, formatMoney } from "@/lib/platformFee";
 import { getPlanConfig } from "@/lib/plan";
-import { createPaymentLink, listPaymentAccounts, listPayments, markPaymentStatus, upsertPaymentAccount } from "@/lib/paymentsApi";
+import { createPaymentLink, deletePayment, listPaymentAccounts, listPayments, markPaymentStatus, upsertPaymentAccount } from "@/lib/paymentsApi";
+import DeleteButton from "@/components/shared/DeleteButton";
 
 const PROVIDERS = ["stripe", "square", "paypal"];
 const EMPTY_FORM = { amount: "", customer_name: "", invoice_id: "", provider: "stripe" };
@@ -314,6 +315,13 @@ export default function Payments() {
                           </button>
                         </>
                       )}
+                      <DeleteButton
+                        label={`payment for ${payment.customer_name || "customer"}`}
+                        onDelete={async () => {
+                          await deletePayment(user.id, payment.id);
+                          setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+                        }}
+                      />
                     </div>
                   </div>
                 );

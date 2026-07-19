@@ -54,3 +54,11 @@ export async function confirmEscrowSide(userId, hold, side) {
   }
   return updateEscrowHold(userId, hold.id, patch);
 }
+
+export async function deleteEscrowHold(userId, id) {
+  try {
+    await api.entities.EscrowHold.delete(id);
+  } catch {
+    save(userId, local(userId).filter((r) => r.id !== id));
+  }
+}

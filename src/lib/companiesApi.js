@@ -76,3 +76,16 @@ export async function inviteCompanyMember(companyId, userId, email, role = "memb
     return { id: uid(), ...payload };
   }
 }
+
+export async function deleteCompany(userId, id) {
+  try {
+    await api.entities.Company.delete(id);
+  } catch {
+    writeLocal(
+      PREFIX,
+      userId,
+      "all",
+      readLocal(PREFIX, userId, "all", []).filter((row) => row.id !== id)
+    );
+  }
+}

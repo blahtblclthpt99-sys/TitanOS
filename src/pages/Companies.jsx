@@ -7,7 +7,8 @@ import PageHeader from "@/components/shared/PageHeader";
 import { api } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { betaBadgeLabel } from "@/lib/plan";
-import { createCompany, inviteCompanyMember, listMyCompanies, setActiveCompany } from "@/lib/companiesApi";
+import { createCompany, deleteCompany, inviteCompanyMember, listMyCompanies, setActiveCompany } from "@/lib/companiesApi";
+import DeleteButton from "@/components/shared/DeleteButton";
 
 const empty = { name: "", city: "", state: "", phone: "", email: "" };
 
@@ -61,7 +62,7 @@ export default function Companies() {
       <section className="lg:col-span-3 space-y-4">
         {loading ? <p className="text-foreground/45">Loading companies…</p> : companies.length ? companies.map((company) => {
           const active = company.id === user?.active_company_id;
-          return <article key={company.id} className={`glass rounded-2xl p-5 border ${active ? "border-titan-cyan/35" : "border-border"}`}><div className="flex justify-between gap-4"><div><div className="flex items-center gap-2"><Building2 className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">{company.name}</h2></div><p className="text-xs text-muted-foreground mt-2">{[company.city, company.state].filter(Boolean).join(", ") || "Location not set"} · {company.member_role || "owner"}</p></div>{active && <span className="h-fit text-xs px-2 py-1 rounded-full bg-titan-cyan/15 text-titan-cyan">Active</span>}</div><Button onClick={() => activate(company.id)} disabled={saving || active} variant="outline" className="mt-4 border-border text-foreground">{active ? <><Check className="w-4 h-4 mr-2" />Active company</> : "Set active"}</Button></article>;
+          return <article key={company.id} className={`glass rounded-2xl p-5 border ${active ? "border-titan-cyan/35" : "border-border"}`}><div className="flex justify-between gap-4"><div><div className="flex items-center gap-2"><Building2 className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">{company.name}</h2></div><p className="text-xs text-muted-foreground mt-2">{[company.city, company.state].filter(Boolean).join(", ") || "Location not set"} · {company.member_role || "owner"}</p></div><div className="flex items-start gap-2">{active && <span className="h-fit text-xs px-2 py-1 rounded-full bg-titan-cyan/15 text-titan-cyan">Active</span>}<DeleteButton label={company.name} onDelete={async () => { await deleteCompany(user.id, company.id); setCompanies((current) => current.filter((c) => c.id !== company.id)); }} /></div></div><Button onClick={() => activate(company.id)} disabled={saving || active} variant="outline" className="mt-4 border-border text-foreground">{active ? <><Check className="w-4 h-4 mr-2" />Active company</> : "Set active"}</Button></article>;
         }) : <div className="glass rounded-2xl p-10 text-center border border-border"><Building2 className="w-8 h-8 text-titan-cyan mx-auto mb-3" /><p className="text-foreground font-semibold">No companies yet</p><p className="text-sm text-muted-foreground mt-1">Create a profile for each business you run.</p></div>}
         <p className="text-xs text-muted-foreground">Current active_company_id: <span className="text-muted-foreground">{user?.active_company_id || "none"}</span></p>
       </section>

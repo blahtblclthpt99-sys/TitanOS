@@ -85,7 +85,7 @@ export default function Customers({ isActive = true }) {
 
   const renderCustomerRow = (c) => (
     <div
-      onClick={() => navigate(`/customers/${c.id}`)}
+      onClick={() => navigate(`/customers/${c.id}`, { state: { customer: c } })}
       className="glass rounded-2xl p-4 glass-hover cursor-pointer active:scale-[0.98] transition-transform"
     >
       <div className="flex items-center gap-4">

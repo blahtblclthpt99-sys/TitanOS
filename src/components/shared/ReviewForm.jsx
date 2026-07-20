@@ -20,18 +20,32 @@ export default function ReviewForm({
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!user?.id || saving || !revieweeId) return;
+    if (!user?.id || saving) return;
+    const targetId = revieweeId || jobId || hireJobId;
+    if (!targetId) {
+      toast({
+        variant: "destructive",
+        title: "Link a customer first",
+        description: "Open the job, add a customer, then submit the rating.",
+      });
+      return;
+    }
     setSaving(true);
     try {
-      await createJobReview(user, {
+      const row = await createJobReview(user, {
         jobId,
         hireJobId,
-        revieweeId,
+        revieweeId: targetId,
         reviewerRole,
         rating,
         body,
       });
-      toast({ title: "Review submitted", description: "Thanks for your feedback." });
+      toast({
+        title: "Review submitted",
+        description: row?._local
+          ? "Saved on this device (server sync pending)."
+          : "Thanks for your feedback.",
+      });
       setBody("");
       onSubmitted?.();
     } catch (err) {

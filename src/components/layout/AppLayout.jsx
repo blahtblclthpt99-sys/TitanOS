@@ -53,7 +53,8 @@ export default function AppLayout() {
       <QuickCreateFAB />
       <FloatingVoiceButton />
       <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      <FeedbackButton ref={feedbackRef} />
+      {/* Feedback opens from AI menu only — no second oversized FAB crowding the screen */}
+      <FeedbackButton ref={feedbackRef} hideTrigger />
       <AppDownloadBanner />
     </div>
   );

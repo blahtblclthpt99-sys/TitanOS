@@ -25,6 +25,7 @@ import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
 import HomeAdClips from "@/components/dashboard/HomeAdClips";
+import DriverHubBanner from "@/components/dashboard/DriverHubBanner";
 import BusinessTimeline from "@/components/timeline/BusinessTimeline";
 import { buildHomeTimelineFeed } from "@/lib/businessTimeline";
 import { computeTitanScore } from "@/lib/titanScore";
@@ -66,14 +67,14 @@ function WidgetShell({ id, title, icon: Icon, color, children, linkTo, linkLabel
   const navigate = useNavigate();
   return (
     <motion.section
-      layout
-      initial={{ opacity: 0, y: 10 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       draggable
       onDragStart={(e) => onDragStart(e, id)}
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, id)}
       className={`titan-card overflow-hidden ${dragging === id ? "opacity-60 ring-2 ring-primary/40" : ""}`}
+      style={{ overflowAnchor: "none" }}
     >
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -235,10 +236,10 @@ export default function Dashboard({ isActive = true }) {
     kpis: (
       <motion.div
         key="kpis"
-        layout
-        initial={{ opacity: 0, y: 8 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="grid grid-cols-2 xl:grid-cols-4 gap-3"
+        style={{ overflowAnchor: "none" }}
         draggable
         onDragStart={(e) => onDragStart(e, "kpis")}
         onDragOver={onDragOver}
@@ -416,7 +417,7 @@ export default function Dashboard({ isActive = true }) {
               iconClass="bg-primary/10 text-primary"
               label={c.name || c.company_name || "Customer"}
               sub={c.email || c.phone || "No contact"}
-              onClick={() => navigate(`/customers/${c.id}`)}
+              onClick={() => navigate(`/customers/${c.id}`, { state: { customer: c } })}
             />
           ))
         )}
@@ -488,11 +489,11 @@ export default function Dashboard({ isActive = true }) {
   };
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto pb-36">
-      <HomeAdClips />
+    <div className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto pb-36" style={{ overflowAnchor: "none" }}>
+      <DriverHubBanner />
 
       {/* Command Center hero */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+      <div className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-1">Business Command Center</p>
         <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
           {greeting}, {name}
@@ -500,7 +501,7 @@ export default function Dashboard({ isActive = true }) {
         <p className="text-muted-foreground mt-1.5 text-sm md:text-base max-w-2xl">
           Your cockpit for today — schedule, cash, invoices, and AI suggestions in one place.
         </p>
-      </motion.div>
+      </div>
 
       {/* Quick actions */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-1 px-1 scrollbar-none">
@@ -515,11 +516,13 @@ export default function Dashboard({ isActive = true }) {
         </Button>
       </div>
 
+      <HomeAdClips isActive={isActive} />
+
       <p className="text-xs text-muted-foreground mb-3">Drag widgets to customize your Command Center</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {widgets.map((id) => (
-          <div key={id} className={id === "kpis" ? "lg:col-span-2" : undefined}>
+          <div key={id} className={id === "kpis" ? "lg:col-span-2" : undefined} style={{ overflowAnchor: "none" }}>
             {widgetMap[id]}
           </div>
         ))}

@@ -9,7 +9,6 @@ import PageHeader from "@/components/shared/PageHeader";
 import { useAuth } from "@/lib/AuthContext";
 import { estimateJobPrice, MARKET_HOURLY } from "@/lib/priceEstimator";
 import { optimizePriceFactors, withPriceOptimization } from "@/lib/priceOptimizer";
-import { SERVICE_TEMPLATES, templateToEstimatorForm } from "@/lib/serviceTemplates";
 import { SERVICE_CATEGORIES } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
 import { generateAiEstimateDraft } from "@/lib/aiEstimate";
@@ -71,14 +70,6 @@ export default function JobEstimator() {
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const changeService = (service_type) => setForm((current) => ({ ...current, service_type, labor_rate: MARKET_HOURLY[service_type] || MARKET_HOURLY.General }));
-  const applyTemplate = (id) => {
-    const t = SERVICE_TEMPLATES.find((row) => row.id === id);
-    const mapped = templateToEstimatorForm(t);
-    if (mapped) {
-      setForm((current) => ({ ...current, ...mapped }));
-      toast({ title: `${t.name} template applied`, description: "Checklist & pricing defaults loaded." });
-    }
-  };
   const draft = { inputs: form, estimate, created_at: new Date().toISOString() };
 
   const createDocument = (path) => {
@@ -137,16 +128,6 @@ export default function JobEstimator() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <PageHeader title="Job Price Estimator" subtitle="Build a market-aware price range for any job." />
       {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {SERVICE_TEMPLATES.slice(0, 8).map((t) => (
-          <button key={t.id} type="button" onClick={() => applyTemplate(t.id)} className="text-xs px-3 py-1.5 rounded-full border border-border bg-muted/40 text-foreground hover:border-titan-cyan/40">
-            {t.icon} {t.name}
-          </button>
-        ))}
-        <button type="button" onClick={() => navigate("/templates")} className="text-xs px-3 py-1.5 rounded-full border border-titan-cyan/30 text-titan-cyan">
-          All templates →
-        </button>
-      </div>
       <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-5">
         <section className="glass rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">Job inputs</h2></div>

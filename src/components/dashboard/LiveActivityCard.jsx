@@ -18,10 +18,9 @@ export default function LiveActivityCard() {
       }
     };
     load();
-    const id = setInterval(load, 25000);
+    // No polling — background refreshes were shifting layout and yanking Home scroll.
     return () => {
       alive = false;
-      clearInterval(id);
     };
   }, []);
 

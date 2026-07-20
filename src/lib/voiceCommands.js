@@ -15,7 +15,7 @@ const RULES = [
   { re: /assistant|titan ai|ask ai/i, path: "/assistant", label: "Open AI Assistant" },
   { re: /titan score|credit score|score/i, path: "/titan-score", label: "Open Titan Score" },
   { re: /marketing|facebook|instagram/i, path: "/marketing", label: "Open Marketing Studio" },
-  { re: /loyalty|rewards|points/i, path: "/loyalty", label: "Open Loyalty" },
+  { re: /driver|uber|doordash|delivery|rideshare/i, path: "/driver", label: "Open Driver Hub" },
   { re: /emergency|same.?day/i, path: "/emergency", label: "Open Emergency Jobs" },
   { re: /escrow|payment protection/i, path: "/escrow", label: "Open Escrow" },
   { re: /route|directions/i, path: "/routes", label: "Open Route Planner" },

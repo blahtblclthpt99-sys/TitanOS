@@ -17,11 +17,8 @@ export default function MobileNav() {
   const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
 
   const handleTab = (path) => {
-    if (pathname === path) {
-      navigate(path, { replace: true });
-    } else {
-      navigate(path);
-    }
+    if (pathname === path) return; // stay put — don't replace/navigate and reset scroll
+    navigate(path);
   };
 
   return (

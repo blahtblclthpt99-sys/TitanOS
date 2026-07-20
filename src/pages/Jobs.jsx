@@ -369,7 +369,7 @@ export default function Jobs({ isActive = true }) {
           )}
           <ReviewForm
             jobId={job.id}
-            revieweeId={job.customer_id ? `customer:${job.customer_id}` : ""}
+            revieweeId={job.customer_id || job.assigned_to || ""}
             reviewerRole="worker"
             onSubmitted={reload}
           />

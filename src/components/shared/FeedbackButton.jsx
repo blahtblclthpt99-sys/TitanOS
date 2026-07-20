@@ -21,7 +21,7 @@ function saveFeedbackLocally(payload) {
   }
 }
 
-const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
+const FeedbackButton = forwardRef(function FeedbackButton({ hideTrigger = false }, ref) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("general");
@@ -84,18 +84,20 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          setError("");
-        }}
-        className="fixed bottom-[9.75rem] md:bottom-28 right-4 md:right-8 z-[60] w-12 h-12 rounded-2xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-lg flex items-center justify-center border border-border"
-        aria-label="Send feedback"
-        title="Send feedback"
-      >
-        <MessageSquare className="w-5 h-5 text-foreground" />
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            setError("");
+          }}
+          className="fixed bottom-[5.5rem] md:bottom-20 right-3 md:right-6 z-[60] w-9 h-9 rounded-xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-md flex items-center justify-center border border-border"
+          aria-label="Send feedback"
+          title="Send feedback"
+        >
+          <MessageSquare className="w-4 h-4 text-foreground" />
+        </button>
+      )}
 
       <AnimatePresence>
         {open && (
@@ -115,7 +117,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed bottom-0 left-0 right-0 md:right-8 md:bottom-40 md:left-auto md:w-[360px] z-[80] bg-card border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
+              className="fixed bottom-0 left-0 right-0 md:right-6 md:bottom-24 md:left-auto md:w-[340px] z-[80] bg-card border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
               onClick={(e) => e.stopPropagation()}
             >

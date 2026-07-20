@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { useEntityRecord } from "@/hooks/useEntityRecord";
 import { useEntityData } from "@/hooks/useEntityData";
@@ -50,7 +50,35 @@ function RecordList({ title, icon: Icon, records, empty, renderRecord, to }) {
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: customer, loading, error, reload } = useEntityRecord("Customer", id);
+  const location = useLocation();
+  const seed = location.state?.customer && String(location.state.customer.id) === String(id)
+    ? location.state.customer
+    : null;
+  const { data: fetched, loading, error, reload } = useEntityRecord("Customer", id);
+  const [listFallback, setListFallback] = useState(null);
+  const customer = fetched || seed || listFallback;
+
+  useEffect(() => {
+    if (fetched || seed || !id) return undefined;
+    let alive = true;
+    api.entities.Customer.filter({ id })
+      .then((rows) => {
+        if (!alive) return;
+        if (rows?.[0]) setListFallback(rows[0]);
+      })
+      .catch(() => {
+        api.entities.Customer.list("-created_date", 200)
+          .then((rows) => {
+            if (!alive) return;
+            const match = (rows || []).find((r) => String(r.id) === String(id));
+            if (match) setListFallback(match);
+          })
+          .catch(() => {});
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, fetched, seed]);
   const [deleting, setDeleting] = useState(false);
   const { data: [allJobs, allEstimates, allInvoices], reload: reloadRelated } = useEntityData([
     { entity: "Job", method: "list", args: ["-scheduled_date", 500] },
@@ -111,8 +139,8 @@ export default function CustomerDetail() {
     } finally { setSaving(false); }
   };
 
-  if (loading) return <PageLoader variant="detail" label="Loading customer" />;
-  if (error) {
+  if (loading && !customer) return <PageLoader variant="detail" label="Loading customer" />;
+  if (error && !customer) {
     return (
       <ErrorState
         title="Couldn't load customer"
@@ -287,38 +315,32 @@ export default function CustomerDetail() {
           <div className="grid lg:grid-cols-2 gap-6">
           <div className="glass rounded-2xl p-5 space-y-3">
             <h2 className="text-base font-semibold text-foreground">Contact info</h2>
-            {customer.email && (
-              <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm text-foreground/90 hover:text-foreground transition-colors min-h-[44px]">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
-                </div>
-                {customer.email}
-              </a>
-            )}
-            {customer.phone && (
-              <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm text-foreground/90 hover:text-foreground transition-colors min-h-[44px]">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
-                </div>
-                {customer.phone}
-              </a>
-            )}
-            {(customer.address || customer.city) && (
-              <div className="flex items-center gap-3 text-sm text-foreground/90 min-h-[44px]">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
-                </div>
-                <span>{[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(", ")}</span>
+            <a href={customer.email ? `mailto:${customer.email}` : undefined} className={`flex items-center gap-3 text-sm min-h-[44px] ${customer.email ? "text-foreground/90 hover:text-foreground" : "text-muted-foreground"}`}>
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <Mail className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
               </div>
-            )}
-            {customer.source && (
-              <div className="flex items-center gap-3 text-sm text-foreground/90 min-h-[44px]">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Tag className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
-                </div>
-                <span className="capitalize">Source: {customer.source.replace("_", " ")}</span>
+              {customer.email || "No email on file"}
+            </a>
+            <a href={customer.phone ? `tel:${customer.phone}` : undefined} className={`flex items-center gap-3 text-sm min-h-[44px] ${customer.phone ? "text-foreground/90 hover:text-foreground" : "text-muted-foreground"}`}>
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <Phone className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
               </div>
-            )}
+              {customer.phone || "No phone on file"}
+            </a>
+            <div className="flex items-center gap-3 text-sm min-h-[44px] text-foreground/90">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
+              </div>
+              <span>
+                {[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(", ") || "No address on file"}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-sm min-h-[44px] text-foreground/90">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <Tag className="w-4 h-4 text-titan-cyan" aria-hidden="true" />
+              </div>
+              <span className="capitalize">Source: {(customer.source || "unknown").replace("_", " ")}</span>
+            </div>
           </div>
           <div className="glass rounded-2xl p-5">
             <h2 className="text-base font-semibold text-foreground mb-3">Notes</h2>

@@ -1,15 +1,112 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle, Plus, Truck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/shared/PageHeader";
 import { createEquipment, deleteEquipment, listEquipment } from "@/lib/equipmentApi";
+
 const EMPTY = { name: "", category: "vehicle", status: "active", next_service_date: "", warranty_expires: "" };
 const due = (date) => date && new Date(date) <= new Date(Date.now() + 30 * 86400000);
+
 export default function Fleet() {
-  const { user } = useAuth(); const [rows, setRows] = useState([]); const [form, setForm] = useState(EMPTY);
-  const load = async () => { if (user?.id) setRows(await listEquipment(user.id)); }; useEffect(() => { load(); }, [user?.id]);
-  const add = async (e) => { e.preventDefault(); if (!form.name) return; const row = await createEquipment(user, form); setRows([row, ...rows]); setForm(EMPTY); };
-  return <div className="p-4 md:p-8 max-w-6xl mx-auto"><PageHeader title="Fleet & equipment" subtitle={`${rows.length} assets tracked`} /><div className="grid lg:grid-cols-[.7fr_1.3fr] gap-5"><form className="glass rounded-2xl p-5 space-y-3" onSubmit={add}><h2 className="font-semibold text-foreground flex gap-2"><Plus className="text-titan-cyan" />Add equipment</h2><Input required placeholder="Equipment name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-muted border-border text-foreground" /><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-2 rounded-xl bg-muted border border-border text-foreground">{["vehicle","trailer","mower","pressure_washer","tool","other"].map((value) => <option key={value}>{value}</option>)}</select><Input type="date" value={form.next_service_date} onChange={(e) => setForm({ ...form, next_service_date: e.target.value })} className="bg-muted border-border text-foreground" /><Input type="date" value={form.warranty_expires} onChange={(e) => setForm({ ...form, warranty_expires: e.target.value })} className="bg-muted border-border text-foreground" /><Button className="w-full bg-titan-cyan text-black">Save equipment</Button></form><section className="space-y-3">{rows.map((row) => <article key={row.id} className="glass rounded-2xl p-4 flex gap-3"><Truck className="text-titan-cyan" /><div className="flex-1"><p className="font-semibold text-foreground">{row.name}</p><p className="text-sm text-foreground/45 capitalize">{row.category.replace("_", " ")} · {row.status}</p>{(due(row.next_service_date) || due(row.warranty_expires)) && <p className="text-xs text-titan-amber flex gap-1 mt-1"><AlertTriangle className="w-3 h-3" />{due(row.next_service_date) ? "Service due" : "Warranty ending soon"}</p>}</div><Button size="sm" variant="ghost" onClick={async () => { await deleteEquipment(user.id, row.id); setRows(rows.filter((item) => item.id !== row.id)); }} className="text-foreground/45">Remove</Button></article>)}</section></div></div>;
+  const { user } = useAuth();
+  const [rows, setRows] = useState([]);
+  const [form, setForm] = useState(EMPTY);
+
+  const load = async () => {
+    if (user?.id) setRows(await listEquipment(user.id));
+  };
+  useEffect(() => {
+    load();
+  }, [user?.id]);
+
+  const add = async (e) => {
+    e.preventDefault();
+    if (!form.name) return;
+    const row = await createEquipment(user, form);
+    setRows([row, ...rows]);
+    setForm(EMPTY);
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+      <PageHeader title="Fleet & equipment" subtitle={`${rows.length} assets tracked`} />
+      <p className="text-sm text-muted-foreground -mt-3 mb-4">
+        Vehicles here power{" "}
+        <Link to="/driver" className="text-titan-cyan hover:underline">
+          Driver Hub
+        </Link>{" "}
+        fuel estimates and tax mileage.
+      </p>
+      <div className="grid lg:grid-cols-[.7fr_1.3fr] gap-5">
+        <form className="glass rounded-2xl p-5 space-y-3" onSubmit={add}>
+          <h2 className="font-semibold text-foreground flex gap-2">
+            <Plus className="text-titan-cyan" />
+            Add equipment
+          </h2>
+          <Input
+            required
+            placeholder="Equipment name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="bg-muted border-border text-foreground"
+          />
+          <select
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            className="w-full p-2 rounded-xl bg-muted border border-border text-foreground"
+          >
+            {["vehicle", "trailer", "mower", "pressure_washer", "tool", "other"].map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+          <Input
+            type="date"
+            value={form.next_service_date}
+            onChange={(e) => setForm({ ...form, next_service_date: e.target.value })}
+            className="bg-muted border-border text-foreground"
+          />
+          <Input
+            type="date"
+            value={form.warranty_expires}
+            onChange={(e) => setForm({ ...form, warranty_expires: e.target.value })}
+            className="bg-muted border-border text-foreground"
+          />
+          <Button className="w-full bg-titan-cyan text-black">Save equipment</Button>
+        </form>
+        <section className="space-y-3">
+          {rows.map((row) => (
+            <article key={row.id} className="glass rounded-2xl p-4 flex gap-3">
+              <Truck className="text-titan-cyan" />
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">{row.name}</p>
+                <p className="text-sm text-foreground/45 capitalize">
+                  {row.category.replace("_", " ")} · {row.status}
+                </p>
+                {(due(row.next_service_date) || due(row.warranty_expires)) && (
+                  <p className="text-xs text-titan-amber flex gap-1 mt-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    {due(row.next_service_date) ? "Service due" : "Warranty ending soon"}
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  await deleteEquipment(user.id, row.id);
+                  setRows(rows.filter((item) => item.id !== row.id));
+                }}
+                className="text-foreground/45"
+              >
+                Remove
+              </Button>
+            </article>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
 }

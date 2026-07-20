@@ -81,14 +81,14 @@ export default function FloatingVoiceButton() {
         type="button"
         whileTap={{ scale: 0.94 }}
         onClick={listening ? stop : start}
-        className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lift border ${
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lift border ${
           listening
             ? "bg-destructive text-destructive-foreground border-destructive"
             : "bg-card text-foreground border-border"
         }`}
         aria-label={listening ? "Stop listening" : "Voice command"}
       >
-        {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+        {listening ? <MicOff className="w-4.5 h-4.5" /> : <Mic className="w-4.5 h-4.5" />}
       </motion.button>
     </div>
   );

@@ -27,7 +27,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
   return (
     <div
       ref={ref}
-      className="fixed z-50 flex flex-col items-end gap-2 right-4 md:right-8 bottom-24 md:bottom-8"
+      className="fixed z-50 flex flex-col items-end gap-1.5 right-3 md:right-6 bottom-[5.25rem] md:bottom-6"
     >
       <AnimatePresence>
         {open && (
@@ -36,12 +36,12 @@ export default function FloatingAIButton({ onOpenFeedback }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="rounded-2xl overflow-hidden shadow-lift border border-border bg-card min-w-[240px]"
+            className="rounded-2xl overflow-hidden shadow-lift border border-border bg-card min-w-[220px] max-w-[260px]"
           >
-            <div className="px-4 pt-3 pb-1">
-              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">Ask Titan</p>
+            <div className="px-3 pt-2.5 pb-1">
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Ask Titan</p>
             </div>
-            <div className="p-2">
+            <div className="p-1.5">
               {SUGGESTIONS.map((s, i) => (
                 <motion.button
                   key={s.label}
@@ -53,9 +53,9 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     navigate(s.action);
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[40px]"
                 >
-                  <s.icon className="w-4 h-4 text-primary flex-shrink-0" />
+                  <s.icon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   {s.label}
                 </motion.button>
               ))}
@@ -66,21 +66,21 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     onOpenFeedback();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[40px]"
                 >
-                  <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
+                  <MessageSquare className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   Send feedback
                 </button>
               )}
             </div>
-            <div className="px-4 pb-3 pt-1 border-t border-border">
+            <div className="px-3 pb-2.5 pt-1 border-t border-border">
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
                   navigate("/assistant");
                 }}
-                className="w-full text-center text-xs font-semibold text-primary hover:underline py-1.5"
+                className="w-full text-center text-[11px] font-semibold text-primary hover:underline py-1"
               >
                 Open full AI assistant →
               </button>
@@ -94,17 +94,17 @@ export default function FloatingAIButton({ onOpenFeedback }) {
         whileTap={{ scale: 0.92 }}
         whileHover={{ scale: 1.04 }}
         onClick={() => setOpen((p) => !p)}
-        className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lift ai-pulse bg-gradient-to-br from-titan-navy to-titan-electric"
+        className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lift ai-pulse bg-gradient-to-br from-titan-navy to-titan-electric"
         aria-label={open ? "Close Titan menu" : "Open Titan AI"}
       >
         <AnimatePresence mode="wait">
           {open ? (
             <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <X className="w-6 h-6 text-white" />
+              <X className="w-4.5 h-4.5 text-white" />
             </motion.div>
           ) : (
             <motion.div key="spark" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <Sparkles className="w-6 h-6 text-white" />
+              <Sparkles className="w-4.5 h-4.5 text-white" />
             </motion.div>
           )}
         </AnimatePresence>

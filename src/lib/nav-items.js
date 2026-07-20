@@ -35,12 +35,11 @@ import {
   User,
   Award,
   Megaphone,
-  Heart,
   Tag,
   Siren,
   ShieldCheck,
   PhoneCall,
-  LayoutTemplate,
+  Car,
 } from "lucide-react";
 
 /**
@@ -55,6 +54,7 @@ export const APP_NAV_ITEMS = [
   { icon: Users, label: "Customers", path: "/customers", group: "daily" },
   { icon: FileText, label: "Estimates", path: "/estimates", group: "daily" },
   { icon: Receipt, label: "Invoices", path: "/invoices", group: "daily" },
+  { icon: Car, label: "Driver Hub", path: "/driver", group: "daily" },
 
   // Money
   { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
@@ -71,7 +71,6 @@ export const APP_NAV_ITEMS = [
   { icon: UserCog, label: "Employees", path: "/employees", group: "field" },
   { icon: Package, label: "Inventory", path: "/inventory", group: "field" },
   { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "field" },
-  { icon: LayoutTemplate, label: "Service Templates", path: "/templates", group: "field" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "field" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "field" },
 
@@ -84,7 +83,6 @@ export const APP_NAV_ITEMS = [
   { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "growth" },
   { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "growth" },
   { icon: Award, label: "Titan Score", path: "/titan-score", group: "growth" },
-  { icon: Heart, label: "Loyalty", path: "/loyalty", group: "growth" },
   { icon: Tag, label: "Local Deals", path: "/deals", group: "growth" },
   { icon: Siren, label: "Emergency Jobs", path: "/emergency", group: "growth" },
   { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
@@ -133,7 +131,7 @@ export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/marketplace", "/community", "/
 export const MORE_MENU_GROUPS = [
   {
     title: "Daily work",
-    paths: ["/schedule", "/customers", "/estimates", "/invoices"],
+    paths: ["/driver", "/schedule", "/customers", "/estimates", "/invoices"],
   },
   {
     title: "Money",
@@ -141,11 +139,11 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Field & team",
-    paths: ["/job-estimator", "/templates", "/routes", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts"],
+    paths: ["/job-estimator", "/routes", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts"],
   },
   {
     title: "Grow business",
-    paths: ["/marketplace", "/hire", "/leads", "/follow-ups", "/reputation", "/growth-coach", "/marketing", "/titan-score", "/loyalty", "/deals", "/emergency", "/insurance", "/referral"],
+    paths: ["/marketplace", "/hire", "/leads", "/follow-ups", "/reputation", "/growth-coach", "/marketing", "/titan-score", "/deals", "/emergency", "/insurance", "/referral"],
   },
   {
     title: "Connect",
@@ -158,6 +156,7 @@ export const MORE_MENU_GROUPS = [
 ];
 
 export const QUICK_CREATE_ACTIONS = [
+  { label: "Driver Hub", path: "/driver", icon: Car },
   { label: "Create Estimate", path: "/estimates?new=1", icon: FileText },
   { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
   { label: "Invoice", path: "/invoices?new=1", icon: Receipt },

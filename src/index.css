@@ -128,12 +128,14 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
     overscroll-behavior: none;
+    overflow-anchor: none;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   #root {
     min-height: 100dvh;
+    overflow-anchor: none;
   }
   button, a[role="button"], nav a {
     user-select: none;

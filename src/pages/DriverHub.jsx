@@ -566,11 +566,11 @@ export default function DriverHub() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">MPG / MPGe (override)</label>
+              <label className="text-xs text-muted-foreground">MPG</label>
               <Input
                 type="number"
                 min="1"
-                placeholder={String(estimateMpg(selectedVehicle))}
+                placeholder="e.g. 28"
                 value={prefs.mpg ?? ""}
                 onChange={(e) => updatePref({ mpg: e.target.value ? Number(e.target.value) : null })}
                 className="mt-1 bg-muted border-border text-foreground rounded-xl"

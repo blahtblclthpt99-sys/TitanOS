@@ -45,6 +45,7 @@ import {
   syncSessionToTax,
   updateSessionMiles,
 } from "@/lib/driverHubApi";
+import { vehicleLabel } from "@/lib/vehicleCatalog";
 
 const CURRENCIES = ["USD", "CAD", "MXN", "EUR", "GBP", "AUD", "JPY", "BRL"];
 
@@ -558,7 +559,8 @@ export default function DriverHub() {
                 {vehicles.length === 0 && <option value="">Add a vehicle in Fleet first</option>}
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.category})
+                    {vehicleLabel(v)}
+                    {v.make ? "" : v.category ? ` (${v.category})` : ""}
                   </option>
                 ))}
               </select>

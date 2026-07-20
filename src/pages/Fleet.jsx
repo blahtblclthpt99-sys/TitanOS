@@ -63,13 +63,17 @@ export default function Fleet() {
     if (isVehicle && (!form.make || !form.model)) return;
     if (!form.name && !(form.make && form.model)) return;
     const payload = {
-      ...form,
       name: form.name || [form.year, form.make, form.model].filter(Boolean).join(" "),
-      // DB column is `brand` (make); keep make for local display
-      brand: form.make || null,
-      make: form.make || null,
-      model: form.model || null,
+      category: form.category,
+      status: form.status,
+      // DB uses brand for make
+      brand: form.make || "",
+      model: form.model || "",
       year: form.year ? Number(form.year) : null,
+      next_service_date: form.next_service_date || null,
+      warranty_expires: form.warranty_expires || null,
+      // local mirror for Driver Hub labels
+      make: form.make || "",
     };
     const row = await createEquipment(user, payload);
     setRows([row, ...rows]);

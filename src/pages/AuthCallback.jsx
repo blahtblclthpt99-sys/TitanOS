@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/api/supabaseClient";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/lib/AuthContext";
 
 function collectParams() {
   const params = new URLSearchParams(window.location.search);
@@ -60,6 +61,7 @@ function friendlyAuthError(message) {
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const { checkUserAuth } = useAuth();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -97,8 +99,7 @@ export default function AuthCallback() {
 
         // Clean OAuth params from the URL so refreshes don't re-run exchange
         if (typeof window !== "undefined" && window.history?.replaceState) {
-          const clean = `${window.location.pathname}${window.location.hash.split("?")[0] || ""}`;
-          window.history.replaceState({}, document.title, clean || "/");
+          window.history.replaceState({}, document.title, "/auth/callback");
         }
 
         // Log new OAuth signups (created in the last 10 minutes)
@@ -124,7 +125,8 @@ export default function AuthCallback() {
           /* ignore */
         }
 
-        if (!cancelled) navigate(from, { replace: true });
+        await checkUserAuth();
+        if (!cancelled) navigate(from && from !== "/auth/callback" ? from : "/", { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));
       }
@@ -134,7 +136,7 @@ export default function AuthCallback() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, checkUserAuth]);
 
   return (
     <AuthLayout title="Signing you in" subtitle="Completing authentication">

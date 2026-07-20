@@ -48,6 +48,22 @@
       crossorigin
     />
     <title>TitanOS — AI OS for Service Businesses</title>
+    <script>
+      /* OAuth sometimes returns to /?code=… (Site URL). Forward before React boots. */
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          var path = location.pathname || "/";
+          if (
+            path !== "/auth/callback" &&
+            path !== "/reset-password" &&
+            (p.has("code") || p.has("access_token") || p.get("error") === "access_denied" || p.has("error_description"))
+          ) {
+            location.replace("/auth/callback" + location.search + location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",

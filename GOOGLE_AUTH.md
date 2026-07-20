@@ -34,14 +34,19 @@ Google sign-in is wired in the app (web + Android). Supabase currently has **Goo
 **Redirect URLs** (one per line):
 
 ```
+https://titanos-web.vercel.app
 https://titanos-web.vercel.app/auth/callback
 https://titanos-web.vercel.app/reset-password
+https://titanfieldos.com
 https://titanfieldos.com/auth/callback
 https://titanfieldos.com/reset-password
+http://localhost:5173
 http://localhost:5173/auth/callback
 http://localhost:5173/reset-password
 com.titanos.myapp://auth/callback
 ```
+
+The app forwards `/?code=…` to `/auth/callback` automatically if Google returns to the Site URL.
 
 
 

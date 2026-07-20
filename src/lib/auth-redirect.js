@@ -51,9 +51,11 @@ export function getAuthRedirectTo(path = "/auth/callback") {
 
 /** Redirect URLs to paste into Supabase → Authentication → URL Configuration */
 export function getSupabaseRedirectAllowList() {
-  const paths = ["/auth/callback", "/reset-password"];
+  // Include site roots: some providers / Site URL configs return ?code= on `/`
+  // (PathNormalizer forwards those to /auth/callback).
+  const paths = ["/", "/auth/callback", "/reset-password"];
   const https = AUTH_PUBLIC_ORIGINS.flatMap((origin) =>
-    paths.map((p) => `${origin.replace(/\/$/, "")}${p}`)
+    paths.map((p) => `${origin.replace(/\/$/, "")}${p === "/" ? "" : p}`)
   );
   return [...https, NATIVE_AUTH_CALLBACK];
 }

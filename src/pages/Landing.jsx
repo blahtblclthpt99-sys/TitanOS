@@ -12,10 +12,12 @@ import {
   Sparkles,
   Calendar,
   MapPin,
+  Car,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FEATURES = [
+  { icon: Car, title: "Driver Hub", slug: "driver-hub", desc: "Uber, DoorDash & Lyft — start driving, hotspots, miles, fuel & tax sync." },
   { icon: Users, title: "Customers", slug: "customers", desc: "Full profiles, job history, contact details and notes for every client." },
   { icon: Briefcase, title: "Jobs & Dispatch", slug: "jobs", desc: "Create, assign, and track jobs from first call to completion." },
   { icon: FileText, title: "Invoicing", slug: "invoicing", desc: "Professional invoices and estimates — sent in seconds." },
@@ -29,7 +31,7 @@ const FEATURES = [
 const TRADES = [
   "Cleaning Services", "HVAC", "Plumbing", "Electrical", "Roofing", "Landscaping",
   "Pest Control", "Pressure Washing", "Mobile Detailing", "Junk Removal", "Handyman",
-  "Pool Services", "Appliance Repair", "General Contractors",
+  "Pool Services", "Appliance Repair", "General Contractors", "Uber / Lyft", "DoorDash / Delivery",
 ];
 
 const REVIEWS = [
@@ -52,6 +54,7 @@ const REVIEWS = [
 
 const INCLUDED = [
   "Unlimited customers & jobs",
+  "Driver Hub (Uber, DoorDash & more)",
   "Titan AI Assistant",
   "Invoicing & estimates",
   "Expense & tax tracking",
@@ -124,7 +127,7 @@ export default function Landing() {
               <span className="block gradient-text">for Service Businesses</span>
             </h1>
             <p className="mt-4 max-w-lg text-base text-white/55 sm:text-lg">
-              Run your entire field service business from one app. Customers, jobs, invoices, scheduling, fleet — all in one place, powered by Titan AI.
+              Field service and gig driving in one app — customers, jobs, invoices, plus Uber/DoorDash Driver Hub with miles and tax sync.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild className="h-11 rounded-xl bg-titan-cyan px-5 text-sm font-bold text-black hover:bg-titan-cyan/85">
@@ -132,16 +135,13 @@ export default function Landing() {
                   Get Started Free <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => scrollToId("features")}
-                className="h-11 rounded-xl px-4 text-sm text-white/70 hover:bg-white/5 hover:text-white"
-              >
-                See all features
+              <Button asChild variant="outline" className="h-11 rounded-xl border-amber-500/40 bg-amber-500/10 px-4 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 hover:text-amber-200">
+                <Link to="/login">
+                  <Car className="mr-1.5 h-4 w-4" /> Open Driver Hub
+                </Link>
               </Button>
             </div>
-            <p className="mt-6 text-xs text-white/35">2,400+ businesses already using TitanOS</p>
+            <p className="mt-6 text-xs text-white/35">2,400+ businesses already using TitanOS · New: Driver Hub</p>
           </div>
 
           <motion.div
@@ -157,7 +157,14 @@ export default function Landing() {
               </div>
               <p className="text-sm text-white/50">Good morning</p>
               <p className="text-xl font-semibold">Marcus 👋</p>
-              <div className="mt-4 rounded-2xl border border-titan-cyan/20 bg-titan-cyan/5 p-3">
+              <div className="mt-4 rounded-2xl border border-amber-500/35 bg-gradient-to-br from-amber-500/20 to-transparent p-3">
+                <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-amber-300">
+                  <Car className="h-3.5 w-3.5" /> Driver Hub · NEW
+                </div>
+                <p className="text-xs text-white/75">Uber · DoorDash · Lyft — start driving</p>
+                <p className="mt-1 text-xs text-white/55">Hotspots · miles · fuel · auto tax fill</p>
+              </div>
+              <div className="mt-3 rounded-2xl border border-titan-cyan/20 bg-titan-cyan/5 p-3">
                 <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-titan-cyan">
                   <Sparkles className="h-3.5 w-3.5" /> Titan AI · Daily Brief
                 </div>
@@ -173,18 +180,6 @@ export default function Landing() {
                   <div key={label} className="rounded-xl bg-white/5 px-2 py-3 text-center">
                     <div className="text-sm font-bold text-titan-cyan">{value}</div>
                     <div className="mt-0.5 text-[10px] text-white/40">{label}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 space-y-2">
-                {[
-                  ["Johnson — AC repair", "9:00 AM"],
-                  ["Smith — Plumbing", "11:30 AM"],
-                  ["Lee — Electrical", "2:00 PM"],
-                ].map(([job, time]) => (
-                  <div key={job} className="flex items-center justify-between rounded-xl bg-white/[0.04] px-3 py-2 text-xs">
-                    <span className="text-white/75">{job}</span>
-                    <span className="text-white/35">{time}</span>
                   </div>
                 ))}
               </div>

@@ -2,10 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { installNativeAuthDeepLinks } from '@/lib/capacitor-auth'
 import { applyTheme, getStoredTheme, setStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
-import { completeOAuthFromUrl, hasPendingOAuthParams } from '@/lib/oauthBootstrap'
 import '@/index.css'
 
 // Restore charcoal dark as the default OS look (one-time after light redesign).
@@ -20,26 +18,20 @@ try {
 
 applyTheme(getStoredTheme());
 watchSystemContrast();
-installNativeAuthDeepLinks();
 
-async function boot() {
-  // Finish Google/OAuth PKCE on whatever path Supabase returned (often /?code=…).
-  if (typeof window !== "undefined" && hasPendingOAuthParams()) {
-    try {
-      await completeOAuthFromUrl();
-    } catch {
-      /* AuthCallback / login will surface errors */
-    }
-  }
-
-  ReactDOM.createRoot(document.getElementById('root')).render(
-    <ErrorBoundary message="The app failed to load." fullScreen showHome>
-      <App />
-    </ErrorBoundary>
-  );
+// Native-only deep links — keep Capacitor plugins out of the web entry chunk
+if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
+  import("@/lib/capacitor-auth")
+    .then((m) => m.installNativeAuthDeepLinks())
+    .catch(() => {});
 }
 
-boot();
+// Paint immediately — never block first render on auth/network.
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary message="The app failed to load." fullScreen showHome>
+    <App />
+  </ErrorBoundary>
+)
 
 // Progressive Web App — register service worker after load + idle (keep LCP clean)
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -48,7 +40,6 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       runWhenIdle(async () => {
         try {
-          // One-time purge of stale shell caches from earlier deploys (fixes blank/stuck loads).
           if (!localStorage.getItem('titanos-sw-v6-purge')) {
             const regs = await navigator.serviceWorker.getRegistrations();
             await Promise.all(regs.map((r) => r.unregister()));

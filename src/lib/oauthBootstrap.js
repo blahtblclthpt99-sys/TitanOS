@@ -1,8 +1,12 @@
 /**
  * Single-flight OAuth/PKCE bootstrap.
- * Handles ?code= on any path (including Site URL `/`) before or during React boot.
+ * Handles ?code= on any path (including Site URL `/`).
+ * Keep this out of main.jsx — import only from AuthCallback / auth routes.
  */
 import { supabase } from "@/api/supabaseClient";
+import { hasPendingOAuthParams } from "@/lib/oauthParams";
+
+export { hasPendingOAuthParams };
 
 let inflight = null;
 let lastCode = "";
@@ -23,18 +27,12 @@ function readAuthParams() {
   };
 }
 
-export function hasPendingOAuthParams() {
-  const p = readAuthParams();
-  return Boolean(p.code || (p.accessToken && p.refreshToken) || p.error);
-}
-
 function cleanAuthParamsFromUrl() {
   if (typeof window === "undefined" || !window.history?.replaceState) return;
   const url = new URL(window.location.href);
   ["code", "state", "error", "error_description", "error_code", "access_token", "refresh_token", "token_type", "expires_in"].forEach(
     (k) => url.searchParams.delete(k)
   );
-  // If we were on `/` with only oauth params, stay on `/` (app shell will take over once session exists)
   const path = url.pathname === "/auth/callback" ? "/" : url.pathname;
   window.history.replaceState({}, document.title, `${path}${url.search}${url.hash}`);
 }
@@ -69,7 +67,6 @@ export async function completeOAuthFromUrl() {
             cleanAuthParamsFromUrl();
             return { ok: true, session: existing.session };
           }
-          // Keep ?code in the URL until AuthCallback shows the error / user retries
           return { ok: false, error: error.message };
         }
         lastCode = params.code;

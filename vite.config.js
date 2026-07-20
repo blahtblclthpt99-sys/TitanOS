@@ -24,7 +24,7 @@ export default defineConfig(() => {
       // Only preload the entry's critical deps — not lazy vendor islands
       modulePreload: {
         polyfill: true,
-        resolveDependencies(filename, deps) {
+          resolveDependencies(filename, deps) {
           return deps.filter((dep) => {
             const name = dep.split('/').pop() || '';
             // Never preload heavy islands on the marketing entry
@@ -37,6 +37,8 @@ export default defineConfig(() => {
             if (name.includes('Marketplace')) return false;
             if (name.includes('Dashboard')) return false;
             if (name.includes('toaster')) return false;
+            // Always allow react-vendor + shared on entry (critical path)
+            if (name.includes('react-vendor') || name.includes('shared')) return true;
             if (filename.includes('index') && (name.includes('icons') || name.includes('radix'))) {
               return false;
             }

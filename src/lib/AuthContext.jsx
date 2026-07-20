@@ -5,7 +5,7 @@ import { runWhenIdle } from "@/lib/perf";
 const AUTH_RETRY_ATTEMPTS = 2;
 const AUTH_RETRY_DELAY_MS = 800;
 /** Hard ceiling so a hung Supabase call never leaves the UI on “Loading TitanOS”. */
-const AUTH_BOOT_TIMEOUT_MS = 12000;
+const AUTH_BOOT_TIMEOUT_MS = 5000;
 
 function withTimeout(promise, ms, label = "timeout") {
   return new Promise((resolve, reject) => {
@@ -53,10 +53,10 @@ const AuthContext = React.createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = React.useState(null);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = React.useState(true);
+  const [isLoadingAuth, setIsLoadingAuth] = React.useState(() => hasCachedAuthSession());
   const [isLoadingPublicSettings] = React.useState(false);
   const [authError, setAuthError] = React.useState(null);
-  const [authChecked, setAuthChecked] = React.useState(false);
+  const [authChecked, setAuthChecked] = React.useState(() => !hasCachedAuthSession());
   const [appPublicSettings] = React.useState({ appName: "TitanOS" });
 
   const checkUserAuth = React.useCallback(async () => {

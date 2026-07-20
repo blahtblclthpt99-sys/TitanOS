@@ -8,10 +8,12 @@ import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { normalizeAppPath } from "@/lib/routing";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { checkUserAuth } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -31,6 +33,7 @@ export default function Login() {
     setLoading(true);
     try {
       await api.auth.loginViaEmailPassword(email, password);
+      await checkUserAuth();
       navigate(returnTo === "/login" ? "/" : returnTo, { replace: true });
     } catch (err) {
       setError(err.message || "Invalid email or password");

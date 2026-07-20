@@ -1,5 +1,5 @@
 import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
-import React, { Suspense, lazy, useEffect, useMemo } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
 import Spinner from "@/components/shared/Spinner";
@@ -101,7 +101,8 @@ function AppShellGate() {
   const pathname = normalizeAppPath(location.pathname);
   const publicPath = isPublicPath(pathname);
   const isHome = pathname === "/";
-  const cachedSession = useMemo(() => hasCachedAuthSession(), []);
+  // Re-check on every render so post-login navigation sees the new session immediately.
+  const cachedSession = hasCachedAuthSession();
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -113,7 +114,8 @@ function AppShellGate() {
   const wantsAppShell =
     (authChecked && isAuthenticated && !publicPath) ||
     (authChecked && isAuthenticated && isHome) ||
-    (!authChecked && isHome && cachedSession);
+    // Token present while auth is still resolving (avoids flash of marketing page after login)
+    (cachedSession && (isHome || !publicPath) && (!authChecked || isLoadingAuth));
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {

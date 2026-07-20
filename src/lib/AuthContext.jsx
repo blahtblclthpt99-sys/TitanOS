@@ -132,8 +132,12 @@ export const AuthProvider = ({ children }) => {
       await checkAppState();
       if (cancelled) return;
 
-    // Defer idle supabase listener longer so Lighthouse doesn't count it as unused JS
-      await new Promise((resolve) => runWhenIdle(resolve, hasCachedAuthSession() ? 500 : 12000));
+      // Attach auth listener quickly on auth screens; otherwise shortly after idle.
+      // A long defer left signed-in users stuck on the marketing page after login.
+      const path = typeof window !== "undefined" ? window.location.pathname : "";
+      const onAuthScreen = /\/(login|register|forgot-password|reset-password|auth\/callback)/.test(path);
+      const delay = hasCachedAuthSession() || onAuthScreen ? 0 : 2500;
+      await new Promise((resolve) => runWhenIdle(resolve, delay));
       if (cancelled) return;
 
       try {

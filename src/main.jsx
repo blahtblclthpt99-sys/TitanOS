@@ -32,7 +32,21 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   const isNative = window.Capacitor?.isNativePlatform?.() === true;
   if (!isNative) {
     window.addEventListener('load', () => {
-      runWhenIdle(() => {
+      runWhenIdle(async () => {
+        try {
+          // One-time purge of stale shell caches from earlier deploys (fixes blank/stuck loads).
+          if (!localStorage.getItem('titanos-sw-v6-purge')) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+            if (window.caches?.keys) {
+              const keys = await caches.keys();
+              await Promise.all(keys.filter((k) => k.startsWith('titanos-shell')).map((k) => caches.delete(k)));
+            }
+            localStorage.setItem('titanos-sw-v6-purge', '1');
+          }
+        } catch {
+          /* ignore */
+        }
         navigator.serviceWorker.register('/sw.js').catch(() => {});
         prefetchHotRoutes();
       }, 2500);

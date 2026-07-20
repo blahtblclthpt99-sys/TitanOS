@@ -10,9 +10,11 @@ import AuthLayout from "@/components/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { toast } from "@/components/ui/use-toast";
 import { attachReferralOnSignup } from "@/lib/referralApi";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { checkUserAuth } = useAuth();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref") || "";
   const [fullName, setFullName] = useState("");
@@ -33,6 +35,7 @@ export default function Register() {
       }
       await attachReferralOnSignup({ userId, email, refCode });
     }
+    await checkUserAuth();
     navigate("/", { replace: true });
   };
 

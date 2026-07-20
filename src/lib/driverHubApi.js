@@ -100,6 +100,8 @@ export function readPrefs(userId) {
     mpg: null,
     connectedApps: [],
     equipmentId: null,
+    mode: "driving", // "driving" | "riding"
+    requestingRide: false,
   });
 }
 
@@ -164,25 +166,114 @@ export function calcFuelCost({ miles, mpg, gasPriceLocal, currency }) {
 }
 
 /**
- * Delivery hotspot suggestions near lat/lng (or city centroid).
- * Colors: red=food corridors, amber=downtown, blue=transit hubs, green=residential demand.
+ * Delivery / rideshare hotspot suggestions near lat/lng.
+ * Includes heat (0–1) so the map can light zones up.
+ * mode: "driving" | "riding" tweaks tips for drivers vs riders requesting a ride.
  */
-export function buildHotspots({ lat, lng, city }) {
+export function buildHotspots({ lat, lng, city, mode = "driving" }) {
   const baseLat = Number(lat) || 32.7767;
   const baseLng = Number(lng) || -96.797;
   const label = city || "your area";
+  const riding = mode === "riding";
   return [
-    { id: "h1", name: `${label} Restaurant Row`, kind: "food", color: "#ef4444", lat: baseLat + 0.012, lng: baseLng + 0.008, tip: "Dinner rush 5–9pm · stacked orders common" },
-    { id: "h2", name: "Downtown core", kind: "downtown", color: "#f59e0b", lat: baseLat + 0.004, lng: baseLng - 0.006, tip: "Lunch + nightlife · short hops" },
-    { id: "h3", name: "Airport / transit", kind: "transit", color: "#3b82f6", lat: baseLat - 0.018, lng: baseLng + 0.022, tip: "Rideshare peaks early morning & evenings" },
-    { id: "h4", name: "Campus / stadium", kind: "events", color: "#a855f7", lat: baseLat + 0.02, lng: baseLng - 0.015, tip: "Event nights spike demand" },
-    { id: "h5", name: "Suburban strip malls", kind: "suburban", color: "#22c55e", lat: baseLat - 0.01, lng: baseLng - 0.02, tip: "Steady grocery & fast food" },
-    { id: "h6", name: "Hospital / medical", kind: "medical", color: "#06b6d4", lat: baseLat + 0.008, lng: baseLng + 0.018, tip: "Reliable daytime rides" },
+    {
+      id: "h1",
+      name: `${label} Restaurant Row`,
+      kind: "food",
+      color: "#ef4444",
+      heat: 0.95,
+      lat: baseLat + 0.012,
+      lng: baseLng + 0.008,
+      tip: riding
+        ? "Busy pickup curb · short waits after 5pm"
+        : "Dinner rush 5–9pm · stacked orders common",
+    },
+    {
+      id: "h2",
+      name: "Downtown core",
+      kind: "downtown",
+      color: "#f59e0b",
+      heat: 0.88,
+      lat: baseLat + 0.004,
+      lng: baseLng - 0.006,
+      tip: riding
+        ? "High ride request volume · surge evenings"
+        : "Lunch + nightlife · short hops",
+    },
+    {
+      id: "h3",
+      name: "Airport / transit",
+      kind: "transit",
+      color: "#3b82f6",
+      heat: 0.8,
+      lat: baseLat - 0.018,
+      lng: baseLng + 0.022,
+      tip: riding
+        ? "Reliable pickups early morning & late night"
+        : "Rideshare peaks early morning & evenings",
+    },
+    {
+      id: "h4",
+      name: "Campus / stadium",
+      kind: "events",
+      color: "#a855f7",
+      heat: 0.72,
+      lat: baseLat + 0.02,
+      lng: baseLng - 0.015,
+      tip: riding
+        ? "Event let-outs = fast matches"
+        : "Event nights spike demand",
+    },
+    {
+      id: "h5",
+      name: "Suburban strip malls",
+      kind: "suburban",
+      color: "#22c55e",
+      heat: 0.62,
+      lat: baseLat - 0.01,
+      lng: baseLng - 0.02,
+      tip: riding
+        ? "Steady grocery & retail pickups"
+        : "Steady grocery & fast food",
+    },
+    {
+      id: "h6",
+      name: "Hospital / medical",
+      kind: "medical",
+      color: "#06b6d4",
+      heat: 0.7,
+      lat: baseLat + 0.008,
+      lng: baseLng + 0.018,
+      tip: riding
+        ? "Daytime ride requests are consistent"
+        : "Reliable daytime rides",
+    },
   ];
 }
 
+export const RIDER_APPS = [
+  {
+    id: "uber_rider",
+    name: "Uber",
+    type: "rideshare",
+    color: "#000000",
+    deepLink: "uber://",
+    web: "https://m.uber.com/ul/",
+    store: "https://www.uber.com/",
+  },
+  {
+    id: "lyft_rider",
+    name: "Lyft",
+    type: "rideshare",
+    color: "#FF00BF",
+    deepLink: "lyft://riderequest",
+    web: "https://www.lyft.com/",
+    store: "https://www.lyft.com/",
+  },
+];
+
 export function openStreetMapEmbed(lat, lng, zoom = 12) {
-  const b = 0.04;
+  const b = 0.045;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${lng - b}%2C${lat - b}%2C${lng + b}%2C${lat + b}&layer=mapnik&marker=${lat}%2C${lng}`;
 }
 

@@ -27,18 +27,21 @@ import {
   addStop,
   buildHotspots,
   calcFuelCost,
+  coachTip,
   convertFromUsd,
   currencySymbol,
   dayPartLabel,
   endStop,
   estimateGasPriceUsd,
   estimateMpg,
+  estimateShiftEarnings,
   formatDuration,
   getDayPart,
   listDriverVehicles,
   openDriverApp,
   readPrefs,
   readSession,
+  readShiftHistory,
   readStops,
   savePrefs,
   sessionStats,
@@ -57,11 +60,14 @@ export default function DriverHub() {
   const [prefs, setPrefs] = useState(() => readPrefs(user?.id));
   const [session, setSession] = useState(() => readSession(user?.id));
   const [stops, setStops] = useState(() => readStops(user?.id));
+  const [history, setHistory] = useState(() => (user?.id ? readShiftHistory(user.id) : []));
   const [vehicles, setVehicles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [milesDraft, setMilesDraft] = useState("");
   const [tick, setTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
+  const [previewPart, setPreviewPart] = useState(null);
+  const [focusId, setFocusId] = useState(null);
 
   const mode = prefs.mode === "riding" ? "riding" : "driving";
   const requestingRide = Boolean(prefs.requestingRide);
@@ -72,6 +78,7 @@ export default function DriverHub() {
     setPrefs(readPrefs(user.id));
     setSession(readSession(user.id));
     setStops(readStops(user.id));
+    setHistory(readShiftHistory(user.id));
   }, [user?.id]);
 
   useEffect(() => {
@@ -110,16 +117,30 @@ export default function DriverHub() {
   });
 
   const hotspots = useMemo(
-    () => buildHotspots({ lat: prefs.lat, lng: prefs.lng, city: prefs.city, mode, now }),
-    [prefs.lat, prefs.lng, prefs.city, mode, now]
+    () =>
+      buildHotspots({
+        lat: prefs.lat,
+        lng: prefs.lng,
+        city: prefs.city,
+        mode,
+        now,
+        previewPart,
+      }),
+    [prefs.lat, prefs.lng, prefs.city, mode, now, previewPart]
   );
 
   const bestNow = useMemo(() => topHotspotsNow(hotspots, 3), [hotspots]);
-  const dayPart = getDayPart(now);
+  const dayPart = previewPart || getDayPart(now);
+  const tip = coachTip(mode, getDayPart(now));
 
   const mapLat = Number(prefs.lat) || hotspots[0]?.lat || 32.7767;
   const mapLng = Number(prefs.lng) || hotspots[0]?.lng || -96.797;
   const stats = sessionStats(session, stops);
+  const earnings = estimateShiftEarnings({
+    miles: stats?.miles || 0,
+    elapsedSec: stats?.elapsedSec || 0,
+    stops: stats?.stops || 0,
+  });
   void tick;
 
   const mapLit = (mode === "driving" && drivingActive) || (mode === "riding" && requestingRide);
@@ -185,11 +206,12 @@ export default function DriverHub() {
             mpg,
             gasPriceLocal: gasLocal,
             currency: prefs.currency || "USD",
-            vehicleName: selectedVehicle?.name,
+            vehicleName: vehicleLabel(selectedVehicle),
           }
         );
         refresh();
         setMilesDraft("");
+        setHistory(readShiftHistory(user.id));
         if (synced.ok) {
           toast({
             title: "Driving ended · tax synced",
@@ -213,7 +235,9 @@ export default function DriverHub() {
         setMilesDraft("0");
         toast({
           title: "Driving · ON",
-          description: "Hotspots lit. Open a gig app, log stops — miles sync to Tax when you end.",
+          description: bestNow[0]
+            ? `Hotspots lit. Head toward ${bestNow[0].short || bestNow[0].name} first.`
+            : "Hotspots lit. Open a gig app and log stops.",
         });
       }
     } finally {
@@ -242,7 +266,7 @@ export default function DriverHub() {
       mpg,
       gasPriceLocal: gasLocal,
       currency: prefs.currency || "USD",
-      vehicleName: selectedVehicle?.name,
+      vehicleName: vehicleLabel(selectedVehicle),
     });
     if (synced.session) setSession(synced.session);
     toast({
@@ -265,8 +289,21 @@ export default function DriverHub() {
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-5">
       <PageHeader
         title="Driver Hub"
-        subtitle="Request a ride or drive · lit hotspots, mileage, fuel & tax"
+        subtitle="Request a ride or drive · live heat map, timed tips, mileage & tax"
       />
+
+      {/* Coach tip */}
+      <div className="rounded-2xl border border-titan-cyan/25 bg-gradient-to-r from-titan-cyan/10 via-card to-card px-4 py-3 flex gap-3 items-start">
+        <div className="w-9 h-9 rounded-xl bg-titan-cyan/15 flex items-center justify-center flex-shrink-0">
+          <MapPin className="w-4 h-4 text-titan-cyan" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-titan-cyan">
+            Tip · {dayPartLabel(getDayPart(now))}
+          </p>
+          <p className="text-sm text-foreground mt-0.5 leading-snug">{tip}</p>
+        </div>
+      </div>
 
       {/* Mode: Requesting a ride vs Driving */}
       <section className="glass rounded-2xl p-4 border border-border">
@@ -374,6 +411,39 @@ export default function DriverHub() {
             </div>
 
             {drivingActive && (
+              <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Live shift</p>
+                  <p className="text-sm font-semibold text-foreground tabular-nums">
+                    {formatDuration(stats?.elapsedSec || 0)}
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase">Miles</p>
+                    <p className="text-lg font-bold text-foreground tabular-nums">{stats?.miles || 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase">Stops</p>
+                    <p className="text-lg font-bold text-foreground tabular-nums">{stats?.stops || 0}</p>
+                  </div>
+                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase">Est. ${prefs.currency || "USD"}</p>
+                    <p className="text-lg font-bold text-emerald-400 tabular-nums">
+                      {sym}
+                      {earnings.gross.toFixed(0)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Rough gross before platform fees · ~{sym}
+                  {earnings.perHourEst}/hr
+                  {selectedVehicle ? ` · ${vehicleLabel(selectedVehicle)}` : ""}
+                </p>
+              </div>
+            )}
+
+            {drivingActive && (
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-muted-foreground">Miles this session</label>
@@ -449,12 +519,17 @@ export default function DriverHub() {
         {bestNow.length > 0 && (
           <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-2">
-              Where to go right now
+              Where to go {previewPart ? `(${previewPart})` : "right now"}
             </p>
             <div className="space-y-2">
               {bestNow.map((h, i) => (
-                <div key={h.id} className="flex items-start gap-2 text-sm">
-                  <span className="text-amber-400 font-bold text-xs w-4">{i + 1}.</span>
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => setFocusId(h.id)}
+                  className="w-full flex items-start gap-2 text-sm text-left rounded-lg hover:bg-amber-500/10 p-1.5 -mx-1.5 transition-colors"
+                >
+                  <span className="text-amber-400 font-bold text-xs w-4 pt-0.5">{i + 1}.</span>
                   <span
                     className="mt-1.5 h-2.5 w-2.5 rounded-full flex-shrink-0"
                     style={{ background: h.color, boxShadow: `0 0 8px ${h.color}` }}
@@ -466,7 +541,7 @@ export default function DriverHub() {
                     </p>
                     <p className="text-xs text-muted-foreground">{h.tip}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -504,6 +579,10 @@ export default function DriverHub() {
           hotspots={hotspots}
           mode={mode}
           active={mapLit}
+          dayPartFilter={previewPart}
+          onDayPartFilter={setPreviewPart}
+          focusId={focusId}
+          onFocus={setFocusId}
         />
 
         <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
@@ -511,26 +590,33 @@ export default function DriverHub() {
         </p>
         <ul className="grid sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {hotspots.map((h) => (
-            <li
-              key={h.id}
-              className={`flex items-start gap-3 text-sm rounded-xl border px-3 py-2 ${
-                h.hotNow ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-muted/40"
-              }`}
-            >
-              <span
-                className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ background: h.color, boxShadow: mapLit ? `0 0 10px ${h.color}` : undefined }}
-              />
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">
-                  {h.name}
-                  {h.hotNow && (
-                    <span className="ml-1.5 text-[10px] font-bold text-amber-400 uppercase">Hot now</span>
-                  )}
-                </p>
-                <p className="text-[11px] text-amber-400/80 mt-0.5">{h.when}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{h.tip}</p>
-              </div>
+            <li key={h.id}>
+              <button
+                type="button"
+                onClick={() => setFocusId(h.id)}
+                className={`w-full flex items-start gap-3 text-sm rounded-xl border px-3 py-2 text-left transition-colors ${
+                  h.hotNow
+                    ? "border-amber-500/40 bg-amber-500/10"
+                    : focusId === h.id
+                      ? "border-titan-cyan/40 bg-titan-cyan/10"
+                      : "border-border bg-muted/40 hover:bg-muted/70"
+                }`}
+              >
+                <span
+                  className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: h.color, boxShadow: mapLit ? `0 0 10px ${h.color}` : undefined }}
+                />
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {h.name}
+                    {h.hotNow && (
+                      <span className="ml-1.5 text-[10px] font-bold text-amber-400 uppercase">Hot now</span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-amber-400/80 mt-0.5">{h.when}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{h.tip}</p>
+                </div>
+              </button>
             </li>
           ))}
         </ul>
@@ -600,6 +686,15 @@ export default function DriverHub() {
               Manage fleet →
             </Link>
           </div>
+          {vehicles.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+              No vehicle yet.{" "}
+              <Link to="/fleet" className="text-titan-cyan font-semibold hover:underline">
+                Add make & model in Fleet
+              </Link>{" "}
+              for better MPG estimates.
+            </div>
+          )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Vehicle</label>
@@ -612,7 +707,7 @@ export default function DriverHub() {
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
                     {vehicleLabel(v)}
-                    {v.make ? "" : v.category ? ` (${v.category})` : ""}
+                    {v.make || v.brand ? "" : v.category ? ` (${v.category})` : ""}
                   </option>
                 ))}
               </select>
@@ -691,6 +786,37 @@ export default function DriverHub() {
             </Link>
             .
           </p>
+        </section>
+      )}
+
+      {mode === "driving" && history.length > 0 && (
+        <section className="glass rounded-2xl p-5 border border-border">
+          <h2 className="text-base font-semibold text-foreground mb-3">Recent shifts</h2>
+          <ul className="space-y-2">
+            {history.slice(0, 5).map((s) => {
+              const mins = s.started_at && s.ended_at
+                ? Math.round((new Date(s.ended_at) - new Date(s.started_at)) / 60000)
+                : 0;
+              return (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {s.started_at ? new Date(s.started_at).toLocaleDateString() : "Shift"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.miles || 0} mi · {s.stops || 0} stops · {mins} min
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {s.ended_at ? new Date(s.ended_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
     </div>

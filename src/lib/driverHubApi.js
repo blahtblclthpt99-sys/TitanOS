@@ -180,6 +180,11 @@ export function getDayPart(date = new Date()) {
   return "late";
 }
 
+/** Representative hour for previewing a day-part on the map. */
+export function hourForDayPart(part) {
+  return { morning: 8, lunch: 12, afternoon: 15, dinner: 18, late: 22 }[part] ?? new Date().getHours();
+}
+
 export function dayPartLabel(part) {
   return (
     {
@@ -207,13 +212,13 @@ function heatForNow(spot, hour) {
  * Rich hotspot set near lat/lng with timed windows + tips.
  * mode: "driving" | "riding"
  */
-export function buildHotspots({ lat, lng, city, mode = "driving", now = new Date() }) {
+export function buildHotspots({ lat, lng, city, mode = "driving", now = new Date(), previewPart = null }) {
   const baseLat = Number(lat) || 32.7767;
   const baseLng = Number(lng) || -96.797;
   const label = city || "your area";
   const riding = mode === "riding";
-  const hour = now.getHours();
-  const part = getDayPart(now);
+  const hour = previewPart ? hourForDayPart(previewPart) : now.getHours();
+  const part = previewPart || getDayPart(now);
 
   const raw = [
     {
@@ -567,7 +572,48 @@ export async function stopDrivingSession(userId) {
     miles: Number(session.miles || 0),
   };
   writeLocal(PREFIX, userId, SESSION_KEY, ended);
+  // Archive recent shifts for the Hub history card
+  const history = readLocal(PREFIX, userId, "history", []);
+  writeLocal(PREFIX, userId, "history", [ended, ...history].slice(0, 12));
   return ended;
+}
+
+export function readShiftHistory(userId) {
+  return readLocal(PREFIX, userId, "history", []);
+}
+
+/** Rough earnings estimate for gig driving (USD-ish, before fees). */
+export function estimateShiftEarnings({ miles = 0, elapsedSec = 0, stops = 0 }) {
+  const hours = Math.max(elapsedSec / 3600, 0);
+  // Heuristic: ~$18–28/hr active + ~$0.55–0.90/mi depending on density
+  const perHour = 22;
+  const perMile = 0.65;
+  const perStop = 2.5;
+  const gross = hours * perHour + Number(miles) * perMile + Number(stops) * perStop;
+  return {
+    gross: Math.round(gross * 100) / 100,
+    perHourEst: hours > 0.05 ? Math.round((gross / hours) * 100) / 100 : 0,
+    hours: Math.round(hours * 100) / 100,
+  };
+}
+
+export function coachTip(mode, dayPart) {
+  const driving = {
+    morning: "Airport + hotel corridors first — early flight banks pay.",
+    lunch: "Restaurant row + downtown offices for stacked short trips.",
+    afternoon: "Position near hospitals and strip malls before the dinner rush.",
+    dinner: "Stay in food corridors 5–9pm — highest stack potential.",
+    late: "Nightlife and late grocery runs; keep gas topped off.",
+  };
+  const riding = {
+    morning: "Hotel curb or transit hub for fastest morning matches.",
+    lunch: "Downtown towers and restaurant strips have short waits.",
+    afternoon: "Mall and hospital entrances are steady.",
+    dinner: "Restaurant curbs after 5pm — busiest pickup windows.",
+    late: "Nightlife districts after 10pm match fastest.",
+  };
+  const map = mode === "riding" ? riding : driving;
+  return map[dayPart] || map.dinner;
 }
 
 export function addStop(userId, partial = {}) {

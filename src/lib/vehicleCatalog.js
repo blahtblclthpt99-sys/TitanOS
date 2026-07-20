@@ -61,14 +61,16 @@ export function modelsForMake(make) {
 }
 
 export function vehicleDisplayName(row = {}) {
-  const parts = [row.year, row.make, row.model].filter(Boolean);
+  const make = row.make || row.brand;
+  const parts = [row.year, make, row.model].filter(Boolean);
   if (parts.length) return parts.join(" ");
   return row.name || "Vehicle";
 }
 
 export function vehicleLabel(row = {}) {
   const base = vehicleDisplayName(row);
-  if (row.name && row.name !== base && row.make) return `${base} · ${row.name}`;
+  const make = row.make || row.brand;
+  if (row.name && row.name !== base && make) return `${base} · ${row.name}`;
   return base;
 }
 

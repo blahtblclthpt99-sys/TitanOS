@@ -145,7 +145,7 @@ export function currencySymbol(currency = "USD") {
 /** Rough MPG from vehicle category/name when not set. */
 export function estimateMpg(vehicle) {
   if (!vehicle) return 25;
-  const text = `${vehicle.category || ""} ${vehicle.name || ""} ${vehicle.make || ""} ${vehicle.model || ""}`.toLowerCase();
+  const text = `${vehicle.category || ""} ${vehicle.name || ""} ${vehicle.make || ""} ${vehicle.brand || ""} ${vehicle.model || ""}`.toLowerCase();
   if (/hybrid|prius|ioniq|bolt/.test(text)) return 48;
   if (/electric|ev|tesla|leaf|id\.4|cybertruck/.test(text)) return 100;
   if (/truck|sierra|silverado|f-150|tundra|tacoma|ram|gladiator|canyon|ranger/.test(text)) return 18;

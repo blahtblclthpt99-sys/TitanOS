@@ -65,6 +65,8 @@ export default function Fleet() {
     const payload = {
       ...form,
       name: form.name || [form.year, form.make, form.model].filter(Boolean).join(" "),
+      // DB column is `brand` (make); keep make for local display
+      brand: form.make || null,
       make: form.make || null,
       model: form.model || null,
       year: form.year ? Number(form.year) : null,
@@ -220,7 +222,9 @@ export default function Fleet() {
                 <p className="font-semibold text-foreground">{vehicleLabel(row)}</p>
                 <p className="text-sm text-foreground/45 capitalize">
                   {row.category?.replace("_", " ")} · {row.status}
-                  {row.make && row.model ? ` · ${row.make} ${row.model}` : ""}
+                  {(row.make || row.brand) && row.model
+                    ? ` · ${row.make || row.brand} ${row.model}`
+                    : ""}
                   {row.year ? ` · ${row.year}` : ""}
                 </p>
                 {(due(row.next_service_date) || due(row.warranty_expires)) && (

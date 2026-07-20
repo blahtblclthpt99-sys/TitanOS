@@ -29,10 +29,12 @@ import {
   calcFuelCost,
   convertFromUsd,
   currencySymbol,
+  dayPartLabel,
   endStop,
   estimateGasPriceUsd,
   estimateMpg,
   formatDuration,
+  getDayPart,
   listDriverVehicles,
   openDriverApp,
   readPrefs,
@@ -43,6 +45,7 @@ import {
   startDrivingSession,
   stopDrivingSession,
   syncSessionToTax,
+  topHotspotsNow,
   updateSessionMiles,
 } from "@/lib/driverHubApi";
 import { vehicleLabel } from "@/lib/vehicleCatalog";
@@ -58,6 +61,7 @@ export default function DriverHub() {
   const [busy, setBusy] = useState(false);
   const [milesDraft, setMilesDraft] = useState("");
   const [tick, setTick] = useState(0);
+  const [now, setNow] = useState(() => new Date());
 
   const mode = prefs.mode === "riding" ? "riding" : "driving";
   const requestingRide = Boolean(prefs.requestingRide);
@@ -85,6 +89,11 @@ export default function DriverHub() {
     return () => window.clearInterval(id);
   }, [session?.active]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.id === prefs.equipmentId) || vehicles[0] || null,
     [vehicles, prefs.equipmentId]
@@ -101,9 +110,12 @@ export default function DriverHub() {
   });
 
   const hotspots = useMemo(
-    () => buildHotspots({ lat: prefs.lat, lng: prefs.lng, city: prefs.city, mode }),
-    [prefs.lat, prefs.lng, prefs.city, mode]
+    () => buildHotspots({ lat: prefs.lat, lng: prefs.lng, city: prefs.city, mode, now }),
+    [prefs.lat, prefs.lng, prefs.city, mode, now]
   );
+
+  const bestNow = useMemo(() => topHotspotsNow(hotspots, 3), [hotspots]);
+  const dayPart = getDayPart(now);
 
   const mapLat = Number(prefs.lat) || hotspots[0]?.lat || 32.7767;
   const mapLng = Number(prefs.lng) || hotspots[0]?.lng || -96.797;
@@ -425,15 +437,41 @@ export default function DriverHub() {
               {mode === "riding" ? "Pickup hotspots" : "Delivery & rideshare hotspots"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {mapLit
-                ? "Zones are lit — brighter glow = hotter demand"
-                : `Turn on ${mode === "riding" ? "Requesting a ride" : "Driving"} to light the map`}
+              {hotspots.length} zones · {dayPartLabel(dayPart)}
+              {mapLit ? " · map lit for live demand" : ` · turn on ${mode === "riding" ? "Requesting a ride" : "Driving"} to light up`}
             </p>
           </div>
           <Button type="button" size="sm" variant="outline" className="border-border" onClick={detectLocation}>
             <Navigation className="w-3.5 h-3.5 mr-1" /> Use my location
           </Button>
         </div>
+
+        {bestNow.length > 0 && (
+          <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-2">
+              Where to go right now
+            </p>
+            <div className="space-y-2">
+              {bestNow.map((h, i) => (
+                <div key={h.id} className="flex items-start gap-2 text-sm">
+                  <span className="text-amber-400 font-bold text-xs w-4">{i + 1}.</span>
+                  <span
+                    className="mt-1.5 h-2.5 w-2.5 rounded-full flex-shrink-0"
+                    style={{ background: h.color, boxShadow: `0 0 8px ${h.color}` }}
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">
+                      {h.name}{" "}
+                      <span className="text-[10px] font-medium text-amber-400/90">· {h.when}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{h.tip}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid sm:grid-cols-3 gap-2 mb-3">
           <Input
             placeholder="City"
@@ -468,16 +506,30 @@ export default function DriverHub() {
           active={mapLit}
         />
 
-        <ul className="mt-3 grid sm:grid-cols-2 gap-2">
+        <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+          All zones · timed tips
+        </p>
+        <ul className="grid sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {hotspots.map((h) => (
-            <li key={h.id} className="flex items-start gap-3 text-sm rounded-xl border border-border bg-muted/40 px-3 py-2">
+            <li
+              key={h.id}
+              className={`flex items-start gap-3 text-sm rounded-xl border px-3 py-2 ${
+                h.hotNow ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-muted/40"
+              }`}
+            >
               <span
                 className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ background: h.color, boxShadow: mapLit ? `0 0 10px ${h.color}` : undefined }}
               />
-              <div>
-                <p className="font-medium text-foreground">{h.name}</p>
-                <p className="text-xs text-muted-foreground">{h.tip}</p>
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">
+                  {h.name}
+                  {h.hotNow && (
+                    <span className="ml-1.5 text-[10px] font-bold text-amber-400 uppercase">Hot now</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-amber-400/80 mt-0.5">{h.when}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{h.tip}</p>
               </div>
             </li>
           ))}

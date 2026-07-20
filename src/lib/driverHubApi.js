@@ -168,89 +168,332 @@ export function calcFuelCost({ miles, mpg, gasPriceLocal, currency }) {
 }
 
 /**
- * Delivery / rideshare hotspot suggestions near lat/lng.
- * Includes heat (0–1) so the map can light zones up.
- * mode: "driving" | "riding" tweaks tips for drivers vs riders requesting a ride.
+ * Time-of-day helpers for hotspot ranking.
+ * Buckets: morning 5–10, lunch 10–14, afternoon 14–17, dinner 17–21, late 21–5
  */
-export function buildHotspots({ lat, lng, city, mode = "driving" }) {
+export function getDayPart(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 5 && h < 10) return "morning";
+  if (h >= 10 && h < 14) return "lunch";
+  if (h >= 14 && h < 17) return "afternoon";
+  if (h >= 17 && h < 21) return "dinner";
+  return "late";
+}
+
+export function dayPartLabel(part) {
+  return (
+    {
+      morning: "Morning (5am–10am)",
+      lunch: "Lunch (10am–2pm)",
+      afternoon: "Afternoon (2pm–5pm)",
+      dinner: "Dinner (5pm–9pm)",
+      late: "Late night (9pm–5am)",
+    }[part] || part
+  );
+}
+
+function heatForNow(spot, hour) {
+  const windows = spot.windows || [];
+  let best = spot.baseHeat ?? 0.4;
+  for (const w of windows) {
+    const wrap = w.start > w.end;
+    const inWindow = wrap ? hour >= w.start || hour < w.end : hour >= w.start && hour < w.end;
+    if (inWindow) best = Math.max(best, w.heat);
+  }
+  return Math.min(1, best);
+}
+
+/**
+ * Rich hotspot set near lat/lng with timed windows + tips.
+ * mode: "driving" | "riding"
+ */
+export function buildHotspots({ lat, lng, city, mode = "driving", now = new Date() }) {
   const baseLat = Number(lat) || 32.7767;
   const baseLng = Number(lng) || -96.797;
   const label = city || "your area";
   const riding = mode === "riding";
-  return [
+  const hour = now.getHours();
+  const part = getDayPart(now);
+
+  const raw = [
     {
       id: "h1",
       name: `${label} Restaurant Row`,
+      short: "Food strip",
       kind: "food",
       color: "#ef4444",
-      heat: 0.95,
-      lat: baseLat + 0.012,
-      lng: baseLng + 0.008,
+      baseHeat: 0.45,
+      lat: baseLat + 0.011,
+      lng: baseLng + 0.007,
+      windows: [
+        { start: 11, end: 14, heat: 0.75 },
+        { start: 17, end: 21, heat: 0.98 },
+        { start: 21, end: 23, heat: 0.7 },
+      ],
+      when: "Best 11am–2pm & 5–9pm",
       tip: riding
-        ? "Busy pickup curb · short waits after 5pm"
-        : "Dinner rush 5–9pm · stacked orders common",
+        ? "Stand near restaurant curb cuts after 5pm — short waits."
+        : "Stack dinner deliveries here 5–9pm; lunch is solid too.",
     },
     {
       id: "h2",
       name: "Downtown core",
+      short: "Downtown",
       kind: "downtown",
       color: "#f59e0b",
-      heat: 0.88,
-      lat: baseLat + 0.004,
-      lng: baseLng - 0.006,
+      baseHeat: 0.5,
+      lat: baseLat + 0.003,
+      lng: baseLng - 0.005,
+      windows: [
+        { start: 7, end: 10, heat: 0.8 },
+        { start: 11, end: 14, heat: 0.85 },
+        { start: 17, end: 21, heat: 0.9 },
+        { start: 21, end: 2, heat: 0.88 },
+      ],
+      when: "Commute + lunch + nightlife",
       tip: riding
-        ? "High ride request volume · surge evenings"
-        : "Lunch + nightlife · short hops",
+        ? "Office towers = morning/evening surge; bars after 9pm."
+        : "Short hops all day; nightlife surge after 9pm.",
     },
     {
       id: "h3",
-      name: "Airport / transit",
+      name: "Airport / transit hub",
+      short: "Airport",
       kind: "transit",
       color: "#3b82f6",
-      heat: 0.8,
-      lat: baseLat - 0.018,
-      lng: baseLng + 0.022,
+      baseHeat: 0.55,
+      lat: baseLat - 0.02,
+      lng: baseLng + 0.024,
+      windows: [
+        { start: 5, end: 9, heat: 0.95 },
+        { start: 16, end: 20, heat: 0.9 },
+        { start: 21, end: 1, heat: 0.75 },
+      ],
+      when: "Best 5–9am & 4–8pm",
       tip: riding
-        ? "Reliable pickups early morning & late night"
-        : "Rideshare peaks early morning & evenings",
+        ? "Arrivals queues move fastest early morning and evening."
+        : "Chase flight banks early AM & evening; longer trips.",
     },
     {
       id: "h4",
       name: "Campus / stadium",
+      short: "Stadium",
       kind: "events",
       color: "#a855f7",
-      heat: 0.72,
-      lat: baseLat + 0.02,
-      lng: baseLng - 0.015,
+      baseHeat: 0.35,
+      lat: baseLat + 0.019,
+      lng: baseLng - 0.014,
+      windows: [
+        { start: 11, end: 14, heat: 0.55 },
+        { start: 17, end: 23, heat: 0.92 },
+      ],
+      when: "Event nights 5–11pm",
       tip: riding
-        ? "Event let-outs = fast matches"
-        : "Event nights spike demand",
+        ? "Wait at exits 15 min before event end — fast matches."
+        : "Pre-position before kickoff/let-out; huge spikes.",
     },
     {
       id: "h5",
       name: "Suburban strip malls",
+      short: "Strip malls",
       kind: "suburban",
       color: "#22c55e",
-      heat: 0.62,
-      lat: baseLat - 0.01,
-      lng: baseLng - 0.02,
+      baseHeat: 0.5,
+      lat: baseLat - 0.012,
+      lng: baseLng - 0.018,
+      windows: [
+        { start: 10, end: 14, heat: 0.7 },
+        { start: 17, end: 21, heat: 0.78 },
+      ],
+      when: "Steady 10am–9pm",
       tip: riding
-        ? "Steady grocery & retail pickups"
-        : "Steady grocery & fast food",
+        ? "Grocery exits and big-box doors are reliable midday."
+        : "Grocery + fast food all afternoon; less surge, steady pay.",
     },
     {
       id: "h6",
       name: "Hospital / medical",
+      short: "Hospitals",
       kind: "medical",
       color: "#06b6d4",
-      heat: 0.7,
-      lat: baseLat + 0.008,
-      lng: baseLng + 0.018,
+      baseHeat: 0.55,
+      lat: baseLat + 0.007,
+      lng: baseLng + 0.016,
+      windows: [
+        { start: 7, end: 11, heat: 0.82 },
+        { start: 14, end: 18, heat: 0.75 },
+      ],
+      when: "Best 7–11am & 2–6pm",
       tip: riding
-        ? "Daytime ride requests are consistent"
-        : "Reliable daytime rides",
+        ? "Main entrance / patient pickup loops daytime."
+        : "Shift changes = rides; quieter late night.",
+    },
+    {
+      id: "h7",
+      name: "Hotel corridor",
+      short: "Hotels",
+      kind: "hotels",
+      color: "#ec4899",
+      baseHeat: 0.4,
+      lat: baseLat + 0.001,
+      lng: baseLng + 0.012,
+      windows: [
+        { start: 6, end: 10, heat: 0.88 },
+        { start: 15, end: 19, heat: 0.7 },
+        { start: 21, end: 1, heat: 0.8 },
+      ],
+      when: "Check-out 6–10am · nights",
+      tip: riding
+        ? "Lobby curb 6–10am for airport runs."
+        : "Morning airport runs; late check-ins after 9pm.",
+    },
+    {
+      id: "h8",
+      name: "Nightlife / bars",
+      short: "Nightlife",
+      kind: "nightlife",
+      color: "#f43f5e",
+      baseHeat: 0.25,
+      lat: baseLat - 0.004,
+      lng: baseLng - 0.01,
+      windows: [
+        { start: 20, end: 3, heat: 0.97 },
+      ],
+      when: "Peak 8pm–3am",
+      tip: riding
+        ? "After 10pm is fastest for matches — wait on side streets."
+        : "Fri/Sat goldmine after 10pm; short busy trips.",
+    },
+    {
+      id: "h9",
+      name: "Grocery / big-box",
+      short: "Grocery",
+      kind: "grocery",
+      color: "#84cc16",
+      baseHeat: 0.48,
+      lat: baseLat - 0.015,
+      lng: baseLng + 0.006,
+      windows: [
+        { start: 9, end: 12, heat: 0.72 },
+        { start: 16, end: 20, heat: 0.85 },
+      ],
+      when: "Best 4–8pm",
+      tip: riding
+        ? "Curbside pickup spots after work hours."
+        : "Instacart/DoorDash peak after work 4–8pm.",
+    },
+    {
+      id: "h10",
+      name: "Office parks",
+      short: "Offices",
+      kind: "office",
+      color: "#64748b",
+      baseHeat: 0.3,
+      lat: baseLat + 0.014,
+      lng: baseLng + 0.02,
+      windows: [
+        { start: 7, end: 10, heat: 0.9 },
+        { start: 16, end: 19, heat: 0.86 },
+      ],
+      when: "Commute 7–10am & 4–7pm",
+      tip: riding
+        ? "Building exits at shift start/end."
+        : "Morning drop-offs and evening pickups; dead midday.",
+    },
+    {
+      id: "h11",
+      name: "Mall / retail plaza",
+      short: "Mall",
+      kind: "retail",
+      color: "#14b8a6",
+      baseHeat: 0.42,
+      lat: baseLat - 0.008,
+      lng: baseLng + 0.015,
+      windows: [
+        { start: 11, end: 15, heat: 0.7 },
+        { start: 17, end: 21, heat: 0.8 },
+      ],
+      when: "Weekends + evenings",
+      tip: riding
+        ? "Main entrance and food court doors."
+        : "Weekend afternoons and dinner hours are strongest.",
+    },
+    {
+      id: "h12",
+      name: "University gates",
+      short: "Campus",
+      kind: "campus",
+      color: "#8b5cf6",
+      baseHeat: 0.4,
+      lat: baseLat + 0.016,
+      lng: baseLng - 0.008,
+      windows: [
+        { start: 8, end: 11, heat: 0.75 },
+        { start: 15, end: 18, heat: 0.7 },
+        { start: 21, end: 1, heat: 0.85 },
+      ],
+      when: "Class changes + late night",
+      tip: riding
+        ? "Main gates between classes; late-night dorm runs."
+        : "Class change windows and weekend nights.",
+    },
+    {
+      id: "h13",
+      name: "Gas / convenience cluster",
+      short: "C-stores",
+      kind: "cstore",
+      color: "#eab308",
+      baseHeat: 0.38,
+      lat: baseLat - 0.006,
+      lng: baseLng - 0.022,
+      windows: [
+        { start: 6, end: 9, heat: 0.65 },
+        { start: 21, end: 2, heat: 0.78 },
+      ],
+      when: "Early AM & late night",
+      tip: riding
+        ? "Quick late-night pickups near 24hr stores."
+        : "Snack runs late; top up gas while waiting.",
+    },
+    {
+      id: "h14",
+      name: "Warehouse / industrial",
+      short: "Industrial",
+      kind: "industrial",
+      color: "#78716c",
+      baseHeat: 0.28,
+      lat: baseLat - 0.022,
+      lng: baseLng - 0.008,
+      windows: [
+        { start: 5, end: 8, heat: 0.8 },
+        { start: 14, end: 17, heat: 0.7 },
+      ],
+      when: "Shift changes 5–8am & 2–5pm",
+      tip: riding
+        ? "Gate / parking lot exits at shift change."
+        : "Shift changes only — skip midday.",
     },
   ];
+
+  return raw
+    .map((spot) => {
+      const heat = heatForNow(spot, hour);
+      const hotNow = heat >= 0.75;
+      return {
+        ...spot,
+        heat,
+        hotNow,
+        dayPart: part,
+        nowTip: hotNow
+          ? `NOW · ${spot.when}`
+          : `${dayPartLabel(part)} is quieter here · try ${spot.when}`,
+      };
+    })
+    .sort((a, b) => b.heat - a.heat);
+}
+
+export function topHotspotsNow(hotspots, limit = 3) {
+  return [...(hotspots || [])].sort((a, b) => b.heat - a.heat).slice(0, limit);
 }
 
 export const RIDER_APPS = [

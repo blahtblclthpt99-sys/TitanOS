@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
+import { dayPartLabel, getDayPart } from "@/lib/driverHubApi";
 
 /**
- * OSM embed + glowing hotspot overlays projected into the map bbox.
- * Markers pulse so demand zones literally "light up" on the map.
+ * Detailed OSM map + many glowing timed hotspot pins.
+ * Closer zoom for street detail; labels + “best now” callouts.
  */
 export default function HotspotMap({
   centerLat,
@@ -11,14 +12,16 @@ export default function HotspotMap({
   mode = "driving",
   active = false,
 }) {
-  const [selected, setSelected] = useState(null);
-  const pad = 0.045;
+  const [selected, setSelected] = useState(hotspots[0]?.id || null);
+  const part = getDayPart();
+  // Tighter bbox = more street-level detail on the embed
+  const pad = 0.032;
   const bounds = useMemo(
     () => ({
       west: centerLng - pad,
       east: centerLng + pad,
-      south: centerLat - pad,
-      north: centerLat + pad,
+      south: centerLat - pad * 0.85,
+      north: centerLat + pad * 0.85,
     }),
     [centerLat, centerLng]
   );
@@ -32,94 +35,134 @@ export default function HotspotMap({
     const x = ((lng - bounds.west) / (bounds.east - bounds.west)) * 100;
     const y = ((bounds.north - lat) / (bounds.north - bounds.south)) * 100;
     return {
-      left: `${Math.min(96, Math.max(4, x))}%`,
-      top: `${Math.min(96, Math.max(4, y))}%`,
+      left: `${Math.min(95, Math.max(5, x))}%`,
+      top: `${Math.min(92, Math.max(8, y))}%`,
     };
   };
+
+  const selectedSpot = hotspots.find((h) => h.id === selected) || hotspots[0];
+  const topNow = hotspots.filter((h) => h.hotNow).slice(0, 4);
 
   return (
     <div className="space-y-3">
       <div
-        className={`relative rounded-xl overflow-hidden border bg-muted aspect-[16/10] ${
-          active ? "border-amber-500/50 shadow-[0_0_28px_rgba(245,158,11,0.18)]" : "border-border"
+        className={`relative rounded-xl overflow-hidden border bg-muted aspect-[4/3] sm:aspect-[16/10] min-h-[280px] ${
+          active ? "border-amber-500/50 shadow-[0_0_32px_rgba(245,158,11,0.22)]" : "border-border"
         }`}
       >
         <iframe
           title="Hotspot map"
-          className="absolute inset-0 w-full h-full pointer-events-none opacity-90"
+          className="absolute inset-0 w-full h-full pointer-events-none"
           src={embedSrc}
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
         />
 
-        {/* Dim overlay so glow markers pop */}
-        <div className="absolute inset-0 bg-slate-950/25 pointer-events-none" />
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity ${
+            active ? "bg-slate-950/20" : "bg-slate-950/35"
+          }`}
+        />
 
-        {/* Interactive hotspot layer */}
         <div className="absolute inset-0">
-          {hotspots.map((h, i) => {
+          {hotspots.map((h) => {
             const pos = toStyle(h.lat, h.lng);
-            const heat = h.heat ?? 0.55 + (i % 3) * 0.12;
+            const heat = h.heat ?? 0.5;
             const isSel = selected === h.id;
+            const showLabel = h.hotNow || isSel;
             return (
               <button
                 key={h.id}
                 type="button"
-                onClick={() => setSelected(isSel ? null : h.id)}
-                className="absolute -translate-x-1/2 -translate-y-1/2 group"
-                style={pos}
-                aria-label={h.name}
+                onClick={() => setSelected(h.id)}
+                className="absolute -translate-x-1/2 -translate-y-1/2 group z-10"
+                style={{ ...pos, zIndex: isSel || h.hotNow ? 20 : 10 }}
+                aria-label={`${h.name}. ${h.when}`}
               >
-                {/* Heat bloom */}
                 <span
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-pulse pointer-events-none"
+                  className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none ${
+                    active && h.hotNow ? "animate-pulse" : ""
+                  }`}
                   style={{
-                    width: `${48 + heat * 56}px`,
-                    height: `${48 + heat * 56}px`,
+                    width: `${36 + heat * 64}px`,
+                    height: `${36 + heat * 64}px`,
                     background: h.color,
-                    opacity: active ? 0.28 : 0.16,
-                    filter: "blur(10px)",
-                    boxShadow: `0 0 ${24 + heat * 30}px ${h.color}`,
+                    opacity: active ? (h.hotNow ? 0.35 : 0.18) : 0.12,
+                    filter: "blur(8px)",
+                    boxShadow: `0 0 ${18 + heat * 36}px ${h.color}`,
                   }}
                 />
-                {/* Core pin */}
                 <span
-                  className={`relative z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform ${
-                    isSel ? "scale-125" : "group-hover:scale-110"
+                  className={`relative z-10 flex items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform ${
+                    isSel ? "h-5 w-5 scale-125" : h.hotNow ? "h-4 w-4" : "h-3 w-3"
                   }`}
                   style={{
                     background: h.color,
-                    boxShadow: `0 0 12px ${h.color}`,
+                    boxShadow: `0 0 ${h.hotNow ? 14 : 8}px ${h.color}`,
                   }}
                 />
-                <span className="absolute left-1/2 top-5 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  {h.name}
-                </span>
+                {showLabel && (
+                  <span className="absolute left-1/2 top-[18px] z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/85 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-md pointer-events-none">
+                    {h.short || h.name}
+                    {h.hotNow ? " · NOW" : ""}
+                  </span>
+                )}
               </button>
             );
           })}
 
-          {/* You-are-here */}
           <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
+            className="absolute -translate-x-1/2 -translate-y-1/2 z-30"
             style={toStyle(centerLat, centerLng)}
           >
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-titan-cyan border-2 border-white shadow-[0_0_12px_rgba(0,199,217,0.8)]" />
+            <span className="relative flex h-4 w-4 items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-titan-cyan/40 animate-ping" />
+              <span className="relative h-3.5 w-3.5 rounded-full bg-titan-cyan border-2 border-white shadow-[0_0_14px_rgba(0,199,217,0.9)]" />
+            </span>
+            <span className="absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap rounded bg-titan-cyan/90 px-1 py-0.5 text-[9px] font-bold text-black">
+              You
+            </span>
           </div>
         </div>
 
-        <div className="absolute left-2 top-2 z-30 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/90">
-          {mode === "riding" ? "Pickup heat" : "Driver heat"} · lit zones
+        <div className="absolute left-2 top-2 z-30 max-w-[70%] rounded-lg bg-black/75 px-2 py-1.5 text-[10px] text-white/95 space-y-0.5">
+          <p className="font-bold uppercase tracking-wider">
+            {mode === "riding" ? "Pickup heat" : "Driver heat"} · {hotspots.length} zones
+          </p>
+          <p className="text-white/70 normal-case tracking-normal">{dayPartLabel(part)}</p>
         </div>
+
+        {topNow.length > 0 && active && (
+          <div className="absolute right-2 top-2 z-30 max-w-[45%] rounded-lg border border-amber-400/40 bg-black/80 px-2 py-1.5 text-[10px] text-amber-200">
+            <p className="font-bold uppercase tracking-wider text-amber-300">Go now</p>
+            {topNow.slice(0, 3).map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => setSelected(h.id)}
+                className="block w-full text-left truncate hover:text-white"
+              >
+                → {h.short || h.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {selected && (
-        <p className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">
-            {hotspots.find((h) => h.id === selected)?.name}:{" "}
-          </span>
-          {hotspots.find((h) => h.id === selected)?.tip}
-        </p>
+      {selectedSpot && (
+        <div className="rounded-xl border border-border bg-muted/50 p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <span
+              className="mt-1 h-3 w-3 rounded-full flex-shrink-0"
+              style={{ background: selectedSpot.color, boxShadow: `0 0 8px ${selectedSpot.color}` }}
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">{selectedSpot.name}</p>
+              <p className="text-xs text-amber-400/90 mt-0.5">{selectedSpot.nowTip || selectedSpot.when}</p>
+              <p className="text-xs text-muted-foreground mt-1">{selectedSpot.tip}</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

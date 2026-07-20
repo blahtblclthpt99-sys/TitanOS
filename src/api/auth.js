@@ -232,16 +232,15 @@ export function createAuthModule() {
     async loginWithProvider(provider) {
       await assertOAuthProviderEnabled(provider);
 
+      // Always absolute callback URL so Supabase does not fall back to Site URL `/`.
       const redirectTo = getAuthRedirectTo("/auth/callback");
       const isNative = Capacitor.isNativePlatform();
       const options = {
         redirectTo,
-        // Always get the URL first so we can open Browser on native,
-        // and avoid a blank 400 page if the provider was just disabled.
         skipBrowserRedirect: true,
       };
       if (provider === "google") {
-        options.queryParams = { access_type: "offline", prompt: "select_account" };
+        options.queryParams = { access_type: "offline", prompt: "consent select_account" };
       }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -251,9 +250,18 @@ export function createAuthModule() {
       throwIfError(error);
       if (!data?.url) throw apiError("Could not start sign-in. Try again.", 400);
 
+      // Confirm redirect_to survived allow-list; if stripped to `/`, warn in console for debugging.
+      try {
+        const authUrl = new URL(data.url);
+        const returned = authUrl.searchParams.get("redirect_to") || "";
+        if (returned && !returned.includes("/auth/callback") && import.meta.env.DEV) {
+          console.warn("[auth] redirect_to missing /auth/callback:", returned);
+        }
+      } catch {
+        /* ignore */
+      }
+
       if (isNative) {
-        // Give async Preferences storage a tick to flush the PKCE verifier
-        // before leaving the WebView for the system browser.
         await new Promise((r) => setTimeout(r, 50));
         await Browser.open({ url: data.url, presentationStyle: "popover" });
       } else {

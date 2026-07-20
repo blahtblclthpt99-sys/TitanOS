@@ -1,60 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/api/supabaseClient";
 import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/lib/AuthContext";
-
-function collectParams() {
-  const params = new URLSearchParams(window.location.search);
-  const hash = window.location.hash || "";
-
-  // Hash router: /#/auth/callback?code=...
-  const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
-  const hashParams = new URLSearchParams(hashQuery);
-
-  // Implicit / fragment tokens sometimes land in the hash itself
-  const frag = hash.replace(/^#/, "");
-  const fragParams = new URLSearchParams(
-    frag.includes("=") && !frag.startsWith("/") ? frag : ""
-  );
-
-  const get = (key) =>
-    params.get(key) || hashParams.get(key) || fragParams.get(key) || "";
-
-  return {
-    code: get("code"),
-    accessToken: get("access_token"),
-    refreshToken: get("refresh_token"),
-    oauthError: get("error_description") || get("error"),
-    from: get("from") || "/",
-  };
-}
-
-/** Prevent double exchange (React StrictMode remount / rapid re-entry). */
-let exchangeInflight = null;
-let exchangedCode = "";
-
-async function exchangeCodeOnce(code) {
-  if (exchangedCode === code) {
-    return supabase.auth.getSession();
-  }
-  if (exchangeInflight) return exchangeInflight;
-
-  exchangeInflight = (async () => {
-    const result = await supabase.auth.exchangeCodeForSession(code);
-    if (!result.error) exchangedCode = code;
-    return result;
-  })().finally(() => {
-    exchangeInflight = null;
-  });
-
-  return exchangeInflight;
-}
+import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
+import { supabase } from "@/api/supabaseClient";
 
 function friendlyAuthError(message) {
-  if (/code verifier|pkce/i.test(message || "")) {
-    return "Google sign-in could not finish (session lost mid-login). Close extra tabs, then try Continue with Google again.";
+  if (/code verifier|pkce|flow state|invalid.*code/i.test(message || "")) {
+    return "Google sign-in could not finish (login session expired). Close extra tabs, then tap Continue with Google again from this same browser.";
   }
   return message || "Sign-in failed";
 }
@@ -68,27 +22,13 @@ export default function AuthCallback() {
     let cancelled = false;
 
     const finish = async () => {
-      const { code, accessToken, refreshToken, oauthError, from } = collectParams();
-
-      if (oauthError) {
-        if (!cancelled) setError(oauthError);
-        return;
-      }
-
       try {
-        if (code) {
-          const { error: exchangeError } = await exchangeCodeOnce(code);
-          if (exchangeError) {
-            // Another attempt may have already created the session
-            const { data } = await supabase.auth.getSession();
-            if (!data.session) throw exchangeError;
+        if (hasPendingOAuthParams()) {
+          const result = await completeOAuthFromUrl();
+          if (!result.ok) {
+            if (!cancelled) setError(friendlyAuthError(result.error));
+            return;
           }
-        } else if (accessToken && refreshToken) {
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (sessionError) throw sessionError;
         } else {
           const { data, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) throw sessionError;
@@ -97,9 +37,9 @@ export default function AuthCallback() {
           }
         }
 
-        // Clean OAuth params from the URL so refreshes don't re-run exchange
+        // Drop oauth query params from the address bar after a successful exchange
         if (typeof window !== "undefined" && window.history?.replaceState) {
-          window.history.replaceState({}, document.title, "/auth/callback");
+          window.history.replaceState({}, document.title, "/");
         }
 
         // Log new OAuth signups (created in the last 10 minutes)
@@ -126,7 +66,7 @@ export default function AuthCallback() {
         }
 
         await checkUserAuth();
-        if (!cancelled) navigate(from && from !== "/auth/callback" ? from : "/", { replace: true });
+        if (!cancelled) navigate("/", { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));
       }
@@ -151,7 +91,7 @@ export default function AuthCallback() {
         </div>
       ) : (
         <div className="flex justify-center py-6">
-          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" aria-hidden="true" />
         </div>
       )}
     </AuthLayout>

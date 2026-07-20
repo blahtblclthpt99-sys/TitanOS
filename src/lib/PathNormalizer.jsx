@@ -4,8 +4,8 @@ import { normalizeAppPath } from "@/lib/routing";
 
 /**
  * Fixes first-load paths like /index.html inside Capacitor WebViews,
- * and recovers OAuth returns that land on `/` with ?code=… (Supabase Site URL)
- * instead of `/auth/callback`.
+ * and sends OAuth returns on `/` to `/auth/callback` for a clear signing-in UI
+ * (session exchange also runs in main.jsx / oauthBootstrap).
  */
 export default function PathNormalizer({ children }) {
   const location = useLocation();
@@ -21,8 +21,9 @@ export default function PathNormalizer({ children }) {
     const path = normalizeAppPath(location.pathname);
     const onCallback = path === "/auth/callback" || path === "/reset-password";
 
+    // Prefer callback route for visible progress; bootstrap may already have exchanged.
     if (hasOAuthPayload && !onCallback) {
-      navigate(`/auth/callback${location.search}${location.hash || ""}`, { replace: true });
+      navigate(`/auth/callback${location.search}`, { replace: true });
       return;
     }
 

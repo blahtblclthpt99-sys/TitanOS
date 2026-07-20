@@ -57,7 +57,7 @@ async function localFallback(functionName, payload) {
   }
 
   if (functionName === "sendEmail") {
-    console.info("[sendEmail local stub]", payload);
+    if (import.meta.env.DEV) console.info("[sendEmail local stub]", payload);
     return { success: true, stub: true };
   }
 
@@ -101,7 +101,7 @@ async function localFallback(functionName, payload) {
   }
 
   if (functionName === "sendFollowUp") {
-    console.info("[sendFollowUp local stub]", payload);
+    if (import.meta.env.DEV) console.info("[sendFollowUp local stub]", payload);
     return { success: true, stub: true, emailed: false };
   }
 

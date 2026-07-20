@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Plus, Truck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
+import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createEquipment, deleteEquipment, listEquipment } from "@/lib/equipmentApi";
 import {
   VEHICLE_MAKES,
@@ -30,15 +33,12 @@ const fieldClass = "w-full h-10 px-3 rounded-xl bg-muted border border-border te
 
 export default function Fleet() {
   const { user } = useAuth();
-  const [rows, setRows] = useState([]);
+  const { data: rows = [], setData: setRows, loading, error, reload } = useSafeAsync(
+    () => listEquipment(user.id),
+    [user?.id],
+    { enabled: Boolean(user?.id), initial: [] }
+  );
   const [form, setForm] = useState(EMPTY);
-
-  const load = async () => {
-    if (user?.id) setRows(await listEquipment(user.id));
-  };
-  useEffect(() => {
-    load();
-  }, [user?.id]);
 
   const isVehicle = form.category === "vehicle";
   const modelOptions = modelsForMake(form.make);
@@ -80,8 +80,11 @@ export default function Fleet() {
     setForm(EMPTY);
   };
 
+  if (loading) return <PageLoader variant="list" label="Loading fleet" />;
+  if (error) return <ErrorState title="Couldn't load fleet" onRetry={reload} />;
+
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Fleet & equipment" subtitle={`${rows.length} assets tracked`} />
       <p className="text-sm text-muted-foreground -mt-3 mb-4">
         Add make & model for vehicles — Driver Hub uses them for fuel estimates and tax mileage.{" "}
@@ -208,7 +211,7 @@ export default function Fleet() {
             className="bg-muted border-border text-foreground"
             aria-label="Warranty expires"
           />
-          <Button className="w-full bg-titan-cyan text-black">
+          <Button className="w-full">
             {isVehicle ? "Save vehicle" : "Save equipment"}
           </Button>
         </form>

@@ -6,6 +6,15 @@ import { assertWithinFreeLimit } from "@/lib/plan";
 
 const PREFIX = "titanos_hire";
 
+/**
+ * Hire board API — Supabase when available, otherwise localStorage.
+ * Used by Hire page and Driver Hub “Request driver” flow.
+ */
+
+/**
+ * @param {{ category?: string, state?: string, search?: string, status?: string }} [opts]
+ * @returns {Promise<object[]>}
+ */
 export async function listHireJobs({ category = "All", state = "", search = "", status = "open" } = {}) {
   try {
     let rows = await api.entities.HireJob.list("-created_date", 200);
@@ -33,6 +42,7 @@ function filterJobs(rows, { category, state, search, status }) {
   });
 }
 
+/** Create a hire post (enforces free-plan limits). Prefills from Driver Hub when used there. */
 export async function createHireJob(user, data) {
   try {
     const mine = await api.entities.HireJob.filter({ customer_id: user.id, status: "open" });
@@ -74,6 +84,7 @@ export async function createHireJob(user, data) {
   }
 }
 
+/** Apply to an open hire post; notifies the poster when possible. */
 export async function applyToHireJob(user, hireJobId, { message, bid_amount }) {
   const payload = {
     hire_job_id: hireJobId,
@@ -167,24 +178,14 @@ export async function listSavedJobs(userId) {
 }
 
 export async function sendHireMessage(user, { hireJobId, recipientId, body }) {
-  const payload = {
-    hire_job_id: hireJobId,
-    listing_id: null,
-    thread_id: `hire_${hireJobId}_${[user.id, recipientId].sort().join("_")}`,
-    sender_id: user.id,
-    recipient_id: recipientId,
-    body: body.trim(),
-    created_by_id: user.id,
-  };
-  try {
-    return await api.entities.MarketplaceMessage.create(payload);
-  } catch {
-    const messages = readLocal(PREFIX, "global", "messages", []);
-    const message = { id: uid(), created_at: new Date().toISOString(), ...payload };
-    messages.push(message);
-    writeLocal(PREFIX, "global", "messages", messages);
-    return message;
-  }
+  const { sendMessage } = await import("@/lib/messagesApi");
+  return sendMessage(user, {
+    threadId: `hire_${hireJobId}_${[user.id, recipientId].sort().join("_")}`,
+    recipientId,
+    body,
+    type: "text",
+    hireJobId,
+  });
 }
 
 export async function listHireMessages(userId, hireJobId) {

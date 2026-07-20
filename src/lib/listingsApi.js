@@ -197,23 +197,14 @@ export async function reportListing(user, listingId, reason, details = "") {
 }
 
 export async function sendListingMessage(user, { listingId, recipientId, body, threadId }) {
-  const payload = {
-    listing_id: listingId || null,
-    thread_id: threadId || `${listingId || "general"}_${[user.id, recipientId].sort().join("_")}`,
-    sender_id: user.id,
-    recipient_id: recipientId,
-    body: body.trim(),
-    created_by_id: user.id,
-  };
-  try {
-    return await api.entities.MarketplaceMessage.create(payload);
-  } catch {
-    const rows = readLocal(PREFIX, user.id, "messages", []);
-    const msg = { id: uid(), created_at: new Date().toISOString(), ...payload };
-    rows.push(msg);
-    writeLocal(PREFIX, user.id, "messages", rows);
-    return msg;
-  }
+  const { sendMessage } = await import("@/lib/messagesApi");
+  return sendMessage(user, {
+    threadId: threadId || `${listingId || "general"}_${[user.id, recipientId].sort().join("_")}`,
+    recipientId,
+    body,
+    type: "text",
+    listingId: listingId || null,
+  });
 }
 
 export async function listListingMessages(userId, listingId) {
@@ -221,6 +212,10 @@ export async function listListingMessages(userId, listingId) {
     const rows = await api.entities.MarketplaceMessage.filter({ listing_id: listingId });
     return rows.filter((m) => m.sender_id === userId || m.recipient_id === userId);
   } catch {
+    const { listConversations, listMessages } = await import("@/lib/messagesApi");
+    const threads = await listConversations(userId);
+    const match = threads.find((t) => t.listing_id === listingId);
+    if (match) return listMessages(userId, match.id);
     return readLocal(PREFIX, userId, "messages", []).filter((m) => m.listing_id === listingId);
   }
 }

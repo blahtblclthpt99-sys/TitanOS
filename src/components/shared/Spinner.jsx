@@ -1,19 +1,28 @@
 import React from "react";
+import { cn } from "@/lib/utils";
+import ProgressBar from "@/components/shared/ProgressBar";
 
 /** Centered spinner. Use fullScreen for page-level loading. */
-export default function Spinner({ size = "md", fullScreen = false, label = "Loading" }) {
-  const sz = { sm: "w-5 h-5", md: "w-8 h-8", lg: "w-12 h-12" }[size];
+export default function Spinner({ size = "md", fullScreen = false, label = "Loading", className }) {
+  const sz = { sm: "w-5 h-5 border-2", md: "w-8 h-8 border-2", lg: "w-12 h-12 border-[3px]" }[size];
   const containerClass = fullScreen
-    ? "flex items-center justify-center h-screen"
-    : "flex items-center justify-center py-20";
+    ? "flex flex-col items-center justify-center gap-4 h-screen"
+    : "flex flex-col items-center justify-center gap-4 py-20";
 
   return (
-    <div className={containerClass} role="status" aria-live="polite" aria-label={label}>
+    <div className={cn(containerClass, className)} role="status" aria-live="polite" aria-label={label}>
       <div
-        className={`${sz} border-2 border-titan-cyan/20 border-t-titan-cyan rounded-full animate-spin`}
+        className={cn(
+          sz,
+          "rounded-full border-primary/20 border-t-primary animate-spin"
+        )}
         aria-hidden="true"
       />
+      <ProgressBar className="w-32" />
       <span className="sr-only">{label}</span>
+      {!fullScreen ? (
+        <p className="text-xs text-muted-foreground">{label}</p>
+      ) : null}
     </div>
   );
 }

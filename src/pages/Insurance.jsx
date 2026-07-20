@@ -1,25 +1,25 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Shield, Upload, FileText, Trash2, Eye, Copy, Check } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { toast } from "@/components/ui/use-toast";
 import { betaBadgeLabel } from "@/lib/plan";
 import { useAuth } from "@/lib/AuthContext";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
+import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createInsuranceDoc, deleteInsuranceDoc, listInsuranceDocs } from "@/lib/insuranceApi";
 
 export default function Insurance() {
   const { user } = useAuth();
-  const [docs, setDocs] = useState([]);
+  const { data: docs = [], setData: setDocs, loading, error, reload } = useSafeAsync(
+    () => listInsuranceDocs(user.id),
+    [user?.id],
+    { enabled: Boolean(user?.id), initial: [] }
+  );
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(null);
   const fileInputRef = useRef(null);
-
-  const load = async () => {
-    if (!user?.id) return;
-    setDocs(await listInsuranceDocs(user.id));
-  };
-
-  useEffect(() => { load(); }, [user?.id]);
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -54,6 +54,9 @@ export default function Insurance() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  if (loading) return <PageLoader variant="list" label="Loading insurance" />;
+  if (error) return <ErrorState title="Couldn't load insurance docs" onRetry={reload} />;
+
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
@@ -76,6 +79,7 @@ export default function Insurance() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
         <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleUpload} />
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="w-full h-36 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-3 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50 mb-6"
@@ -111,11 +115,11 @@ export default function Insurance() {
                 <p className="text-xs text-muted-foreground">{doc.size_label || doc.doc_type}</p>
               </div>
               <div className="flex gap-1">
-                <a href={doc.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground"><Eye className="w-4 h-4" /></a>
-                <button type="button" onClick={() => handleCopyLink(doc)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground">
+                <a href={doc.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground" aria-label={`View ${doc.name}`}><Eye className="w-4 h-4" /></a>
+                <button type="button" onClick={() => handleCopyLink(doc)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground" aria-label={`Copy link for ${doc.name}`}>
                   {copied === doc.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 </button>
-                <button type="button" onClick={() => handleDelete(doc.id)} className="p-2 rounded-lg hover:bg-muted text-red-400"><Trash2 className="w-4 h-4" /></button>
+                <button type="button" onClick={() => handleDelete(doc.id)} className="p-2 rounded-lg hover:bg-muted text-red-400" aria-label={`Delete ${doc.name}`}><Trash2 className="w-4 h-4" /></button>
               </div>
             </motion.div>
           ))}

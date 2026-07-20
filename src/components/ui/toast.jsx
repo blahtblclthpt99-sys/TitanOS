@@ -22,13 +22,15 @@ const ToastViewport = React.forwardRef(({ ...props }, ref) => (
 ToastViewport.displayName = "ToastViewport";
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border border-border bg-card text-card-foreground p-4 pr-12 shadow-lift transition-all cursor-pointer data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full",
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border border-border bg-card text-card-foreground p-4 pr-12 shadow-lift transition-all duration-base cursor-pointer data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full",
   {
     variants: {
       variant: {
         default: "border-border bg-card text-card-foreground",
         destructive:
-          "destructive group border-red-500/40 bg-red-950/90 text-red-50",
+          "destructive group border-destructive/40 bg-destructive text-destructive-foreground",
+        success:
+          "border-success/40 bg-card text-foreground [&>svg]:text-success",
       },
     },
     defaultVariants: {

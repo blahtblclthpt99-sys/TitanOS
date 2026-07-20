@@ -69,7 +69,18 @@ export default function Marketplace() {
   };
 
   useEffect(() => { if (authChecked && user?.id && tab !== "apps") loadListings(); }, [authChecked, user?.id, tab, filters, myListings]);
-  useEffect(() => { if (user?.id) fetchFavoriteIds(user.id).then(setFavorites); }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let alive = true;
+    fetchFavoriteIds(user.id)
+      .then((ids) => {
+        if (alive) setFavorites(ids);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
 
   const openDetail = async (listing) => {
     setSelected(listing); setDetailData({ reviews: [], messages: [] });

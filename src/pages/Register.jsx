@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Lock, Loader2, User } from "lucide-react";
@@ -93,7 +94,7 @@ export default function Register() {
     return (
       <AuthLayout title="Verify your email" subtitle={`We sent a code to ${email}`}>
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100" role="alert">
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {error}
           </div>
         )}
@@ -106,24 +107,24 @@ export default function Register() {
             </InputOTPGroup>
           </InputOTP>
         </div>
-        <button
+        <Button
           type="button"
-          className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+          className="h-12 w-full"
           onClick={handleVerify}
           disabled={loading || otpCode.length < 6}
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               Verifying...
             </>
           ) : (
             "Verify"
           )}
-        </button>
-        <p className="text-center text-sm text-slate-500 mt-4">
+        </Button>
+        <p className="text-center text-sm text-muted-foreground mt-4">
           Didn't receive the code?{" "}
-          <button type="button" onClick={handleResend} className="font-semibold text-slate-800 hover:underline">
+          <button type="button" onClick={handleResend} className="font-semibold text-foreground hover:underline">
             Resend
           </button>
         </p>
@@ -139,7 +140,7 @@ export default function Register() {
         </p>
       ) : null}
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100" role="alert">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}
         </div>
       )}
@@ -148,20 +149,20 @@ export default function Register() {
 
       <div className="relative my-5">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-slate-200" />
+          <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
-          <span className="bg-white px-3 text-slate-400">OR</span>
+          <span className="bg-card px-3 text-muted-foreground">OR</span>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="fullName" className="text-slate-700 font-medium">
+          <Label htmlFor="fullName" className="font-medium text-foreground">
             Full name
           </Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="fullName"
               type="text"
@@ -169,16 +170,16 @@ export default function Register() {
               placeholder="Alex Rivera"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="h-12 pl-10"
             />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-slate-700 font-medium">
+          <Label htmlFor="email" className="font-medium text-foreground">
             Email
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="email"
               type="email"
@@ -186,17 +187,17 @@ export default function Register() {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="h-12 pl-10"
               required
             />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-slate-700 font-medium">
+          <Label htmlFor="password" className="font-medium text-foreground">
             Password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="password"
               type="password"
@@ -204,18 +205,18 @@ export default function Register() {
               placeholder="At least 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="h-12 pl-10"
               minLength={8}
               required
             />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm" className="text-slate-700 font-medium">
+          <Label htmlFor="confirm" className="font-medium text-foreground">
             Confirm password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="confirm"
               type="password"
@@ -223,31 +224,27 @@ export default function Register() {
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="h-12 pl-10"
               minLength={8}
               required
             />
           </div>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
-        >
+        <Button type="submit" disabled={loading} className="h-12 w-full">
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               Creating account...
             </>
           ) : (
             "Create free account"
           )}
-        </button>
+        </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-slate-500">
+      <p className="mt-5 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-slate-800 hover:underline">
+        <Link to="/login" className="font-semibold text-foreground hover:underline">
           Sign in
         </Link>
       </p>

@@ -79,7 +79,7 @@ export default function HotspotMap({
           onClick={() => onDayPartFilter?.(null)}
           className={`flex-shrink-0 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-colors ${
             !dayPartFilter
-              ? "bg-titan-cyan/15 text-titan-cyan border-titan-cyan/30"
+              ? "bg-primary/15 text-primary border-primary/30"
               : "bg-muted text-muted-foreground border-border"
           }`}
         >
@@ -172,10 +172,10 @@ export default function HotspotMap({
             style={toStyle(centerLat, centerLng)}
           >
             <span className="relative flex h-4 w-4 items-center justify-center">
-              <span className="absolute inset-0 rounded-full bg-titan-cyan/45 animate-ping" />
-              <span className="relative h-3.5 w-3.5 rounded-full bg-titan-cyan border-2 border-white shadow-[0_0_14px_rgba(0,199,217,0.9)]" />
+              <span className="absolute inset-0 rounded-full bg-primary/45 animate-ping" />
+              <span className="relative h-3.5 w-3.5 rounded-full bg-primary border-2 border-white shadow-[0_0_14px_rgba(0,199,217,0.9)]" />
             </span>
-            <span className="absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap rounded bg-titan-cyan px-1 py-0.5 text-[9px] font-bold text-black">
+            <span className="absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap rounded bg-primary px-1 py-0.5 text-[9px] font-bold text-black">
               You
             </span>
           </div>

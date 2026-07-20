@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { matchVoiceCommand, speechSupported } from "@/lib/voiceCommands";
 import { toast } from "@/components/ui/use-toast";
 
 export default function FloatingVoiceButton() {
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [supported] = useState(() => speechSupported());
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
@@ -68,9 +69,11 @@ export default function FloatingVoiceButton() {
       <AnimatePresence>
         {heard && (
           <motion.p
-            initial={{ opacity: 0, y: 6 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
+            role="status"
+            aria-live="polite"
             className="mb-2 max-w-[200px] text-xs bg-card border border-border rounded-xl px-3 py-2 text-foreground shadow-soft"
           >
             “{heard}”
@@ -79,14 +82,15 @@ export default function FloatingVoiceButton() {
       </AnimatePresence>
       <motion.button
         type="button"
-        whileTap={{ scale: 0.94 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.94 }}
         onClick={listening ? stop : start}
-        className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lift border ${
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lift border focus-ring ${
           listening
             ? "bg-destructive text-destructive-foreground border-destructive"
             : "bg-card text-foreground border-border"
         }`}
         aria-label={listening ? "Stop listening" : "Voice command"}
+        aria-pressed={listening}
       >
         {listening ? <MicOff className="w-4.5 h-4.5" /> : <Mic className="w-4.5 h-4.5" />}
       </motion.button>

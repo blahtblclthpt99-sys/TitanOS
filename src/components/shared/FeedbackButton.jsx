@@ -1,14 +1,23 @@
 import React, { useState, useImperativeHandle, forwardRef } from "react";
-import { MessageSquare, X, Bug, Lightbulb, Star, Send, Check } from "lucide-react";
+import { MessageSquare, Bug, Lightbulb, Star, Send, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { api } from "@/api/apiClient";
-import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
+import FormField from "@/components/shared/FormField";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 const TYPES = [
-  { id: "bug", label: "Bug Report", icon: Bug, color: "text-red-400", bg: "bg-red-400/10" },
-  { id: "feature", label: "Feature Request", icon: Lightbulb, color: "text-titan-amber", bg: "bg-titan-amber/10" },
-  { id: "general", label: "General Feedback", icon: Star, color: "text-titan-cyan", bg: "bg-titan-cyan/10" },
+  { id: "bug", label: "Bug", icon: Bug },
+  { id: "feature", label: "Feature", icon: Lightbulb },
+  { id: "general", label: "General", icon: Star },
 ];
 
 function saveFeedbackLocally(payload) {
@@ -17,7 +26,7 @@ function saveFeedbackLocally(payload) {
     pending.push({ ...payload, saved_at: new Date().toISOString() });
     localStorage.setItem("titanos_beta_feedback", JSON.stringify(pending));
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 
@@ -74,7 +83,7 @@ const FeedbackButton = forwardRef(function FeedbackButton({ hideTrigger = false 
         setMessage("");
         setType("general");
         setError("");
-      }, 1800);
+      }, 1600);
     } catch (err) {
       setError(err?.message || "Could not send feedback. Please try again.");
     } finally {
@@ -91,120 +100,90 @@ const FeedbackButton = forwardRef(function FeedbackButton({ hideTrigger = false 
             setOpen(true);
             setError("");
           }}
-          className="fixed bottom-[5.5rem] md:bottom-20 right-3 md:right-6 z-[60] w-9 h-9 rounded-xl bg-titan-indigo hover:bg-titan-indigo/90 active:scale-95 transition-all shadow-md flex items-center justify-center border border-border"
+          className="fixed bottom-[5.5rem] md:bottom-20 right-3 md:right-6 z-[60] min-h-[44px] min-w-[44px] rounded-md bg-secondary hover:bg-secondary/90 transition-colors shadow-soft flex items-center justify-center border border-border focus-ring"
           aria-label="Send feedback"
-          title="Send feedback"
         >
-          <MessageSquare className="w-4 h-4 text-foreground" />
+          <MessageSquare className="w-4 h-4 text-foreground" aria-hidden="true" />
         </button>
       )}
 
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Send feedback"
-              initial={{ opacity: 0, y: 40, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.97 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed bottom-0 left-0 right-0 md:right-6 md:bottom-24 md:left-auto md:w-[340px] z-[80] bg-card border border-border rounded-t-3xl md:rounded-2xl p-5 shadow-2xl"
-              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-10 h-1 bg-muted rounded-full mx-auto mb-4 md:hidden" />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md rounded-lg">
+          <DialogHeader>
+            <DialogTitle>Send feedback</DialogTitle>
+            <DialogDescription>Help us improve TitanOS during public beta.</DialogDescription>
+          </DialogHeader>
 
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Send Feedback</h3>
-                  <p className="text-xs text-muted-foreground">Help us improve TitanOS</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          {submitted ? (
+            <div className="text-center py-6">
+              <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Check className="w-6 h-6 text-primary" aria-hidden="true" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Thank you</p>
+              <p className="text-xs text-muted-foreground mt-1">Your feedback was recorded.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2" role="group" aria-label="Feedback type">
+                {TYPES.map((t) => (
+                  <button
+                    type="button"
+                    key={t.id}
+                    aria-pressed={type === t.id}
+                    onClick={() => setType(t.id)}
+                    className={cn(
+                      "flex-1 flex flex-col items-center gap-1 py-2.5 min-h-[44px] rounded-md border text-xs font-medium transition-colors focus-ring",
+                      type === t.id
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <t.icon className="w-4 h-4" aria-hidden="true" />
+                    {t.label}
+                  </button>
+                ))}
               </div>
 
-              {submitted ? (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 rounded-2xl bg-titan-cyan/10 flex items-center justify-center mx-auto mb-3">
-                    <Check className="w-6 h-6 text-titan-cyan" />
-                  </div>
-                  <p className="text-sm font-semibold text-foreground">Thank you!</p>
-                  <p className="text-xs text-muted-foreground mt-1">Your feedback has been sent.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex gap-2 mb-4">
-                    {TYPES.map((t) => (
-                      <button
-                        type="button"
-                        key={t.id}
-                        onClick={() => setType(t.id)}
-                        className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all ${
-                          type === t.id
-                            ? `${t.bg} border-current ${t.color}`
-                            : "border-border text-muted-foreground hover:text-foreground/50"
-                        }`}
-                      >
-                        <t.icon className="w-4 h-4" />
-                        <span className="text-[10px] leading-tight text-center">{t.label}</span>
-                      </button>
-                    ))}
-                  </div>
+              <FormField label="Your message" required>
+                <Textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={
+                    type === "bug"
+                      ? "Describe what happened and how to reproduce it…"
+                      : type === "feature"
+                        ? "What feature would make TitanOS better for you?"
+                        : "Share your thoughts…"
+                  }
+                  rows={4}
+                  className="resize-none"
+                />
+              </FormField>
 
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={
-                      type === "bug"
-                        ? "Describe what happened and how to reproduce it..."
-                        : type === "feature"
-                          ? "What feature would make TitanOS better for you?"
-                          : "Share your thoughts, suggestions, or anything on your mind..."
-                    }
-                    rows={4}
-                    className="w-full bg-muted border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none mb-3"
-                  />
+              {error ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {error}
+                </p>
+              ) : null}
 
-                  {error ? (
-                    <p className="text-xs text-red-400 mb-3" role="alert">
-                      {error}
-                    </p>
-                  ) : null}
-
-                  <Button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading || !message.trim()}
-                    className="w-full bg-titan-indigo hover:bg-titan-indigo/90 text-foreground font-semibold rounded-xl h-10 text-sm gap-2 disabled:opacity-40"
-                  >
-                    {loading ? (
-                      "Sending…"
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" /> Send Feedback
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || !message.trim()}
+                className="w-full gap-2"
+              >
+                {loading ? (
+                  "Sending…"
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" aria-hidden="true" /> Send feedback
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 });

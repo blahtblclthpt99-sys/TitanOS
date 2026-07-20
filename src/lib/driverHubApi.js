@@ -8,63 +8,6 @@ const SESSION_KEY = "session";
 const STOPS_KEY = "stops";
 const PREFS_KEY = "prefs";
 
-export const DRIVER_APPS = [
-  {
-    id: "uber",
-    name: "Uber",
-    type: "rideshare",
-    color: "#000000",
-    deepLink: "uber://",
-    web: "https://m.uber.com/ul/",
-    store: "https://www.uber.com/us/en/drive/",
-  },
-  {
-    id: "lyft",
-    name: "Lyft",
-    type: "rideshare",
-    color: "#FF00BF",
-    deepLink: "lyft://",
-    web: "https://www.lyft.com/driver",
-    store: "https://www.lyft.com/driver",
-  },
-  {
-    id: "doordash",
-    name: "DoorDash",
-    type: "delivery",
-    color: "#FF3008",
-    deepLink: "doordash://",
-    web: "https://www.doordash.com/dasher/login",
-    store: "https://www.doordash.com/dasher/signup/",
-  },
-  {
-    id: "ubereats",
-    name: "Uber Eats",
-    type: "delivery",
-    color: "#06C167",
-    deepLink: "ubereats://",
-    web: "https://www.uber.com/us/en/deliver/",
-    store: "https://www.uber.com/us/en/deliver/",
-  },
-  {
-    id: "grubhub",
-    name: "Grubhub",
-    type: "delivery",
-    color: "#FF8000",
-    deepLink: "grubhubdriver://",
-    web: "https://driver.grubhub.com/",
-    store: "https://driver.grubhub.com/",
-  },
-  {
-    id: "instacart",
-    name: "Instacart",
-    type: "delivery",
-    color: "#0AAD0A",
-    deepLink: "instacart-shopper://",
-    web: "https://shoppers.instacart.com/",
-    store: "https://shoppers.instacart.com/",
-  },
-];
-
 /** Approximate USD/gal by US ZIP first digit (fallback when no live API). */
 const ZIP_GAS_USD = {
   0: 3.45,
@@ -501,41 +444,9 @@ export function topHotspotsNow(hotspots, limit = 3) {
   return [...(hotspots || [])].sort((a, b) => b.heat - a.heat).slice(0, limit);
 }
 
-export const RIDER_APPS = [
-  {
-    id: "uber_rider",
-    name: "Uber",
-    type: "rideshare",
-    color: "#000000",
-    deepLink: "uber://",
-    web: "https://m.uber.com/ul/",
-    store: "https://www.uber.com/",
-  },
-  {
-    id: "lyft_rider",
-    name: "Lyft",
-    type: "rideshare",
-    color: "#FF00BF",
-    deepLink: "lyft://riderequest",
-    web: "https://www.lyft.com/",
-    store: "https://www.lyft.com/",
-  },
-];
-
 export function openStreetMapEmbed(lat, lng, zoom = 12) {
   const b = 0.045;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${lng - b}%2C${lat - b}%2C${lng + b}%2C${lat + b}&layer=mapnik&marker=${lat}%2C${lng}`;
-}
-
-export async function openDriverApp(app) {
-  if (typeof window === "undefined") return;
-  const started = Date.now();
-  window.location.href = app.deepLink;
-  window.setTimeout(() => {
-    if (Date.now() - started < 2500) {
-      window.open(app.web || app.store, "_blank", "noopener,noreferrer");
-    }
-  }, 900);
 }
 
 export async function startDrivingSession(user, prefs) {
@@ -676,7 +587,7 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
     from_location: session.city || "Driver hub start",
     to_location: session.active ? "In progress" : "Driver hub end",
     miles,
-    customer_name: (session.apps || []).join(", ") || "Gig apps",
+    customer_name: "Driver Hub",
     notes,
     tax_year: year,
     created_by_id: user.id,

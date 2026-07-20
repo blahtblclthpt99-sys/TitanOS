@@ -17,7 +17,7 @@ const RULES = [
   { re: /marketing|facebook|instagram/i, path: "/marketing", label: "Open Marketing Studio" },
   { re: /driver|uber|doordash|delivery|rideshare/i, path: "/driver", label: "Open Driver Hub" },
   { re: /emergency|same.?day/i, path: "/emergency", label: "Open Emergency Jobs" },
-  { re: /escrow|payment protection/i, path: "/escrow", label: "Open Escrow" },
+  { re: /escrow|job hold|payment protection/i, path: "/escrow", label: "Open Job Holds" },
   { re: /route|directions/i, path: "/routes", label: "Open Route Planner" },
   { re: /tax|1099|mileage/i, path: "/tax-center", label: "Open Tax Center" },
   { re: /settings|profile/i, path: "/settings", label: "Open Settings" },

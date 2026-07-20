@@ -1,0 +1,3 @@
+# TitanOS signup emails
+# Format: ISO_DATE	EMAIL	FULL_NAME	SOURCE
+# Real addresses are written to signup-emails.txt (gitignored) and the signup_emails table.

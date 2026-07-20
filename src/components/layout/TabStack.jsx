@@ -11,8 +11,9 @@ import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PageNotFound from "@/lib/PageNotFound";
 import { normalizeAppPath } from "@/lib/routing";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
-const TAB_PATHS = ["/", "/jobs", "/marketplace", "/community", "/settings", "/more"];
+const TAB_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/settings", "/more"];
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
@@ -20,14 +21,15 @@ const Customers = lazy(() => import("@/pages/Customers"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const MarketplaceTab = lazy(() => import("@/pages/Marketplace"));
-const CommunityTab = lazy(() => import("@/pages/Community"));
+const MessagesTab = lazy(() => import("@/pages/Messages"));
 const SettingsTab = lazy(() => import("@/pages/Settings"));
+const Community = lazy(() => import("@/pages/Community"));
 
 const TAB_COMPONENTS = {
   "/": Dashboard,
   "/jobs": Jobs,
   "/marketplace": MarketplaceTab,
-  "/community": CommunityTab,
+  "/messages": MessagesTab,
   "/settings": SettingsTab,
   "/more": MoreMenu,
 };
@@ -40,6 +42,7 @@ const Finances = lazy(() => import("@/pages/Finances"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
 const Reports = lazy(() => import("@/pages/Reports"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
@@ -67,6 +70,10 @@ const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
 const Escrow = lazy(() => import("@/pages/Escrow"));
 const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 const DriverHub = lazy(() => import("@/pages/DriverHub"));
+const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
+const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -75,12 +82,14 @@ const NON_TAB_ROUTES = {
   "/fleet": Fleet,
   "/tax-center": TaxCenter,
   "/reports": Reports,
+  "/analytics": Analytics,
   "/customers": Customers,
   "/invoices": Invoices,
   "/assistant": AIAssistant,
   "/insurance": Insurance,
   "/referral": Referral,
   "/hire": Hire,
+  "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
   "/admin/moderation": AdminModeration,
@@ -104,6 +113,9 @@ const NON_TAB_ROUTES = {
   "/escrow": Escrow,
   "/phone": PhoneReceptionist,
   "/driver": DriverHub,
+  "/profile": Profile,
+  "/trust-safety": TrustSafety,
+  "/design-system": DesignSystem,
 };
 
 function NonTabPage() {
@@ -124,6 +136,13 @@ function NonTabPage() {
       </Suspense>
     );
   }
+  if (pathname.startsWith("/driver/") && pathname !== "/driver/") {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <DriverProfile />
+      </Suspense>
+    );
+  }
 
   const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
   const Page = NON_TAB_ROUTES[routeKey];
@@ -140,6 +159,7 @@ export default function TabStack() {
   const location = useLocation();
   const mountedTabs = useRef(new Set(["/"]));
   const pathname = normalizeAppPath(location.pathname);
+  const reduceMotion = usePrefersReducedMotion();
 
   const isTab = TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
@@ -160,9 +180,10 @@ export default function TabStack() {
             key={path}
             style={{ display: isActive ? "block" : "none" }}
             aria-hidden={!isActive}
+            className={isActive && !reduceMotion ? "page-enter" : undefined}
           >
-            <ErrorBoundary message="This tab failed to load.">
-              <Suspense fallback={<Spinner />}>
+            <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
+              <Suspense fallback={<Spinner label="Loading" />}>
                 <Page isActive={isActive} />
               </Suspense>
             </ErrorBoundary>
@@ -174,14 +195,14 @@ export default function TabStack() {
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, x: 18 }}
+            initial={reduceMotion ? false : { opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }}
+            transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
             {/* key={pathname} remounts the boundary so a crash on Reports can't trap Jobs/Home */}
-            <ErrorBoundary key={pathname} message="This page failed to load.">
+            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Command Center.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>

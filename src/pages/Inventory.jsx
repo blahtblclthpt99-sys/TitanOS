@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { AlertTriangle, PackagePlus } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
 import DeleteButton from "@/components/shared/DeleteButton";
+import { useSafeAsync } from "@/hooks/useSafeAsync";
 import {
   createInventoryItem,
   deleteInventoryItem,
@@ -17,15 +20,12 @@ const EMPTY = { name: "", quantity: "", reorder_at: "5", unit: "ea", category: "
 
 export default function Inventory() {
   const { user } = useAuth();
-  const [items, setItems] = useState([]);
+  const { data: items = [], setData: setItems, loading, error, reload } = useSafeAsync(
+    () => listInventory(user.id),
+    [user?.id],
+    { enabled: Boolean(user?.id), initial: [] }
+  );
   const [form, setForm] = useState(EMPTY);
-
-  const load = async () => {
-    if (user?.id) setItems(await listInventory(user.id));
-  };
-  useEffect(() => {
-    load();
-  }, [user?.id]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -40,10 +40,13 @@ export default function Inventory() {
     setItems(items.map((row) => (row.id === item.id ? saved : row)));
   };
 
+  if (loading) return <PageLoader variant="list" label="Loading inventory" />;
+  if (error) return <ErrorState title="Couldn't load inventory" onRetry={reload} />;
+
   const low = items.filter(isLowStock);
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Inventory" subtitle={`${low.length} low-stock alert${low.length === 1 ? "" : "s"}`} />
       <div className="grid lg:grid-cols-[.75fr_1.25fr] gap-5">
         <form className="glass rounded-2xl p-5 space-y-3" onSubmit={add}>
@@ -61,7 +64,7 @@ export default function Inventory() {
               className="bg-muted border-border text-foreground"
             />
           ))}
-          <Button className="bg-titan-cyan text-black w-full">Save item</Button>
+          <Button className="w-full">Save item</Button>
         </form>
         <section className="space-y-3">
           {items.map((item) => (

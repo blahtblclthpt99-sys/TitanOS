@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Store,
@@ -118,21 +118,32 @@ function StatPill({ icon: Icon, label, value, accent }) {
 function ModuleCard({ module, index, isInstalled, isOnWaitlist, onView }) {
   const priceLabel = module.status === "coming_soon" ? "Soon" : formatModulePrice(module);
   const isFree = module.price === 0 && module.status !== "coming_soon";
+  const reduceMotion = useReducedMotion();
+  const open = () => onView(module);
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 16 }}
+      layout={!reduceMotion}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ delay: index * 0.05, duration: 0.35 }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className={`group relative rounded-2xl p-5 cursor-pointer overflow-hidden bg-gradient-to-br ${module.gradient} border transition-all duration-300 ${
+      exit={reduceMotion ? undefined : { opacity: 0, scale: 0.96 }}
+      transition={reduceMotion ? { duration: 0 } : { delay: index * 0.05, duration: 0.35 }}
+      whileHover={reduceMotion ? undefined : { y: -4, transition: { duration: 0.2 } }}
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${module.name}${isInstalled ? " (installed)" : ""}`}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+      className={`group relative rounded-2xl p-5 cursor-pointer overflow-hidden bg-gradient-to-br ${module.gradient} border transition-all duration-300 focus-ring ${
         isInstalled
           ? "border-titan-green/30 ring-1 ring-titan-green/20 shadow-[0_0_30px_rgba(34,197,94,0.08)]"
           : "border-border hover:border-border hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
       }`}
-      onClick={() => onView(module)}
     >
       <div className="absolute inset-0 glass opacity-80 group-hover:opacity-90 transition-opacity" />
       <div className="absolute top-0 right-0 w-32 h-32 bg-muted rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-muted transition-colors" />

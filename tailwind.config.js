@@ -4,12 +4,39 @@ module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
   theme: {
     extend: {
+      /* 8px-aligned spacing aliases (Tailwind default already 4px base) */
+      spacing: {
+        "space-1": "var(--space-1)",
+        "space-2": "var(--space-2)",
+        "space-3": "var(--space-3)",
+        "space-4": "var(--space-4)",
+        "space-5": "var(--space-5)",
+        "space-6": "var(--space-6)",
+        "space-8": "var(--space-8)",
+      },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        "2xl": "1.25rem",
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        "2xl": "var(--radius-xl)",
         "3xl": "1.5rem",
+      },
+      transitionDuration: {
+        fast: "var(--duration-fast)",
+        base: "var(--duration-base)",
+        slow: "var(--duration-slow)",
+      },
+      transitionTimingFunction: {
+        out: "var(--ease-out)",
+        "in-out": "var(--ease-in-out)",
+      },
+      fontSize: {
+        "display": ["2.25rem", { lineHeight: "1.15", fontWeight: "700", letterSpacing: "-0.02em" }],
+        "title": ["1.5rem", { lineHeight: "1.25", fontWeight: "700", letterSpacing: "-0.02em" }],
+        "heading": ["1.125rem", { lineHeight: "1.35", fontWeight: "600" }],
+        "body": ["0.875rem", { lineHeight: "1.5", fontWeight: "400" }],
+        "caption": ["0.75rem", { lineHeight: "1.4", fontWeight: "500" }],
       },
       colors: {
         background: "hsl(var(--background))",
@@ -84,9 +111,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        heading: ["Inter", "var(--font-heading)"],
-        body: ["Inter", "var(--font-body)"],
-        display: ["Inter", "var(--font-display)"],
+        heading: ["var(--font-heading)"],
+        body: ["var(--font-body)"],
+        display: ["var(--font-display)"],
         mono: ["var(--font-mono)"],
       },
       boxShadow: {
@@ -114,13 +141,19 @@ module.exports = {
           from: { opacity: "0", transform: "scale(0.96)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "success-pop": {
+          "0%": { transform: "scale(0.6)", opacity: "0" },
+          "60%": { transform: "scale(1.08)", opacity: "1" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.4s ease-out",
-        "slide-in": "slide-in 0.3s ease-out",
-        "scale-in": "scale-in 0.25s ease-out",
+        "fade-in": "fade-in var(--duration-slow) var(--ease-out)",
+        "slide-in": "slide-in var(--duration-base) var(--ease-out)",
+        "scale-in": "scale-in var(--duration-base) var(--ease-out)",
+        "success-pop": "success-pop var(--duration-slow) var(--ease-out)",
       },
     },
   },

@@ -9,10 +9,11 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import NativeSelect from "@/components/shared/NativeSelect";
 import PageHeader from "@/components/shared/PageHeader";
 import EmptyState from "@/components/shared/EmptyState";
+import FilterChip from "@/components/shared/FilterChip";
 import StatusBadge from "@/components/shared/StatusBadge";
 import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
@@ -83,60 +84,80 @@ export default function Customers({ isActive = true }) {
   if (loading && !customers.length) return <PageLoader variant="list" label="Loading customers" />;
   if (error) return <ErrorState title="Couldn't load customers" onRetry={reload} />;
 
-  const renderCustomerRow = (c) => (
-    <div
-      onClick={() => navigate(`/customers/${c.id}`, { state: { customer: c } })}
-      className="glass rounded-2xl p-4 glass-hover cursor-pointer active:scale-[0.98] transition-transform"
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-sm font-bold text-titan-cyan">{c.first_name?.[0]}{c.last_name?.[0]}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-semibold text-foreground truncate">{c.first_name} {c.last_name}</p>
-            <StatusBadge status={c.status} />
+  const renderCustomerRow = (c) => {
+    const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Customer";
+    const open = () => navigate(`/customers/${c.id}`, { state: { customer: c } });
+    return (
+      <div
+        role="link"
+        tabIndex={0}
+        aria-label={`Open ${name}`}
+        onClick={open}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            open();
+          }
+        }}
+        className="titan-surface p-4 glass-hover cursor-pointer focus-ring titan-surface-interactive"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-md bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+            <span className="text-sm font-bold text-primary">{c.first_name?.[0]}{c.last_name?.[0]}</span>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {c.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" />{c.phone}</span>}
-            {c.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="w-3 h-3" />{c.email}</span>}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <p className="text-sm font-semibold text-foreground truncate">{c.first_name} {c.last_name}</p>
+              <StatusBadge status={c.status} />
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {c.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" aria-hidden="true" />{c.phone}</span>}
+              {c.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="w-3 h-3" aria-hidden="true" />{c.email}</span>}
+            </div>
+          </div>
+          {c.lifetime_value > 0 && (
+            <p className="text-sm font-semibold text-emerald-400 flex-shrink-0">${c.lifetime_value.toLocaleString()}</p>
+          )}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <DeleteButton
+              label={name}
+              onDelete={async () => {
+                await api.entities.Customer.delete(c.id);
+                setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
+                reload();
+                toast({ title: "Contact deleted" });
+              }}
+            />
           </div>
         </div>
-        {c.lifetime_value > 0 && (
-          <p className="text-sm font-semibold text-emerald-400 flex-shrink-0">${c.lifetime_value.toLocaleString()}</p>
-        )}
-        <DeleteButton
-          label={`${c.first_name || ""} ${c.last_name || ""}`.trim() || "this contact"}
-          onDelete={async () => {
-            await api.entities.Customer.delete(c.id);
-            setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
-            reload();
-            toast({ title: "Contact deleted" });
-          }}
-        />
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div ref={containerRef} className="p-4 md:p-8 max-w-7xl mx-auto overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+    <div ref={containerRef} className="page-pad max-w-7xl mx-auto pb-28 md:pb-10 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
       <PullToRefreshIndicator pullProgress={pullProgress} isRefreshing={isRefreshing} pullDist={pullDist} />
       <PageHeader title="Customers" subtitle={`${customers.length} total`} onAdd={openForm} addLabel="Add Customer" />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search customers…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-card border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/80" />
+          <Input
+            placeholder="Search customers…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            aria-label="Search customers"
+            className="pl-11 bg-card border-border text-foreground rounded-md h-11 placeholder:text-muted-foreground/80"
+          />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Customer status filters">
           {["all", "lead", "active", "vip", "inactive"].map(s => (
-            <button key={s} onClick={() => setStatus(s)}
-              className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                statusFilter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-card text-muted-foreground border border-border hover:text-foreground/90"
-              }`}>
+            <FilterChip key={s} active={statusFilter === s} onClick={() => setStatus(s)}>
               {s === "all" ? "All" : s}
-            </button>
+            </FilterChip>
           ))}
         </div>
       </div>
@@ -144,7 +165,7 @@ export default function Customers({ isActive = true }) {
       {filtered.length === 0 && !search && statusFilter === "all" ? (
         <EmptyState icon={Users} title="No customers yet" description="Add your first customer to start tracking relationships." onAction={openForm} actionLabel="Add Customer" />
       ) : filtered.length === 0 ? (
-        <p className="text-center text-muted-foreground py-16 text-sm">No customers match your filter.</p>
+        <EmptyState title="No matches" description="No customers match your filter. Try clearing search or status." className="py-12" />
       ) : shouldVirtualize(filtered.length) ? (
         <VirtualList
           items={filtered}
@@ -163,7 +184,10 @@ export default function Customers({ isActive = true }) {
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
         <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
-          <DialogHeader><DialogTitle className="text-foreground text-lg">Add Customer</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-lg">Add Customer</DialogTitle>
+            <DialogDescription>Add contact details and status for a new customer.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="First Name" value={form.first_name} onChange={e => f("first_name", e.target.value)} />
@@ -186,8 +210,8 @@ export default function Customers({ isActive = true }) {
                 className="mt-1"
               />
             </FormField>
-            {formError && <p className="text-xs text-red-400 bg-red-400/10 rounded-xl px-3 py-2" role="alert">{formError}</p>}
-            <Button onClick={handleSave} disabled={saving} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 disabled:opacity-50">
+            {formError && <p className="text-xs text-red-400 bg-red-400/10 rounded-md px-3 py-2" role="alert">{formError}</p>}
+            <Button onClick={handleSave} disabled={saving} className="w-full h-11">
               {saving ? "Saving…" : "Save Customer"}
             </Button>
           </div>

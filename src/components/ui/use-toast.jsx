@@ -152,6 +152,14 @@ function toast({ duration = TOAST_DURATION, ...props }) {
   };
 }
 
+/** Convenience helpers for consistent toast tone */
+toast.success = (title, description, opts = {}) =>
+  toast({ title, description, variant: "success", ...opts });
+toast.error = (title, description, opts = {}) =>
+  toast({ title, description, variant: "destructive", ...opts });
+toast.info = (title, description, opts = {}) =>
+  toast({ title, description, variant: "default", ...opts });
+
 function useToast() {
   const [state, setState] = useState(memoryState);
 

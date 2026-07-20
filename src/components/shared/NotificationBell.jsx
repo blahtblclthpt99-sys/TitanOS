@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { unreadCount } from "@/lib/notificationsApi";
+import { unreadCount, ensureNotificationCenter } from "@/lib/notificationsApi";
 import NavBadge from "@/components/shared/NavBadge";
 
 export default function NotificationBell({ className = "" }) {
@@ -13,8 +13,11 @@ export default function NotificationBell({ className = "" }) {
     if (!user?.id) { setCount(0); return undefined; }
     let active = true;
     const load = async () => {
-      try { const next = await unreadCount(user.id); if (active) setCount(next); }
-      catch { if (active) setCount(0); }
+      try {
+        await ensureNotificationCenter(user.id);
+        const next = await unreadCount(user.id);
+        if (active) setCount(next);
+      } catch { if (active) setCount(0); }
     };
     load();
     const poll = setInterval(load, 30000);

@@ -5,15 +5,15 @@ import { listMarketplaceListings } from "@/lib/listingsApi";
 
 const TITAN_CLIPS = [
   {
-    id: "driver",
-    title: "Drive & deliver",
-    subtitle: "Uber, DoorDash hotspots + mileage for taxes",
-    cta: "Driver hub",
-    path: "/driver",
-    badge: "New",
-    poster: "https://images.pexels.com/photos/1112598/pexels-photo-1112598.jpeg?auto=compress&cs=tinysrgb&w=600",
+    id: "ai",
+    title: "Ask Titan AI",
+    subtitle: "Schedule, invoice, and chase payments",
+    cta: "Open AI",
+    path: "/assistant",
+    badge: "AI",
+    poster: "https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600",
     video: null,
-    tint: "from-amber-950/85 via-amber-900/30 to-transparent",
+    tint: "from-indigo-950/85 via-indigo-900/35 to-transparent",
   },
   {
     id: "jobs",
@@ -38,17 +38,6 @@ const TITAN_CLIPS = [
     tint: "from-emerald-950/85 via-emerald-900/30 to-transparent",
   },
   {
-    id: "ai",
-    title: "Ask Titan AI",
-    subtitle: "Schedule, invoice, and chase payments",
-    cta: "Open AI",
-    path: "/assistant",
-    badge: "AI",
-    poster: "https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600",
-    video: null,
-    tint: "from-indigo-950/85 via-indigo-900/35 to-transparent",
-  },
-  {
     id: "payments",
     title: "Get paid",
     subtitle: "Checkout links with platform fees",
@@ -69,6 +58,17 @@ const TITAN_CLIPS = [
     poster: "https://images.pexels.com/photos/6476589/pexels-photo-6476589.jpeg?auto=compress&cs=tinysrgb&w=600",
     video: null,
     tint: "from-violet-950/85 via-violet-900/30 to-transparent",
+  },
+  {
+    id: "driver",
+    title: "On the road",
+    subtitle: "Miles, stops & tax sync when you need it",
+    cta: "Driver Hub",
+    path: "/driver",
+    badge: "Tools",
+    poster: "https://images.pexels.com/photos/1112598/pexels-photo-1112598.jpeg?auto=compress&cs=tinysrgb&w=600",
+    video: null,
+    tint: "from-amber-950/85 via-amber-900/30 to-transparent",
   },
 ];
 

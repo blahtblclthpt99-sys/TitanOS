@@ -1,35 +1,28 @@
 import React from "react";
-import Spinner from "@/components/shared/Spinner";
-import { DashboardSkeleton, ListSkeleton } from "@/components/shared/SkeletonLoader";
+import ProgressBar from "@/components/shared/ProgressBar";
+import {
+  CardGridSkeleton,
+  DashboardSkeleton,
+  DetailSkeleton,
+  ListSkeleton,
+} from "@/components/shared/SkeletonLoader";
 
 /**
- * Standardized loading UI for pages.
- * - dashboard: skeleton matching Dashboard layout
- * - list: skeleton rows for list/table pages
- * - detail: centered spinner for detail views
- * - fullscreen: full-screen spinner (auth, suspense)
+ * Full-page loading — skeleton shape + soft progress cue.
  */
-export default function PageLoader({ variant = "list", label = "Loading" }) {
-  if (variant === "dashboard") {
-    return (
-      <div aria-busy="true" aria-live="polite" aria-label={label}>
+export default function PageLoader({ variant = "list", label = "Loading", count }) {
+  return (
+    <div className="page-pad mx-auto w-full max-w-6xl" role="status" aria-live="polite" aria-label={label}>
+      <ProgressBar className="mb-4 max-w-xs" label={label} />
+      {variant === "dashboard" ? (
         <DashboardSkeleton />
-      </div>
-    );
-  }
-
-  if (variant === "list") {
-    return (
-      <div className="p-4 md:p-8 max-w-7xl mx-auto" aria-busy="true" aria-live="polite" aria-label={label}>
-        <div className="h-10 w-48 bg-muted rounded-xl animate-pulse mb-6" />
-        <ListSkeleton count={6} />
-      </div>
-    );
-  }
-
-  if (variant === "detail") {
-    return <Spinner label={label} />;
-  }
-
-  return <Spinner fullScreen label={label} />;
+      ) : variant === "cards" ? (
+        <CardGridSkeleton count={count || 6} />
+      ) : variant === "detail" ? (
+        <DetailSkeleton />
+      ) : (
+        <ListSkeleton count={count || 5} />
+      )}
+    </div>
+  );
 }

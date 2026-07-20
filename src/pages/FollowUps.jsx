@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Check, Send, Mail } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
 import DeleteButton from "@/components/shared/DeleteButton";
+import { useSafeAsync } from "@/hooks/useSafeAsync";
 import {
   createRule,
   deleteQueueItem,
@@ -19,20 +22,19 @@ import {
 
 export default function FollowUps() {
   const { user } = useAuth();
-  const [rules, setRules] = useState([]);
-  const [queue, setQueue] = useState([]);
+  const { data, setData, loading, error, reload } = useSafeAsync(
+    async () => {
+      const [rules, queue] = await Promise.all([listRules(user.id), listQueue(user.id)]);
+      return { rules, queue };
+    },
+    [user?.id],
+    { enabled: Boolean(user?.id), initial: { rules: [], queue: [] } }
+  );
+  const rules = data?.rules ?? [];
+  const queue = data?.queue ?? [];
   const [name, setName] = useState("");
   const [days, setDays] = useState("7");
   const [sendingId, setSendingId] = useState(null);
-
-  const load = async () => {
-    if (!user?.id) return;
-    const [r, q] = await Promise.all([listRules(user.id), listQueue(user.id)]);
-    setRules(r);
-    setQueue(q);
-  };
-
-  useEffect(() => { load(); }, [user?.id]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -42,20 +44,26 @@ export default function FollowUps() {
       delay_days: Number(days),
       message_template: `Hi {customer_name}, checking in from TitanOS.`,
     });
-    setRules([...rules, row]);
+    setData((prev) => ({ ...prev, rules: [...(prev?.rules ?? []), row] }));
     setName("");
   };
 
   const sent = async (row) => {
     const saved = await markQueueSent(user.id, row.id);
-    setQueue(queue.map((item) => (item.id === row.id ? saved : item)));
+    setData((prev) => ({
+      ...prev,
+      queue: (prev?.queue ?? []).map((item) => (item.id === row.id ? saved : item)),
+    }));
   };
 
   const emailSend = async (row) => {
     setSendingId(row.id);
     try {
       const saved = await sendFollowUpNow(user, row);
-      setQueue(queue.map((item) => (item.id === row.id ? saved : item)));
+      setData((prev) => ({
+        ...prev,
+        queue: (prev?.queue ?? []).map((item) => (item.id === row.id ? saved : item)),
+      }));
       toast({
         title: saved.send?.stub ? "Marked sent (email stub)" : "Follow-up sent",
         description: saved.send?.message || "Queue item updated.",
@@ -67,11 +75,20 @@ export default function FollowUps() {
     }
   };
 
+  if (loading) return <PageLoader variant="list" label="Loading follow-ups" />;
+  if (error) return <ErrorState title="Couldn't load follow-ups" onRetry={reload} />;
+
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Follow-ups" subtitle="Turn completed work into repeat business" />
       <div className="flex justify-end mb-4">
-        <Button onClick={async () => { await seedDefaultFollowUpRules(user); load(); }} className="bg-titan-cyan text-black">
+        <Button
+          type="button"
+          onClick={async () => {
+            await seedDefaultFollowUpRules(user);
+            reload();
+          }}
+        >
           Seed defaults
         </Button>
       </div>
@@ -89,7 +106,10 @@ export default function FollowUps() {
                 label={`rule “${rule.name}”`}
                 onDelete={async () => {
                   await deleteRule(user.id, rule.id);
-                  setRules((prev) => prev.filter((r) => r.id !== rule.id));
+                  setData((prev) => ({
+                    ...prev,
+                    rules: (prev?.rules ?? []).filter((r) => r.id !== rule.id),
+                  }));
                 }}
               />
             </div>
@@ -111,7 +131,7 @@ export default function FollowUps() {
                 <p className="text-xs text-muted-foreground mt-1">{new Date(row.scheduled_for).toLocaleDateString()}</p>
               </div>
               <div className="flex flex-col gap-1 items-end">
-                <Button onClick={() => emailSend(row)} size="sm" disabled={sendingId === row.id} className="bg-titan-cyan text-black">
+                <Button onClick={() => emailSend(row)} size="sm" disabled={sendingId === row.id}>
                   <Mail className="w-4 h-4" />{sendingId === row.id ? "…" : "Email"}
                 </Button>
                 <Button onClick={() => sent(row)} size="sm" variant="outline" className="border-border text-foreground">
@@ -121,7 +141,10 @@ export default function FollowUps() {
                   label="this follow-up"
                   onDelete={async () => {
                     await deleteQueueItem(user.id, row.id);
-                    setQueue((prev) => prev.filter((item) => item.id !== row.id));
+                    setData((prev) => ({
+                      ...prev,
+                      queue: (prev?.queue ?? []).filter((item) => item.id !== row.id),
+                    }));
                   }}
                 />
               </div>

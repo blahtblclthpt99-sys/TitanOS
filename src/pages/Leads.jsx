@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Plus, Trash2, UserRound, Upload } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
+import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createLead, deleteLead, listLeads, updateStatus } from "@/lib/leadsApi";
 import { importLeadsFromCsv } from "@/lib/leadImportApi";
 
@@ -13,16 +16,15 @@ const STATUSES = ["new", "called", "emailed", "interested", "scheduled"];
 
 export default function Leads() {
   const { user } = useAuth();
-  const [rows, setRows] = useState([]);
+  const { data: rows = [], setData: setRows, loading, error, reload } = useSafeAsync(
+    () => listLeads(user.id),
+    [user?.id],
+    { enabled: Boolean(user?.id), initial: [] }
+  );
   const [name, setName] = useState("");
   const [filter, setFilter] = useState("all");
   const [csvText, setCsvText] = useState("");
   const [importing, setImporting] = useState(false);
-
-  const load = async () => {
-    if (user?.id) setRows(await listLeads(user.id));
-  };
-  useEffect(() => { load(); }, [user?.id]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -55,7 +57,7 @@ export default function Leads() {
       const result = await importLeadsFromCsv(user, csvText);
       toast({ title: `Imported ${result.count} leads` });
       setCsvText("");
-      load();
+      reload();
     } catch {
       toast({ title: "Import failed", variant: "destructive" });
     } finally {
@@ -63,14 +65,17 @@ export default function Leads() {
     }
   };
 
+  if (loading) return <PageLoader variant="list" label="Loading leads" />;
+  if (error) return <ErrorState title="Couldn't load leads" onRetry={reload} />;
+
   const display = filter === "all" ? rows : rows.filter((row) => row.status === filter);
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Leads" subtitle="Find, qualify, and convert new work" />
       <form onSubmit={add} className="glass rounded-2xl p-4 flex gap-2 mb-4">
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Lead name" className="bg-muted border-border text-foreground" />
-        <Button className="bg-titan-cyan text-black"><Plus className="w-4 h-4" />Add lead</Button>
+        <Button><Plus className="w-4 h-4" />Add lead</Button>
       </form>
 
       <section className="glass rounded-2xl p-4 mb-4 space-y-2">

@@ -25,3 +25,6 @@ dist
 coverage
 .turbo
 .cache
+.lighthouse-tmp
+lighthouse-report.json
+lighthouse-report.html

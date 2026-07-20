@@ -54,7 +54,9 @@ async function buildUser(authUser, profile) {
     company_logo_url: profile?.company_logo_url || "",
     theme_pref: profile?.theme_pref || "system",
     notification_prefs: profile?.notification_prefs || {},
+    marketing_prefs: profile?.marketing_prefs || {},
     privacy_prefs: profile?.privacy_prefs || {},
+    professional_profile: profile?.professional_profile || {},
     community_opt_in: profile?.community_opt_in ?? false,
     referral_code: profile?.referral_code || "",
     referred_by_code: profile?.referred_by_code || "",
@@ -179,6 +181,24 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
+        // Best-effort: log email when client falls back to direct Supabase signup
+        try {
+          const bases = [];
+          const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+          if (configured) bases.push(configured);
+          if (typeof window !== "undefined") bases.push(window.location.origin);
+          bases.push("https://titanos-web.vercel.app");
+          for (const base of [...new Set(bases)]) {
+            const res = await fetch(`${base}/api/signup-emails`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, fullName, source: "supabase_fallback" }),
+            });
+            if (res.ok) break;
+          }
+        } catch {
+          /* ignore logging failures */
+        }
         return {
           session: data.session,
           user: data.user,
@@ -277,7 +297,9 @@ export function createAuthModule() {
         "company_logo_url",
         "theme_pref",
         "notification_prefs",
+        "marketing_prefs",
         "privacy_prefs",
+        "professional_profile",
         "community_opt_in",
         "referral_code",
         "referred_by_code",
@@ -294,10 +316,23 @@ export function createAuthModule() {
       }
 
       if (Object.keys(payload).length > 0) {
-        const { error: profileError } = await supabase
+        let { error: profileError } = await supabase
           .from("profiles")
           .update(payload)
           .eq("id", userId);
+
+        // Older DBs may lack marketing_prefs / professional_profile — retry without them
+        if (profileError && (payload.marketing_prefs !== undefined || payload.professional_profile !== undefined)) {
+          const retry = { ...payload };
+          delete retry.marketing_prefs;
+          delete retry.professional_profile;
+          if (Object.keys(retry).length > 0) {
+            const second = await supabase.from("profiles").update(retry).eq("id", userId);
+            profileError = second.error;
+          } else {
+            profileError = null;
+          }
+        }
         throwIfError(profileError);
       }
 

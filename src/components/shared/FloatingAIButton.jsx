@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, Calendar, FileText, Users, Receipt, MessageSquare, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const SUGGESTIONS = [
   { icon: Calendar, label: "Schedule a job", action: "/jobs?new=1" },
@@ -15,14 +16,31 @@ export default function FloatingAIButton({ onOpenFeedback }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const ref = useRef(null);
+  const reduceMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
+
+  const panelMotion = reduceMotion
+    ? { initial: false, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, y: 12, scale: 0.95 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: 8, scale: 0.95 },
+        transition: { duration: 0.2 },
+      };
 
   return (
     <div
@@ -32,11 +50,10 @@ export default function FloatingAIButton({ onOpenFeedback }) {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
+            {...panelMotion}
             className="rounded-2xl overflow-hidden shadow-lift border border-border bg-card min-w-[220px] max-w-[260px]"
+            role="menu"
+            aria-label="Suggested AI actions"
           >
             <div className="px-3 pt-2.5 pb-1">
               <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">Ask Titan</p>
@@ -46,9 +63,9 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                 <motion.button
                   key={s.label}
                   type="button"
-                  initial={{ opacity: 0, x: 8 }}
+                  initial={reduceMotion ? false : { opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
+                  transition={reduceMotion ? { duration: 0 } : { delay: i * 0.04 }}
                   onClick={() => {
                     setOpen(false);
                     navigate(s.action);
@@ -91,19 +108,33 @@ export default function FloatingAIButton({ onOpenFeedback }) {
 
       <motion.button
         type="button"
-        whileTap={{ scale: 0.92 }}
-        whileHover={{ scale: 1.04 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+        whileHover={reduceMotion ? undefined : { scale: 1.04 }}
         onClick={() => setOpen((p) => !p)}
-        className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lift ai-pulse bg-gradient-to-br from-titan-navy to-titan-electric"
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lift bg-gradient-to-br from-titan-navy to-titan-electric ${reduceMotion ? "" : "ai-pulse"}`}
         aria-label={open ? "Close Titan menu" : "Open Titan AI"}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         <AnimatePresence mode="wait">
           {open ? (
-            <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+            <motion.div
+              key="x"
+              initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={reduceMotion ? undefined : { rotate: 90, opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.15 }}
+            >
               <X className="w-4.5 h-4.5 text-white" />
             </motion.div>
           ) : (
-            <motion.div key="spark" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
+            <motion.div
+              key="spark"
+              initial={reduceMotion ? false : { rotate: 90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={reduceMotion ? undefined : { rotate: -90, opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.15 }}
+            >
               <Sparkles className="w-4.5 h-4.5 text-white" />
             </motion.div>
           )}

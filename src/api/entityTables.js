@@ -48,8 +48,6 @@ export const ENTITY_TABLES = {
   FollowUpRule: "follow_up_rules",
   FollowUpQueue: "follow_up_queue",
   Credential: "credentials",
-  LoyaltyMember: "loyalty_members",
-  LoyaltyEvent: "loyalty_events",
   EmergencyJob: "emergency_jobs",
   EscrowHold: "escrow_holds",
   MarketingAsset: "marketing_assets",

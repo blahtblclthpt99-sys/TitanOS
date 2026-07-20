@@ -1,55 +1,85 @@
-import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 
-/** Mobile FAB for Quick Create (Estimate / Job / Invoice / Customer). */
+/** Mobile FAB — primary create action above bottom nav. */
 export default function QuickCreateFAB() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const ref = useRef(null);
+  const reduceMotion = useReducedMotion();
+  const fabRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        fabRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const first = menuRef.current?.querySelector('[role="menuitem"]');
+    first?.focus?.();
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <div
       ref={ref}
       className="md:hidden fixed z-50 flex flex-col items-center gap-2"
       style={{
-        bottom: "calc(env(safe-area-inset-bottom) + 5.25rem)",
-        left: "50%",
-        transform: "translateX(-50%)",
+        bottom: "calc(env(safe-area-inset-bottom) + 5.5rem)",
+        right: "1rem",
       }}
     >
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            className="mb-1 rounded-2xl border border-border bg-card shadow-lift overflow-hidden min-w-[200px]"
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="mb-1 min-w-[220px] overflow-hidden rounded-lg border border-border bg-card shadow-lift"
+            role="menu"
+            id="quick-create-menu"
+            aria-label="Create"
+            ref={menuRef}
           >
+            <p className="border-b border-border px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Quick create
+            </p>
             {QUICK_CREATE_ACTIONS.map((action, i) => (
               <motion.button
                 key={action.path}
                 type="button"
-                initial={{ opacity: 0, y: 6 }}
+                role="menuitem"
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
+                transition={{ delay: i * 0.03 }}
                 onClick={() => {
                   setOpen(false);
                   navigate(action.path);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left border-b border-border last:border-0 min-h-[48px]"
+                className="flex min-h-[52px] w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left text-sm font-semibold text-foreground transition-colors duration-fast last:border-0 hover:bg-muted active:bg-muted focus-ring"
               >
-                <action.icon className="w-4 h-4 text-primary" />
+                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <action.icon className="h-4 w-4" aria-hidden="true" />
+                </span>
                 {action.label}
               </motion.button>
             ))}
@@ -58,21 +88,34 @@ export default function QuickCreateFAB() {
       </AnimatePresence>
 
       <motion.button
+        ref={fabRef}
         type="button"
-        whileTap={{ scale: 0.92 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.92 }}
         onClick={() => setOpen((v) => !v)}
-        className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lift flex items-center justify-center"
-        aria-label={open ? "Close quick create" : "Quick create"}
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift focus-ring"
+        aria-label={open ? "Close quick create" : "Create new"}
         aria-expanded={open}
+        aria-haspopup="menu"
+        aria-controls="quick-create-menu"
       >
         <AnimatePresence mode="wait">
           {open ? (
-            <motion.span key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ opacity: 0 }}>
-              <X className="w-6 h-6" />
+            <motion.span
+              key="x"
+              initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <X className="h-6 w-6" aria-hidden="true" />
             </motion.span>
           ) : (
-            <motion.span key="plus" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ opacity: 0 }}>
-              <Plus className="w-6 h-6" />
+            <motion.span
+              key="plus"
+              initial={reduceMotion ? false : { rotate: 90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <Plus className="h-6 w-6" aria-hidden="true" />
             </motion.span>
           )}
         </AnimatePresence>

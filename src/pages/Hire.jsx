@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Bookmark, BriefcaseBusiness, CalendarDays, Check, Loader2, MapPin, MessageCircle, Search, Send, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,6 +9,8 @@ import { toast } from "@/components/ui/use-toast";
 import FormField from "@/components/shared/FormField";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import PageShell from "@/components/shared/PageShell";
+import EmptyState from "@/components/shared/EmptyState";
 import ReviewForm from "@/components/shared/ReviewForm";
 import { useAuth } from "@/lib/AuthContext";
 import { SERVICE_CATEGORIES, US_STATES, timeAgo } from "@/lib/platformConstants";
@@ -19,29 +22,69 @@ import {
 } from "@/lib/hireApi";
 
 const BLANK_JOB = { title: "", description: "", category: "General", city: "", state: "", budget_min: "", budget_max: "", deadline: "", imageUrl: "", is_same_day: false, is_urgent: false };
-const fieldClass = "bg-titan-surface2 border-border text-foreground rounded-xl focus:border-titan-cyan/40";
-
-function EmptyPanel({ title, detail, action }) {
-  return <div className="glass rounded-3xl p-12 text-center border border-border"><BriefcaseBusiness className="w-9 h-9 text-titan-cyan mx-auto mb-3" /><p className="font-semibold text-foreground">{title}</p><p className="text-sm text-muted-foreground mt-1">{detail}</p>{action}</div>;
-}
+const fieldClass = "bg-muted border-border text-foreground rounded-md";
 
 function JobCard({ job, saved, onSave, onApply }) {
-  return <article className="glass rounded-2xl p-5 border border-border">
-    <div className="flex justify-between gap-3">
-      <div className="min-w-0"><h2 className="font-semibold text-foreground truncate">{job.title}</h2><p className="text-xs text-titan-cyan mt-1">{job.category}</p>{(job.is_same_day || job.is_urgent) && <div className="flex gap-1 mt-2">{job.is_same_day && <span className="text-[10px] px-2 py-0.5 rounded-full bg-titan-amber/15 text-titan-amber">Same day</span>}{job.is_urgent && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-400/15 text-red-300">Urgent</span>}</div>}</div>
-      <div className="flex items-start gap-2"><button type="button" onClick={() => onSave(job.id)} aria-label={saved ? "Remove saved job" : "Save job"} className="p-1 text-foreground/45 hover:text-titan-cyan"><Bookmark className={`w-5 h-5 ${saved ? "fill-titan-cyan text-titan-cyan" : ""}`} /></button><p className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo(job.created_date || job.created_at)}</p></div>
-    </div>
-    <p className="text-sm text-muted-foreground leading-relaxed mt-3 line-clamp-2">{job.description}</p>
-    <div className="flex justify-between items-end mt-4 pt-3 border-t border-border">
-      <div className="space-y-1 text-xs text-muted-foreground"><p className="flex gap-1 items-center"><MapPin className="w-3 h-3" />{locationLabel(job.city, job.state) || "Location not provided"}</p>{job.deadline && <p className="flex gap-1 items-center"><CalendarDays className="w-3 h-3" />Due {new Date(`${job.deadline}T12:00:00`).toLocaleDateString()}</p>}</div>
-      <div className="text-right"><p className="font-bold text-titan-cyan">{formatBudget(job)}</p><Button onClick={() => onApply(job)} className="mt-2 bg-titan-cyan text-black h-8">Apply</Button></div>
-    </div>
-  </article>;
+  return (
+    <article className="titan-surface p-5">
+      <div className="flex justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold text-foreground truncate">{job.title}</h2>
+          <p className="text-xs text-primary mt-1">{job.category}</p>
+          {(job.is_same_day || job.is_urgent) && (
+            <div className="flex gap-1 mt-2">
+              {job.is_same_day && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-warning/15 text-warning">Same day</span>
+              )}
+              {job.is_urgent && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-destructive/15 text-destructive">Urgent</span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            onClick={() => onSave(job.id)}
+            aria-label={saved ? "Remove saved job" : "Save job"}
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary focus-ring"
+          >
+            <Bookmark className={`w-5 h-5 ${saved ? "fill-primary text-primary" : ""}`} />
+          </button>
+          <p className="text-xs text-muted-foreground whitespace-nowrap pt-3">
+            {timeAgo(job.created_date || job.created_at)}
+          </p>
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground leading-relaxed mt-3 line-clamp-2">{job.description}</p>
+      <div className="flex justify-between items-end mt-4 pt-3 border-t border-border">
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p className="flex gap-1 items-center">
+            <MapPin className="w-3 h-3" />
+            {locationLabel(job.city, job.state) || "Location not provided"}
+          </p>
+          {job.deadline && (
+            <p className="flex gap-1 items-center">
+              <CalendarDays className="w-3 h-3" />
+              Due {new Date(`${job.deadline}T12:00:00`).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="font-bold text-primary">{formatBudget(job)}</p>
+          <Button onClick={() => onApply(job)} size="sm" className="mt-2">
+            Apply
+          </Button>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function Hire() {
   const { user, isLoadingAuth, authChecked } = useAuth();
-  const [tab, setTab] = useState("browse");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => (searchParams.get("new") === "1" ? "post" : "browse"));
   const [filters, setFilters] = useState({ search: "", category: "All", state: "" });
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -56,6 +99,15 @@ export default function Hire() {
   const [messageTarget, setMessageTarget] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageBody, setMessageBody] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setTab("post");
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = async () => {
     if (!user?.id) return;
@@ -129,21 +181,183 @@ export default function Hire() {
     } catch { toast({ variant: "destructive", title: "Couldn't send message" }); } finally { setSaving(false); }
   };
 
+
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading Hire" />;
-  const tabs = [["browse", "Browse Jobs"], ["saved", "Saved"], ["post", "Post a Job"], ["posts", "My Posts"], ["applications", "My Applications"]];
-  return <div className="relative p-4 md:p-8 max-w-6xl mx-auto pb-32">
-    <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-titan-cyan/8 blur-[100px]" /></div>
-    <div className="relative">
-      <PageHeader title="Hire" subtitle="Find local help and grow your service network" />
-      {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 p-4 border border-titan-cyan/20 flex justify-between gap-3"><div><p className="font-semibold text-foreground">{betaBadgeLabel()}</p><p className="text-xs text-muted-foreground mt-1">Post jobs and connect with local professionals at no cost.</p></div><span className="text-xs font-medium text-titan-cyan whitespace-nowrap">No fees</span></div>}
-      <div className="flex overflow-x-auto gap-2 mb-6 border-b border-border">{tabs.map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === id ? "border-titan-cyan text-titan-cyan" : "border-transparent text-muted-foreground hover:text-foreground/90"}`}>{label}</button>)}</div>
-      {tab === "browse" && <><div className="glass rounded-2xl p-4 mb-6 border border-border grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" /><Input value={filters.search} onChange={(e) => updateFilter("search", e.target.value)} placeholder="Search jobs" className={`${fieldClass} pl-9`} /></div><select value={filters.category} onChange={(e) => updateFilter("category", e.target.value)} className={fieldClass}><option value="All">All categories</option>{SERVICE_CATEGORIES.map((value) => <option key={value}>{value}</option>)}</select><select value={filters.state} onChange={(e) => updateFilter("state", e.target.value)} className={fieldClass}><option value="">All states</option>{US_STATES.map((value) => <option key={value}>{value}</option>)}</select></div>{loading ? <PageLoader variant="list" label="Loading jobs" /> : jobs.length ? <div className="grid md:grid-cols-2 gap-4">{jobs.map((job) => <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} onSave={saveToggle} onApply={openApply} />)}</div> : <EmptyPanel title="No jobs found" detail="Try broadening your search or check back soon." />}</>}
-      {tab === "saved" && (loading ? <PageLoader variant="list" label="Loading saved jobs" /> : jobs.length ? <div className="grid md:grid-cols-2 gap-4">{jobs.map((job) => <JobCard key={job.id} job={job} saved onSave={saveToggle} onApply={openApply} />)}</div> : <EmptyPanel title="No saved jobs" detail="Save jobs from Browse to revisit them here." action={<Button onClick={() => setTab("browse")} className="mt-4 bg-titan-cyan text-black">Browse Jobs</Button>} />)}
-      {tab === "post" && <form onSubmit={saveJob} className="glass rounded-3xl p-5 md:p-7 border border-border max-w-3xl"><div className="grid sm:grid-cols-2 gap-4"><FormField label="Job title" value={jobForm.title} onChange={(e) => setJobForm((x) => ({ ...x, title: e.target.value }))} required /><FormField label="Category"><select value={jobForm.category} onChange={(e) => setJobForm((x) => ({ ...x, category: e.target.value }))} className={fieldClass}>{SERVICE_CATEGORIES.map((value) => <option key={value}>{value}</option>)}</select></FormField></div><FormField label="Description"><Textarea required rows={5} value={jobForm.description} onChange={(e) => setJobForm((x) => ({ ...x, description: e.target.value }))} className={fieldClass} /></FormField><div className="grid sm:grid-cols-2 gap-4"><FormField label="City" value={jobForm.city} onChange={(e) => setJobForm((x) => ({ ...x, city: e.target.value }))} /><FormField label="State"><select value={jobForm.state} onChange={(e) => setJobForm((x) => ({ ...x, state: e.target.value }))} className={fieldClass}><option value="">Select state</option>{US_STATES.map((value) => <option key={value}>{value}</option>)}</select></FormField><FormField label="Minimum budget"><Input type="number" min="0" value={jobForm.budget_min} onChange={(e) => setJobForm((x) => ({ ...x, budget_min: e.target.value }))} className={fieldClass} /></FormField><FormField label="Maximum budget"><Input type="number" min="0" value={jobForm.budget_max} onChange={(e) => setJobForm((x) => ({ ...x, budget_max: e.target.value }))} className={fieldClass} /></FormField><FormField label="Deadline"><Input type="date" value={jobForm.deadline} onChange={(e) => setJobForm((x) => ({ ...x, deadline: e.target.value }))} className={fieldClass} /></FormField><FormField label="Image URL"><Input type="url" placeholder="https://..." value={jobForm.imageUrl} onChange={(e) => setJobForm((x) => ({ ...x, imageUrl: e.target.value }))} className={fieldClass} /></FormField></div><div className="flex flex-wrap gap-5 mt-4 text-sm text-foreground/85"><label className="flex items-center gap-2"><input type="checkbox" checked={jobForm.is_same_day} onChange={(e) => setJobForm((x) => ({ ...x, is_same_day: e.target.checked }))} className="accent-cyan-400" />Need service same day</label><label className="flex items-center gap-2"><input type="checkbox" checked={jobForm.is_urgent} onChange={(e) => setJobForm((x) => ({ ...x, is_urgent: e.target.checked }))} className="accent-cyan-400" />Urgent request</label></div><Button disabled={saving} type="submit" className="w-full mt-5 bg-titan-cyan text-black font-semibold">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Post Job"}</Button></form>}
-      {tab === "posts" && (loading ? <PageLoader variant="list" label="Loading your posts" /> : jobs.length ? <div className="space-y-4">{jobs.map((job) => <section key={job.id} className="glass rounded-2xl p-5 border border-border"><div className="flex justify-between gap-3"><div><h2 className="font-semibold text-foreground">{job.title}</h2><p className="text-xs text-muted-foreground mt-1">{job.category} · {formatBudget(job)}</p></div><span className={`text-xs px-2 py-1 rounded-lg h-fit ${job.status === "hired" ? "bg-emerald-400/15 text-emerald-400" : "bg-titan-cyan/10 text-titan-cyan"}`}>{job.status}</span></div><div className="mt-4 pt-4 border-t border-border"><p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Applications ({applicants[job.id]?.length || 0})</p>{applicants[job.id]?.length ? applicants[job.id].map((app) => <div key={app.id} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-t border-border first:border-0"><div className="flex-1"><p className="text-sm text-foreground flex items-center gap-1"><UserRound className="w-3 h-3 text-muted-foreground" />{app.worker_name || "Applicant"}</p><p className="text-xs text-muted-foreground mt-1">{app.message || "No message provided"}{app.bid_amount ? ` · Bid: $${app.bid_amount}` : ""}</p></div><div className="flex gap-2">{<Button onClick={() => openMessages(job, app.worker_id, app.worker_name || "Applicant")} variant="outline" className="h-8 border-border text-foreground"><MessageCircle className="w-4 h-4 mr-1" />Message</Button>}{app.status === "accepted" ? <span className="text-xs text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" />Hired</span> : job.status === "open" && <Button onClick={() => hire(job, app)} disabled={saving} className="bg-titan-cyan text-black h-8">Hire</Button>}</div></div>) : <p className="text-sm text-muted-foreground">No applications yet.</p>}{job.status === "hired" && job.hired_worker_id && <div className="mt-4"><ReviewForm revieweeId={job.hired_worker_id} reviewerRole="customer" hireJobId={job.id} /></div>}</div></section>)}</div> : <EmptyPanel title="No jobs posted" detail="Post a job to find the right local professional." action={<Button onClick={() => setTab("post")} className="mt-4 bg-titan-cyan text-black">Post a Job</Button>} />)}
-      {tab === "applications" && (loading ? <PageLoader variant="list" label="Loading applications" /> : applications.length ? <div className="space-y-3">{applications.map((app) => { const job = jobById[app.hire_job_id]; return <article key={app.id} className="glass rounded-2xl p-5 border border-border"><div className="flex justify-between gap-3"><div><h2 className="font-semibold text-foreground">{job?.title || app.hire_job_title || "Job application"}</h2><p className="text-xs text-muted-foreground mt-1">{app.message || "Application submitted"}{app.bid_amount ? ` · Bid: $${app.bid_amount}` : ""}</p></div><span className={`text-xs h-fit px-2 py-1 rounded-lg ${app.status === "accepted" ? "bg-emerald-400/15 text-emerald-400" : "bg-muted text-muted-foreground"}`}>{app.status}</span></div>{job && <div className="mt-4 flex flex-wrap gap-3"><Button onClick={() => openMessages(job, job.customer_id, job.customer_name || "Customer")} variant="outline" className="border-border text-foreground"><MessageCircle className="w-4 h-4 mr-2" />Message customer</Button>{app.status === "accepted" && <ReviewForm revieweeId={job.customer_id} reviewerRole="worker" hireJobId={job.id} />}</div>}</article>; })}</div> : <EmptyPanel title="No applications yet" detail="Browse open jobs to find your next opportunity." action={<Button onClick={() => setTab("browse")} className="mt-4 bg-titan-cyan text-black">Browse Jobs</Button>} />)}
-    </div>
-    <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}><DialogContent className="bg-titan-surface1 border-border text-foreground max-w-md rounded-2xl">{selectedJob && <><DialogHeader><DialogTitle>Apply to {selectedJob.title}</DialogTitle></DialogHeader><form onSubmit={submitApplication} className="space-y-4"><FormField label="Message"><Textarea required rows={4} value={applyForm.message} onChange={(e) => setApplyForm((x) => ({ ...x, message: e.target.value }))} placeholder="Introduce yourself and describe your experience." className={fieldClass} /></FormField><FormField label="Your bid (optional)"><Input type="number" min="0" value={applyForm.bid_amount} onChange={(e) => setApplyForm((x) => ({ ...x, bid_amount: e.target.value }))} className={fieldClass} /></FormField><Button disabled={saving} type="submit" className="w-full bg-titan-cyan text-black">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4 mr-2" />Send Application</>}</Button></form></>}</DialogContent></Dialog>
-    <Dialog open={!!messageTarget} onOpenChange={(open) => !open && setMessageTarget(null)}><DialogContent className="bg-titan-surface1 border-border text-foreground max-w-md rounded-2xl">{messageTarget && <><DialogHeader><DialogTitle>Message {messageTarget.recipientName}</DialogTitle></DialogHeader><div className="max-h-64 overflow-y-auto space-y-3 pr-1">{messages.filter((message) => message.sender_id === user.id || message.sender_id === messageTarget.recipientId).map((message) => <div key={message.id} className={`rounded-xl p-3 text-sm ${message.sender_id === user.id ? "bg-titan-cyan/15 ml-8" : "bg-muted mr-8"}`}><p className="text-foreground">{message.body}</p></div>)}</div><form onSubmit={submitMessage} className="flex gap-2 pt-2"><Textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} placeholder="Write a message…" className={fieldClass} rows={2} /><Button type="submit" disabled={saving || !messageBody.trim()} className="bg-titan-cyan text-black self-end"><Send className="w-4 h-4" /></Button></form></>}</DialogContent></Dialog>
-  </div>;
+  const tabs = [
+    ["browse", "Browse"],
+    ["saved", "Saved"],
+    ["post", "Post a job"],
+    ["posts", "My posts"],
+    ["applications", "Applications"],
+  ];
+
+  return (
+    <PageShell maxWidth="lg">
+      <PageHeader
+        eyebrow="Grow"
+        title="Hire workers"
+        subtitle="Post hauls and gigs, or apply to work — find local help for your service business."
+      />
+      {betaBadgeLabel() && (
+        <div className="titan-surface mb-5 p-4 flex justify-between gap-3">
+          <div>
+            <p className="font-semibold text-foreground">{betaBadgeLabel()}</p>
+            <p className="text-xs text-muted-foreground mt-1">Post jobs and connect with local professionals at no cost.</p>
+          </div>
+          <span className="text-xs font-medium text-primary whitespace-nowrap">No fees</span>
+        </div>
+      )}
+      <div className="flex overflow-x-auto gap-1 mb-6 border-b border-border" role="tablist" aria-label="Hire sections">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors focus-ring ${
+              tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "browse" && (
+        <>
+          <div className="titan-surface p-4 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+              <Input value={filters.search} onChange={(e) => updateFilter("search", e.target.value)} placeholder="Search jobs" aria-label="Search jobs" className={`${fieldClass} pl-9`} />
+            </div>
+            <select value={filters.category} onChange={(e) => updateFilter("category", e.target.value)} className={fieldClass} aria-label="Category">
+              <option value="All">All categories</option>
+              {SERVICE_CATEGORIES.map((value) => <option key={value}>{value}</option>)}
+            </select>
+            <select value={filters.state} onChange={(e) => updateFilter("state", e.target.value)} className={fieldClass} aria-label="State">
+              <option value="">All states</option>
+              {US_STATES.map((value) => <option key={value}>{value}</option>)}
+            </select>
+          </div>
+          {loading ? <PageLoader variant="list" label="Loading jobs" /> : jobs.length ? (
+            <div className="grid md:grid-cols-2 gap-4">{jobs.map((job) => <JobCard key={job.id} job={job} saved={savedIds.has(job.id)} onSave={saveToggle} onApply={openApply} />)}</div>
+          ) : (
+            <EmptyState icon={BriefcaseBusiness} title="No jobs found" description="Try broadening your search or check back soon." />
+          )}
+        </>
+      )}
+      {tab === "saved" && (loading ? <PageLoader variant="list" label="Loading saved jobs" /> : jobs.length ? (
+        <div className="grid md:grid-cols-2 gap-4">{jobs.map((job) => <JobCard key={job.id} job={job} saved onSave={saveToggle} onApply={openApply} />)}</div>
+      ) : (
+        <EmptyState icon={BriefcaseBusiness} title="No saved jobs" description="Save jobs from Browse to revisit them here." onAction={() => setTab("browse")} actionLabel="Browse jobs" />
+      ))}
+      {tab === "post" && (
+        <form onSubmit={saveJob} className="titan-surface p-5 md:p-7 max-w-3xl">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FormField label="Job title" value={jobForm.title} onChange={(e) => setJobForm((x) => ({ ...x, title: e.target.value }))} required />
+            <FormField label="Category"><select value={jobForm.category} onChange={(e) => setJobForm((x) => ({ ...x, category: e.target.value }))} className={fieldClass}>{SERVICE_CATEGORIES.map((value) => <option key={value}>{value}</option>)}</select></FormField>
+          </div>
+          <FormField label="Description" className="mt-4"><Textarea required rows={5} value={jobForm.description} onChange={(e) => setJobForm((x) => ({ ...x, description: e.target.value }))} className={fieldClass} /></FormField>
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            <FormField label="City" value={jobForm.city} onChange={(e) => setJobForm((x) => ({ ...x, city: e.target.value }))} />
+            <FormField label="State"><select value={jobForm.state} onChange={(e) => setJobForm((x) => ({ ...x, state: e.target.value }))} className={fieldClass}><option value="">Select state</option>{US_STATES.map((value) => <option key={value}>{value}</option>)}</select></FormField>
+            <FormField label="Minimum budget"><Input type="number" min="0" value={jobForm.budget_min} onChange={(e) => setJobForm((x) => ({ ...x, budget_min: e.target.value }))} className={fieldClass} /></FormField>
+            <FormField label="Maximum budget"><Input type="number" min="0" value={jobForm.budget_max} onChange={(e) => setJobForm((x) => ({ ...x, budget_max: e.target.value }))} className={fieldClass} /></FormField>
+            <FormField label="Deadline"><Input type="date" value={jobForm.deadline} onChange={(e) => setJobForm((x) => ({ ...x, deadline: e.target.value }))} className={fieldClass} /></FormField>
+            <FormField label="Image URL" hint="Optional"><Input type="url" placeholder="https://..." value={jobForm.imageUrl} onChange={(e) => setJobForm((x) => ({ ...x, imageUrl: e.target.value }))} className={fieldClass} /></FormField>
+          </div>
+          <div className="flex flex-wrap gap-5 mt-4 text-sm">
+            <label className="flex items-center gap-2 min-h-[44px]"><input type="checkbox" checked={jobForm.is_same_day} onChange={(e) => setJobForm((x) => ({ ...x, is_same_day: e.target.checked }))} className="accent-primary" />Need service same day</label>
+            <label className="flex items-center gap-2 min-h-[44px]"><input type="checkbox" checked={jobForm.is_urgent} onChange={(e) => setJobForm((x) => ({ ...x, is_urgent: e.target.checked }))} className="accent-primary" />Urgent request</label>
+          </div>
+          <Button disabled={saving} type="submit" className="w-full mt-5">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Post job"}</Button>
+        </form>
+      )}
+      {tab === "posts" && (loading ? <PageLoader variant="list" label="Loading your posts" /> : jobs.length ? (
+        <div className="space-y-4">{jobs.map((job) => (
+          <section key={job.id} className="titan-surface p-5">
+            <div className="flex justify-between gap-3">
+              <div><h2 className="font-semibold text-foreground">{job.title}</h2><p className="text-xs text-muted-foreground mt-1">{job.category} · {formatBudget(job)}</p></div>
+              <span className={`text-xs px-2 py-1 rounded-md h-fit ${job.status === "hired" ? "bg-success/15 text-success" : "bg-primary/10 text-primary"}`}>{job.status}</span>
+            </div>
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Applications ({applicants[job.id]?.length || 0})</p>
+              {applicants[job.id]?.length ? applicants[job.id].map((app) => (
+                <div key={app.id} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-t border-border first:border-0">
+                  <div className="flex-1">
+                    <p className="text-sm text-foreground flex items-center gap-1"><UserRound className="w-3 h-3 text-muted-foreground" />{app.worker_name || "Applicant"}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{app.message || "No message provided"}{app.bid_amount ? ` · Bid: $${app.bid_amount}` : ""}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => openMessages(job, app.worker_id, app.worker_name || "Applicant")} variant="outline" size="sm"><MessageCircle className="w-4 h-4 mr-1" />Message</Button>
+                    {app.status === "accepted" ? <span className="text-xs text-success flex items-center gap-1"><Check className="w-3 h-3" />Hired</span> : job.status === "open" && <Button onClick={() => hire(job, app)} disabled={saving} size="sm">Hire</Button>}
+                  </div>
+                </div>
+              )) : <p className="text-sm text-muted-foreground">No applications yet.</p>}
+              {job.status === "hired" && job.hired_worker_id && <div className="mt-4"><ReviewForm revieweeId={job.hired_worker_id} reviewerRole="customer" hireJobId={job.id} /></div>}
+            </div>
+          </section>
+        ))}</div>
+      ) : (
+        <EmptyState icon={BriefcaseBusiness} title="No jobs posted" description="Post a job to find the right local professional." onAction={() => setTab("post")} actionLabel="Post a job" />
+      ))}
+      {tab === "applications" && (loading ? <PageLoader variant="list" label="Loading applications" /> : applications.length ? (
+        <div className="space-y-3">{applications.map((app) => {
+          const job = jobById[app.hire_job_id];
+          return (
+            <article key={app.id} className="titan-surface p-5">
+              <div className="flex justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold text-foreground">{job?.title || app.hire_job_title || "Job application"}</h2>
+                  <p className="text-xs text-muted-foreground mt-1">{app.message || "Application submitted"}{app.bid_amount ? ` · Bid: $${app.bid_amount}` : ""}</p>
+                </div>
+                <span className={`text-xs h-fit px-2 py-1 rounded-md ${app.status === "accepted" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{app.status}</span>
+              </div>
+              {job && (
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button onClick={() => openMessages(job, job.customer_id, job.customer_name || "Customer")} variant="outline"><MessageCircle className="w-4 h-4 mr-2" />Message customer</Button>
+                  {app.status === "accepted" && <ReviewForm revieweeId={job.customer_id} reviewerRole="worker" hireJobId={job.id} />}
+                </div>
+              )}
+            </article>
+          );
+        })}</div>
+      ) : (
+        <EmptyState icon={BriefcaseBusiness} title="No applications yet" description="Browse open jobs to find your next opportunity." onAction={() => setTab("browse")} actionLabel="Browse jobs" />
+      ))}
+
+      <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-lg">
+          {selectedJob && (
+            <>
+              <DialogHeader><DialogTitle>Apply to {selectedJob.title}</DialogTitle></DialogHeader>
+              <form onSubmit={submitApplication} className="space-y-4">
+                <FormField label="Message"><Textarea required rows={4} value={applyForm.message} onChange={(e) => setApplyForm((x) => ({ ...x, message: e.target.value }))} placeholder="Introduce yourself and describe your experience." className={fieldClass} /></FormField>
+                <FormField label="Your bid (optional)"><Input type="number" min="0" value={applyForm.bid_amount} onChange={(e) => setApplyForm((x) => ({ ...x, bid_amount: e.target.value }))} className={fieldClass} /></FormField>
+                <Button disabled={saving} type="submit" className="w-full">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4 mr-2" />Send application</>}</Button>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!messageTarget} onOpenChange={(open) => !open && setMessageTarget(null)}>
+        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-lg">
+          {messageTarget && (
+            <>
+              <DialogHeader><DialogTitle>Message {messageTarget.recipientName}</DialogTitle></DialogHeader>
+              <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
+                {messages.filter((message) => message.sender_id === user.id || message.sender_id === messageTarget.recipientId).map((message) => (
+                  <div key={message.id} className={`rounded-md p-3 text-sm ${message.sender_id === user.id ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`}><p className="text-foreground">{message.body}</p></div>
+                ))}
+              </div>
+              <form onSubmit={submitMessage} className="flex gap-2 pt-2">
+                <Textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} placeholder="Write a message…" className={fieldClass} rows={2} aria-label="Message" />
+                <Button type="submit" disabled={saving || !messageBody.trim()} className="self-end" aria-label="Send"><Send className="w-4 h-4" /></Button>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </PageShell>
+  );
 }

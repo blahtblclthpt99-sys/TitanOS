@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.js";
+import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 
 /**
  * Server-side registration that bypasses Supabase's built-in email rate limit.
@@ -45,6 +46,9 @@ export default async function handler(req, res) {
       const status = /already|registered|exists/i.test(msg) ? 409 : 400;
       return res.status(status).json({ error: msg });
     }
+
+    // Persist signup email to data/signup-emails.txt + durable DB (never blocks signup)
+    await recordSignupEmail(admin, { email, fullName, source: "register" });
 
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const anon = getSupabaseAnonKey();

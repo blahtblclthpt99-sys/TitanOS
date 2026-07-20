@@ -157,10 +157,10 @@ export default function TaxCenter({ isActive = true }) {
       <button
         type="button"
         onClick={() => navigate("/receipts")}
-        className="mt-4 w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover"
+        className="mt-4 w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover titan-surface-interactive"
       >
-        <div className="w-10 h-10 rounded-xl bg-titan-cyan/10 flex items-center justify-center">
-          <ScanLine className="w-5 h-5 text-titan-cyan" />
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <ScanLine className="w-5 h-5 text-primary" />
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground">Scan receipt for write-off</p>
@@ -172,7 +172,7 @@ export default function TaxCenter({ isActive = true }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 mb-8">
         {[
           { label: "Gross Income",     value: grossIncome,      color: "text-emerald-400", bg: "bg-emerald-400/10",  icon: DollarSign },
-          { label: "Total Write-offs", value: allDeductions,    color: "text-titan-cyan",  bg: "bg-titan-cyan/10",   icon: TrendingDown },
+          { label: "Total Write-offs", value: allDeductions,    color: "text-primary",  bg: "bg-primary/10",   icon: TrendingDown },
           { label: "Net Taxable",      value: taxableIncome,    color: "text-titan-amber", bg: "bg-titan-amber/10",  icon: FileText },
           { label: "Est. Tax Owed",    value: totalTaxEstimate, color: "text-red-400",     bg: "bg-red-400/10",      icon: Calculator },
         ].map((card, i) => (
@@ -194,14 +194,14 @@ export default function TaxCenter({ isActive = true }) {
         {/* ── Tax Breakdown ── */}
         <div className="glass rounded-2xl p-6">
           <h3 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Calculator className="w-4 h-4 text-titan-cyan" /> Tax Breakdown
+            <Calculator className="w-4 h-4 text-primary" /> Tax Breakdown
           </h3>
           <div className="space-y-3 text-sm">
             {[
               { label: "Gross Income",              value: grossIncome,        color: "text-foreground" },
-              { label: `Write-offs & Deductions`,   value: -allDeductions,     color: "text-titan-cyan" },
+              { label: `Write-offs & Deductions`,   value: -allDeductions,     color: "text-primary" },
               { label: "Net Profit",                value: netProfit,          color: "text-foreground", border: true },
-              { label: "½ SE Tax Deduction",        value: -seDeduction,       color: "text-titan-cyan" },
+              { label: "½ SE Tax Deduction",        value: -seDeduction,       color: "text-primary" },
               { label: "Taxable Income",            value: taxableIncome,      color: "text-foreground", border: true },
               { label: "Self-Employment Tax (15.3%)",value: seTax,             color: "text-red-400" },
               { label: "Federal Income Tax (est.)", value: incomeTax,          color: "text-red-400" },
@@ -221,18 +221,18 @@ export default function TaxCenter({ isActive = true }) {
         {/* ── Deductions by Category ── */}
         <div className="glass rounded-2xl p-6">
           <h3 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-titan-cyan" /> Write-offs by Category
+            <TrendingDown className="w-4 h-4 text-primary" /> Write-offs by Category
           </h3>
           {mileageDeduction > 0 && (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-titan-cyan/10 border border-titan-cyan/20 mb-3 mt-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20 mb-3 mt-3">
               <div className="flex items-center gap-2">
-                <Car className="w-4 h-4 text-titan-cyan" />
+                <Car className="w-4 h-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Mileage Deduction</p>
                   <p className="text-xs text-muted-foreground">{totalMiles.toLocaleString()} miles × $0.67</p>
                 </div>
               </div>
-              <p className="text-sm font-semibold text-titan-cyan">${Math.round(mileageDeduction).toLocaleString()}</p>
+              <p className="text-sm font-semibold text-primary">${Math.round(mileageDeduction).toLocaleString()}</p>
             </div>
           )}
           {byCategory.length === 0 && mileageDeduction === 0 ? (
@@ -256,7 +256,7 @@ export default function TaxCenter({ isActive = true }) {
                         <span className="text-xs font-semibold text-foreground">${Math.round(total).toLocaleString()}</span>
                       </div>
                       <div className="h-1 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-titan-cyan/60 transition-all" style={{ width: `${pct}%` }} />
+                        <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   </div>
@@ -279,7 +279,7 @@ export default function TaxCenter({ isActive = true }) {
       {/* ── Quarterly Estimated Taxes ── */}
       <div className="glass rounded-2xl p-6 mb-6">
         <h3 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-titan-cyan" /> Quarterly Estimated Tax Schedule
+          <FileText className="w-4 h-4 text-primary" /> Quarterly Estimated Tax Schedule
         </h3>
         <p className="text-xs text-muted-foreground mb-4">As a 1099 worker, pay estimated taxes each quarter to avoid penalties.</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -290,7 +290,7 @@ export default function TaxCenter({ isActive = true }) {
             );
             const isPast = i < currentQuarterIndex;
             return (
-              <div key={q.label} className={`rounded-xl p-4 border ${isPast ? "bg-white/[0.02] border-border" : "bg-titan-cyan/5 border-titan-cyan/20"}`}>
+              <div key={q.label} className={`rounded-xl p-4 border ${isPast ? "bg-white/[0.02] border-border" : "bg-primary/5 border-primary/20"}`}>
                 <p className="text-xs text-muted-foreground mb-1">{q.label}</p>
                 <p className="text-sm font-semibold text-foreground tabular-nums">${Math.round(q.estimated_tax).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">Income: ${Math.round(q.income).toLocaleString()}</p>
@@ -319,7 +319,7 @@ export default function TaxCenter({ isActive = true }) {
               <div className="w-8 h-8 rounded-lg bg-titan-amber/10 flex items-center justify-center"><Home className="w-4 h-4 text-titan-amber" /></div>
               <div>
                 <p className="text-sm font-medium text-foreground">Home Office</p>
-                <p className="text-xs text-muted-foreground">$5/sq ft · up to 300 sq ft = <span className="text-titan-cyan font-semibold">$1,500</span> max deduction</p>
+                <p className="text-xs text-muted-foreground">$5/sq ft · up to 300 sq ft = <span className="text-primary font-semibold">$1,500</span> max deduction</p>
               </div>
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function TaxCenter({ isActive = true }) {
               <div className="w-8 h-8 rounded-lg bg-titan-amber/10 flex items-center justify-center"><Phone className="w-4 h-4 text-titan-amber" /></div>
               <div>
                 <p className="text-sm font-medium text-foreground">Phone & Internet</p>
-                <p className="text-xs text-muted-foreground">Log business-use % — 80% use on a <span className="text-foreground">$150/mo</span> plan = <span className="text-titan-cyan font-semibold">${Math.round(150 * 0.8 * 12).toLocaleString()}/yr</span></p>
+                <p className="text-xs text-muted-foreground">Log business-use % — 80% use on a <span className="text-foreground">$150/mo</span> plan = <span className="text-primary font-semibold">${Math.round(150 * 0.8 * 12).toLocaleString()}/yr</span></p>
               </div>
             </div>
           </div>
@@ -357,7 +357,7 @@ export default function TaxCenter({ isActive = true }) {
                 <p className="text-sm font-medium text-foreground">SEP-IRA / Solo 401(k)</p>
                 <p className="text-xs text-muted-foreground">
                   Contribute up to 25% of net earnings — on <span className="text-foreground">${Math.round(netProfit).toLocaleString()}</span> net that's up to{" "}
-                  <span className="text-titan-cyan font-semibold">${Math.round(netProfit * 0.25).toLocaleString()}</span> tax-free
+                  <span className="text-primary font-semibold">${Math.round(netProfit * 0.25).toLocaleString()}</span> tax-free
                 </p>
               </div>
             </div>

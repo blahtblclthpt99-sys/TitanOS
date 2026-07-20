@@ -13,6 +13,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
 import { buildFinanceSummary, buildExpenseCategoryData } from "@/lib/finance-metrics";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const FinancesExpenseChart = lazy(() => import("@/components/charts/FinancesExpenseChart"));
 const EXPENSE_CATS = ["fuel","supplies","equipment","vehicle","insurance","marketing","payroll","rent","utilities","other"];
@@ -68,21 +69,21 @@ export default function Finances() {
   const categoryData = buildExpenseCategoryData(expenses);
 
   const summaryCards = [
-    { label: "Revenue",     value: `$${totalRevenue.toLocaleString()}`,  icon: TrendingUp,   color: "text-emerald-400",  bg: "bg-emerald-400/10" },
-    { label: "Expenses",    value: `$${totalExpenses.toLocaleString()}`, icon: TrendingDown, color: "text-red-400",      bg: "bg-red-400/10" },
+    { label: "Revenue",     value: formatCurrency(totalRevenue),  icon: TrendingUp,   color: "text-emerald-400",  bg: "bg-emerald-400/10" },
+    { label: "Expenses",    value: formatCurrency(totalExpenses), icon: TrendingDown, color: "text-red-400",      bg: "bg-red-400/10" },
     { label: profit >= 0 ? "Profit" : "Loss",
-      value: `$${Math.abs(profit).toLocaleString()}`,
+      value: formatCurrency(Math.abs(profit)),
       icon: DollarSign,
       color: profit >= 0 ? "text-emerald-400" : "text-red-400",
       bg:    profit >= 0 ? "bg-emerald-400/10" : "bg-red-400/10" },
-    { label: "Outstanding", value: `$${outstanding.toLocaleString()}`,   icon: Receipt,      color: "text-titan-amber", bg: "bg-titan-amber/10" },
+    { label: "Outstanding", value: formatCurrency(outstanding),   icon: Receipt,      color: "text-titan-amber", bg: "bg-titan-amber/10" },
   ];
 
   if (loading) return <PageLoader variant="list" label="Loading finances" />;
   if (error) return <ErrorState title="Couldn't load finances" onRetry={reload} />;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+    <div className="page-pad max-w-7xl mx-auto">
       <PageHeader title="Finances" subtitle="Profit & loss overview" onAdd={() => setShowForm(true)} addLabel="Add Expense" />
       <button
         type="button"
@@ -180,14 +181,23 @@ export default function Finances() {
               {form.receipt_url ? (
                 <div className="relative rounded-xl overflow-hidden border border-border">
                   <img src={form.receipt_url} alt="Receipt" className="w-full h-40 object-cover" />
-                  <button onClick={() => f("receipt_url", "")}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors">
+                  <button
+                    type="button"
+                    aria-label="Remove receipt"
+                    onClick={() => f("receipt_url", "")}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                  >
                     <X className="w-4 h-4 text-foreground" />
                   </button>
                 </div>
               ) : (
-                <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  className="w-full h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50">
+                <button
+                  type="button"
+                  aria-label="Attach receipt photo"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2 hover:border-titan-cyan/40 hover:bg-titan-cyan/5 transition-all disabled:opacity-50"
+                >
                   {uploading ? (
                     <div className="w-5 h-5 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin" />
                   ) : <>

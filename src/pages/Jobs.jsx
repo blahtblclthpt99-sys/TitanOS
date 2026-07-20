@@ -2,19 +2,22 @@ import React, { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Briefcase, Search, Clock, MapPin, User, Calendar, CheckSquare, Square, X, ChevronDown, UserCheck, Plus, Camera, LogIn, LogOut } from "lucide-react";
+import { Briefcase, Search, Clock, MapPin, User, Calendar, CheckSquare, Square, X, ChevronDown, UserCheck, Camera, LogIn, LogOut } from "lucide-react";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import NativeSelect from "@/components/shared/NativeSelect";
 import EmptyState from "@/components/shared/EmptyState";
 import StatusBadge from "@/components/shared/StatusBadge";
 import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
+import PageHeader from "@/components/shared/PageHeader";
+import PageShell from "@/components/shared/PageShell";
+import FilterChip from "@/components/shared/FilterChip";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import ReviewForm from "@/components/shared/ReviewForm";
@@ -29,7 +32,7 @@ import { googleMapsLink, jobSiteCoords, openStreetMapEmbed } from "@/lib/geofenc
 import { generateJobSummary } from "@/lib/jobSummary";
 
 const PRIORITY_COLORS = {
-  low: "text-muted-foreground", medium: "text-titan-cyan",
+  low: "text-muted-foreground", medium: "text-primary",
   high: "text-titan-amber", urgent: "text-red-400",
 };
 
@@ -103,7 +106,7 @@ export default function Jobs({ isActive = true }) {
     .filter(j => filter === "all" || j.status === filter)
     .filter(j => `${j.title} ${j.customer_name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
-  // ── Bulk helpers ──────────────────────────────────────────────────────────
+  // --- Bulk helpers ---
   const toggleSelect = (id) => {
     setSelected(prev => {
       const next = new Set(prev);
@@ -251,14 +254,14 @@ export default function Jobs({ isActive = true }) {
     <div
       onClick={() => bulkMode ? toggleSelect(job.id) : null}
       className={`glass rounded-2xl p-4 transition-all ${bulkMode ? "cursor-pointer" : "glass-hover"} ${
-        bulkMode && selected.has(job.id) ? "border border-titan-cyan/40 bg-titan-cyan/5" : ""
+        bulkMode && selected.has(job.id) ? "border border-primary/40 bg-primary/5" : ""
       }`}
     >
       <div className="flex items-start gap-4">
         {bulkMode && (
           <div className="flex-shrink-0 mt-1">
             {selected.has(job.id)
-              ? <CheckSquare className="w-4 h-4 text-titan-cyan" />
+              ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4 text-muted-foreground" />}
           </div>
         )}
@@ -301,7 +304,7 @@ export default function Jobs({ isActive = true }) {
       {(expandedJobId === job.id || ["in_progress", "completed"].includes(job.status)) && !bulkMode && (
         <div className="mt-4 pt-4 border-t border-border">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => checkin(job, "check_in")} disabled={opsSaving} size="sm" className="bg-titan-cyan/15 text-titan-cyan border border-titan-cyan/20"><LogIn className="w-4 h-4 mr-1" />Check in</Button>
+            <Button onClick={() => checkin(job, "check_in")} disabled={opsSaving} size="sm" className="bg-primary/15 text-primary border border-primary/20"><LogIn className="w-4 h-4 mr-1" />Check in</Button>
             <Button onClick={() => checkin(job, "check_out")} disabled={opsSaving} size="sm" variant="outline" className="border-border text-foreground"><LogOut className="w-4 h-4 mr-1" />Check out</Button>
             {["before", "after"].map((kind) => <label key={kind} className="inline-flex items-center cursor-pointer h-9 px-3 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"><Camera className="w-4 h-4 mr-1" />{kind === "before" ? "Before photo" : "After photo"}<input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(job, kind, e.target.files?.[0])} /></label>)}
           </div>
@@ -311,11 +314,11 @@ export default function Jobs({ isActive = true }) {
             return (
               <div className="mt-3 rounded-xl overflow-hidden border border-border">
                 <iframe title="Job site map" src={openStreetMapEmbed(site.lat, site.lng)} className="w-full h-36 border-0" loading="lazy" />
-                <a href={googleMapsLink(site.lat, site.lng)} target="_blank" rel="noreferrer" className="block text-xs text-titan-cyan px-3 py-2 bg-muted/40">Open site in Maps · geofence {job.geofence_m || 150}m</a>
+                <a href={googleMapsLink(site.lat, site.lng)} target="_blank" rel="noreferrer" className="block text-xs text-primary px-3 py-2 bg-muted/40">Open site in Maps · geofence {job.geofence_m || 150}m</a>
               </div>
             );
           })()}
-          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-titan-cyan" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
+          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-primary" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
           {!!jobPhotos[job.id]?.length && (
             <div className="mt-3 space-y-2">
               <div className="flex flex-wrap gap-2">
@@ -351,12 +354,12 @@ export default function Jobs({ isActive = true }) {
         <div className="mt-4 pt-4 border-t border-border space-y-3">
           {(job.completion_summary || job.follow_up_draft) && (
             <div className="rounded-xl bg-muted/50 p-3 text-xs text-foreground/90 space-y-2">
-              <p className="font-semibold text-titan-cyan">AI job summary</p>
+              <p className="font-semibold text-primary">AI job summary</p>
               {job.completion_summary && <p>{job.completion_summary}</p>}
               {job.follow_up_draft && (
                 <button
                   type="button"
-                  className="text-titan-cyan underline"
+                  className="text-primary underline"
                   onClick={() => {
                     navigator.clipboard?.writeText(job.follow_up_draft);
                     toast({ title: "Follow-up copied" });
@@ -379,54 +382,52 @@ export default function Jobs({ isActive = true }) {
   );
 
   return (
-    <div ref={containerRef} className="p-4 md:p-8 max-w-7xl mx-auto overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+    <PageShell maxWidth="xl" className="overflow-y-auto" style={{ overscrollBehavior: "contain" }} ref={containerRef}>
       <PullToRefreshIndicator pullProgress={pullProgress} isRefreshing={isRefreshing} pullDist={pullDist} />
 
-      <div className="flex items-start justify-between mb-6">
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Jobs</h1>
-          <p className="text-sm text-muted-foreground mt-1">{jobs.length} total</p>
-        </motion.div>
-        <div className="flex items-center gap-2">
-          {!bulkMode && (
-            <button
-              onClick={() => setBulkMode(true)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-titan-cyan border border-border hover:border-titan-cyan/30 rounded-xl px-3 py-2 transition-all"
-            >
-              <CheckSquare className="w-3.5 h-3.5" /> Bulk Edit
-            </button>
-          )}
-          <Button onClick={openForm}
-            className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl gap-2">
-            <Plus className="w-4 h-4" /> New Job
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Daily work"
+        title="Jobs"
+        subtitle={`${jobs.length} total · Create, assign, and track every job from quote to done.`}
+        actions={
+          <>
+            {!bulkMode && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setBulkMode(true)} className="gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" /> Bulk edit
+              </Button>
+            )}
+          </>
+        }
+        onAdd={openForm}
+        addLabel="New job"
+      />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-11 bg-card border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/80" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Search jobs…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search jobs"
+            className="pl-11 bg-card border-border text-foreground rounded-md h-11 placeholder:text-muted-foreground/80"
+          />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {["all", "scheduled", "in_progress", "completed", "cancelled"].map(s => (
-            <button key={s} onClick={() => setFilter(s)}
-              className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all capitalize ${
-                filter === s ? "bg-titan-cyan/10 text-titan-cyan border border-titan-cyan/20" : "bg-card text-muted-foreground border border-border hover:text-foreground/90"
-              }`}>
+        <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter by status">
+          {["all", "scheduled", "in_progress", "completed", "cancelled"].map((s) => (
+            <FilterChip key={s} active={filter === s} onClick={() => setFilter(s)}>
               {s === "all" ? "All" : s.replace("_", " ")}
-            </button>
+            </FilterChip>
           ))}
         </div>
       </div>
 
       {/* Bulk mode header */}
       {bulkMode && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-titan-cyan/5 border border-titan-cyan/20 rounded-2xl">
+        <div className="flex items-center gap-3 mb-4 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
           <button onClick={toggleAll} className="flex items-center gap-2 text-sm text-foreground/90 hover:text-foreground transition-colors">
             {selected.size === filtered.length && filtered.length > 0
-              ? <CheckSquare className="w-4 h-4 text-titan-cyan" />
+              ? <CheckSquare className="w-4 h-4 text-primary" />
               : <Square className="w-4 h-4" />}
             {selected.size > 0 ? `${selected.size} selected` : "Select all"}
           </button>
@@ -439,7 +440,7 @@ export default function Jobs({ isActive = true }) {
       {filtered.length === 0 && !search && filter === "all" ? (
         <EmptyState icon={Briefcase} title="No jobs yet" description="Create your first job to start tracking work." onAction={openForm} actionLabel="New Job" />
       ) : filtered.length === 0 ? (
-        <p className="text-center text-muted-foreground py-16 text-sm">No jobs match your filter.</p>
+        <EmptyState title="No matches" description="No jobs match your filter. Try clearing search or status." className="py-12" />
       ) : shouldVirtualize(filtered.length) ? (
         <VirtualList
           items={filtered}
@@ -472,7 +473,7 @@ export default function Jobs({ isActive = true }) {
             <div className="relative">
               <button
                 onClick={() => { setShowBulkStatus(p => !p); setShowBulkAssign(false); }}
-                className="flex items-center gap-1.5 bg-titan-cyan/10 hover:bg-titan-cyan/20 text-titan-cyan border border-titan-cyan/20 rounded-xl px-3 py-2 text-xs font-medium transition-all"
+                className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl px-3 py-2 text-xs font-medium transition-all"
               >
                 Set Status <ChevronDown className="w-3 h-3" />
               </button>
@@ -518,7 +519,10 @@ export default function Jobs({ isActive = true }) {
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
         <DialogContent className="bg-card border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-foreground text-lg">New Job</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-lg">New Job</DialogTitle>
+            <DialogDescription>Schedule a job with customer, timing, and site details.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Job Title" value={form.title} onChange={e => f("title", e.target.value)} placeholder="e.g. Full house cleaning" />
             <FormField label="Customer">
@@ -550,17 +554,20 @@ export default function Jobs({ isActive = true }) {
               <FormField label="Amount ($)" type="number" value={form.amount} onChange={e => f("amount", parseFloat(e.target.value) || 0)} />
             </div>
             <FormField label="Address" value={form.address} onChange={e => f("address", e.target.value)} />
-            <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground text-xs font-medium">Description</label>
-              <Textarea value={form.description} onChange={e => f("description", e.target.value)}
-                className="bg-muted border-border text-foreground rounded-xl min-h-[80px]" />
-            </div>
-            <Button onClick={handleSave} disabled={saving || !form.title} className="w-full bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-11 disabled:opacity-50">
-              {saving ? "Creating…" : "Create Job"}
+            <FormField label="Description">
+              <Textarea
+                id="job-description"
+                value={form.description}
+                onChange={(e) => f("description", e.target.value)}
+                className="bg-muted border-border text-foreground rounded-md min-h-[80px]"
+              />
+            </FormField>
+            <Button onClick={handleSave} disabled={saving || !form.title} className="w-full h-11">
+              {saving ? "Creating..." : "Create job"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

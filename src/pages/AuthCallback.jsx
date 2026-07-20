@@ -101,6 +101,29 @@ export default function AuthCallback() {
           window.history.replaceState({}, document.title, clean || "/");
         }
 
+        // Log new OAuth signups (created in the last 10 minutes)
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          const u = userData?.user;
+          if (u?.email) {
+            const createdMs = u.created_at ? new Date(u.created_at).getTime() : 0;
+            const isNew = createdMs && Date.now() - createdMs < 10 * 60 * 1000;
+            if (isNew) {
+              await fetch("/api/signup-emails", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: u.email,
+                  fullName: u.user_metadata?.full_name || u.user_metadata?.name || "",
+                  source: "oauth",
+                }),
+              });
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+
         if (!cancelled) navigate(from, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

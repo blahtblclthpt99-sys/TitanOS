@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Mail, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
@@ -17,7 +18,7 @@ export default function ForgotPassword() {
     try {
       await api.auth.resetPasswordRequest(email);
     } catch {
-      // Always show success
+      // Always show success (anti-enumeration)
     } finally {
       setLoading(false);
       setSent(true);
@@ -27,17 +28,17 @@ export default function ForgotPassword() {
   return (
     <AuthLayout title="Reset password" subtitle="We'll email you a reset link">
       {sent ? (
-        <p className="text-sm text-slate-600 text-center leading-relaxed">
-          If an account exists with that email, you'll receive a password reset link shortly.
+        <p className="text-center text-sm leading-relaxed text-muted-foreground">
+          If an account exists with that email, you&apos;ll receive a password reset link shortly.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-slate-700 font-medium">
+            <Label htmlFor="email" className="font-medium text-foreground">
               Email
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 id="email"
                 type="email"
@@ -46,29 +47,25 @@ export default function ForgotPassword() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+                className="h-12 pl-10"
                 required
               />
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-foreground text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
-          >
+          <Button type="submit" disabled={loading} className="h-12 w-full">
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Sending...
               </>
             ) : (
               "Send reset link"
             )}
-          </button>
+          </Button>
         </form>
       )}
-      <p className="mt-5 text-center text-sm text-slate-500">
-        <Link to="/login" className="font-semibold text-slate-800 hover:underline">
+      <p className="mt-5 text-center text-sm text-muted-foreground">
+        <Link to="/login" className="font-semibold text-foreground hover:underline focus-ring rounded-md">
           Back to sign in
         </Link>
       </p>

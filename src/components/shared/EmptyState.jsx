@@ -1,24 +1,65 @@
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { Inbox, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function EmptyState({ icon: Icon, title, description, onAction, actionLabel }) {
+/**
+ * Meaningful empty state — calm, actionable, motion-aware.
+ */
+export default function EmptyState({
+  icon: Icon = Inbox,
+  title,
+  description,
+  onAction,
+  actionLabel,
+  secondaryAction,
+  secondaryLabel,
+  className,
+}) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center py-16 md:py-20 text-center px-4"
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      className={cn(
+        "flex flex-col items-center justify-center px-4 py-16 text-center md:py-20",
+        className
+      )}
+      role="status"
     >
-      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 shadow-soft">
-        {Icon && <Icon className="w-8 h-8 text-primary" aria-hidden="true" />}
+      <div className="relative mb-5">
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 shadow-soft ring-1 ring-primary/15"
+          aria-hidden="true"
+        >
+          <Icon className="h-7 w-7 text-primary" />
+        </div>
+        <span
+          className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-primary/40 success-pop"
+          aria-hidden="true"
+        />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-sm mb-6 leading-relaxed">{description}</p>
-      {onAction && (
-        <Button onClick={onAction} className="gap-2">
-          <Plus className="w-4 h-4" /> {actionLabel}
-        </Button>
+      <h3 className="mb-2 text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+      {description ? (
+        <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
+      ) : null}
+      {(onAction || secondaryAction) && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {onAction && actionLabel ? (
+            <Button type="button" onClick={onAction} className="gap-2">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {actionLabel}
+            </Button>
+          ) : null}
+          {secondaryAction && secondaryLabel ? (
+            <Button type="button" variant="outline" onClick={secondaryAction}>
+              {secondaryLabel}
+            </Button>
+          ) : null}
+        </div>
       )}
     </motion.div>
   );

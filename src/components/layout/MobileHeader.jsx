@@ -6,12 +6,16 @@ import { normalizeAppPath } from "@/lib/routing";
 import NotificationBell from "@/components/shared/NotificationBell";
 
 function getTabRoot(pathname) {
+  if (pathname.startsWith("/driver/")) return "/driver";
   if (pathname.startsWith("/customers/")) return "/customers";
   if (pathname.startsWith("/invoices/")) return "/invoices";
   if (pathname.startsWith("/jobs/")) return "/jobs";
   if (pathname.startsWith("/marketplace")) return "/marketplace";
+  if (pathname.startsWith("/messages")) return "/messages";
   if (pathname.startsWith("/community")) return "/community";
   if (pathname.startsWith("/settings")) return "/settings";
+  if (pathname.startsWith("/titan-score")) return "/";
+  if (pathname.startsWith("/trust-safety")) return "/settings";
   return "/";
 }
 
@@ -39,7 +43,7 @@ export default function MobileHeader() {
     >
       <div className="flex items-center h-14 w-full gap-2">
         {isRoot ? (
-          <span className="gradient-text font-bold text-lg tracking-tight flex-1">TitanOS</span>
+          <span className="gradient-text font-bold text-lg tracking-tight flex-1">Titan OS</span>
         ) : (
           <button
             type="button"

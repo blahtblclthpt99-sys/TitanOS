@@ -9,10 +9,13 @@ import { useEntityData } from "@/hooks/useEntityData";
 import { lastNMonthKeys } from "@/lib/date-utils";
 import { sumPaidRevenue, sumExpenses, sumOutstanding } from "@/lib/finance-metrics";
 import { buildCohorts, exportCsv } from "@/lib/advancedAnalytics";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const ReportsCharts = lazy(() => import("@/components/charts/ReportsCharts"));
 
 export default function Reports() {
+  const reduceMotion = usePrefersReducedMotion();
   const { data: [jobs, customers, invoices, expenses], loading, error, reload } = useEntityData([
     { entity: "Job", method: "list", args: ["-created_date", 200] },
     { entity: "Customer", method: "list", args: ["-created_date", 200] },
@@ -66,11 +69,11 @@ export default function Reports() {
   const statCards = [
     { icon: Briefcase, label: "Total Jobs", value: jobs.length, color: "text-titan-cyan", bg: "bg-titan-cyan/10" },
     { icon: Users, label: "Customers", value: customers.length, color: "text-titan-indigo", bg: "bg-titan-indigo/10" },
-    { icon: DollarSign, label: "Revenue", value: `$${revenue.toLocaleString()}`, color: "text-emerald-400", bg: "bg-emerald-400/10" },
-    { icon: ArrowDownRight, label: "Expenses", value: `$${totalExpenses.toLocaleString()}`, color: "text-red-400", bg: "bg-red-400/10" },
+    { icon: DollarSign, label: "Revenue", value: formatCurrency(revenue), color: "text-emerald-400", bg: "bg-emerald-400/10" },
+    { icon: ArrowDownRight, label: "Expenses", value: formatCurrency(totalExpenses), color: "text-red-400", bg: "bg-red-400/10" },
     { icon: TrendingUp, label: "Completion Rate", value: `${completionRate}%`, color: "text-titan-cyan", bg: "bg-titan-cyan/10" },
-    { icon: Receipt, label: "Outstanding", value: `$${outstanding.toLocaleString()}`, color: "text-titan-amber", bg: "bg-titan-amber/10" },
-    { icon: DollarSign, label: "Avg job value", value: `$${avgJobValue.toLocaleString()}`, color: "text-emerald-300", bg: "bg-emerald-400/10" },
+    { icon: Receipt, label: "Outstanding", value: formatCurrency(outstanding), color: "text-titan-amber", bg: "bg-titan-amber/10" },
+    { icon: DollarSign, label: "Avg job value", value: formatCurrency(avgJobValue), color: "text-emerald-300", bg: "bg-emerald-400/10" },
   ];
 
   const hasMonthly = monthlyData.some((d) => d.revenue > 0 || d.expenses > 0);
@@ -87,11 +90,11 @@ export default function Reports() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+    <div className="page-pad max-w-7xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
         <PageHeader title="Reports" subtitle="Business analytics & insights" />
-        <Button onClick={downloadRevenue} variant="outline" className="border-border text-foreground">
-          <Download className="w-4 h-4 mr-2" /> Export paid CSV
+        <Button type="button" onClick={downloadRevenue} variant="outline" className="border-border text-foreground">
+          <Download className="w-4 h-4 mr-2" aria-hidden="true" /> Export paid CSV
         </Button>
       </div>
 
@@ -99,10 +102,10 @@ export default function Reports() {
         {statCards.map((card, i) => (
           <motion.div
             key={card.label}
-            initial={{ opacity: 0, y: 12 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-            className="glass rounded-2xl p-5"
+            transition={reduceMotion ? { duration: 0 } : { delay: i * 0.06 }}
+            className="titan-surface p-5"
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.bg}`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
@@ -134,7 +137,7 @@ export default function Reports() {
                     <td className="py-2 pr-4">{c.customers}</td>
                     <td className="py-2 pr-4">{c.paying}</td>
                     <td className="py-2 pr-4">{c.conversion}%</td>
-                    <td className="py-2">${Math.round(c.revenue).toLocaleString()}</td>
+                    <td className="py-2">{formatCurrency(c.revenue)}</td>
                   </tr>
                 ))}
               </tbody>

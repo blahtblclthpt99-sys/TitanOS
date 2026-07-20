@@ -1,16 +1,13 @@
 /**
- * NativeSelect — mobile-native bottom-sheet picker, desktop dropdown.
- * Drop-in replacement for Radix Select in forms.
- *
- * Props:
- *   value, onValueChange, placeholder, options: [{value, label}]
- *   className (applied to trigger button)
+ * NativeSelect — mobile bottom-sheet picker, desktop drawer.
+ * Matches Input / SelectTrigger height and field chrome.
  */
 import React, { useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import {
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer";
+import { cn } from "@/lib/utils";
 
 export default function NativeSelect({
   value,
@@ -18,9 +15,10 @@ export default function NativeSelect({
   placeholder = "Select…",
   options = [],
   className = "",
+  "aria-label": ariaLabel,
 }) {
   const [open, setOpen] = useState(false);
-  const selected = options.find(o => o.value === value);
+  const selected = options.find((o) => o.value === value);
 
   const pick = (val) => {
     onValueChange(val);
@@ -29,36 +27,46 @@ export default function NativeSelect({
 
   return (
     <>
-      {/* Trigger — looks like a select input on all screen sizes */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex h-11 w-full items-center justify-between rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring ${className}`}
+        aria-label={ariaLabel || placeholder}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={cn(
+          "flex h-11 min-h-[44px] w-full items-center justify-between rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors duration-fast focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/40",
+          className
+        )}
       >
         <span className={selected ? "text-foreground" : "text-muted-foreground"}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2" />
+        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2" aria-hidden="true" />
       </button>
 
-      {/* Bottom-sheet on mobile / centered modal feel on desktop */}
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="bg-card border-border max-h-[70vh]">
+        <DrawerContent className="bg-card border-border max-h-[70vh] rounded-t-lg">
           <DrawerHeader className="border-b border-border pb-3">
             <DrawerTitle className="text-foreground text-base">{placeholder}</DrawerTitle>
           </DrawerHeader>
-          <div className="overflow-y-auto py-2" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-            {options.map(opt => (
+          <div
+            className="overflow-y-auto py-2"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            role="listbox"
+          >
+            {options.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
+                role="option"
+                aria-selected={opt.value === value}
                 onClick={() => pick(opt.value)}
-                className="w-full flex items-center justify-between px-5 py-4 text-sm text-left hover:bg-muted active:bg-muted transition-colors capitalize"
+                className="w-full flex items-center justify-between min-h-[48px] px-5 py-3 text-sm text-left hover:bg-muted active:bg-muted transition-colors capitalize focus-ring"
               >
-                <span className={opt.value === value ? "text-[#00C7D9] font-semibold" : "text-foreground"}>
+                <span className={opt.value === value ? "text-primary font-semibold" : "text-foreground"}>
                   {opt.label}
                 </span>
-                {opt.value === value && <Check className="w-4 h-4 text-[#00C7D9]" />}
+                {opt.value === value && <Check className="w-4 h-4 text-primary" aria-hidden="true" />}
               </button>
             ))}
           </div>

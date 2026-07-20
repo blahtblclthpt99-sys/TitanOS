@@ -36,6 +36,10 @@ const FEATURES = {
     title: "Mile Tracker",
     desc: "Automatic mileage logging for every job run — audit-ready when you need it.",
   },
+  "driver-hub": {
+    title: "Driver Hub",
+    desc: "Find verified drivers by CDL, vehicle, route, and rating — plus track your own shift, miles, and tax sync.",
+  },
 };
 
 export default function FeatureDetail() {

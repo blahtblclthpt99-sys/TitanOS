@@ -1,25 +1,24 @@
-import { Toaster } from "@/components/ui/toaster";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClientInstance } from "@/lib/query-client";
 import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
-import React, { Suspense, lazy, useEffect } from "react";
-import PageNotFound from "./lib/PageNotFound";
+import React, { Suspense, lazy, useEffect, useMemo } from "react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
 import Spinner from "@/components/shared/Spinner";
+import DeferredToaster from "./components/DeferredToaster";
 import PathNormalizer from "./lib/PathNormalizer";
 import { normalizeAppPath, shouldUseHashRouter } from "@/lib/routing";
-import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
 import { resolveBookingSlugFromHost } from "@/lib/bookingSubdomain";
+import { hasCachedAuthSession } from "@/lib/sessionPeek";
 
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import ForgotPassword from "@/pages/ForgotPassword";
-import ResetPassword from "@/pages/ResetPassword";
-import AuthCallback from "@/pages/AuthCallback";
-import AppLayout from "@/components/layout/AppLayout";
+/** Marketing home — keep in main graph for fast FCP (no framer-motion / radix). */
 import Landing from "@/pages/Landing";
 
+const PageNotFound = lazy(() => import("./lib/PageNotFound"));
+const AuthenticatedShell = lazy(() => import("./AuthenticatedShell"));
+const Login = lazy(() => import("@/pages/Login"));
+const Register = lazy(() => import("@/pages/Register"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const AuthCallback = lazy(() => import("@/pages/AuthCallback"));
 const Pricing = lazy(() => import("@/pages/Pricing"));
 const Beta = lazy(() => import("@/pages/Beta"));
 const Download = lazy(() => import("@/pages/Download"));
@@ -27,8 +26,8 @@ const FeatureDetail = lazy(() => import("@/pages/FeatureDetail"));
 const ThankYou = lazy(() => import("@/pages/ThankYou"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
-
 const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
+const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const PublicSign = lazy(() => import("@/pages/PublicSign"));
 
 /** Marketing + auth screens that must not use the app shell. */
@@ -52,54 +51,12 @@ function isPublicPath(pathname) {
   if (PUBLIC_EXACT.has(p)) return true;
   if (p.startsWith("/features/")) return true;
   if (p.startsWith("/book/")) return true;
+  if (p.startsWith("/u/")) return true;
   if (p.startsWith("/sign/")) return true;
   return false;
 }
 
-/**
- * One AppLayout instance for every authenticated app route (including `/`).
- * Previously `/` used RootRoute's AppLayout and `/reports` used a different
- * ProtectedRoute AppLayout — so Home remounted the shell while other tabs
- * stayed trapped if a More-menu page crashed.
- */
-function AppShellGate() {
-  const location = useLocation();
-  const {
-    isAuthenticated,
-    isLoadingAuth,
-    isLoadingPublicSettings,
-    authChecked,
-    authError,
-    checkUserAuth,
-  } = useAuth();
-
-  usePrefetchDashboard(isAuthenticated && authChecked);
-
-  useEffect(() => {
-    if (!authChecked && !isLoadingAuth) {
-      checkUserAuth();
-    }
-  }, [authChecked, isLoadingAuth, checkUserAuth]);
-
-  if (isLoadingPublicSettings || isLoadingAuth || !authChecked) {
-    return <Spinner fullScreen label="Loading TitanOS" />;
-  }
-
-  if (authError?.type === "user_not_registered") {
-    return <Navigate to="/login" replace />;
-  }
-
-  const pathname = normalizeAppPath(location.pathname);
-  const publicPath = isPublicPath(pathname);
-
-  if (isAuthenticated && !publicPath) {
-    return <AppLayout />;
-  }
-
-  if (!isAuthenticated && !publicPath && pathname !== "/") {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
+function PublicRoutes() {
   return (
     <Suspense fallback={<Spinner fullScreen label="Loading page" />}>
       <Routes>
@@ -118,9 +75,81 @@ function AppShellGate() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/book/:slug" element={<PublicBooking />} />
+        <Route path="/u/:username" element={<PublicProfile />} />
         <Route path="/sign/:token" element={<PublicSign />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+    </Suspense>
+  );
+}
+
+/**
+ * One AppLayout instance for every authenticated app route (including `/`).
+ * Public/marketing routes paint immediately without waiting on auth.
+ */
+function AppShellGate() {
+  const location = useLocation();
+  const {
+    isAuthenticated,
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authChecked,
+    authError,
+    checkUserAuth,
+  } = useAuth();
+
+  const pathname = normalizeAppPath(location.pathname);
+  const publicPath = isPublicPath(pathname);
+  const isHome = pathname === "/";
+  const cachedSession = useMemo(() => hasCachedAuthSession(), []);
+
+  useEffect(() => {
+    if (!authChecked && !isLoadingAuth) {
+      checkUserAuth();
+    }
+  }, [authChecked, isLoadingAuth, checkUserAuth]);
+
+  // Authenticated shell for app routes (and home when signed in)
+  const wantsAppShell =
+    (authChecked && isAuthenticated && !publicPath) ||
+    (authChecked && isAuthenticated && isHome) ||
+    (!authChecked && isHome && cachedSession);
+
+  if (wantsAppShell) {
+    if (authError?.type === "user_not_registered") {
+      return <Navigate to="/login" replace />;
+    }
+    if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
+      return <Spinner fullScreen label="Loading TitanOS" />;
+    }
+    return (
+      <Suspense fallback={<Spinner fullScreen label="Loading app" />}>
+        <AuthenticatedShell />
+      </Suspense>
+    );
+  }
+
+  // Public marketing / auth — paint immediately (no auth spinner)
+  if (isHome || publicPath) {
+    return <PublicRoutes />;
+  }
+
+  // Protected deep-link while auth resolves
+  if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
+    return <Spinner fullScreen label="Loading TitanOS" />;
+  }
+
+  if (authError?.type === "user_not_registered") {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return (
+    <Suspense fallback={<Spinner fullScreen label="Loading app" />}>
+      <AuthenticatedShell />
     </Suspense>
   );
 }
@@ -149,13 +178,11 @@ function App() {
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <ScrollToTop />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
+      <Router>
+        <ScrollToTop />
+        <AuthenticatedApp />
+      </Router>
+      <DeferredToaster />
     </AuthProvider>
   );
 }

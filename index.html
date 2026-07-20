@@ -3,10 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
+    <link rel="canonical" href="https://titanos-web.vercel.app/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0A0A0B" />
-    <meta name="description" content="TitanOS — The AI Operating System for Service Businesses" />
-    <title>TitanOS</title>
+    <meta
+      name="description"
+      content="TitanOS — the AI operating system for service businesses. Jobs, invoices, drivers, schedule, and Command Center in one place."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TitanOS" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TitanOS" />
+    <meta property="og:url" content="https://titanos-web.vercel.app/" />
+    <meta property="og:title" content="TitanOS — AI OS for Service Businesses" />
+    <meta
+      property="og:description"
+      content="Run jobs, invoices, drivers, and your Command Center from one app built for field service teams."
+    />
+    <meta property="og:image" content="https://titanos-web.vercel.app/pwa-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="TitanOS app icon" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="TitanOS — AI OS for Service Businesses" />
+    <meta
+      name="twitter:description"
+      content="Run jobs, invoices, drivers, and your Command Center from one app built for field service teams."
+    />
+    <meta name="twitter:image" content="https://titanos-web.vercel.app/pwa-512.png" />
+
+    <link rel="dns-prefetch" href="https://vitals.vercel-insights.com" />
+    <link
+      rel="preload"
+      href="/fonts/plus-jakarta-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>TitanOS — AI OS for Service Businesses</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "TitanOS",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, Android",
+        "url": "https://titanos-web.vercel.app/",
+        "description": "The AI operating system for service businesses — jobs, invoices, drivers, and Command Center.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -9,4 +9,4 @@ export function fetchEntity(descriptor) {
   return api.entities[entity][method](...args);
 }
 
-export const ENTITY_STALE_TIME = 60_000;
+export const ENTITY_STALE_TIME = 90_000;

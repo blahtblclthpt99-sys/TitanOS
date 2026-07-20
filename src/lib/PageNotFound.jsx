@@ -1,7 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
-import { Button } from '@/components/ui/button';
 
 export default function PageNotFound() {
   const location = useLocation();
@@ -44,14 +42,13 @@ export default function PageNotFound() {
           )}
 
           <div className="pt-6">
-            <Button
+            <button
+              type="button"
               onClick={() => navigate('/')}
-              variant="outline"
-              className="gap-2 border-white/10 text-white hover:bg-white/5"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-md border border-white/10 text-white text-sm font-semibold hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             >
-              <Home className="w-4 h-4" aria-hidden="true" />
               Go Home
-            </Button>
+            </button>
           </div>
         </div>
       </div>

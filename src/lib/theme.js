@@ -15,20 +15,35 @@ export const TEXT_SCALES = [
   { id: "xl", label: "Extra large", pct: 125 },
 ];
 
+/** Canonical preference: light | dark | system (follow OS). Default: system. */
+export const THEME_OPTIONS = ["system", "light", "dark"];
+
+export function normalizeThemePref(pref) {
+  const v = String(pref || "").toLowerCase();
+  return THEME_OPTIONS.includes(v) ? v : "system";
+}
+
 export function getStoredTheme() {
   try {
-    return localStorage.getItem(STORAGE_KEY) || "dark";
+    return normalizeThemePref(localStorage.getItem(STORAGE_KEY) || "system");
   } catch {
-    return "dark";
+    return "system";
   }
 }
 
 export function setStoredTheme(pref) {
   try {
-    localStorage.setItem(STORAGE_KEY, pref);
+    localStorage.setItem(STORAGE_KEY, normalizeThemePref(pref));
   } catch {
     /* ignore */
   }
+}
+
+/** Apply and persist in one step (Settings + Auth sync). */
+export function persistAndApplyTheme(pref) {
+  const next = normalizeThemePref(pref);
+  setStoredTheme(next);
+  return applyTheme(next);
 }
 
 export function getHighContrast() {

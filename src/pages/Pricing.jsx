@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
 import { PLANS, betaBadgeLabel } from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
+import SiteFooter from "@/components/marketing/SiteFooter";
 
 const CARDS = [
   {
@@ -130,7 +131,8 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
 
 export default function Pricing() {
   return (
-    <div className="min-h-screen bg-[#0A0A0B] flex flex-col items-center py-12 px-4 pb-24">
+    <div className="min-h-screen bg-[#0A0A0B] text-white flex flex-col">
+    <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10 max-w-2xl w-full">
         {betaBadgeLabel() && (
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-titan-cyan/10 border border-titan-cyan/20 mb-6">
@@ -195,6 +197,8 @@ export default function Pricing() {
           </div>
         </div>
       </motion.div>
+    </div>
+    <SiteFooter className="border-white/10 bg-[#0A0A0B] text-white/50 [&_a]:text-white/50 [&_a:hover]:text-white" />
     </div>
   );
 }

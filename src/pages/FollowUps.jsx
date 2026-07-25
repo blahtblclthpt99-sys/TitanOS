@@ -65,7 +65,7 @@ export default function FollowUps() {
         queue: (prev?.queue ?? []).map((item) => (item.id === row.id ? saved : item)),
       }));
       toast({
-        title: saved.send?.stub ? "Marked sent (email stub)" : "Follow-up sent",
+        title: saved.send?.stub ? "Follow-up saved — email not delivered" : "Follow-up sent",
         description: saved.send?.message || "Queue item updated.",
       });
     } catch {

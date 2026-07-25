@@ -88,7 +88,7 @@ export default function Settings() {
   const [notificationPrefs, setNotificationPrefs] = useState({});
   const [marketingPrefs, setMarketingPrefs] = useState(() => mergeMarketingPrefs(null));
   const [privacyForm, setPrivacy] = useState({ community_opt_in: false, privacy_prefs: {} });
-  const [themePref, setThemePref] = useState("dark");
+  const [themePref, setThemePref] = useState("system");
   const [highContrast, setHighContrastState] = useState(() => getHighContrast());
   const [textScale, setTextScaleState] = useState(() => getTextScale());
   const [reduceMotion, setReduceMotionState] = useState(() => {
@@ -125,7 +125,7 @@ export default function Settings() {
         community_opt_in: user.community_opt_in ?? false,
         privacy_prefs: user.privacy_prefs || {},
       });
-      setThemePref(user.theme_pref || "dark");
+      setThemePref(user.theme_pref || "system");
     }
   }, [user]);
 
@@ -350,6 +350,16 @@ export default function Settings() {
         className="w-full border-red-400/20 text-red-400 hover:bg-red-400/10 rounded-md h-11 gap-2 mb-3">
         <LogOut className="w-4 h-4" /> Sign Out
       </Button>
+
+      <div className="titan-surface p-4 mb-3 flex flex-col gap-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Legal</p>
+        <Link to="/privacy-policy" className="text-sm text-foreground hover:text-primary underline-offset-2 hover:underline">
+          Privacy Policy
+        </Link>
+        <Link to="/terms" className="text-sm text-foreground hover:text-primary underline-offset-2 hover:underline">
+          Terms of Service
+        </Link>
+      </div>
 
       {/* Account Deletion */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}

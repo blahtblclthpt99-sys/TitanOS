@@ -75,7 +75,7 @@ export default function Referral() {
           description:
             result.source === "local"
               ? "Saved on this device. Copy your referral link to share — mail provider isn’t configured."
-              : "Invite recorded, but email delivery returned a stub or failed. Copy your link to share.",
+              : "Invite recorded, but the email could not be sent. Copy your link to share.",
         });
       }
     } catch (error) {

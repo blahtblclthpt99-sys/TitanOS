@@ -12,8 +12,9 @@ Do **not** deploy if build/lint fails, secrets are in the commit, or payment/aut
 
 - [ ] Working tree reviewed (`git status`) — no `.env`, keys, APKs, or backup dumps
 - [ ] `.env.production` is **not** tracked (use Vercel env + local ignored file / `.env.production.example`)
-- [ ] Migrations **016–019** applied on Supabase (hire RLS, fee engine, Stripe idempotency, payment/hire/notify lockdown) **or** explicitly deferred with risk accepted
+- [ ] Migrations **016–026** applied on Supabase (hire RLS, fee engine, Stripe idempotency, payment lockdown, privilege/money, driver profiles, vehicle capacity, job-location tax, driver trust fields) **or** explicitly deferred with risk accepted
 - [ ] No `sk_`, `service_role`, or webhook secrets in client (`VITE_*`) code
+- [ ] `SENTRY_DEBUG_ROUTE` is **unset/0** in Production after smoke verification
 
 ## 2. Local verify (required)
 
@@ -46,6 +47,7 @@ Project → Settings → Environment Variables (Production + Preview as needed):
 | `STRIPE_WEBHOOK_SECRET` | For settle | Server only |
 | `VITE_SENTRY_DSN` | Optional | Browser Sentry DSN (client) |
 | `SENTRY_DSN` | Optional | API Sentry DSN (server; falls back to `VITE_SENTRY_DSN`) |
+| `SENTRY_DEBUG_ROUTE` | Verify only | Set `1` temporarily; **must be off** in steady-state Production |
 | `RESEND_API_KEY` / `OPENAI_API_KEY` | Optional | Server only |
 
 - [ ] No Base44 / `VITE_TITANOS_APP_ID` required (legacy — ignore old docs)

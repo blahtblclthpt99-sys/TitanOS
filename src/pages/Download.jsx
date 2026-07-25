@@ -1,12 +1,13 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Download as DownloadIcon, ArrowRight, Smartphone, ExternalLink } from "lucide-react";
+import { Download as DownloadIcon, ArrowRight, Smartphone, ExternalLink, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DOWNLOAD_PACKAGES,
   TITANOS_PLAY_TESTING_URL,
   openPlayTestingOptIn,
 } from "@/lib/app-download";
+import SiteFooter from "@/components/marketing/SiteFooter";
 
 const STEPS = [
   "Join testing with the Google account invited in Play Console (opt-in link below)",
@@ -32,8 +33,12 @@ export default function Download() {
               Titan<span className="gradient-text">OS</span>
             </span>
           </Link>
-          <Link to="/" className="text-xs text-white/40 hover:text-white">
-            ← Back
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white min-h-[44px]"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            Back
           </Link>
         </div>
 
@@ -129,7 +134,7 @@ export default function Download() {
           </Link>
         </Button>
 
-        <p className="text-center text-xs text-white/20">
+        <p className="text-center text-xs text-white/20 mb-8">
           Questions?{" "}
           <Link to="/beta" className="text-titan-cyan hover:text-titan-cyan/70">
             Join the Beta Program
@@ -139,7 +144,16 @@ export default function Download() {
             sign in
           </Link>
         </p>
+        <p className="text-center text-xs text-white/30 mb-4 space-x-3">
+          <Link to="/privacy-policy" className="hover:text-white underline-offset-2 hover:underline">
+            Privacy Policy
+          </Link>
+          <Link to="/terms" className="hover:text-white underline-offset-2 hover:underline">
+            Terms of Service
+          </Link>
+        </p>
       </div>
+      <SiteFooter className="border-white/10 bg-[#0A0A0B] text-white/50 [&_a]:text-white/50 [&_a:hover]:text-white" />
     </div>
   );
 }

@@ -9,6 +9,13 @@ export default defineConfig(() => {
   return {
     base: process.env.VITE_CAPACITOR_BUILD === 'true' ? './' : '/',
     plugins: [react()],
+    define: {
+      // Expose Vercel build metadata to the client Sentry release/environment
+      "import.meta.env.VITE_VERCEL_ENV": JSON.stringify(process.env.VERCEL_ENV || ""),
+      "import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA": JSON.stringify(
+        process.env.VERCEL_GIT_COMMIT_SHA || ""
+      ),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -20,7 +27,7 @@ export default defineConfig(() => {
       cssCodeSplit: true,
       cssMinify: true,
       minify: 'esbuild',
-      sourcemap: false,
+      sourcemap: "hidden", // readable stacks after Sentry upload; not served publicly
       assetsInlineLimit: 2048,
       // Only preload the entry's critical deps — not lazy vendor islands
       modulePreload: {

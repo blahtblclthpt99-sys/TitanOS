@@ -257,6 +257,18 @@ export default function Register() {
         </Button>
       </form>
 
+      <p className="mt-4 text-center text-xs text-muted-foreground leading-relaxed px-1">
+        By creating an account, you agree to our{" "}
+        <Link to="/terms" className="font-medium text-foreground underline underline-offset-2">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link to="/privacy-policy" className="font-medium text-foreground underline underline-offset-2">
+          Privacy Policy
+        </Link>
+        .
+      </p>
+
       <p className="mt-5 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
         <Link to="/login" state={location.state} className="font-semibold text-foreground hover:underline">

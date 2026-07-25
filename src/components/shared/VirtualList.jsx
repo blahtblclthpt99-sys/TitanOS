@@ -2,12 +2,16 @@ import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 const VIRTUAL_THRESHOLD = 25;
-const DEFAULT_ESTIMATE = 88;
+const DEFAULT_ESTIMATE = 120;
 
 export function shouldVirtualize(count) {
   return count > VIRTUAL_THRESHOLD;
 }
 
+/**
+ * Virtualized list with dynamic row measurement so expanded cards
+ * (Jobs field ops, maps, photos) do not overlap neighbors.
+ */
 export default function VirtualList({
   items,
   renderItem,
@@ -23,7 +27,11 @@ export default function VirtualList({
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElementRef.current,
-    estimateSize: () => estimateSize + gap,
+    estimateSize: () => (typeof estimateSize === "function" ? estimateSize() : estimateSize) + gap,
+    measureElement:
+      typeof window !== "undefined" && typeof window.ResizeObserver !== "undefined"
+        ? (el) => el?.getBoundingClientRect().height ?? DEFAULT_ESTIMATE + gap
+        : undefined,
     overscan: 6,
   });
 
@@ -40,6 +48,8 @@ export default function VirtualList({
         return (
           <div
             key={item.id ?? virtualRow.index}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
             style={{
               position: "absolute",
               top: 0,

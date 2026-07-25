@@ -325,9 +325,9 @@ export default async function handler(req, res) {
         logError("titanAI:action_execute", execErr);
         return res.status(200).json({
           data: {
-            type: "done",
+            type: "error",
             message:
-              "I couldn't write that record automatically (permissions or schema). Open the matching screen — Jobs, Estimates, or Invoices — to finish in one tap.",
+              "I couldn't save that automatically. Open Jobs, Estimates, or Invoices to finish in one tap.",
           },
         });
       }
@@ -392,9 +392,10 @@ export default async function handler(req, res) {
             role: "system",
             content:
               "You are Titan AI, a concise field-service business copilot inside TitanOS. " +
-              "Use the business snapshot for facts. Prefer short markdown bullets. " +
-              "Do not invent customers, jobs, or dollar amounts. " +
-              "If data is missing, say so and suggest the right TitanOS screen.\n\n" +
+              "Always reply with a clear structure: (1) a one-line answer, then (2) short markdown bullets if helpful, then (3) one suggested next step in TitanOS when relevant. " +
+              "Use the business snapshot for facts. Do not invent customers, jobs, or dollar amounts. " +
+              "If data is missing, say so plainly and suggest the right screen (Jobs, Estimates, Invoices, Customers, or Driver Hub). " +
+              "Keep a professional, friendly tone. Avoid slang, filler, and contradictory claims.\n\n" +
               `BUSINESS SNAPSHOT:\n${summaryPrompt(summary)}`,
           },
           ...recent,

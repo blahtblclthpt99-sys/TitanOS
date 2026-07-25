@@ -1,19 +1,20 @@
 import React, { useEffect } from "react";
 import TitanMark from "@/components/brand/TitanMark";
+import { applyTheme, getStoredTheme } from "@/lib/theme";
 
 /**
- * Public auth shell matching titanfieldos.com look:
- * light page, white card, TitanOS mark — no Base44.
+ * Public auth shell: fixed light card for readability on Login/Register.
+ * Restores the user's theme preference when leaving auth screens.
  */
 export default function AuthLayout({ title, subtitle, children, footer }) {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("dark");
+    root.style.colorScheme = "light";
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    const previousTheme = themeMeta?.getAttribute("content");
     if (themeMeta) themeMeta.setAttribute("content", "#F8FAFC");
     return () => {
-      if (themeMeta && previousTheme) themeMeta.setAttribute("content", previousTheme);
+      applyTheme(getStoredTheme());
     };
   }, []);
 

@@ -643,7 +643,10 @@ export default function Landing() {
               Beta
             </Link>
             <Link to="/privacy-policy" className="rounded-md hover:text-foreground focus-ring">
-              Privacy
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="rounded-md hover:text-foreground focus-ring">
+              Terms of Service
             </Link>
             <Link to="/login" className="rounded-md hover:text-foreground focus-ring">
               Sign in

@@ -131,7 +131,7 @@ export default function DriverProfile() {
         <PageHeader title="Driver not found" eyebrow="Driver Hub" />
         <p className="text-sm text-muted-foreground">This driver profile isn’t in the directory.</p>
         <Button asChild variant="outline">
-          <Link to="/driver?tab=directory">Back to Find Drivers</Link>
+          <Link to="/driver?tab=directory">Back to Driver Hub</Link>
         </Button>
       </PageShell>
     );
@@ -170,7 +170,7 @@ export default function DriverProfile() {
         <Button type="button" variant="ghost" className="min-h-[44px] gap-2 px-2" asChild>
           <Link to="/driver?tab=directory">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Find Drivers
+            Driver Hub
           </Link>
         </Button>
         <div className="flex items-center gap-1">

@@ -4,6 +4,7 @@ import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimit } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
+import { captureApiException } from "./_lib/sentry.js";
 
 /**
  * Server-side registration.
@@ -101,6 +102,7 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     logError("api/register", { message: err?.message || String(err) });
+    captureApiException(err, { tags: { route: "register" } });
     return res.status(500).json({ error: "Registration failed" });
   }
 }

@@ -68,7 +68,7 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
     if (data?.stub || data?.setupRequired) {
       throw new PersistenceError(
         data?.message ||
-          "Live checkout is not configured. Add STRIPE_SECRET_KEY on the server — no payment link was created.",
+          "Checkout isn't available yet. No payment link was created.",
         { source: DATA_SOURCE.stub, code: "PAYMENT_STUB" }
       );
     }

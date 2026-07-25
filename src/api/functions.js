@@ -47,7 +47,7 @@ async function localFallback(functionName, payload) {
         source: "local",
         message:
           local ||
-          "Titan AI is offline on this host. Connect to the web app (titanos-web.vercel.app) or check VITE_API_BASE_URL.",
+          "Titan AI is temporarily unavailable. Please try again in a moment.",
       },
     };
   }
@@ -65,7 +65,7 @@ async function localFallback(functionName, payload) {
     return {
       payment: null,
       setupRequired: true,
-      message: "Add STRIPE_SECRET_KEY on Vercel to enable live Stripe Checkout.",
+      message: "Checkout isn't set up yet. Contact support if you need live payments.",
       stub: true,
     };
   }

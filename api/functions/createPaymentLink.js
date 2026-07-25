@@ -88,6 +88,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Amount exceeds maximum" });
     }
 
+    if (provider === "stripe" && !process.env.STRIPE_SECRET_KEY) {
+      return res.status(503).json({
+        error: "Stripe is not configured. Set STRIPE_SECRET_KEY before accepting live payments.",
+        setupRequired: true,
+      });
+    }
+
     // Ignore any client-supplied fee / total — recalculate from Fee Engine
     const feeResult = await calculateCategoryFees(admin, {
       categoryId: "service_requests",
@@ -226,12 +233,15 @@ export default async function handler(req, res) {
       params.set("metadata[fee_config_source]", feeResult.configSource || "seed");
       params.set("metadata[user_id]", user.id);
 
+      const stripeHeaders = {
+        Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      if (payment?.id) stripeHeaders["Idempotency-Key"] = `checkout_${payment.id}`;
+
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: stripeHeaders,
         body: params.toString(),
       });
       const session = await stripeRes.json();

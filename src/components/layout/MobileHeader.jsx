@@ -5,18 +5,25 @@ import { MOBILE_ROOT_PATHS } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 import NotificationBell from "@/components/shared/NotificationBell";
 
+/**
+ * Map nested routes to a sensible parent when browser history is empty
+ * or the entry was a cold deep link (location.key === "default").
+ */
 function getTabRoot(pathname) {
-  if (pathname.startsWith("/driver/")) return "/driver";
-  if (pathname.startsWith("/customers/")) return "/customers";
-  if (pathname.startsWith("/invoices/")) return "/invoices";
-  if (pathname.startsWith("/jobs/")) return "/jobs";
+  if (pathname.startsWith("/driver")) return "/driver";
+  if (pathname.startsWith("/customers")) return "/customers";
+  if (pathname.startsWith("/invoices")) return "/invoices";
+  if (pathname.startsWith("/jobs")) return "/jobs";
+  if (pathname.startsWith("/estimates")) return "/estimates";
   if (pathname.startsWith("/marketplace")) return "/marketplace";
   if (pathname.startsWith("/messages")) return "/messages";
   if (pathname.startsWith("/community")) return "/community";
-  if (pathname.startsWith("/settings")) return "/more";
-  if (pathname.startsWith("/profile")) return "/profile";
-  if (pathname.startsWith("/titan-score")) return "/";
-  if (pathname.startsWith("/trust-safety")) return "/more";
+  if (pathname.startsWith("/assistant")) return "/assistant";
+  if (pathname.startsWith("/settings") || pathname.startsWith("/trust-safety")) return "/more";
+  if (pathname.startsWith("/profile") || pathname.startsWith("/titan-score")) return "/profile";
+  if (pathname.startsWith("/schedule")) return "/schedule";
+  if (pathname.startsWith("/finances") || pathname.startsWith("/payments")) return "/more";
+  if (pathname.startsWith("/fleet") || pathname.startsWith("/hire")) return "/more";
   return "/";
 }
 
@@ -27,11 +34,19 @@ export default function MobileHeader() {
   const isRoot = MOBILE_ROOT_PATHS.includes(pathname);
 
   const handleBack = () => {
-    if (window.history.length > 1) {
+    const parent = getTabRoot(pathname);
+    // Cold deep-link / refresh: avoid leaving the app via history.back()
+    const isColdEntry = !location.key || location.key === "default";
+    const canGoBack =
+      !isColdEntry &&
+      typeof window !== "undefined" &&
+      window.history.state?.idx > 0;
+
+    if (canGoBack) {
       navigate(-1);
-    } else {
-      navigate(getTabRoot(pathname), { replace: true });
+      return;
     }
+    navigate(parent, { replace: true });
   };
 
   return (
@@ -44,7 +59,7 @@ export default function MobileHeader() {
     >
       <div className="flex items-center h-14 w-full gap-2">
         {isRoot ? (
-          <span className="gradient-text font-bold text-lg tracking-tight flex-1">Titan OS</span>
+          <span className="gradient-text font-bold text-lg tracking-tight flex-1">TitanOS</span>
         ) : (
           <button
             type="button"

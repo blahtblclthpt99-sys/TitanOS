@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initSentry, captureException } from '@/lib/sentry'
-import { applyTheme, getStoredTheme, setStoredTheme, watchSystemContrast } from '@/lib/theme'
+import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
 import '@/index.css'
 
@@ -29,16 +29,7 @@ function installGlobalErrorLogging() {
 
 installGlobalErrorLogging();
 
-// Restore charcoal dark as the default OS look (one-time after light redesign).
-try {
-  if (!localStorage.getItem("titanos-theme-dark-restore")) {
-    setStoredTheme("dark");
-    localStorage.setItem("titanos-theme-dark-restore", "1");
-  }
-} catch {
-  /* ignore */
-}
-
+// Prefer stored preference (system / light / dark). Default is system when unset.
 applyTheme(getStoredTheme());
 watchSystemContrast();
 

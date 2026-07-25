@@ -90,7 +90,7 @@ export const APP_NAV_ITEMS = [
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
 
   // Connect
-  { icon: Bot, label: "AI Assistant", path: "/assistant", group: "connect" },
+  { icon: Bot, label: "Titan AI", path: "/assistant", group: "connect" },
   { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
   { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
 
@@ -129,7 +129,7 @@ export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", 
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Store, label: "Market", path: "/marketplace" },
+  { icon: Store, label: "Marketplace", path: "/marketplace" },
   { icon: MessageSquare, label: "Messages", path: "/messages" },
   { icon: User, label: "Profile", path: "/profile" },
 ];

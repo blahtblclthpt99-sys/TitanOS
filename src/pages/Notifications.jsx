@@ -213,7 +213,7 @@ export default function Notifications() {
                 {badge > 0 && (
                   <span
                     className={`min-w-[1.15rem] h-4 px-1 rounded-full text-[10px] flex items-center justify-center ${
-                      active ? "bg-black/15 text-black" : "bg-titan-cyan/20 text-titan-cyan"
+                      active ? "bg-primary/15 text-primary" : "bg-titan-cyan/20 text-titan-cyan"
                     }`}
                   >
                     {badge}

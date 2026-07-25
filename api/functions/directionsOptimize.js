@@ -2,6 +2,8 @@ import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
 import { logError } from "../_lib/safeLog.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
 
 function haversineMiles(a, b) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -52,6 +54,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 40, windowMs: 60_000, key: "directionsOptimize" })) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;
@@ -99,6 +102,7 @@ export default async function handler(req, res) {
     return res.status(200).json(nearestNeighbor(normalized));
   } catch (error) {
     logError("directionsOptimize", error);
+    captureApiException(error, { tags: { route: "directionsOptimize" } });
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

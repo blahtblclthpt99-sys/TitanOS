@@ -35,9 +35,10 @@
     "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs",
     "test:money": "node --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
     "test:tax": "node --test scripts/tax-engine.test.mjs",
+    "test:hardening": "node --test scripts/production-hardening.test.mjs",
     "test:auth": "node --test scripts/auth-guards.test.mjs",
     "test:db-security": "node scripts/verify-db-security.mjs",
-    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth"
+    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

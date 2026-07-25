@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 
 export default function ActionResult({ message, isError = false }) {
   return (
@@ -11,13 +12,18 @@ export default function ActionResult({ message, isError = false }) {
       className={`glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%] border ${
         isError ? "border-red-400/20 bg-red-400/5" : "border-emerald-400/20 bg-emerald-400/5"
       }`}
+      role={isError ? "alert" : "status"}
     >
       <div className="flex items-start gap-2">
-        {isError
-          ? <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-          : <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-        }
-        <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&_p]:text-foreground [&_strong]:text-foreground [&_p]:my-0.5 [&_li]:text-foreground/90">
+        {isError ? (
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        ) : (
+          <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        )}
+        <ReactMarkdown
+          components={safeMarkdownComponents}
+          className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_strong]:text-foreground [&_p]:my-0.5 [&_li]:text-foreground/90"
+        >
           {message}
         </ReactMarkdown>
       </div>

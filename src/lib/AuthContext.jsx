@@ -48,6 +48,9 @@ async function withRetry(task, attempts = AUTH_RETRY_ATTEMPTS) {
   throw lastError;
 }
 
+import { setSentryUser, clearSentryUser } from "@/lib/sentry";
+import { persistAndApplyTheme, normalizeThemePref } from "@/lib/theme";
+
 const AuthContext = React.createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -59,19 +62,31 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = React.useState(() => !hasCachedAuthSession());
   const [appPublicSettings] = React.useState({ appName: "TitanOS" });
 
+  const applyUser = React.useCallback((next) => {
+    setUser(next);
+    if (next?.id) {
+      setSentryUser(next);
+      if (next.theme_pref) {
+        persistAndApplyTheme(normalizeThemePref(next.theme_pref));
+      }
+    } else {
+      clearSentryUser();
+    }
+  }, []);
+
   const checkUserAuth = React.useCallback(async () => {
     try {
       setIsLoadingAuth(true);
       const api = await loadApi();
       const currentUser = await withRetry(() => api.auth.me());
-      setUser(currentUser);
+      applyUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
     } catch (error) {
       if (import.meta.env.DEV) {
         console.debug("User auth check failed:", error?.status || error?.message || error);
       }
-      setUser(null);
+      applyUser(null);
       setIsAuthenticated(false);
       if (error?.status === 401 || error?.status === 403) {
         setAuthError({
@@ -83,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  }, []);
+  }, [applyUser]);
 
   const checkAppState = React.useCallback(async () => {
     setIsLoadingAuth(true);
@@ -91,7 +106,7 @@ export const AuthProvider = ({ children }) => {
 
     // Fast path: anonymous visitors never download Supabase on first paint
     if (!hasCachedAuthSession()) {
-      setUser(null);
+      applyUser(null);
       setIsAuthenticated(false);
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -108,7 +123,7 @@ export const AuthProvider = ({ children }) => {
       if (data.session) {
         await withTimeout(checkUserAuth(), AUTH_BOOT_TIMEOUT_MS, "auth_me_timeout");
       } else {
-        setUser(null);
+        applyUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
         setAuthChecked(true);
@@ -117,12 +132,12 @@ export const AuthProvider = ({ children }) => {
       if (import.meta.env.DEV) {
         console.debug("Auth boot failed:", error?.message || error);
       }
-      setUser(null);
+      applyUser(null);
       setIsAuthenticated(false);
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  }, [checkUserAuth]);
+  }, [checkUserAuth, applyUser]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -147,7 +162,7 @@ export const AuthProvider = ({ children }) => {
           if (session) {
             checkUserAuth();
           } else {
-            setUser(null);
+            applyUser(null);
             setIsAuthenticated(false);
             setIsLoadingAuth(false);
             setAuthChecked(true);
@@ -166,7 +181,7 @@ export const AuthProvider = ({ children }) => {
   }, [checkAppState, checkUserAuth]);
 
   const logout = React.useCallback(async (redirectTo = window.location.href) => {
-    setUser(null);
+    applyUser(null);
     setIsAuthenticated(false);
     setAuthError(null);
     const api = await loadApi();
@@ -175,7 +190,7 @@ export const AuthProvider = ({ children }) => {
     } else {
       api.auth.logout(redirectTo);
     }
-  }, []);
+  }, [applyUser]);
 
   const navigateToLogin = React.useCallback(async () => {
     const api = await loadApi();

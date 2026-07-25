@@ -189,7 +189,7 @@ export default function Jobs({ isActive = true }) {
         title: "Job completed",
         description:
           summary.source === "local"
-            ? "Template summary generated on-device (not a live AI model)."
+            ? "Summary written on this device."
             : summary.follow_up_message?.slice(0, 100) || summary.completion_report?.slice(0, 100),
       });
     } catch (err) {
@@ -263,38 +263,40 @@ export default function Jobs({ isActive = true }) {
         bulkMode && selected.has(job.id) ? "border border-primary/40 bg-primary/5" : ""
       }`}
     >
-      <div className="flex items-start gap-4">
-        {bulkMode && (
-          <div className="flex-shrink-0 mt-1">
-            {selected.has(job.id)
-              ? <CheckSquare className="w-4 h-4 text-primary" />
-              : <Square className="w-4 h-4 text-muted-foreground" />}
-          </div>
-        )}
-        <div className="w-1 h-14 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: job.color || "#00C7D9" }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
-            <StatusBadge status={job.status} />
-            <span className={`text-xs font-semibold ${PRIORITY_COLORS[job.priority]}`}>● {job.priority}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {job.customer_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="w-3 h-3" />{job.customer_name}</span>}
-            {job.assigned_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><UserCheck className="w-3 h-3" />{job.assigned_name}</span>}
-            <span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="w-3 h-3" />{formatMonthDay(job.scheduled_date)}</span>
-            {job.scheduled_time && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="w-3 h-3" />{job.scheduled_time}</span>}
-            {job.address && <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[160px]"><MapPin className="w-3 h-3" />{job.address}</span>}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+          {bulkMode && (
+            <div className="flex-shrink-0 mt-1">
+              {selected.has(job.id)
+                ? <CheckSquare className="w-4 h-4 text-primary" />
+                : <Square className="w-4 h-4 text-muted-foreground" />}
+            </div>
+          )}
+          <div className="w-1 h-14 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: job.color || "#00C7D9" }} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <p className="text-sm font-semibold text-foreground break-words">{job.title}</p>
+              <StatusBadge status={job.status} />
+              <span className={`text-xs font-semibold ${PRIORITY_COLORS[job.priority]}`}>● {job.priority}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {job.customer_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="w-3 h-3 flex-shrink-0" />{job.customer_name}</span>}
+              {job.assigned_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><UserCheck className="w-3 h-3 flex-shrink-0" />{job.assigned_name}</span>}
+              <span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="w-3 h-3 flex-shrink-0" />{formatMonthDay(job.scheduled_date)}</span>
+              {job.scheduled_time && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="w-3 h-3 flex-shrink-0" />{job.scheduled_time}</span>}
+              {job.address && <span className="flex items-center gap-1 text-xs text-muted-foreground max-w-full sm:max-w-[200px]"><MapPin className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.address}</span></span>}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {job.amount > 0 && <p className="text-sm font-bold text-emerald-400">${job.amount.toLocaleString()}</p>}
+        <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end pl-4 sm:pl-0">
+          {job.amount > 0 && <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${job.amount.toLocaleString()}</p>}
           {job.status !== "completed" && !bulkMode && (
             <Button onClick={() => markComplete(job)} disabled={completingId === job.id} size="sm"
-              className="bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-300 border border-emerald-400/20 rounded-lg text-xs">
+              className="bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-700 dark:text-emerald-300 border border-emerald-400/20 rounded-lg text-xs min-h-[36px]">
               {completingId === job.id ? "Saving…" : "Complete"}
             </Button>
           )}
-          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/90 rounded-lg text-xs">Field ops</Button>}
+          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/90 rounded-lg text-xs min-h-[36px]">Field ops</Button>}
           {!bulkMode && (
             <DeleteButton
               label={job.title || "this job"}
@@ -447,10 +449,11 @@ export default function Jobs({ isActive = true }) {
         <EmptyState icon={Briefcase} title="No jobs yet" description="Create your first job to start tracking work." onAction={openForm} actionLabel="New Job" />
       ) : filtered.length === 0 ? (
         <EmptyState title="No matches" description="No jobs match your filter. Try clearing search or status." className="py-12" />
-      ) : shouldVirtualize(filtered.length) ? (
+      ) : shouldVirtualize(filtered.length) && !expandedJobId ? (
         <VirtualList
           items={filtered}
           renderItem={renderJobRow}
+          estimateSize={180}
           className="pb-28"
           scrollRef={containerRef}
         />
@@ -472,7 +475,10 @@ export default function Jobs({ isActive = true }) {
             animate={{ y: 0, opacity: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { y: 80, opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.2 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-2xl shadow-2xl px-4 py-3"
+            className="fixed left-1/2 -translate-x-1/2 z-[60] flex flex-wrap items-center justify-center gap-2 bg-card border border-border rounded-2xl shadow-2xl px-4 py-3 max-w-[calc(100vw-1.5rem)]"
+            style={{
+              bottom: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
+            }}
           >
             <span className="text-xs text-muted-foreground mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>
 

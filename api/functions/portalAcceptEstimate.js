@@ -1,6 +1,8 @@
 import { getSupabaseAdmin, readJson, toEntityRow } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { logError } from "../_lib/safeLog.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
 
 async function requirePortalSession(admin, token) {
   if (!token || typeof token !== "string") return { error: "Missing session token", status: 400 };
@@ -17,6 +19,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 30, windowMs: 60_000, key: "portalAcceptEstimate" })) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -55,6 +58,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ estimate: toEntityRow(updated) });
   } catch (error) {
     logError("portalAcceptEstimate", error);
+    captureApiException(error, { tags: { route: "portalAcceptEstimate" } });
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

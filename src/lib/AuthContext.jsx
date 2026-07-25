@@ -86,13 +86,36 @@ export const AuthProvider = ({ children }) => {
       if (import.meta.env.DEV) {
         console.debug("User auth check failed:", error?.status || error?.message || error);
       }
-      applyUser(null);
-      setIsAuthenticated(false);
-      if (error?.status === 401 || error?.status === 403) {
+
+      // Transient failures (timeout / network) while Supabase still has a session:
+      // keep the previous signed-in state instead of dumping the user on Landing.
+      const status = error?.status;
+      const transient = status === 408 || status === 500 || status === 502 || status === 503 || !status;
+      let stillHasSession = false;
+      try {
+        const supabase = await loadSupabase();
+        const { data } = await supabase.auth.getSession();
+        stillHasSession = Boolean(data?.session?.access_token);
+      } catch {
+        stillHasSession = hasCachedAuthSession();
+      }
+
+      if (transient && stillHasSession) {
         setAuthError({
-          type: "auth_required",
-          message: "Authentication required",
+          type: "auth_degraded",
+          message: "Couldn’t refresh your profile. Retrying…",
         });
+        // Keep prior signed-in state (and user) if we already had one.
+        // Do not invent isAuthenticated=true without a loaded profile.
+      } else {
+        applyUser(null);
+        setIsAuthenticated(false);
+        if (status === 401 || status === 403) {
+          setAuthError({
+            type: "auth_required",
+            message: "Authentication required",
+          });
+        }
       }
     } finally {
       setIsLoadingAuth(false);
@@ -132,10 +155,21 @@ export const AuthProvider = ({ children }) => {
       if (import.meta.env.DEV) {
         console.debug("Auth boot failed:", error?.message || error);
       }
-      applyUser(null);
-      setIsAuthenticated(false);
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
+      // Timeout / network during boot must not wipe a still-valid session —
+      // that was dumping signed-in users onto the marketing Landing page.
+      if (hasCachedAuthSession()) {
+        setAuthError({
+          type: "auth_degraded",
+          message: "Couldn’t finish signing you in. You can retry from login.",
+        });
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+      } else {
+        applyUser(null);
+        setIsAuthenticated(false);
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+      }
     }
   }, [checkUserAuth, applyUser]);
 

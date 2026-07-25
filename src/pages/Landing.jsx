@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
+import { useAuth } from "@/lib/AuthContext";
+import { hasCachedAuthSession } from "@/lib/sessionPeek";
+import Spinner from "@/components/shared/Spinner";
 
 const btn =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-[48px] px-6";
@@ -261,6 +264,7 @@ function FieldShowcase() {
 }
 
 export default function Landing() {
+  const { isAuthenticated, authChecked, isLoadingAuth } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef(null);
   const menuPanelRef = useRef(null);
@@ -282,6 +286,17 @@ export default function Landing() {
     first?.focus?.();
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+
+  // Safety net: never paint marketing home while signed in (or recovering a session).
+  if (authChecked && isAuthenticated) {
+    return null;
+  }
+  if ((!authChecked || isLoadingAuth) && hasCachedAuthSession()) {
+    return <Spinner fullScreen label="Loading TitanOS" />;
+  }
+  if (authChecked && !isAuthenticated && hasCachedAuthSession()) {
+    return <Navigate to="/login" replace state={{ sessionRecover: true }} />;
+  }
 
   const nav = (
     <>

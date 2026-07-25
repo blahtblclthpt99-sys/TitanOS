@@ -79,7 +79,8 @@ export function readSession(userId) {
 }
 
 export function readStops(userId) {
-  return readLocal(PREFIX, userId, STOPS_KEY, []);
+  const raw = readLocal(PREFIX, userId, STOPS_KEY, []);
+  return Array.isArray(raw) ? raw : [];
 }
 
 export async function listDriverVehicles(userId) {
@@ -595,7 +596,8 @@ export async function stopDrivingSession(userId, snapshot = {}) {
 }
 
 export function readShiftHistory(userId) {
-  return readLocal(PREFIX, userId, "history", []);
+  const raw = readLocal(PREFIX, userId, "history", []);
+  return Array.isArray(raw) ? raw : [];
 }
 
 export function coachTip(mode, dayPart) {
@@ -757,7 +759,7 @@ export function computeShiftDashboard(session, stops, { mpg, gasPriceLocal, curr
     earnings,
     profit,
     taxEstimate,
-    jobsCompleted: (stops || []).filter((s) => s.ended_at).length,
+    jobsCompleted: (Array.isArray(stops) ? stops : []).filter((s) => s.ended_at).length,
   };
 }
 
@@ -838,7 +840,8 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
 
 export function sessionStats(session, stops) {
   if (!session) return null;
-  const closed = (stops || []).filter((s) => s.ended_at);
+  const stopList = Array.isArray(stops) ? stops : [];
+  const closed = stopList.filter((s) => s.ended_at);
   const avgStop =
     closed.length > 0
       ? Math.round(closed.reduce((s, x) => s + (x.duration_sec || 0), 0) / closed.length)
@@ -863,7 +866,7 @@ export function sessionStats(session, stops) {
   return {
     miles: Number(session.miles || 0),
     autoMiles: Number(session.auto_miles || 0),
-    stops: (stops || []).length,
+    stops: stopList.length,
     avgStopSec: avgStop,
     avgBetweenSec: avgBetween,
     elapsedSec,

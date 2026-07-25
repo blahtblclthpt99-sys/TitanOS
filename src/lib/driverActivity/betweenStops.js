@@ -14,9 +14,16 @@ function secBetween(aIso, bIso) {
   return Math.max(0, Math.round((ts(bIso) - ts(aIso)) / 1000));
 }
 
+/** Coerce localStorage / history payloads to a real array (objects throw on spread). */
+function asStopList(stops) {
+  if (Array.isArray(stops)) return stops;
+  if (stops && typeof stops === "object") return Object.values(stops).filter(Boolean);
+  return [];
+}
+
 /** Oldest → newest */
 export function chronologicalStops(stops = []) {
-  return [...(stops || [])].sort((a, b) => ts(a.started_at) - ts(b.started_at));
+  return [...asStopList(stops)].sort((a, b) => ts(a.started_at) - ts(b.started_at));
 }
 
 /**

@@ -27,15 +27,24 @@ export default function BetweenStopsPanel({
   tick = 0,
 }) {
   const report = useMemo(
-    () => buildStopLegReport(session, stops, { now: new Date() }),
+    () => {
+      try {
+        return buildStopLegReport(session, Array.isArray(stops) ? stops : [], { now: new Date() });
+      } catch (err) {
+        console.error("[BetweenStopsPanel]", err);
+        return null;
+      }
+    },
     // tick forces live refresh while session is active
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [session, stops, tick]
   );
 
-  if (!session) return null;
+  if (!session || !report) return null;
 
-  const { stops: cards, summary, insights, timeline, afterLast } = report;
+  const { stops: cards = [], summary, insights, timeline = [], afterLast = { drive_sec: 0, miles: 0 } } =
+    report;
+  if (!summary || !insights) return null;
 
   const exportSession = () => {
     const csv = buildSessionChronologyCsv(session, stops);
@@ -130,9 +139,9 @@ export default function BetweenStopsPanel({
         </p>
       ) : (
         <ul className="space-y-3">
-          {cards.map((st) => (
+          {cards.map((st, idx) => (
             <li
-              key={st.id}
+              key={st.id || `stop-${idx}`}
               className="rounded-2xl border border-border bg-card/70 p-4 space-y-2"
             >
               <div className="flex items-center justify-between gap-2">
@@ -180,16 +189,16 @@ export default function BetweenStopsPanel({
         </ul>
       )}
 
-      {(afterLast.drive_sec > 0 || afterLast.miles > 0) && (
+      {((afterLast?.drive_sec || 0) > 0 || (afterLast?.miles || 0) > 0) && (
         <div className="rounded-xl border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2">
           <Route className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden="true" />
           <p>
             {session.ended_at ? "After last stop" : "Since last stop"}:{" "}
             <strong className="text-foreground tabular-nums">
-              {formatDuration(afterLast.drive_sec)}
+              {formatDuration(afterLast?.drive_sec)}
             </strong>{" "}
             driving ·{" "}
-            <strong className="text-foreground tabular-nums">{afterLast.miles} mi</strong>
+            <strong className="text-foreground tabular-nums">{afterLast?.miles ?? 0} mi</strong>
           </p>
         </div>
       )}

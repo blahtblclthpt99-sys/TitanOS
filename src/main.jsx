@@ -33,6 +33,28 @@ installGlobalErrorLogging();
 applyTheme(getStoredTheme());
 watchSystemContrast();
 
+// Clear one-shot chunk-reload flag after a successful boot
+try {
+  sessionStorage.removeItem("titanos-chunk-reload");
+} catch {
+  /* ignore */
+}
+
+// Vite: missing hashed chunk after deploy → hard reload once
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    event.preventDefault?.();
+    try {
+      if (!sessionStorage.getItem("titanos-chunk-reload")) {
+        sessionStorage.setItem("titanos-chunk-reload", "1");
+        window.location.reload();
+      }
+    } catch {
+      window.location.reload();
+    }
+  });
+}
+
 // Native-only deep links — keep Capacitor plugins out of the web entry chunk
 if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
   import("@/lib/capacitor-auth")
@@ -54,14 +76,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       runWhenIdle(async () => {
         try {
-          if (!localStorage.getItem('titanos-sw-v6-purge')) {
+          if (!localStorage.getItem('titanos-sw-v7-purge')) {
             const regs = await navigator.serviceWorker.getRegistrations();
             await Promise.all(regs.map((r) => r.unregister()));
             if (window.caches?.keys) {
               const keys = await caches.keys();
               await Promise.all(keys.filter((k) => k.startsWith('titanos-shell')).map((k) => caches.delete(k)));
             }
-            localStorage.setItem('titanos-sw-v6-purge', '1');
+            localStorage.setItem('titanos-sw-v7-purge', '1');
           }
         } catch {
           /* ignore */

@@ -1,5 +1,5 @@
 /* TitanOS service worker — app shell cache + offline fallback + static assets */
-const CACHE = "titanos-shell-v6";
+const CACHE = "titanos-shell-v7";
 const PRECACHE = [
   "/offline.html",
   "/manifest.webmanifest",

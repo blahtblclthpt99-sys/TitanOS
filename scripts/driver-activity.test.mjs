@@ -193,4 +193,26 @@ describe("time between stops", () => {
     assert.equal(corrected.stops[0].miles_since_prev, 15);
     assert.equal(corrected.summary.totalBusinessMiles, 22);
   });
+
+  it("tolerates non-array stops payloads without throwing", async () => {
+    const { buildStopLegReport, summarizeBetweenStopsDaily } = await import(
+      "../src/lib/driverActivity/betweenStops.js"
+    );
+    const session = {
+      started_at: "2026-07-25T09:00:00Z",
+      active: true,
+      miles: 3,
+      drive_sec: 100,
+    };
+    const fromObject = buildStopLegReport(session, {
+      a: { id: "a", started_at: "2026-07-25T09:10:00Z", ended_at: "2026-07-25T09:12:00Z" },
+    });
+    assert.equal(fromObject.summary.totalStops, 1);
+    const fromNull = buildStopLegReport(session, null);
+    assert.equal(fromNull.summary.totalStops, 0);
+    const daily = summarizeBetweenStopsDaily([
+      { ...session, ended_at: "2026-07-25T10:00:00Z", stops_detail: { x: 1 } },
+    ]);
+    assert.equal(typeof daily.totalStops, "number");
+  });
 });

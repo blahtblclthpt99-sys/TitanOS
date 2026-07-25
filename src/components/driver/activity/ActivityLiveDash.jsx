@@ -156,7 +156,7 @@ export default function ActivityLiveDash({
             </StatHint>
           </p>
           <p className="text-sm font-semibold text-emerald-500 tabular-nums">
-            ${dash.taxEstimate.toFixed(0)}
+            ${(Number(dash.taxEstimate) || 0).toFixed(0)}
           </p>
         </div>
       </div>

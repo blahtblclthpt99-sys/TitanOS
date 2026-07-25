@@ -21,6 +21,7 @@ import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import { useDriverActivityTracker } from "@/components/driver/activity/useDriverActivityTracker";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -671,15 +672,17 @@ export default function DriverShiftPanel() {
             </div>
 
             {drivingActive && dash && (
-              <ActivityLiveDash
-                dash={dash}
-                stopPhase={session?.stop_phase || dash.stopPhase}
-                paused={sessionPaused}
-                milesSource={session?.miles_source || dash.milesSource}
-                onPause={handlePauseSession}
-                onResume={handleResumeSession}
-                busy={busy}
-              />
+              <ErrorBoundary message="Live session dash couldn't load.">
+                <ActivityLiveDash
+                  dash={dash}
+                  stopPhase={session?.stop_phase || dash.stopPhase}
+                  paused={sessionPaused}
+                  milesSource={session?.miles_source || dash.milesSource}
+                  onPause={handlePauseSession}
+                  onResume={handleResumeSession}
+                  busy={busy}
+                />
+              </ErrorBoundary>
             )}
 
             {drivingActive && gpsError && (
@@ -959,16 +962,18 @@ export default function DriverShiftPanel() {
 
       {mode === "driving" && session && (
         <section className="glass rounded-2xl p-5 border border-border">
-          <BetweenStopsPanel
-            session={session}
-            stops={stops}
-            tick={tick}
-            onRenameStop={(id, label) => {
-              if (!user?.id) return;
-              renameStop(user.id, id, label);
-              setStops(readStops(user.id));
-            }}
-          />
+          <ErrorBoundary message="Time between stops couldn't load. Other shift tools still work.">
+            <BetweenStopsPanel
+              session={session}
+              stops={stops}
+              tick={tick}
+              onRenameStop={(id, label) => {
+                if (!user?.id) return;
+                renameStop(user.id, id, label);
+                setStops(readStops(user.id));
+              }}
+            />
+          </ErrorBoundary>
           {openStop ? (
             <div className="mt-3">
               <Button type="button" variant="outline" size="sm" onClick={() => handleEndStop(openStop.id)}>
@@ -987,7 +992,9 @@ export default function DriverShiftPanel() {
       )}
 
       {mode === "driving" && (
-        <ActivityStatsPanel history={history} liveSession={drivingActive ? session : null} stops={stops} />
+        <ErrorBoundary message="Driver statistics couldn't load. Try refresh.">
+          <ActivityStatsPanel history={history} liveSession={drivingActive ? session : null} stops={stops} />
+        </ErrorBoundary>
       )}
 
       {mode === "driving" && (
@@ -1040,7 +1047,7 @@ export default function DriverShiftPanel() {
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase">Deductible est.</p>
                 <p className="text-lg font-bold text-emerald-500 tabular-nums">
-                  ${recorded.taxEstimate.toFixed(2)}
+                  ${(Number(recorded.taxEstimate) || 0).toFixed(2)}
                 </p>
               </div>
             </div>

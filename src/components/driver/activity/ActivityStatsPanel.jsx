@@ -27,12 +27,19 @@ export default function ActivityStatsPanel({ history, liveSession, stops }) {
   );
 
   const todayBetween = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = (history || []).filter((h) => (h.started_at || "").slice(0, 10) === today);
-    if (liveSession?.active) {
-      rows.unshift({ ...liveSession, stops_detail: stops || [] });
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = (Array.isArray(history) ? history : []).filter(
+        (h) => (h.started_at || "").slice(0, 10) === today
+      );
+      if (liveSession?.active) {
+        rows.unshift({ ...liveSession, stops_detail: Array.isArray(stops) ? stops : [] });
+      }
+      return summarizeBetweenStopsDaily(rows);
+    } catch (err) {
+      console.error("[ActivityStatsPanel]", err);
+      return summarizeBetweenStopsDaily([]);
     }
-    return summarizeBetweenStopsDaily(rows);
   }, [history, liveSession, stops]);
 
   const exportCsv = () => {

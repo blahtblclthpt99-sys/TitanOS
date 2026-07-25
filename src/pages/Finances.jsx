@@ -141,7 +141,7 @@ export default function Finances() {
           ) : (
             <div className="space-y-2">
               {expenses.slice(0, 8).map(exp => (
-                <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-white/[0.05] transition-colors">
+                <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
                     <p className="text-xs text-muted-foreground capitalize">{exp.category}{exp.vendor ? ` · ${exp.vendor}` : ""} · {formatMonthDay(exp.date)}</p>

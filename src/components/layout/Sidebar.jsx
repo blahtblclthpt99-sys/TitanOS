@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, Zap } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { useNavBadges } from "@/hooks/useNavBadges";
 import { isRouteActive } from "@/lib/nav-utils";
@@ -16,6 +16,8 @@ import { normalizeAppPath } from "@/lib/routing";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { useAuth } from "@/lib/AuthContext";
 import { isUserAdmin } from "@/lib/isAdmin";
+import TitanMark from "@/components/brand/TitanMark";
+import TitanWordmark from "@/components/brand/TitanWordmark";
 
 const OPEN_GROUPS_KEY = "titanos_sidebar_open_groups";
 
@@ -135,11 +137,9 @@ export default function Sidebar() {
         <Link
           to="/"
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1.5 focus-ring"
-          aria-label="Titan OS home"
+          aria-label="TitanOS home"
         >
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-soft">
-            <Zap className="h-4.5 w-4.5 h-4 w-4" aria-hidden="true" />
-          </div>
+          <TitanMark className="h-9 w-9 flex-shrink-0" />
           <AnimatePresence initial={false}>
             {expanded && (
               <motion.div
@@ -149,8 +149,10 @@ export default function Sidebar() {
                 transition={{ duration: 0.15 }}
                 className="min-w-0 overflow-hidden"
               >
-                <p className="truncate text-sm font-bold tracking-tight text-foreground">Titan OS</p>
-                <p className="truncate text-[10px] font-medium text-muted-foreground">Command Center</p>
+                <TitanWordmark size="sm" />
+                <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">
+                  Command Center
+                </p>
               </motion.div>
             )}
           </AnimatePresence>

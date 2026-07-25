@@ -25,6 +25,8 @@ import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
+import ThemeToggle from "@/components/brand/ThemeToggle";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import {
   MARKETING_CHANNELS,
   MARKETING_CATEGORIES,
@@ -624,23 +626,14 @@ export default function Settings() {
         <DialogContent className="bg-card border-border text-foreground max-w-md rounded-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Appearance &amp; accessibility</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground mt-1">Theme, contrast, text size, and motion</p>
-          <div className="grid grid-cols-3 gap-2 mt-4" role="group" aria-label="Color theme">
-            {["system", "light", "dark"].map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setThemePref(option)}
-                className={`rounded-md border px-3 py-4 text-sm font-medium capitalize transition-colors duration-fast focus-ring ${
-                  themePref === option
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:bg-muted"
-                }`}
-                aria-pressed={themePref === option}
-              >
-                {option}
-              </button>
-            ))}
+          <div className="mt-4 flex justify-center">
+            <TitanBrandLogo layout="horizontal" imgClassName="h-12 dark:brightness-110" />
           </div>
+          <ThemeToggle
+            variant="segmented"
+            className="mt-4"
+            onChange={(next) => setThemePref(next)}
+          />
           <button
             type="button"
             onClick={() => {

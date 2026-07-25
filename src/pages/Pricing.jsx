@@ -81,24 +81,24 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
       className={`w-full glass rounded-3xl p-6 border ${
-        highlighted ? "border-titan-cyan/40 titan-glow" : "border-white/10"
+        highlighted ? "border-titan-cyan/40 titan-glow" : "border-border"
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-white/35 mb-1">{plan.audience}</p>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{plan.audience}</p>
           <div className="flex items-center gap-2 mb-1">
-            <Icon className={`w-4 h-4 ${highlighted ? "text-titan-cyan" : "text-white/45"}`} />
-            <h2 className="text-lg font-bold text-white">{plan.name}</h2>
+            <Icon className={`w-4 h-4 ${highlighted ? "text-titan-cyan" : "text-muted-foreground"}`} />
+            <h2 className="text-lg font-bold text-foreground">{plan.name}</h2>
           </div>
-          <p className="text-xs text-white/45 leading-relaxed">{plan.blurb}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{plan.blurb}</p>
         </div>
         <div className="text-right shrink-0">
           <span className="text-2xl font-bold text-titan-cyan">
             {plan.priceMonthly === 0 ? "$0" : formatMoney(plan.priceMonthly)}
           </span>
-          <p className="text-xs text-white/40 mt-0.5">{plan.priceMonthly === 0 ? "to start" : "/ month"}</p>
-          <p className="text-[11px] text-white/35 mt-1">{plan.feeLabel} fee</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{plan.priceMonthly === 0 ? "to start" : "/ month"}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{plan.feeLabel} fee</p>
         </div>
       </div>
 
@@ -108,7 +108,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
             <div className="w-5 h-5 rounded-full bg-titan-cyan/15 flex items-center justify-center flex-shrink-0 mt-0.5">
               <Check className="w-3 h-3 text-titan-cyan" />
             </div>
-            <span className="text-xs text-white/60 leading-relaxed">{f}</span>
+            <span className="text-xs text-muted-foreground leading-relaxed">{f}</span>
           </div>
         ))}
       </div>
@@ -118,7 +118,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
         className={`w-full rounded-2xl h-11 text-sm font-semibold gap-2 ${
           highlighted
             ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black"
-            : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
+            : "bg-muted hover:bg-muted/80 text-foreground border border-border"
         }`}
       >
         <Link to={cta.to}>
@@ -131,7 +131,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
 
 export default function Pricing() {
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white flex flex-col">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
     <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10 max-w-2xl w-full">
         {betaBadgeLabel() && (
@@ -140,11 +140,11 @@ export default function Pricing() {
             <span className="text-xs text-titan-cyan font-semibold uppercase tracking-wider">{betaBadgeLabel()}</span>
           </div>
         )}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
           Launch pricing that<br />
           <span className="gradient-text">grows with you</span>
         </h1>
-        <p className="text-white/50 text-base sm:text-lg max-w-xl mx-auto">
+        <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
           Customers hire free. Workers start at $0 with an {PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.
         </p>
       </motion.div>
@@ -166,8 +166,8 @@ export default function Pricing() {
             <Smartphone className="w-6 h-6 text-titan-cyan" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white mb-0.5">TitanOS for Android</p>
-            <p className="text-xs text-white/40">Same launch pricing on mobile via Google Play</p>
+            <p className="text-sm font-semibold text-foreground mb-0.5">TitanOS for Android</p>
+            <p className="text-xs text-muted-foreground">Same launch pricing on mobile via Google Play</p>
           </div>
           <Button
             onClick={openPlayStore}
@@ -183,13 +183,13 @@ export default function Pricing() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="w-full max-w-6xl glass rounded-2xl p-5 border border-white/5"
+        className="w-full max-w-6xl glass rounded-2xl p-5 border border-border"
       >
         <div className="flex items-start gap-3">
           <Zap className="w-5 h-5 text-titan-amber flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-white mb-1">Why this structure</p>
-            <p className="text-xs text-white/50 leading-relaxed">
+            <p className="text-sm font-semibold text-foreground mb-1">Why this structure</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               New users can try the platform with no upfront cost. Professionals get a clear incentive to upgrade as they book more work.
               Fees apply when you collect payment through TitanOS — Customer {PLANS.customer.feeLabel}, Worker Free {PLANS.worker_free.feeLabel},
               Worker Premium {PLANS.worker_premium.feeLabel}, Business {PLANS.business.feeLabel}. Pricing can adjust as the network grows.
@@ -198,7 +198,7 @@ export default function Pricing() {
         </div>
       </motion.div>
     </div>
-    <SiteFooter className="border-white/10 bg-[#0A0A0B] text-white/50 [&_a]:text-white/50 [&_a:hover]:text-white" />
+    <SiteFooter />
     </div>
   );
 }

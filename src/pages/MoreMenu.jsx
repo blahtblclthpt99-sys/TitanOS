@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
+import ThemeToggle from "@/components/brand/ThemeToggle";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import { MORE_MENU_GROUPS, filterNavItems, navItemsByPaths } from "@/lib/nav-items";
 import { useAuth } from "@/lib/AuthContext";
 import { isUserAdmin } from "@/lib/isAdmin";
@@ -20,6 +22,11 @@ export default function MoreMenu() {
         title="More"
         subtitle="Daily tools first — Labs holds demos and early experiments."
       />
+
+      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+        <TitanBrandLogo layout="svg" markClassName="h-9 w-9" showTagline />
+        <ThemeToggle variant="segmented" className="w-full sm:w-auto sm:min-w-[240px]" />
+      </div>
 
       {betaBadgeLabel() && (
         <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-medium text-primary">

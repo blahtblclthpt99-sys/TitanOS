@@ -290,7 +290,7 @@ export default function TaxCenter({ isActive = true }) {
             );
             const isPast = i < currentQuarterIndex;
             return (
-              <div key={q.label} className={`rounded-xl p-4 border ${isPast ? "bg-white/[0.02] border-border" : "bg-primary/5 border-primary/20"}`}>
+              <div key={q.label} className={`rounded-xl p-4 border ${isPast ? "bg-muted/50 border-border" : "bg-primary/5 border-primary/20"}`}>
                 <p className="text-xs text-muted-foreground mb-1">{q.label}</p>
                 <p className="text-sm font-semibold text-foreground tabular-nums">${Math.round(q.estimated_tax).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">Income: ${Math.round(q.income).toLocaleString()}</p>

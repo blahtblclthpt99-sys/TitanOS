@@ -23,13 +23,13 @@ export default function AppDownloadBanner() {
   return (
     <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+8.75rem)] md:bottom-3 left-0 right-0 z-40 px-3 pointer-events-none">
       <div className="max-w-lg mx-auto pointer-events-auto">
-        <div className="glass border border-white/8 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-2xl">
+        <div className="glass border border-border rounded-2xl px-4 py-3 flex items-center gap-3 shadow-2xl">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">
             <Smartphone className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white leading-tight">TitanOS for Android</p>
-            <p className="text-[11px] text-white/40 leading-tight">
+            <p className="text-xs font-semibold text-foreground leading-tight">TitanOS for Android</p>
+            <p className="text-[11px] text-muted-foreground leading-tight">
               Install from Google Play ·{" "}
               <a href={TITANOS_PLAY_TESTING_URL} className="text-titan-cyan/80 underline-offset-2 hover:underline" target="_blank" rel="noreferrer">
                 tester opt-in
@@ -47,7 +47,7 @@ export default function AppDownloadBanner() {
           <button
             type="button"
             onClick={dismiss}
-            className="text-white/40 hover:text-white/80 transition-colors inline-flex min-h-[44px] min-w-[44px] items-center justify-center flex-shrink-0 rounded-md focus-ring"
+            className="text-muted-foreground hover:text-foreground transition-colors inline-flex min-h-[44px] min-w-[44px] items-center justify-center flex-shrink-0 rounded-md focus-ring"
             aria-label="Dismiss"
           >
             <X className="w-4 h-4" />

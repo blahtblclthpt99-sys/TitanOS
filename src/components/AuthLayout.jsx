@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import TitanMark from "@/components/brand/TitanMark";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 
 /**
@@ -31,8 +31,8 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
       <div className="w-full max-w-[420px]">
         <div className="bg-white rounded-2xl shadow-[0_10px_40px_rgba(15,23,42,0.08)] border border-slate-200/80 p-8 sm:p-10">
           <div className="text-center mb-6">
-            <div className="inline-flex justify-center mb-3">
-              <TitanMark className="w-[88px] h-[88px]" />
+            <div className="inline-flex justify-center mb-4">
+              <TitanBrandLogo layout="stacked" imgClassName="h-[4.5rem]" />
             </div>
             <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-slate-900 leading-tight">
               {title}

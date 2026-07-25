@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { Download as DownloadIcon, ArrowRight, Smartphone, ExternalLink, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,8 @@ const STEPS = [
 ];
 
 export default function Download() {
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
-
   return (
-    <div className="min-h-svh bg-[#0A0A0B] px-4 py-10 text-white">
+    <div className="min-h-svh bg-background px-4 py-10 text-foreground">
       <div className="mx-auto max-w-md">
         <div className="mb-10 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-semibold">
@@ -35,7 +31,7 @@ export default function Download() {
           </Link>
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white min-h-[44px]"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground min-h-[44px]"
           >
             <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
             Back
@@ -49,14 +45,14 @@ export default function Download() {
             </span>
           </div>
           <h1 className="mb-3 text-3xl font-black">Get TitanOS</h1>
-          <p className="text-sm leading-relaxed text-white/40">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             Closed testers must install from Google Play with the invited Google account — not a random APK.
           </p>
         </div>
 
         <div className="mb-5 rounded-2xl border border-titan-cyan/25 bg-titan-cyan/5 p-5">
-          <p className="text-sm font-semibold text-white">Play testers — do this first</p>
-          <p className="mt-1 text-xs leading-relaxed text-white/50">
+          <p className="text-sm font-semibold text-foreground">Play testers — do this first</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Open the opt-in page, tap Become a tester, wait ~1 minute, then install from Play.
           </p>
           <Button
@@ -67,14 +63,14 @@ export default function Download() {
             <ExternalLink className="mr-2 h-4 w-4" />
             Become a tester
           </Button>
-          <p className="mt-2 break-all text-[10px] text-white/25">{TITANOS_PLAY_TESTING_URL}</p>
+          <p className="mt-2 break-all text-[10px] text-muted-foreground/60">{TITANOS_PLAY_TESTING_URL}</p>
         </div>
 
         <div className="mb-5 space-y-3">
           {DOWNLOAD_PACKAGES.map((pkg) => (
             <div
               key={pkg.id}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+              className="rounded-2xl border border-border bg-muted/50 p-5"
             >
               <div className="mb-3 flex items-start gap-3">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-titan-cyan/10">
@@ -82,8 +78,8 @@ export default function Download() {
                 </div>
                 <div className="min-w-0 flex-1 text-left">
                   <p className="text-sm font-semibold">{pkg.name}</p>
-                  <p className="mt-0.5 text-xs text-white/40">{pkg.desc}</p>
-                  <p className="mt-1 text-[11px] text-white/25">
+                  <p className="mt-0.5 text-xs text-muted-foreground">{pkg.desc}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground/70">
                     {pkg.filename} · {pkg.size}
                   </p>
                 </div>
@@ -94,7 +90,7 @@ export default function Download() {
                 className={
                   pkg.primary
                     ? "h-11 w-full rounded-xl bg-titan-cyan text-sm font-bold text-black hover:bg-titan-cyan/85"
-                    : "h-11 w-full rounded-xl border border-white/10 bg-transparent text-sm font-bold text-white/70 hover:bg-white/5 hover:text-white"
+                    : "h-11 w-full rounded-xl border border-border bg-transparent text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
                 }
                 variant={pkg.primary ? "default" : "outline"}
               >
@@ -109,8 +105,8 @@ export default function Download() {
           ))}
         </div>
 
-        <div className="mb-5 rounded-2xl border border-white/5 bg-white/[0.03] p-5">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/30">
+        <div className="mb-5 rounded-2xl border border-border bg-muted/50 p-5">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             How to install (Play)
           </p>
           <ol className="space-y-3">
@@ -119,7 +115,7 @@ export default function Download() {
                 <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-titan-cyan/15 text-[10px] font-black text-titan-cyan">
                   {i + 1}
                 </span>
-                <p className="text-xs leading-relaxed text-white/50">{step}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{step}</p>
               </li>
             ))}
           </ol>
@@ -134,7 +130,7 @@ export default function Download() {
           </Link>
         </Button>
 
-        <p className="text-center text-xs text-white/20 mb-8">
+        <p className="text-center text-xs text-muted-foreground/70 mb-8">
           Questions?{" "}
           <Link to="/beta" className="text-titan-cyan hover:text-titan-cyan/70">
             Join the Beta Program
@@ -144,16 +140,16 @@ export default function Download() {
             sign in
           </Link>
         </p>
-        <p className="text-center text-xs text-white/30 mb-4 space-x-3">
-          <Link to="/privacy-policy" className="hover:text-white underline-offset-2 hover:underline">
+        <p className="text-center text-xs text-muted-foreground mb-4 space-x-3">
+          <Link to="/privacy-policy" className="hover:text-foreground underline-offset-2 hover:underline">
             Privacy Policy
           </Link>
-          <Link to="/terms" className="hover:text-white underline-offset-2 hover:underline">
+          <Link to="/terms" className="hover:text-foreground underline-offset-2 hover:underline">
             Terms of Service
           </Link>
         </p>
       </div>
-      <SiteFooter className="border-white/10 bg-[#0A0A0B] text-white/50 [&_a]:text-white/50 [&_a:hover]:text-white" />
+      <SiteFooter />
     </div>
   );
 }

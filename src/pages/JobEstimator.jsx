@@ -152,7 +152,7 @@ export default function JobEstimator() {
 
         <section className="glass rounded-2xl p-5 h-fit">
           <h2 className="font-semibold text-foreground mb-4">Recommended range</h2>
-          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/90"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-white/[0.04] rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
+          <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/90"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-muted/50 rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
           <div className="space-y-3 border-t border-border pt-4">
             <Metric label="Suggested Customer Price" value={estimate.suggested_price} prominent />
             <Metric label="Estimated Profit" value={estimate.profit_estimate} positive={estimate.profit_estimate >= 0} />

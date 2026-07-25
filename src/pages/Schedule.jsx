@@ -134,7 +134,7 @@ export default function Schedule() {
               <div className="space-y-1 min-h-[120px]">
                 {dayJobs.map((job) => (
                   <motion.div key={job.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-white/[0.06] transition-colors cursor-pointer ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
+                    className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-muted transition-colors cursor-pointer ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
                     <p className="text-[11px] font-medium text-foreground truncate leading-tight">{job.title}</p>
                     {job.scheduled_time && (
                       <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">

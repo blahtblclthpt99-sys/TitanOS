@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { MOBILE_ROOT_PATHS } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 import NotificationBell from "@/components/shared/NotificationBell";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
+import ThemeToggle from "@/components/brand/ThemeToggle";
 
 /**
  * Map nested routes to a sensible parent when browser history is empty
@@ -35,7 +37,6 @@ export default function MobileHeader() {
 
   const handleBack = () => {
     const parent = getTabRoot(pathname);
-    // Cold deep-link / refresh: avoid leaving the app via history.back()
     const isColdEntry = !location.key || location.key === "default";
     const canGoBack =
       !isColdEntry &&
@@ -59,7 +60,7 @@ export default function MobileHeader() {
     >
       <div className="flex items-center h-14 w-full gap-2">
         {isRoot ? (
-          <span className="gradient-text font-bold text-lg tracking-tight flex-1">TitanOS</span>
+          <TitanBrandLogo to="/" className="flex-1 min-w-0" markClassName="h-8 w-8" />
         ) : (
           <button
             type="button"
@@ -71,6 +72,7 @@ export default function MobileHeader() {
             <span className="text-sm font-medium">Back</span>
           </button>
         )}
+        <ThemeToggle className="shrink-0" />
         <NotificationBell />
       </div>
     </header>

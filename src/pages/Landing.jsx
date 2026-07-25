@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import TitanMark from "@/components/brand/TitanMark";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
+import ThemeToggle from "@/components/brand/ThemeToggle";
 
 const btn =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-[48px] px-6";
@@ -391,13 +393,11 @@ export default function Landing() {
 
           <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 md:grid-cols-[1.05fr_0.95fr] md:gap-12 md:pb-20 md:pt-16">
             <div className="landing-rise">
-              <div className="mb-5 flex items-center gap-3">
-                <TitanMark className="h-14 w-14 sm:h-16 sm:w-16" title="TitanOS" />
-                <div>
-                  <p className="landing-display text-3xl tracking-tight text-foreground sm:text-4xl">TitanOS</p>
-                  <p className="text-caption font-semibold text-primary">Public beta · Free to start</p>
-                </div>
+              <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <TitanBrandLogo layout="stacked" imgClassName="h-16 sm:h-20" />
+                <ThemeToggle variant="segmented" className="max-w-xs w-full sm:w-auto" />
               </div>
+              <p className="mb-4 text-caption font-semibold text-primary">Public beta · Free to start</p>
               <h1 className="landing-display max-w-xl text-3xl text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.12]">
                 The operating system for service businesses.
               </h1>

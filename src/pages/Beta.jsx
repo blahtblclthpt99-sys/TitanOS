@@ -123,7 +123,7 @@ export default function Beta() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] py-10 px-4">
+    <div className="min-h-screen bg-background py-10 px-4">
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}
@@ -132,11 +132,11 @@ export default function Beta() {
             <Sparkles className="w-3.5 h-3.5 text-titan-cyan" />
             <span className="text-xs text-titan-cyan font-semibold uppercase tracking-wider">Public Beta Program</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3 leading-tight">
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-3 leading-tight">
             Help Build the Future of<br />
             <span className="gradient-text">Service Business Software</span>
           </h1>
-          <p className="text-white/50 text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
+          <p className="text-muted-foreground text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
             Join the TitanOS Public Beta. Get early access to every new feature and help shape the next generation of AI-powered business management.
           </p>
         </motion.div>
@@ -145,13 +145,13 @@ export default function Beta() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
           {BENEFITS.map((b, i) => (
             <motion.div key={b.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
-              className="glass rounded-2xl p-4 border border-white/5 flex items-start gap-3">
+              className="glass rounded-2xl p-4 border border-border flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-titan-cyan/10 flex items-center justify-center flex-shrink-0">
                 <b.icon className="w-4 h-4 text-titan-cyan" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white mb-0.5">{b.title}</p>
-                <p className="text-xs text-white/40 leading-relaxed">{b.description}</p>
+                <p className="text-sm font-semibold text-foreground mb-0.5">{b.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{b.description}</p>
               </div>
             </motion.div>
           ))}
@@ -166,25 +166,25 @@ export default function Beta() {
               <div className="w-16 h-16 rounded-2xl bg-titan-cyan/10 flex items-center justify-center mx-auto mb-4">
                 <Check className="w-8 h-8 text-titan-cyan" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Application saved</h3>
-              <p className="text-sm text-white/50 mb-2">
+              <h3 className="text-xl font-bold text-foreground mb-2">Application saved</h3>
+              <p className="text-sm text-muted-foreground mb-2">
                 We recorded your application
                 {form.email ? (
                   <>
                     {" "}
-                    for <span className="text-white/70">{form.email}</span>
+                    for <span className="text-foreground/80">{form.email}</span>
                   </>
                 ) : null}
                 . If email delivery isn’t configured on this host, we may not auto-reply — create an account to stay in the loop.
               </p>
-              <p className="text-xs text-white/30 mb-6">In the meantime, feel free to explore the app.</p>
+              <p className="text-xs text-muted-foreground/70 mb-6">In the meantime, feel free to explore the app.</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button asChild className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 text-sm gap-2">
                   <Link to="/register">
                     Create free account <ChevronRight className="w-4 h-4" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="rounded-xl h-10 text-sm border-white/15 bg-transparent text-white hover:bg-white/5">
+                <Button asChild variant="outline" className="rounded-xl h-10 text-sm border-border bg-transparent text-foreground hover:bg-muted">
                   <Link to="/download">Download app</Link>
                 </Button>
               </div>
@@ -196,8 +196,8 @@ export default function Beta() {
                   <Rocket className="w-5 h-5 text-titan-cyan" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white">Apply to be a Beta Tester</h2>
-                  <p className="text-xs text-white/40">Takes about 1 minute · We review every application</p>
+                  <h2 className="text-base font-bold text-foreground">Apply to be a Beta Tester</h2>
+                  <p className="text-xs text-muted-foreground">Takes about 1 minute · We review every application</p>
                 </div>
               </div>
 
@@ -205,31 +205,31 @@ export default function Beta() {
                 {/* Row: name + email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-white/50 mb-1.5 block">Full Name *</label>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Full Name *</label>
                     <Input value={form.full_name} onChange={set("full_name")} placeholder="Jane Smith" required
-                      className="bg-[#242427] border-white/10 text-white rounded-xl h-11 placeholder:text-white/20 text-sm" />
+                      className="bg-muted border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/50 text-sm" />
                   </div>
                   <div>
-                    <label className="text-xs text-white/50 mb-1.5 block">Email Address *</label>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Email Address *</label>
                     <Input type="email" value={form.email} onChange={set("email")} placeholder="jane@example.com" required
-                      className="bg-[#242427] border-white/10 text-white rounded-xl h-11 placeholder:text-white/20 text-sm" />
+                      className="bg-muted border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/50 text-sm" />
                   </div>
                 </div>
 
                 {/* Business type */}
                 <div>
-                  <label className="text-xs text-white/50 mb-1.5 block">Type of Service Business <span className="text-white/25">(optional)</span></label>
+                  <label className="text-xs text-muted-foreground mb-1.5 block">Type of Service Business <span className="text-muted-foreground/60">(optional)</span></label>
                   <Input value={form.business_type} onChange={set("business_type")} placeholder="e.g. HVAC, plumbing, cleaning, landscaping..."
-                    className="bg-[#242427] border-white/10 text-white rounded-xl h-11 placeholder:text-white/20 text-sm" />
+                    className="bg-muted border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/50 text-sm" />
                 </div>
 
                 {/* Team size */}
                 <div>
-                  <label className="text-xs text-white/50 mb-2 block">Team Size <span className="text-white/25">(optional)</span></label>
+                  <label className="text-xs text-muted-foreground mb-2 block">Team Size <span className="text-muted-foreground/60">(optional)</span></label>
                   <div className="flex flex-wrap gap-2">
                     {BUSINESS_SIZES.map(s => (
                       <button type="button" key={s.value} onClick={() => setForm(f => ({ ...f, business_size: s.value }))}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${form.business_size === s.value ? "bg-titan-cyan/10 border-titan-cyan/40 text-titan-cyan" : "border-white/10 text-white/40 hover:text-white/60"}`}>
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${form.business_size === s.value ? "bg-titan-cyan/10 border-titan-cyan/40 text-titan-cyan" : "border-border text-muted-foreground hover:text-foreground"}`}>
                         {s.label}
                       </button>
                     ))}
@@ -238,11 +238,11 @@ export default function Beta() {
 
                 {/* Tech experience */}
                 <div>
-                  <label className="text-xs text-white/50 mb-2 block">Tech Comfort Level <span className="text-white/25">(optional)</span></label>
+                  <label className="text-xs text-muted-foreground mb-2 block">Tech Comfort Level <span className="text-muted-foreground/60">(optional)</span></label>
                   <div className="flex flex-col gap-2">
                     {EXPERIENCE.map(ex => (
                       <button type="button" key={ex.value} onClick={() => setForm(f => ({ ...f, experience: ex.value }))}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${form.experience === ex.value ? "bg-titan-cyan/10 border-titan-cyan/40 text-titan-cyan" : "border-white/10 text-white/40 hover:text-white/60"}`}>
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-all ${form.experience === ex.value ? "bg-titan-cyan/10 border-titan-cyan/40 text-titan-cyan" : "border-border text-muted-foreground hover:text-foreground"}`}>
                         {ex.label}
                       </button>
                     ))}
@@ -251,10 +251,10 @@ export default function Beta() {
 
                 {/* Why join */}
                 <div>
-                  <label className="text-xs text-white/50 mb-1.5 block">Why do you want to join the beta? <span className="text-white/25">(optional)</span></label>
+                  <label className="text-xs text-muted-foreground mb-1.5 block">Why do you want to join the beta? <span className="text-muted-foreground/60">(optional)</span></label>
                   <textarea value={form.why_join} onChange={set("why_join")}
                     placeholder="Tell us what you're hoping to get out of TitanOS..." rows={3}
-                    className="w-full bg-[#242427] border border-white/10 text-white rounded-xl p-3 text-sm placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none" />
+                    className="w-full bg-muted border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-titan-cyan/50 resize-none" />
                 </div>
 
                 {applyError && <p className="text-xs text-red-400">{applyError}</p>}
@@ -277,8 +277,8 @@ export default function Beta() {
               <MessageSquare className="w-5 h-5 text-titan-indigo" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Leave Feedback</h2>
-              <p className="text-xs text-white/40">Already testing? Tell us what you think.</p>
+              <h2 className="text-base font-bold text-foreground">Leave Feedback</h2>
+              <p className="text-xs text-muted-foreground">Already testing? Tell us what you think.</p>
             </div>
           </div>
 
@@ -287,8 +287,8 @@ export default function Beta() {
               <div className="w-12 h-12 rounded-2xl bg-titan-indigo/20 flex items-center justify-center mx-auto mb-3">
                 <Check className="w-6 h-6 text-titan-indigo" />
               </div>
-              <p className="text-sm font-semibold text-white mb-1">Feedback received — thank you!</p>
-              <p className="text-xs text-white/40">We read every submission and it shapes what we build.</p>
+              <p className="text-sm font-semibold text-foreground mb-1">Feedback received — thank you!</p>
+              <p className="text-xs text-muted-foreground">We read every submission and it shapes what we build.</p>
               <button onClick={() => { setFbSent(false); setFbMessage(""); setFbEmail(""); }}
                 className="mt-4 text-xs text-titan-indigo hover:text-titan-indigo/80 transition-colors">
                 Submit more feedback
@@ -300,7 +300,7 @@ export default function Beta() {
               <div className="flex gap-2">
                 {FEEDBACK_TYPES.map(t => (
                   <button type="button" key={t.id} onClick={() => setFbType(t.id)}
-                    className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all ${fbType === t.id ? `${t.bg} ${t.border} ${t.color}` : "border-white/5 text-white/30 hover:text-white/50"}`}>
+                    className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all ${fbType === t.id ? `${t.bg} ${t.border} ${t.color}` : "border-border text-muted-foreground/70 hover:text-foreground"}`}>
                     <t.icon className="w-4 h-4" />
                     {t.label}
                   </button>
@@ -309,25 +309,25 @@ export default function Beta() {
 
               {/* Message */}
               <div>
-                <label className="text-xs text-white/50 mb-1.5 block">
+                <label className="text-xs text-muted-foreground mb-1.5 block">
                   {fbType === "bug" ? "What happened? How do we reproduce it?" : fbType === "feature" ? "What feature would help you most?" : "What's on your mind?"}
                 </label>
                 <textarea value={fbMessage} onChange={e => setFbMessage(e.target.value)} required rows={4}
                   placeholder={fbType === "bug" ? "Describe the bug and steps to reproduce..." : fbType === "feature" ? "Describe the feature you'd like to see..." : "Share thoughts, ideas, or anything..."}
-                  className="w-full bg-[#242427] border border-white/10 text-white rounded-xl p-3 text-sm placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-titan-indigo/50 resize-none" />
+                  className="w-full bg-muted border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-titan-indigo/50 resize-none" />
               </div>
 
               {/* Optional email */}
               <div>
-                <label className="text-xs text-white/50 mb-1.5 block">Your email <span className="text-white/25">(optional — if you'd like a reply)</span></label>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Your email <span className="text-muted-foreground/60">(optional — if you'd like a reply)</span></label>
                 <Input type="email" value={fbEmail} onChange={e => setFbEmail(e.target.value)} placeholder="you@example.com"
-                  className="bg-[#242427] border-white/10 text-white rounded-xl h-11 placeholder:text-white/20 text-sm" />
+                  className="bg-muted border-border text-foreground rounded-xl h-11 placeholder:text-muted-foreground/50 text-sm" />
               </div>
 
               {fbError && <p className="text-xs text-red-400">{fbError}</p>}
 
               <Button type="submit" disabled={fbLoading || !fbMessage.trim()}
-                className="w-full bg-titan-indigo hover:bg-titan-indigo/90 text-white font-semibold rounded-xl h-11 text-sm gap-2 disabled:opacity-40">
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-11 text-sm gap-2 disabled:opacity-40">
                 {fbLoading ? "Sending…" : <><Send className="w-4 h-4" /> Send Feedback</>}
               </Button>
             </form>
@@ -335,7 +335,7 @@ export default function Beta() {
         </motion.div>
 
         <div className="text-center">
-          <Link to="/privacy-policy" className="text-xs text-white/20 hover:text-white/40 transition-colors">Privacy Policy</Link>
+          <Link to="/privacy-policy" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Privacy Policy</Link>
         </div>
       </div>
     </div>

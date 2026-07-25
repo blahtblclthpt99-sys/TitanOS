@@ -1,7 +1,9 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
+import SiteFooter from "@/components/marketing/SiteFooter";
 
 const FEATURES = {
   customers: {
@@ -49,35 +51,24 @@ export default function FeatureDetail() {
     desc: "Everything you need to run a field service business — included free during public beta.",
   };
 
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
-
   return (
-    <div className="min-h-svh bg-background px-4 py-12 text-foreground">
-      <div className="mx-auto max-w-lg text-center">
-        <Link to="/" className="mb-8 inline-flex items-center gap-2 font-semibold">
-          <span className="text-titan-cyan" aria-hidden>
-            ⚡
-          </span>
-          Titan OS
-        </Link>
-        <h1 className="mt-6 text-3xl font-bold tracking-tight">{feature.title}</h1>
+    <div className="min-h-svh bg-background text-foreground flex flex-col">
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 py-12 text-center">
+        <TitanBrandLogo to="/" layout="svg" markClassName="h-10 w-10" className="mb-8" />
+        <h1 className="text-3xl font-bold tracking-tight">{feature.title}</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{feature.desc}</p>
-        <Button
-          asChild
-          className="mt-8 h-12 rounded-2xl bg-titan-cyan px-6 text-sm font-bold text-black hover:bg-titan-cyan/90"
-        >
+        <Button asChild className="mt-8 h-12 rounded-2xl px-6 text-sm font-bold">
           <Link to="/register">
             Get Started Free <ArrowRight className="ml-1 h-4 w-4" />
           </Link>
         </Button>
         <div className="mt-4">
-          <Link to="/#features" className="text-xs text-muted-foreground hover:text-foreground/60">
+          <Link to="/#features" className="text-xs text-muted-foreground hover:text-foreground">
             ← All features
           </Link>
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }

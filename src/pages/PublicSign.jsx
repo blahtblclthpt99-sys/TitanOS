@@ -75,7 +75,7 @@ export default function PublicSign() {
         <form onSubmit={sign} className="mt-6 space-y-4">
           <label className="text-sm text-muted-foreground block">
             Your full name (typed signature)
-            <Input required value={signature} onChange={(e) => setSignature(e.target.value)} className="mt-1 bg-white/[.06] border-border text-foreground rounded-xl" />
+            <Input required value={signature} onChange={(e) => setSignature(e.target.value)} className="mt-1 bg-muted/50 border-border text-foreground rounded-xl" />
           </label>
           <div>
             <p className="text-sm text-muted-foreground mb-2">Draw signature (optional)</p>

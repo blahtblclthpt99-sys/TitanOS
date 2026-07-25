@@ -4,6 +4,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Clock, Command, Plus, Search, Sparkles } from "lucide-react";
 import NotificationCenter from "@/components/layout/NotificationCenter";
 import UserProfileMenu from "@/components/layout/UserProfileMenu";
+import ThemeToggle from "@/components/brand/ThemeToggle";
+import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -117,6 +119,11 @@ export default function DesktopTopBar() {
       }}
       role="banner"
     >
+      <TitanBrandLogo
+        to="/"
+        className="mr-1 hidden lg:inline-flex"
+        markClassName="h-7 w-7"
+      />
       <div className="relative max-w-xl flex-1" ref={searchRef}>
         <button
           type="button"
@@ -363,6 +370,7 @@ export default function DesktopTopBar() {
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <ThemeToggle />
         <NotificationCenter />
         <UserProfileMenu />
       </div>

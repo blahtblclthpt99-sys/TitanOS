@@ -8,7 +8,7 @@ import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
 import { getBookingPageBySlug, listAvailability, submitBookingRequest, WEEKDAYS } from "@/lib/bookingApi";
 
 const initialForm = { customer_name: "", customer_email: "", customer_phone: "", service: "", preferred_date: "", preferred_time: "", notes: "", is_same_day: false };
-const inputClass = "bg-white/[.06] border-border text-foreground rounded-xl";
+const inputClass = "bg-muted/50 border-border text-foreground rounded-xl";
 
 export default function PublicBooking() {
   const { slug } = useParams();

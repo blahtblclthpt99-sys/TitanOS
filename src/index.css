@@ -105,8 +105,9 @@
     --sidebar-ring: 217 91% 48%;
     --sidebar-width: 72px;
 
-    /* Brand aliases → single primary accent (electric blue) */
-    --titan-cyan: #2563EB;
+    /* Brand aliases — electric blue + cyan orbit (matches TitanOS shield lockup) */
+    --titan-cyan: #0891B2;
+    --titan-orbit: #06B6D4;
     --titan-amber: #D97706;
     --titan-indigo: #1E3A8A;
     --titan-navy: #0B1F3A;
@@ -159,7 +160,8 @@
     --sidebar-border: 222 14% 14%;
     --sidebar-ring: 213 94% 60%;
 
-    --titan-cyan: #3B82F6;
+    --titan-cyan: #22D3EE;
+    --titan-orbit: #22D3EE;
     --titan-amber: #F59E0B;
     --titan-indigo: #60A5FA;
     --titan-navy: #93C5FD;
@@ -441,16 +443,27 @@
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #0B1F3A, #2563EB);
+  background: linear-gradient(105deg, #1E3A8A 0%, #2563EB 45%, #0891B2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .dark .gradient-text {
-  background: linear-gradient(135deg, #93C5FD, #3B82F6);
+  background: linear-gradient(105deg, #E2E8F0 0%, #60A5FA 42%, #22D3EE 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* TitanMark discs — soft disc in light, outline-only in dark */
+.titan-mark .titan-mark-disc-dark {
+  display: none;
+}
+.dark .titan-mark .titan-mark-disc-light {
+  display: none;
+}
+.dark .titan-mark .titan-mark-disc-dark {
+  display: block;
 }
 
 @keyframes pulse-glow {

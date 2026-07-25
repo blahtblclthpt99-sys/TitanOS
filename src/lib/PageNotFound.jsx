@@ -8,20 +8,20 @@ export default function PageNotFound() {
   const { user, isAuthenticated, authChecked } = useAuth();
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0A0A0B]">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
       <div className="max-w-md w-full">
         <div className="text-center space-y-6">
           <div className="space-y-2">
-            <h1 className="text-7xl font-light text-white/20">404</h1>
-            <div className="h-0.5 w-16 bg-white/10 mx-auto" />
+            <h1 className="text-7xl font-light text-muted-foreground/40">404</h1>
+            <div className="h-0.5 w-16 bg-border mx-auto" />
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-2xl font-medium text-white">
+            <h2 className="text-2xl font-medium text-foreground">
               Page Not Found
             </h2>
-            <p className="text-white/50 leading-relaxed">
-              The page <span className="font-medium text-white/70">&ldquo;{pageName || '/'}&rdquo;</span> could not be found in this application.
+            <p className="text-muted-foreground leading-relaxed">
+              The page <span className="font-medium text-foreground/80">&ldquo;{pageName || '/'}&rdquo;</span> could not be found in this application.
             </p>
           </div>
 
@@ -32,8 +32,8 @@ export default function PageNotFound() {
                   <div className="w-2 h-2 rounded-full bg-titan-amber" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-white/80">Admin Note</p>
-                  <p className="text-sm text-white/50 leading-relaxed">
+                  <p className="text-sm font-medium text-foreground">Admin Note</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     This could mean that the AI hasn&apos;t implemented this page yet. Ask it to implement it in the chat.
                   </p>
                 </div>
@@ -45,7 +45,7 @@ export default function PageNotFound() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-md border border-white/10 text-white text-sm font-semibold hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-md border border-border text-foreground text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Go Home
             </button>

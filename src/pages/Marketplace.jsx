@@ -15,6 +15,7 @@ import { listItemMotion, hoverLiftMotion } from "@/lib/listMotion";
 import { SERVICE_CATEGORIES, US_STATES, timeAgo } from "@/lib/platformConstants";
 import { betaBadgeLabel, isMarketplaceFree, MARKETPLACE_PREMIUM } from "@/lib/plan";
 import { archiveListing, createListing, createSellerReview, deleteListing, fetchFavoriteIds, getListing, listListingMessages, listMarketplaceListings, listSellerReviews, PAGE_SIZE, reportListing, sendListingMessage, toggleFavorite, updateListing } from "@/lib/listingsApi";
+import { api } from "@/api/apiClient";
 
 const MarketplaceApps = lazy(() => import("@/pages/MarketplaceApps"));
 

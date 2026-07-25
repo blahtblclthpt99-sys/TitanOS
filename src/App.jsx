@@ -3,12 +3,14 @@ import React, { Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
 import Spinner from "@/components/shared/Spinner";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import DeferredToaster from "./components/DeferredToaster";
 import PathNormalizer from "./lib/PathNormalizer";
 import { normalizeAppPath, shouldUseHashRouter } from "@/lib/routing";
 import { resolveBookingSlugFromHost } from "@/lib/bookingSubdomain";
 import { hasCachedAuthSession } from "@/lib/sessionPeek";
 import { rememberReturnTo } from "@/lib/returnTo";
+import ConfigMissingBanner from "@/components/shared/ConfigMissingBanner";
 
 /** Marketing home — keep in main graph for fast FCP (no framer-motion / radix). */
 import Landing from "@/pages/Landing";
@@ -62,30 +64,32 @@ function isPublicPath(pathname) {
 
 function PublicRoutes() {
   return (
-    <Suspense fallback={<Spinner fullScreen label="Loading page" />}>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/download" element={<Download />} />
-        <Route path="/features/:slug" element={<FeatureDetail />} />
-        <Route path="/beta" element={<Beta />} />
-        <Route path="/thank-you" element={<ThankYou />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
-        <Route path="/portal" element={<CustomerPortal />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/book/:slug" element={<PublicBooking />} />
-        <Route path="/u/:username" element={<PublicProfile />} />
-        <Route path="/sign/:token" element={<PublicSign />} />
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary message="This page failed to load. Try refresh or go home." fullScreen showHome>
+      <Suspense fallback={<Spinner fullScreen label="Loading page" />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/download" element={<Download />} />
+          <Route path="/features/:slug" element={<FeatureDetail />} />
+          <Route path="/beta" element={<Beta />} />
+          <Route path="/thank-you" element={<ThankYou />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/portal" element={<CustomerPortal />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/book/:slug" element={<PublicBooking />} />
+          <Route path="/u/:username" element={<PublicProfile />} />
+          <Route path="/sign/:token" element={<PublicSign />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
@@ -132,7 +136,9 @@ function AppShellGate() {
     }
     return (
       <Suspense fallback={<Spinner fullScreen label="Loading app" />}>
-        <AuthenticatedShell />
+        <ErrorBoundary message="The app shell failed to load. Try refresh." fullScreen showHome>
+          <AuthenticatedShell />
+        </ErrorBoundary>
       </Suspense>
     );
   }
@@ -187,6 +193,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <ConfigMissingBanner />
       <Router>
         <ScrollToTop />
         <AuthenticatedApp />

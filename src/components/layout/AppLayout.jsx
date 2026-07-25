@@ -47,7 +47,7 @@ export default function AppLayout() {
         id="main-content"
         tabIndex={-1}
         aria-label="Main content"
-        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+8.5rem)] md:pb-8"
+        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
         style={{
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",

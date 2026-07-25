@@ -3,6 +3,7 @@ import AppError from "@/components/shared/AppError";
 import { captureException } from "@/lib/sentry";
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
+const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 
 function isChunkLoadError(error) {
   const msg = String(error?.message || error || "");
@@ -28,6 +29,19 @@ async function purgeShellCaches() {
   }
 }
 
+function markAndReloadOnce() {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    sessionStorage.setItem(CHUNK_RELOAD_TS, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+  purgeShellCaches().finally(() => {
+    window.location.reload();
+  });
+}
+
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -47,16 +61,7 @@ export default class ErrorBoundary extends React.Component {
 
     // After a deploy, stale tabs often fail on missing hashed chunks — one hard reload usually fixes it.
     if (isChunkLoadError(error) && typeof window !== "undefined") {
-      try {
-        if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
-          sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
-          purgeShellCaches().finally(() => {
-            window.location.reload();
-          });
-        }
-      } catch {
-        /* ignore */
-      }
+      markAndReloadOnce();
     }
   }
 

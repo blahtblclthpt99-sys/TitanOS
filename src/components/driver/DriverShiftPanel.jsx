@@ -947,13 +947,13 @@ export default function DriverShiftPanel() {
             <div className="text-sm">
               <p className="font-semibold text-foreground">
                 ~{sym}
-                {gasLocal.toFixed(2)} / gal equivalent in {prefs.currency || "USD"}
+                {Number(gasLocal || 0).toFixed(2)} / gal equivalent in {prefs.currency || "USD"}
               </p>
               <p className="text-muted-foreground mt-1">
-                Using ZIP {prefs.zip || "—"} regional average (~${gasUsd.toFixed(2)} USD). At {mpg} mpg,{" "}
+                Using ZIP {prefs.zip || "—"} regional average (~${Number(gasUsd || 0).toFixed(2)} USD). At {mpg} mpg,{" "}
                 {displayMiles || "—"} mi ≈ {fuel.gallons} gal · {sym}
-                {fuel.cost} ({sym}
-                {fuel.perMile}/mi).
+                {Number(fuel.cost || 0).toFixed(2)} ({sym}
+                {Number(fuel.perMile || 0).toFixed(3)}/mi).
               </p>
             </div>
           </div>
@@ -1041,7 +1041,7 @@ export default function DriverShiftPanel() {
                 <p className="text-[10px] text-muted-foreground uppercase">Fuel est.</p>
                 <p className="text-lg font-bold text-titan-amber tabular-nums">
                   {sym}
-                  {recorded.fuel.toFixed(2)}
+                  {Number(recorded.fuel || 0).toFixed(2)}
                 </p>
               </div>
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">

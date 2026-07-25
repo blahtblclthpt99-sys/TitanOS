@@ -1,5 +1,5 @@
-/* TitanOS service worker — app shell cache + offline fallback + static assets */
-const CACHE = "titanos-shell-v7";
+/* TitanOS service worker — app shell + stale-while-revalidate hashed assets */
+const CACHE = "titanos-shell-v8";
 const PRECACHE = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -33,14 +33,36 @@ function isBypass(url) {
   );
 }
 
-/** Cache-first for hashed assets + self-hosted fonts */
+function isHashedAsset(url) {
+  return url.pathname.startsWith("/assets/");
+}
+
 function isStaticAsset(url) {
   return (
-    url.pathname.startsWith("/assets/") ||
     url.pathname.startsWith("/fonts/") ||
     url.pathname === "/favicon.svg" ||
-    url.pathname.startsWith("/pwa-")
+    url.pathname.startsWith("/pwa-") ||
+    url.pathname === "/apple-touch-icon.png" ||
+    url.pathname.startsWith("/brand/")
   );
+}
+
+/** Stale-while-revalidate — never stick on a broken hashed chunk after deploy */
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE);
+  const hit = await cache.match(request);
+  const network = fetch(request)
+    .then((res) => {
+      if (res.ok) cache.put(request, res.clone());
+      return res;
+    })
+    .catch(() => null);
+  if (hit) {
+    network.catch(() => {});
+    return hit;
+  }
+  const res = await network;
+  return res || Response.error();
 }
 
 self.addEventListener("fetch", (event) => {
@@ -50,6 +72,11 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (isBypass(url)) return;
+
+  if (isHashedAsset(url)) {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
 
   if (isStaticAsset(url)) {
     event.respondWith(
@@ -68,7 +95,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigations — always prefer network so shell HTML stays fresh (never serve stale index)
+  // Navigations — always prefer network so shell HTML stays fresh
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)

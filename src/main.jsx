@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -6,6 +6,9 @@ import { initSentry, captureException } from '@/lib/sentry'
 import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
 import '@/index.css'
+
+const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
+const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 
 // Observability — no-ops when VITE_SENTRY_DSN is unset
 initSentry();
@@ -33,25 +36,57 @@ installGlobalErrorLogging();
 applyTheme(getStoredTheme());
 watchSystemContrast();
 
-// Clear one-shot chunk-reload flag after a successful boot
-try {
-  sessionStorage.removeItem("titanos-chunk-reload");
-} catch {
-  /* ignore */
+/**
+ * One-shot chunk recovery after deploy.
+ * Do NOT clear the flag at module load (that caused infinite reloads).
+ * Clear only after the app has stayed healthy for a few seconds.
+ */
+function markChunkReloadAttempt() {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    sessionStorage.setItem(CHUNK_RELOAD_TS, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
 }
 
-// Vite: missing hashed chunk after deploy → hard reload once
+function canAttemptChunkReload() {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function clearChunkReloadFlagWhenHealthy() {
+  try {
+    // Only clear if we reloaded recently (within 30s) and stayed up
+    const at = Number(sessionStorage.getItem(CHUNK_RELOAD_TS) || 0);
+    if (!at) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      return;
+    }
+    if (Date.now() - at > 4000) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      sessionStorage.removeItem(CHUNK_RELOAD_TS);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 if (typeof window !== "undefined") {
   window.addEventListener("vite:preloadError", (event) => {
     event.preventDefault?.();
-    try {
-      if (!sessionStorage.getItem("titanos-chunk-reload")) {
-        sessionStorage.setItem("titanos-chunk-reload", "1");
-        window.location.reload();
-      }
-    } catch {
-      window.location.reload();
-    }
+    if (!canAttemptChunkReload()) return;
+    markChunkReloadAttempt();
+    window.location.reload();
+  });
+
+  // After a successful paint + idle, clear the one-shot flag
+  window.addEventListener("load", () => {
+    window.setTimeout(clearChunkReloadFlagWhenHealthy, 5000);
   });
 }
 
@@ -62,10 +97,20 @@ if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
     .catch(() => {});
 }
 
+function BootProbe({ children }) {
+  useEffect(() => {
+    const id = window.setTimeout(clearChunkReloadFlagWhenHealthy, 3500);
+    return () => window.clearTimeout(id);
+  }, []);
+  return children;
+}
+
 // Paint immediately — never block first render on auth/network.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary message="The app failed to load." fullScreen showHome>
-    <App />
+    <BootProbe>
+      <App />
+    </BootProbe>
   </ErrorBoundary>
 )
 
@@ -76,14 +121,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       runWhenIdle(async () => {
         try {
-          if (!localStorage.getItem('titanos-sw-v7-purge')) {
+          if (!localStorage.getItem('titanos-sw-v8-purge')) {
             const regs = await navigator.serviceWorker.getRegistrations();
             await Promise.all(regs.map((r) => r.unregister()));
             if (window.caches?.keys) {
               const keys = await caches.keys();
               await Promise.all(keys.filter((k) => k.startsWith('titanos-shell')).map((k) => caches.delete(k)));
             }
-            localStorage.setItem('titanos-sw-v7-purge', '1');
+            localStorage.setItem('titanos-sw-v8-purge', '1');
           }
         } catch {
           /* ignore */

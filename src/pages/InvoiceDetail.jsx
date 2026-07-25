@@ -121,7 +121,7 @@ export default function InvoiceDetail() {
                   ? ` · ${invoice.tax_snapshot.jurisdictionLabel}`
                   : ""}
               </span>
-              <span className="text-foreground tabular-nums">${invoice.tax_amount.toFixed(2)}</span>
+              <span className="text-foreground tabular-nums">${Number(invoice.tax_amount || 0).toFixed(2)}</span>
             </div>
           )}
           {invoice.job_location?.city || invoice.job_city ? (
@@ -138,12 +138,12 @@ export default function InvoiceDetail() {
           ) : null}
           <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
             <span className="text-foreground">Total</span>
-            <span className="text-titan-cyan tabular-nums">${(invoice.total || 0).toFixed(2)}</span>
+            <span className="text-titan-cyan tabular-nums">${Number(invoice.total || 0).toFixed(2)}</span>
           </div>
-          {invoice.balance_due > 0 && invoice.balance_due !== invoice.total && (
+          {Number(invoice.balance_due) > 0 && Number(invoice.balance_due) !== Number(invoice.total) && (
             <div className="flex justify-between text-sm">
               <span className="text-titan-amber">Balance Due</span>
-              <span className="text-titan-amber tabular-nums font-semibold">${invoice.balance_due.toFixed(2)}</span>
+              <span className="text-titan-amber tabular-nums font-semibold">${Number(invoice.balance_due || 0).toFixed(2)}</span>
             </div>
           )}
         </div>

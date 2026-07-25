@@ -180,12 +180,27 @@ async function registerViaServer({ email, password, fullName }) {
 export function createAuthModule() {
   return {
     async me() {
+      // Prefer getUser (validates JWT). Fall back to local session so slow/flaky
+      // network never locks the user out of the shell.
+      let authUser = null;
       const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        throw apiError("Authentication required", 401);
+      if (!error && data?.user) {
+        authUser = data.user;
+      } else {
+        const { data: sess } = await supabase.auth.getSession();
+        authUser = sess?.session?.user ?? null;
+        if (!authUser) {
+          throw apiError(error?.message || "Authentication required", 401);
+        }
       }
-      const profile = await fetchProfile(data.user.id);
-      return buildUser(data.user, profile);
+
+      let profile = null;
+      try {
+        profile = await fetchProfile(authUser.id);
+      } catch {
+        // Profile is optional for boot — missing/RLS errors must not force logout.
+      }
+      return buildUser(authUser, profile);
     },
 
     async loginViaEmailPassword(email, password) {

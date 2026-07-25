@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
@@ -287,15 +287,12 @@ export default function Landing() {
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
-  // Safety net: never paint marketing home while signed in (or recovering a session).
-  if (authChecked && isAuthenticated) {
+  // Safety net: never paint marketing home while a session is present.
+  if (isAuthenticated || hasCachedAuthSession()) {
+    if (!authChecked || isLoadingAuth || !isAuthenticated) {
+      return <Spinner fullScreen label="Loading TitanOS" />;
+    }
     return null;
-  }
-  if ((!authChecked || isLoadingAuth) && hasCachedAuthSession()) {
-    return <Spinner fullScreen label="Loading TitanOS" />;
-  }
-  if (authChecked && !isAuthenticated && hasCachedAuthSession()) {
-    return <Navigate to="/login" replace state={{ sessionRecover: true }} />;
   }
 
   const nav = (

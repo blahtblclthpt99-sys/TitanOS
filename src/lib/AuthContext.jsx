@@ -1,11 +1,13 @@
 import React from "react";
 import { hasCachedAuthSession } from "@/lib/sessionPeek";
 import { runWhenIdle } from "@/lib/perf";
+import { setSentryUser, clearSentryUser } from "@/lib/sentry";
+import { persistAndApplyTheme, normalizeThemePref } from "@/lib/theme";
 
 const AUTH_RETRY_ATTEMPTS = 2;
 const AUTH_RETRY_DELAY_MS = 800;
 /** Hard ceiling so a hung Supabase call never leaves the UI on “Loading TitanOS”. */
-const AUTH_BOOT_TIMEOUT_MS = 5000;
+const AUTH_BOOT_TIMEOUT_MS = 8000;
 
 function withTimeout(promise, ms, label = "timeout") {
   return new Promise((resolve, reject) => {
@@ -48,8 +50,22 @@ async function withRetry(task, attempts = AUTH_RETRY_ATTEMPTS) {
   throw lastError;
 }
 
-import { setSentryUser, clearSentryUser } from "@/lib/sentry";
-import { persistAndApplyTheme, normalizeThemePref } from "@/lib/theme";
+function userFromSession(session) {
+  const authUser = session?.user;
+  if (!authUser) return null;
+  return {
+    id: authUser.id,
+    email: authUser.email || "",
+    full_name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || "",
+    role: "user",
+    is_pro: false,
+    lifetime_premium: false,
+    paying_subscriber: false,
+    plan_tier: "",
+    account_type: "",
+    theme_pref: "system",
+  };
+}
 
 const AuthContext = React.createContext();
 
@@ -75,56 +91,83 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const markAuthenticated = React.useCallback(
+    (nextUser) => {
+      applyUser(nextUser);
+      isAuthenticatedRef.current = true;
+      setIsAuthenticated(true);
+    },
+    [applyUser]
+  );
+
+  const markSignedOut = React.useCallback(() => {
+    applyUser(null);
+    isAuthenticatedRef.current = false;
+    setIsAuthenticated(false);
+  }, [applyUser]);
+
+  /** Clear dead tokens so we stop treating storage as a live session. */
+  const clearDeadSession = React.useCallback(async () => {
+    try {
+      const supabase = await loadSupabase();
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* ignore */
+    }
+    markSignedOut();
+  }, [markSignedOut]);
+
   const checkUserAuth = React.useCallback(async () => {
     try {
       setIsLoadingAuth(true);
       const api = await loadApi();
       const currentUser = await withRetry(() => api.auth.me());
-      applyUser(currentUser);
-      isAuthenticatedRef.current = true;
-      setIsAuthenticated(true);
+      markAuthenticated(currentUser);
       setAuthError(null);
     } catch (error) {
       if (import.meta.env.DEV) {
         console.debug("User auth check failed:", error?.status || error?.message || error);
       }
 
-      // Transient failures (timeout / network) while Supabase still has a session:
-      // keep the previous signed-in state instead of dumping the user on Landing.
       const status = error?.status;
-      const transient = status === 408 || status === 500 || status === 502 || status === 503 || !status;
-      let stillHasSession = false;
+      let session = null;
       try {
         const supabase = await loadSupabase();
         const { data } = await supabase.auth.getSession();
-        stillHasSession = Boolean(data?.session?.access_token);
+        session = data?.session ?? null;
+
+        // Expired/invalid access token — try one refresh before giving up.
+        if (!session?.user && hasCachedAuthSession()) {
+          const refreshed = await supabase.auth.refreshSession();
+          session = refreshed?.data?.session ?? null;
+        }
       } catch {
-        stillHasSession = hasCachedAuthSession();
+        session = null;
       }
 
-      if (transient && stillHasSession) {
+      if (session?.user) {
+        // Stay signed in from the local session; profile can catch up later.
+        if (!isAuthenticatedRef.current) {
+          markAuthenticated(userFromSession(session));
+        }
         setAuthError({
           type: "auth_degraded",
           message: "Couldn’t refresh your profile. Retrying…",
         });
-        // Keep prior signed-in state (and user) if we already had one.
-        // Do not invent isAuthenticated=true without a loaded profile.
+      } else if (status === 401 || status === 403 || hasCachedAuthSession()) {
+        await clearDeadSession();
+        setAuthError({
+          type: "auth_required",
+          message: "Authentication required",
+        });
       } else {
-        applyUser(null);
-        isAuthenticatedRef.current = false;
-        setIsAuthenticated(false);
-        if (status === 401 || status === 403) {
-          setAuthError({
-            type: "auth_required",
-            message: "Authentication required",
-          });
-        }
+        markSignedOut();
       }
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  }, [applyUser]);
+  }, [markAuthenticated, markSignedOut, clearDeadSession]);
 
   const checkAppState = React.useCallback(async () => {
     setIsLoadingAuth(true);
@@ -132,9 +175,7 @@ export const AuthProvider = ({ children }) => {
 
     // Fast path: anonymous visitors never download Supabase on first paint
     if (!hasCachedAuthSession()) {
-      applyUser(null);
-      isAuthenticatedRef.current = false;
-      setIsAuthenticated(false);
+      markSignedOut();
       setIsLoadingAuth(false);
       setAuthChecked(true);
       return;
@@ -147,12 +188,23 @@ export const AuthProvider = ({ children }) => {
         AUTH_BOOT_TIMEOUT_MS,
         "session_timeout"
       );
-      if (data.session) {
-        await withTimeout(checkUserAuth(), AUTH_BOOT_TIMEOUT_MS, "auth_me_timeout");
+
+      if (data.session?.user) {
+        // Hydrate immediately so `/` opens the shell — never bounce to /login.
+        markAuthenticated(userFromSession(data.session));
+        setAuthChecked(true);
+        // Enrich profile without a hard timeout race that undoes auth.
+        try {
+          await withTimeout(checkUserAuth(), AUTH_BOOT_TIMEOUT_MS, "auth_me_timeout");
+        } catch {
+          setAuthError({
+            type: "auth_degraded",
+            message: "Couldn’t finish loading your profile.",
+          });
+          setIsLoadingAuth(false);
+        }
       } else {
-        applyUser(null);
-        isAuthenticatedRef.current = false;
-        setIsAuthenticated(false);
+        await clearDeadSession();
         setIsLoadingAuth(false);
         setAuthChecked(true);
       }
@@ -160,24 +212,21 @@ export const AuthProvider = ({ children }) => {
       if (import.meta.env.DEV) {
         console.debug("Auth boot failed:", error?.message || error);
       }
-      // Timeout / network during boot must not wipe a still-valid session —
-      // that was dumping signed-in users onto the marketing Landing page.
       if (hasCachedAuthSession()) {
+        // Keep trying via listener; do not mark signed-out or send to login.
         setAuthError({
           type: "auth_degraded",
-          message: "Couldn’t finish signing you in. You can retry from login.",
+          message: "Couldn’t finish signing you in. Retrying…",
         });
         setIsLoadingAuth(false);
         setAuthChecked(true);
       } else {
-        applyUser(null);
-        isAuthenticatedRef.current = false;
-        setIsAuthenticated(false);
+        markSignedOut();
         setIsLoadingAuth(false);
         setAuthChecked(true);
       }
     }
-  }, [checkUserAuth, applyUser]);
+  }, [checkUserAuth, markAuthenticated, markSignedOut, clearDeadSession]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -187,8 +236,6 @@ export const AuthProvider = ({ children }) => {
       await checkAppState();
       if (cancelled) return;
 
-      // Attach auth listener quickly on auth screens; otherwise shortly after idle.
-      // A long defer left signed-in users stuck on the marketing page after login.
       const path = typeof window !== "undefined" ? window.location.pathname : "";
       const onAuthScreen = /\/(login|register|forgot-password|reset-password|auth\/callback)/.test(path);
       const delay = hasCachedAuthSession() || onAuthScreen ? 0 : 2500;
@@ -199,16 +246,16 @@ export const AuthProvider = ({ children }) => {
         const supabase = await loadSupabase();
         if (cancelled) return;
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
-          if (session) {
-            // Silent JWT refresh must not re-hit profiles.
+          if (session?.user) {
             if (event === "TOKEN_REFRESHED") return;
-            // INITIAL_SESSION: hydrate if boot skipped us (e.g. session peek miss).
             if (event === "INITIAL_SESSION" && isAuthenticatedRef.current) return;
+            // Hydrate immediately on sign-in, then enrich.
+            if (!isAuthenticatedRef.current) {
+              markAuthenticated(userFromSession(session));
+            }
             checkUserAuth();
-          } else {
-            applyUser(null);
-            isAuthenticatedRef.current = false;
-            setIsAuthenticated(false);
+          } else if (event === "SIGNED_OUT") {
+            markSignedOut();
             setIsLoadingAuth(false);
             setAuthChecked(true);
           }
@@ -223,20 +270,21 @@ export const AuthProvider = ({ children }) => {
       cancelled = true;
       unsubscribe();
     };
-  }, [checkAppState, checkUserAuth]);
+  }, [checkAppState, checkUserAuth, markAuthenticated, markSignedOut]);
 
-  const logout = React.useCallback(async (redirectTo = window.location.href) => {
-    applyUser(null);
-    isAuthenticatedRef.current = false;
-    setIsAuthenticated(false);
-    setAuthError(null);
-    const api = await loadApi();
-    if (redirectTo === false) {
-      api.auth.logout();
-    } else {
-      api.auth.logout(redirectTo);
-    }
-  }, [applyUser]);
+  const logout = React.useCallback(
+    async (redirectTo = window.location.href) => {
+      markSignedOut();
+      setAuthError(null);
+      const api = await loadApi();
+      if (redirectTo === false) {
+        api.auth.logout();
+      } else {
+        api.auth.logout(redirectTo);
+      }
+    },
+    [markSignedOut]
+  );
 
   const navigateToLogin = React.useCallback(async () => {
     const api = await loadApi();

@@ -120,25 +120,28 @@ function AppShellGate() {
     }
   }, [authChecked, isLoadingAuth, checkUserAuth]);
 
-  // Tokens exist but profile load failed — never dump the user on the marketing landing page.
-  // Send them to login to recover instead of "circling" Landing ↔ app.
-  if (authChecked && !isLoadingAuth && !isAuthenticated && cachedSession && (isHome || !publicPath)) {
-    rememberReturnTo(isHome ? "/" : location);
-    return <Navigate to="/login" replace state={{ from: location, sessionRecover: true }} />;
-  }
+  // Soft session on app routes: stay on spinner / shell — never bounce to /login
+  // (that redirect was looping Login ↔ `/`).
+  useEffect(() => {
+    if (!cachedSession || isAuthenticated || isLoadingAuth || publicPath) return;
+    if (!authChecked) return;
+    const t = setTimeout(() => {
+      checkUserAuth().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [cachedSession, isAuthenticated, isLoadingAuth, authChecked, publicPath, checkUserAuth]);
 
-  // Authenticated shell for app routes (and home when signed in)
+  // Authenticated shell for app routes (and home when signed in / session present)
   const wantsAppShell =
-    (authChecked && isAuthenticated && !publicPath) ||
-    (authChecked && isAuthenticated && isHome) ||
-    // Token present while auth is still resolving (avoids flash of marketing page after login)
-    (cachedSession && (isHome || !publicPath) && (!authChecked || isLoadingAuth));
+    (isAuthenticated && !publicPath) ||
+    (isAuthenticated && isHome) ||
+    (cachedSession && (isHome || !publicPath));
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {
       return <Navigate to="/login" replace />;
     }
-    if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
+    if (!isAuthenticated || isLoadingAuth || isLoadingPublicSettings || !authChecked) {
       return <Spinner fullScreen label="Loading TitanOS" />;
     }
     return (

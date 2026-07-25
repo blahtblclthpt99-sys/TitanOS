@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
@@ -9,18 +9,15 @@ import AuthLayout from "@/components/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { useAuth } from "@/lib/AuthContext";
 import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
-import { hasCachedAuthSession } from "@/lib/sessionPeek";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { checkUserAuth, isAuthenticated, authChecked, isLoadingAuth } = useAuth();
+  const { checkUserAuth, isAuthenticated, authChecked } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const sessionRecover = Boolean(location.state?.sessionRecover);
-  const recoverAttempted = useRef(false);
 
   const returnTo = resolveReturnTo(location);
 
@@ -30,17 +27,6 @@ export default function Login() {
     }
   }, [authChecked, isAuthenticated, navigate, returnTo]);
 
-  // Recover soft sessions (tokens present, profile load failed) instead of bouncing to Landing.
-  useEffect(() => {
-    if (recoverAttempted.current) return;
-    if (!sessionRecover && !hasCachedAuthSession()) return;
-    if (isAuthenticated || isLoadingAuth) return;
-    if (!authChecked) return;
-    if (!hasCachedAuthSession()) return;
-    recoverAttempted.current = true;
-    checkUserAuth().catch(() => {});
-  }, [sessionRecover, authChecked, isAuthenticated, isLoadingAuth, checkUserAuth]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -49,7 +35,7 @@ export default function Login() {
       await api.auth.loginViaEmailPassword(email, password);
       await checkUserAuth();
       // Navigate via the isAuthenticated effect so the shell gate sees auth=true
-      // in the same render as `/` (avoids a one-frame Landing flash → loop feel).
+      // in the same render as `/`.
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -59,11 +45,6 @@ export default function Login() {
 
   return (
     <AuthLayout title="Welcome to TitanOS" subtitle="Sign in to continue">
-      {sessionRecover && !isAuthenticated && (
-        <div className="mb-4 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground" role="status">
-          Your session couldn’t be restored. Sign in again to get back into the app.
-        </div>
-      )}
       {error && (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}

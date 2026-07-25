@@ -4,9 +4,11 @@ import { AlertTriangle, Plus, Truck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createEquipment, deleteEquipment, listEquipment } from "@/lib/equipmentApi";
 import {
@@ -32,7 +34,7 @@ const YEARS = vehicleYearOptions();
 const fieldClass = "w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground text-sm";
 
 export default function Fleet() {
-  const { user } = useAuth();
+  const { user, authChecked, isLoadingAuth } = useAuth();
   const { data: rows = [], setData: setRows, loading, error, reload } = useSafeAsync(
     () => listEquipment(user.id),
     [user?.id],
@@ -75,11 +77,30 @@ export default function Fleet() {
       // local mirror for Driver Hub labels
       make: form.make || "",
     };
-    const row = await createEquipment(user, payload);
-    setRows([row, ...rows]);
-    setForm(EMPTY);
+    try {
+      const row = await createEquipment(user, payload);
+      setRows([row, ...rows]);
+      setForm(EMPTY);
+      toast({ title: "Equipment added" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't add equipment" });
+    }
   };
 
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading fleet" />;
+  if (!user?.id) {
+    return (
+      <div className="page-pad max-w-6xl mx-auto pb-24">
+        <PageHeader title="Fleet & equipment" subtitle="Track vehicles and tools" />
+        <EmptyState
+          title="Sign in to manage fleet"
+          description="Equipment tracking requires an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
   if (loading) return <PageLoader variant="list" label="Loading fleet" />;
   if (error) return <ErrorState title="Couldn't load fleet" onRetry={reload} />;
 
@@ -245,8 +266,13 @@ export default function Fleet() {
                 size="sm"
                 variant="ghost"
                 onClick={async () => {
-                  await deleteEquipment(user.id, row.id);
-                  setRows(rows.filter((item) => item.id !== row.id));
+                  try {
+                    await deleteEquipment(user.id, row.id);
+                    setRows(rows.filter((item) => item.id !== row.id));
+                    toast({ title: "Removed from fleet" });
+                  } catch {
+                    toast({ variant: "destructive", title: "Couldn't remove" });
+                  }
                 }}
                 className="text-foreground/45"
               >

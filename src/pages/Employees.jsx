@@ -4,27 +4,45 @@ import { api } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import DeleteButton from "@/components/shared/DeleteButton";
 
 const EMPTY = { name: "", role: "technician", phone: "", email: "", hourly_rate: "", status: "active" };
 
 export default function Employees() {
-  const { user } = useAuth();
+  const { user, authChecked, isLoadingAuth } = useAuth();
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [adding, setAdding] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const load = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setLoadError(false);
     try {
       setRows(await api.entities.Employee.list("-created_date", 100));
     } catch {
-      setRows([]);
+      setLoadError(true);
+      toast({ variant: "destructive", title: "Couldn't load employees" });
+    } finally {
+      setLoading(false);
     }
   };
+
   useEffect(() => {
-    if (user?.id) load();
-  }, [user?.id]);
+    if (!authChecked) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [authChecked, user?.id]);
 
   const add = async (event) => {
     event.preventDefault();
@@ -38,19 +56,44 @@ export default function Employees() {
       });
       setRows((current) => [row, ...current]);
       setForm(EMPTY);
+      toast({ title: "Employee added" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't add employee" });
     } finally {
       setAdding(false);
     }
   };
 
   const clock = async (row) => {
-    const patch = {
-      is_clocked_in: !row.is_clocked_in,
-      current_location: !row.is_clocked_in ? `Checked in ${new Date().toLocaleTimeString()}` : "",
-    };
-    const saved = await api.entities.Employee.update(row.id, patch);
-    setRows((current) => current.map((item) => (item.id === row.id ? saved : item)));
+    try {
+      const patch = {
+        is_clocked_in: !row.is_clocked_in,
+        current_location: !row.is_clocked_in ? `Checked in ${new Date().toLocaleTimeString()}` : "",
+      };
+      const saved = await api.entities.Employee.update(row.id, patch);
+      setRows((current) => current.map((item) => (item.id === row.id ? saved : item)));
+      toast({ title: saved.is_clocked_in ? "Clocked in" : "Clocked out" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update clock" });
+    }
   };
+
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading employees" />;
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
+        <PageHeader title="Employees" subtitle="Manage your field team" />
+        <EmptyState
+          title="Sign in to manage employees"
+          description="Team roster and clock-in require an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
+  if (loading) return <PageLoader variant="list" label="Loading employees" />;
+  if (loadError) return <ErrorState title="Couldn't load employees" onRetry={load} />;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
@@ -112,9 +155,11 @@ export default function Employees() {
               </article>
             ))
           ) : (
-            <div className="glass rounded-2xl p-10 text-center text-muted-foreground">
-              <Users className="mx-auto mb-2" />No employees yet
-            </div>
+            <EmptyState
+              title="No employees yet"
+              description="Add your first field teammate to track clock-ins and roles."
+              icon={Users}
+            />
           )}
         </section>
       </div>

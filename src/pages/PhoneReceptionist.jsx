@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
+import PageLoader from "@/components/shared/PageLoader";
+import EmptyState from "@/components/shared/EmptyState";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import {
   answerFromScript,
@@ -18,13 +20,14 @@ import {
 } from "@/lib/phoneScriptApi";
 
 export default function PhoneReceptionist() {
-  const { user } = useAuth();
+  const { user, authChecked } = useAuth();
   const [scripts, setScripts] = useState([]);
   const [script, setScript] = useState(null);
   const [utterance, setUtterance] = useState("");
   const [log, setLog] = useState([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async (preferId) => {
     if (!user?.id) return;
@@ -43,9 +46,14 @@ export default function PhoneReceptionist() {
   };
 
   useEffect(() => {
-    load();
+    if (!authChecked) return;
+    if (!user?.id) { setLoading(false); return; }
+    setLoading(true);
+    load()
+      .catch(() => toast({ variant: "destructive", title: "Couldn't load phone scripts" }))
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [authChecked, user?.id]);
 
   const selectScript = (row) => {
     setScript(row);
@@ -119,7 +127,25 @@ export default function PhoneReceptionist() {
     setUtterance("");
   };
 
-  if (!script) return <div className="p-8 text-muted-foreground">Loading scripts…</div>;
+  if (!authChecked || (loading && !script)) return <PageLoader variant="list" label="Loading scripts" />;
+  if (!user?.id) {
+    return (
+      <PageShell maxWidth="lg">
+        <PageHeader
+          eyebrow="Labs · Coming soon"
+          title="Phone scripts"
+          subtitle="Write a greeting and FAQ, then practice replies — not a live phone line."
+        />
+        <EmptyState
+          title="Sign in to manage phone scripts"
+          description="Creating and editing scripts requires an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </PageShell>
+    );
+  }
+  if (!script) return <PageLoader variant="list" label="Loading scripts" />;
 
   const faqs = Array.isArray(script.faq_json) ? script.faq_json : [];
 

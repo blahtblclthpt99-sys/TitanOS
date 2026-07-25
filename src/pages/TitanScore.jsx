@@ -139,9 +139,16 @@ export default function TitanScore() {
             <button
               key={tip}
               type="button"
-              onClick={() =>
-                navigate(tip.toLowerCase().includes("verif") ? "/trust-safety" : "/invoices")
-              }
+              onClick={() => {
+                const t = tip.toLowerCase();
+                let path = "/profile";
+                if (t.includes("verif") || t.includes("trust")) path = "/trust-safety";
+                else if (t.includes("invoice") || t.includes("overdue")) path = "/invoices";
+                else if (t.includes("job") || t.includes("finish") || t.includes("completed work")) path = "/jobs";
+                else if (t.includes("review")) path = "/reputation";
+                else if (t.includes("message") || t.includes("reply") || t.includes("response")) path = "/messages";
+                navigate(path);
+              }}
               className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md bg-muted/60 px-4 py-3 text-left text-sm text-foreground hover:bg-muted"
             >
               <span>{tip}</span>

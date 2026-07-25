@@ -133,6 +133,22 @@ export default function Notifications() {
     return <PageLoader variant="list" label="Loading notifications" />;
   }
 
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
+        <PageHeader title="Notification center" subtitle="Job updates, messages, reviews, and account alerts" />
+        <EmptyState
+          title="Sign in to view notifications"
+          description="Your notification center requires an account."
+          actionLabel="Sign in"
+          onAction={() => {
+            window.location.href = "/login";
+          }}
+        />
+      </div>
+    );
+  }
+
   const hasUnreadInView = notifications.some((n) => !n.read_at);
   const unreadBadge =
     category === "all" ? counts.unread || 0 : counts[`${category}_unread`] || 0;

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import EmptyState from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/AuthContext";
 import { getReferralLink, ensureReferralCode, inviteReferral, listReferrals, referralStats } from "@/lib/referralApi";
 import { FREE_DURING_BETA, REFERRAL_REWARD, betaBadgeLabel } from "@/lib/plan";
@@ -85,7 +86,21 @@ export default function Referral() {
     }
   };
 
-  if (!authChecked || isLoadingAuth || loading) return <PageLoader variant="list" label="Loading referrals" />;
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading referrals" />;
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
+        <PageHeader title="Referral Program" subtitle="Invite your network. Unlock premium for life." />
+        <EmptyState
+          title="Sign in to view referrals"
+          description="Your referral link and invite history require an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
+  if (loading) return <PageLoader variant="list" label="Loading referrals" />;
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">

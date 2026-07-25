@@ -1,14 +1,21 @@
 import React from "react";
-import { Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronRight, Sparkles } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { useEntityData } from "@/hooks/useEntityData";
 import { buildWeeklyCoachReport } from "@/lib/growthCoach";
 
 export default function GrowthCoach() {
+  const navigate = useNavigate();
   const {
     data: [invoices, expenses, customers, jobs, estimates],
+    loading,
+    error,
+    reload,
   } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 100] },
     { entity: "Expense", method: "list", args: ["-created_date", 100] },
@@ -16,6 +23,10 @@ export default function GrowthCoach() {
     { entity: "Job", method: "list", args: ["-created_date", 100] },
     { entity: "Estimate", method: "list", args: ["-created_date", 100] },
   ]);
+
+  if (loading) return <PageLoader variant="list" label="Loading growth tips" />;
+  if (error) return <ErrorState title="Couldn't load growth tips" onRetry={reload} />;
+
   const insights = buildWeeklyCoachReport({ invoices, expenses, customers, jobs, estimates });
 
   return (
@@ -35,11 +46,21 @@ export default function GrowthCoach() {
           <h2 className="font-semibold text-foreground">Suggested next moves</h2>
         </div>
         <div className="space-y-3">
-          {insights.map((insight) => (
-            <p key={insight} className="rounded-md bg-muted/60 p-4 text-sm text-foreground/90">
-              {insight}
-            </p>
-          ))}
+          {insights.map((insight) => {
+            const text = typeof insight === "string" ? insight : insight.text;
+            const path = typeof insight === "string" ? "/jobs" : insight.path;
+            return (
+              <button
+                key={text}
+                type="button"
+                onClick={() => navigate(path)}
+                className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md bg-muted/60 p-4 text-left text-sm text-foreground/90 hover:bg-muted focus-ring"
+              >
+                <span>{text}</span>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              </button>
+            );
+          })}
         </div>
       </section>
     </PageShell>

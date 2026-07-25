@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import EmptyState from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/AuthContext";
 import { SERVICE_CATEGORIES, locationLabel, timeAgo } from "@/lib/platformConstants";
 import { addComment, createCommunityPost, deleteCommunityPost, getCommunityPostQuota, listActivity, listActivitySince, listComments, listCommunityPosts, toggleLike } from "@/lib/communityApi";
@@ -52,7 +53,21 @@ export default function Community() {
     } catch { toast({ variant: "destructive", title: "Couldn't load community" }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { if (authChecked && user?.id) load(); }, [authChecked, user?.id]);
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!user?.id) { setLoading(false); return; }
+    load();
+  }, [authChecked, user?.id]);
+  useEffect(() => {
+    if (!posts.length || !window.location.hash) return;
+    const id = window.location.hash.replace("#", "");
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-titan-cyan/50");
+    const timeout = window.setTimeout(() => el.classList.remove("ring-2", "ring-titan-cyan/50"), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [posts]);
   useEffect(() => {
     if (!user?.id) return undefined;
     const poll = setInterval(async () => {
@@ -137,6 +152,19 @@ export default function Community() {
   };
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading community" />;
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
+        <PageHeader title="Community" subtitle="Share professional wins with your local service network" />
+        <EmptyState
+          title="Sign in to view Community"
+          description="The feed, activity, and posting require an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
   const canCompose = user?.community_opt_in || user?.privacy_prefs?.share_completed_jobs;
   const activityItems = activity;
   return <div className="relative p-4 md:p-8 max-w-6xl mx-auto pb-32">

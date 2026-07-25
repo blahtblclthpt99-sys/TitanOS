@@ -239,6 +239,19 @@ export default function Hire() {
 
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading Hire" />;
+  if (!user?.id) {
+    return (
+      <PageShell maxWidth="lg">
+        <PageHeader title="Hire workers" subtitle="Post hauls and gigs, or apply to work." />
+        <EmptyState
+          title="Sign in to use Hire"
+          description="Posting jobs and applications require an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </PageShell>
+    );
+  }
   const tabs = [
     ["browse", "Browse"],
     ["saved", "Saved"],

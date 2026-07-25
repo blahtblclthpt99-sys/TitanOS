@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import {
@@ -21,7 +22,7 @@ import {
 } from "@/lib/followUpApi";
 
 export default function FollowUps() {
-  const { user } = useAuth();
+  const { user, authChecked, isLoadingAuth } = useAuth();
   const { data, setData, loading, error, reload } = useSafeAsync(
     async () => {
       const [rules, queue] = await Promise.all([listRules(user.id), listQueue(user.id)]);
@@ -38,22 +39,32 @@ export default function FollowUps() {
 
   const add = async (e) => {
     e.preventDefault();
-    if (!name) return;
-    const row = await createRule(user, {
-      name,
-      delay_days: Number(days),
-      message_template: `Hi {customer_name}, checking in from TitanOS.`,
-    });
-    setData((prev) => ({ ...prev, rules: [...(prev?.rules ?? []), row] }));
-    setName("");
+    if (!name || !user?.id) return;
+    try {
+      const row = await createRule(user, {
+        name,
+        delay_days: Number(days),
+        message_template: `Hi {customer_name}, checking in from TitanOS.`,
+      });
+      setData((prev) => ({ ...prev, rules: [...(prev?.rules ?? []), row] }));
+      setName("");
+      toast({ title: "Rule added" });
+    } catch {
+      toast({ title: "Couldn't add rule", variant: "destructive" });
+    }
   };
 
   const sent = async (row) => {
-    const saved = await markQueueSent(user.id, row.id);
-    setData((prev) => ({
-      ...prev,
-      queue: (prev?.queue ?? []).map((item) => (item.id === row.id ? saved : item)),
-    }));
+    try {
+      const saved = await markQueueSent(user.id, row.id);
+      setData((prev) => ({
+        ...prev,
+        queue: (prev?.queue ?? []).map((item) => (item.id === row.id ? saved : item)),
+      }));
+      toast({ title: "Marked as sent" });
+    } catch {
+      toast({ title: "Couldn't update", variant: "destructive" });
+    }
   };
 
   const emailSend = async (row) => {
@@ -75,6 +86,26 @@ export default function FollowUps() {
     }
   };
 
+  if (!authChecked || isLoadingAuth) {
+    return <PageLoader variant="list" label="Loading follow-ups" />;
+  }
+
+  if (!user?.id) {
+    return (
+      <div className="page-pad max-w-6xl mx-auto pb-24">
+        <PageHeader title="Follow-ups" subtitle="Turn completed work into repeat business" />
+        <EmptyState
+          title="Sign in to manage follow-ups"
+          description="Automation rules and the send queue require an account."
+          actionLabel="Sign in"
+          onAction={() => {
+            window.location.href = "/login";
+          }}
+        />
+      </div>
+    );
+  }
+
   if (loading) return <PageLoader variant="list" label="Loading follow-ups" />;
   if (error) return <ErrorState title="Couldn't load follow-ups" onRetry={reload} />;
 
@@ -85,8 +116,13 @@ export default function FollowUps() {
         <Button
           type="button"
           onClick={async () => {
-            await seedDefaultFollowUpRules(user);
-            reload();
+            try {
+              await seedDefaultFollowUpRules(user);
+              reload();
+              toast({ title: "Default rules seeded" });
+            } catch {
+              toast({ title: "Couldn't seed defaults", variant: "destructive" });
+            }
           }}
         >
           Seed defaults
@@ -114,6 +150,9 @@ export default function FollowUps() {
               />
             </div>
           ))}
+          {!rules.length && (
+            <p className="text-muted-foreground text-sm py-4">No rules yet. Add one below or seed defaults.</p>
+          )}
           <form onSubmit={add} className="flex gap-2 mt-4">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Rule name" className="bg-muted border-border text-foreground" />
             <Input value={days} onChange={(e) => setDays(e.target.value)} type="number" className="w-20 bg-muted border-border text-foreground" />
@@ -151,7 +190,10 @@ export default function FollowUps() {
             </div>
           ))}
           {!queue.some((row) => row.status === "pending") && (
-            <p className="text-muted-foreground text-sm py-8">No pending follow-ups.</p>
+            <EmptyState
+              title="No pending follow-ups"
+              description="Queued messages will show here when a rule fires after completed work."
+            />
           )}
         </section>
       </div>

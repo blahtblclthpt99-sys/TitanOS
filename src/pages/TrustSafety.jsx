@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import ComingSoonState from "@/components/shared/ComingSoonState";
 import { useAuth } from "@/lib/AuthContext";
@@ -76,7 +77,27 @@ export default function TrustSafety() {
     }
   };
 
-  if (!authChecked || isLoadingAuth || loading) {
+  if (!authChecked || isLoadingAuth) {
+    return <PageLoader variant="list" label="Loading Trust & Safety" />;
+  }
+
+  if (!user?.id) {
+    return (
+      <div className="page-pad max-w-3xl mx-auto pb-24">
+        <PageHeader title="Trust & Safety" subtitle="Reporting and blocking for your account" />
+        <EmptyState
+          title="Sign in for Trust & Safety"
+          description="Report and block tools require an account."
+          actionLabel="Sign in"
+          onAction={() => {
+            window.location.href = "/login";
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (loading) {
     return <PageLoader variant="list" label="Loading Trust & Safety" />;
   }
 

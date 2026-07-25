@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import EmptyState from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/AuthContext";
 import { betaBadgeLabel } from "@/lib/plan";
 import { api } from "@/api/apiClient";
@@ -26,6 +27,7 @@ export default function Booking() {
   const [requests, setRequests] = useState([]);
   const [saving, setSaving] = useState(false);
   const [savingAvailability, setSavingAvailability] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     if (!user?.id) return;
@@ -37,7 +39,13 @@ export default function Booking() {
     setRequests(incoming.sort((a, b) => new Date(b.created_date || b.created_at) - new Date(a.created_date || a.created_at)));
   };
 
-  useEffect(() => { if (authChecked && user?.id) load().catch(() => toast({ variant: "destructive", title: "Couldn't load booking page" })); }, [authChecked, user?.id]);
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!user?.id) { setLoading(false); return; }
+    load()
+      .catch(() => toast({ variant: "destructive", title: "Couldn't load booking page" }))
+      .finally(() => setLoading(false));
+  }, [authChecked, user?.id]);
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const savePage = async (event) => {
@@ -81,7 +89,21 @@ export default function Booking() {
     catch { toast({ variant: "destructive", title: "Couldn't copy link" }); }
   };
 
-  if (!authChecked || !form) return <PageLoader variant="list" label="Loading booking page" />;
+  if (!authChecked) return <PageLoader variant="list" label="Loading booking page" />;
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-5xl mx-auto pb-24">
+        <PageHeader title="Booking" subtitle="Publish a shareable page for customers to request service." />
+        <EmptyState
+          title="Sign in to manage booking"
+          description="Your public booking page requires an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
+  if (!form) return <PageLoader variant="list" label="Loading booking page" />;
   return <div className="p-4 md:p-8 max-w-5xl mx-auto pb-28">
     <PageHeader title="Booking" subtitle="Publish a shareable page for customers to request service." />
     {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}

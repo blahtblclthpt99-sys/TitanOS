@@ -95,6 +95,20 @@ export default function Companies() {
     }
   };
 
+  if (!authChecked) return <PageLoader variant="list" label="Loading companies" />;
+  if (!user?.id) {
+    return (
+      <div className="page-pad mx-auto max-w-6xl pb-24">
+        <PageHeader title="Companies" subtitle="Manage your business profiles and team access" />
+        <EmptyState
+          title="Sign in to manage companies"
+          description="Company profiles and team invites require an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
   if (loading) return <PageLoader variant="list" label="Loading companies" />;
   if (loadError) return <ErrorState title="Couldn't load companies" onRetry={load} />;
 

@@ -63,9 +63,15 @@ function safeDate(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export const getDateYear = (date) => getYear(new Date(date));
+export const getDateYear = (date) => {
+  const d = safeDate(date);
+  return d ? getYear(d) : null;
+};
 
-export const getDateMonth = (date) => getMonth(new Date(date));
+export const getDateMonth = (date) => {
+  const d = safeDate(date);
+  return d ? getMonth(d) : null;
+};
 
 export const isToday = (date) => isSameDay(date, new Date());
 

@@ -9,6 +9,7 @@ import NativeSelect from "@/components/shared/NativeSelect";
 import { useEntityData } from "@/hooks/useEntityData";
 import { EXPENSE_CATEGORIES } from "@/lib/platformConstants";
 import { formatMonthDayYear, todayISO } from "@/lib/date-utils";
+import { toast } from "@/components/ui/use-toast";
 
 const blankExpense = () => ({
   category: "other", amount: "", date: todayISO(), description: "", notes: "", vendor: "",
@@ -58,8 +59,16 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
     try {
       const { file_url } = await api.integrations.Core.UploadFile({ file });
       f("receipt_url", file_url);
+      toast({ title: "Receipt attached" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't upload receipt",
+        description: err?.message || "Try again.",
+      });
     } finally {
       setUploading(false);
+      if (event.target) event.target.value = "";
     }
   };
 
@@ -75,9 +84,16 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
     try {
       if (editingId) await api.entities.Expense.update(editingId, payload);
       else await api.entities.Expense.create(payload);
+      toast({ title: editingId ? "Expense updated" : "Expense saved" });
       closeForm();
       await reload();
       onChanged?.();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't save expense",
+        description: err?.message || "Try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -95,8 +111,19 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this expense?")) return;
-    await api.entities.Expense.delete(id);
-    await reload();
+    try {
+      await api.entities.Expense.delete(id);
+      toast({ title: "Expense deleted" });
+      await reload();
+      onChanged?.();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't delete expense",
+        description: err?.message || "Try again.",
+      });
+    }
+  };
     onChanged?.();
   };
 

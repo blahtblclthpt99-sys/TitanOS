@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -12,9 +12,9 @@ import { useEntityData } from "@/hooks/useEntityData";
 import MileTracker from "@/components/tax/MileTracker";
 import BusinessExpenses from "@/components/tax/BusinessExpenses";
 import { getDateMonth, getDateYear } from "@/lib/date-utils";
+import { IRS_MILEAGE_RATE_USD } from "@/lib/driverHubMath";
 
-// IRS standard mileage rate 2024
-const MILEAGE_RATE = 0.67;
+const MILEAGE_RATE = IRS_MILEAGE_RATE_USD;
 
 // SE tax rate (15.3%) and income tax bracket estimates
 const SE_TAX_RATE = 0.153;
@@ -47,7 +47,7 @@ const CATEGORY_ICONS = {
 };
 
 const WRITEOFF_TIPS = [
-  { icon: Car,      title: "Vehicle & Mileage",    tip: "Track every business mile at $0.67/mile (2024 IRS rate). Keep a mileage log — it's one of the biggest 1099 deductions." },
+  { icon: Car,      title: "Vehicle & Mileage",    tip: `Track every business mile at $${MILEAGE_RATE.toFixed(2)}/mile (IRS rate). Keep a mileage log — it's one of the biggest 1099 deductions.` },
   { icon: Home,     title: "Home Office",           tip: "If you use part of your home exclusively for work, deduct $5/sq ft (up to 300 sq ft) or the actual expense ratio." },
   { icon: Phone,    title: "Phone & Internet",      tip: "Deduct the business-use percentage of your monthly bill. 80% business use = 80% deductible." },
   { icon: Utensils, title: "Business Meals",        tip: "50% of meals with clients or while traveling for work are deductible. Keep receipts and note the business purpose." },
@@ -67,13 +67,18 @@ export default function TaxCenter({ isActive = true }) {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(String(currentYear));
   const [expandedTip, setExpandedTip] = useState(null);
+  const [tripMiles, setTripMiles] = useState(0);
+
+  const handleTripTotals = useCallback(({ totalMiles: miles }) => {
+    setTripMiles(Number(miles) || 0);
+  }, []);
 
   const { data: [invoices, expenses], loading, error, reload } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 500] },
     { entity: "Expense", method: "list", args: ["-date", 500] },
   ], { enabled: isActive });
 
-  const yr = parseInt(taxYear);
+  const yr = parseInt(taxYear, 10);
 
   // ── Revenue for the tax year ─────────────────────────────────────────
   const grossIncome = useMemo(() =>
@@ -94,8 +99,9 @@ export default function TaxCenter({ isActive = true }) {
     return s + (e.amount || 0) * pct;
   }, 0);
 
-  // Mileage deduction
-  const totalMiles = yearExpenses.reduce((s, e) => s + (e.mileage_miles || 0), 0);
+  // Mileage: expense.mileage_miles + MileTracker trips
+  const expenseMiles = yearExpenses.reduce((s, e) => s + (e.mileage_miles || 0), 0);
+  const totalMiles = Math.round((expenseMiles + tripMiles) * 10) / 10;
   const mileageDeduction = totalMiles * MILEAGE_RATE;
 
   const allDeductions = totalDeductions + mileageDeduction;
@@ -229,7 +235,7 @@ export default function TaxCenter({ isActive = true }) {
                 <Car className="w-4 h-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Mileage Deduction</p>
-                  <p className="text-xs text-muted-foreground">{totalMiles.toLocaleString()} miles × $0.67</p>
+                  <p className="text-xs text-muted-foreground">{totalMiles.toLocaleString()} miles × ${MILEAGE_RATE.toFixed(2)}</p>
                 </div>
               </div>
               <p className="text-sm font-semibold text-primary">${Math.round(mileageDeduction).toLocaleString()}</p>
@@ -238,7 +244,7 @@ export default function TaxCenter({ isActive = true }) {
           {byCategory.length === 0 && mileageDeduction === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">
               <p className="text-sm text-muted-foreground">No deductible expenses for {taxYear}</p>
-              <p className="text-xs text-muted-foreground mt-1">Mark expenses as tax-deductible in Finances</p>
+              <p className="text-xs text-muted-foreground mt-1">Add write-offs in Business Expenses below, or Finances</p>
             </div>
           ) : (
             <div className="space-y-2 mt-3">
@@ -269,7 +275,7 @@ export default function TaxCenter({ isActive = true }) {
             <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-titan-amber/10 border border-titan-amber/20">
               <AlertCircle className="w-4 h-4 text-titan-amber mt-0.5 flex-shrink-0" />
               <p className="text-xs text-titan-amber/90">
-                <strong>{untaggedCount} expense{untaggedCount !== 1 ? "s" : ""}</strong> not marked as tax-deductible. Review in Finances to maximize write-offs.
+                <strong>{untaggedCount} expense{untaggedCount !== 1 ? "s" : ""}</strong> not marked as tax-deductible. Tag them in Business Expenses below (or Finances) to maximize write-offs.
               </p>
             </div>
           )}
@@ -303,7 +309,7 @@ export default function TaxCenter({ isActive = true }) {
       </div>
 
       {/* ── Mile Tracker ── */}
-      <MileTracker taxYear={yr} />
+      <MileTracker taxYear={yr} onTotalsChange={handleTripTotals} />
 
       {/* ── Tax Advantages ── */}
       <div className="glass rounded-2xl p-6 mt-6">
@@ -337,7 +343,7 @@ export default function TaxCenter({ isActive = true }) {
               <div className="w-8 h-8 rounded-lg bg-titan-amber/10 flex items-center justify-center"><Utensils className="w-4 h-4 text-titan-amber" /></div>
               <div>
                 <p className="text-sm font-medium text-foreground">Business Meals</p>
-                <p className="text-xs text-muted-foreground">50% deductible · add meals in Finances and tag as deductible</p>
+                <p className="text-xs text-muted-foreground">50% deductible · add meals below and tag as deductible</p>
               </div>
             </div>
           </div>
@@ -368,7 +374,7 @@ export default function TaxCenter({ isActive = true }) {
           <div className="flex items-start gap-2 p-3 rounded-xl bg-titan-amber/10 border border-titan-amber/20">
             <AlertCircle className="w-4 h-4 text-titan-amber mt-0.5 flex-shrink-0" />
             <p className="text-xs text-titan-amber/90">
-              No deductions logged yet for {taxYear}. Add expenses in Finances and log trips above to see your real tax savings.
+              No deductions logged yet for {taxYear}. Add expenses below, log trips above, or scan a receipt to see your real tax savings.
             </p>
           </div>
         )}

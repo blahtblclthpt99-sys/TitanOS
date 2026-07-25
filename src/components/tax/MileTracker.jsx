@@ -23,7 +23,7 @@ function tripDeduction(miles) {
   return Math.round(Number(miles || 0) * IRS_MILEAGE_RATE_USD * 100) / 100;
 }
 
-export default function MileTracker({ taxYear }) {
+export default function MileTracker({ taxYear, onTotalsChange }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -67,6 +67,10 @@ export default function MileTracker({ taxYear }) {
       totalDeduction: tripDeduction(rounded),
     };
   }, [trips]);
+
+  useEffect(() => {
+    onTotalsChange?.({ totalMiles, totalDeduction });
+  }, [totalMiles, totalDeduction, onTotalsChange]);
 
   const openCreate = () => {
     setEditingId(null);

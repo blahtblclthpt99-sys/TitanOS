@@ -50,7 +50,6 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const planId = resolvePlanFromProfile(profile, user);
-    const provider = body.provider || "stripe";
     const currency = (body.currency || "usd").toLowerCase();
     const origin = resolveAppOrigin(req);
 
@@ -88,7 +87,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Amount exceeds maximum" });
     }
 
-    if (provider === "stripe" && !process.env.STRIPE_SECRET_KEY) {
+    const provider = String(body.provider || "stripe").toLowerCase();
+    if (provider !== "stripe") {
+      return res.status(400).json({
+        error: "Only Stripe Checkout is available. Square and PayPal providers are not live yet.",
+      });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
       return res.status(503).json({
         error: "Stripe is not configured. Set STRIPE_SECRET_KEY before accepting live payments.",
         setupRequired: true,

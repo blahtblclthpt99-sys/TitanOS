@@ -17,7 +17,7 @@ import DeleteButton from "@/components/shared/DeleteButton";
 import EmptyState from "@/components/shared/EmptyState";
 import PageLoader from "@/components/shared/PageLoader";
 
-const PROVIDERS = ["stripe", "square", "paypal"];
+const PROVIDERS = ["stripe"];
 const EMPTY_FORM = { amount: "", customer_name: "", invoice_id: "", provider: "stripe" };
 const statusClass = {
   succeeded: "bg-emerald-400/15 text-emerald-300",
@@ -81,24 +81,31 @@ export default function Payments() {
   };
 
   useEffect(() => {
-    if (authChecked && user?.id) load();
+    if (!authChecked) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    load();
   }, [authChecked, user?.id]);
 
   useEffect(() => {
-    const result =
-      new URLSearchParams(window.location.search).get("success") === "1"
-        ? "Payment completed"
-        : new URLSearchParams(window.location.search).get("canceled") === "1"
-          ? "Payment canceled"
-          : "";
-    if (result === "Payment completed") {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get("success") === "1";
+    const canceled = params.get("canceled") === "1";
+    if (!success && !canceled) return;
+    if (success) {
       toast({
         title: "Checkout returned success",
-        description: "Confirm in your provider dashboard — this app may only have recorded a pending link.",
+        description: "Confirm in your Stripe dashboard — TitanOS marks paid only via webhook.",
       });
-    } else if (result) {
-      toast({ title: result });
+    } else {
+      toast({ title: "Payment canceled" });
     }
+    params.delete("success");
+    params.delete("canceled");
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    window.history.replaceState({}, "", next);
   }, []);
 
   const toggleProvider = async (provider) => {
@@ -204,6 +211,22 @@ export default function Payments() {
   const plan = getPlanConfig(user);
   const feePreview = Number(form.amount) > 0 ? calcPlatformFee(form.amount, user) : null;
 
+  if (authChecked && !user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
+        <PageHeader title="Payments" subtitle="Collect payments with Stripe Checkout" />
+        <EmptyState
+          title="Sign in to manage payments"
+          description="Payment links and history require an account."
+          actionLabel="Sign in"
+          onAction={() => {
+            window.location.href = "/login";
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
       <PageHeader
@@ -211,10 +234,9 @@ export default function Payments() {
         subtitle="Checkout is live when Stripe is configured — paid status comes only from the Stripe webhook"
       />
       <FeatureHonestyBanner>
-        Square and PayPal OAuth are not available yet (buttons disabled). Stripe Checkout collects live
-        payments when configured. TitanOS never marks a payment paid from the browser — only the Stripe
-        webhook can set succeeded/refunded. Creating a link fails closed unless Stripe returns a real
-        checkout URL.
+        Stripe Checkout collects live payments when configured. TitanOS never marks a payment paid from the
+        browser — only the Stripe webhook can set succeeded/refunded. Creating a link fails closed unless
+        Stripe returns a real checkout URL.
         {deviceOnly
           ? " Payment records below are from this device — the payments table was unreachable."
           : ""}

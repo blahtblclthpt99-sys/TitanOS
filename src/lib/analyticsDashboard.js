@@ -94,7 +94,7 @@ export function buildAnalyticsDashboard({
         title: j.title || j.customer_name || "Job update",
         meta: j.status,
         at: j.updated_date || j.created_date,
-        path: "/jobs",
+        path: j.id ? `/jobs?id=${j.id}` : "/jobs",
       })),
     ...invoices
       .slice()
@@ -106,7 +106,7 @@ export function buildAnalyticsDashboard({
         title: inv.customer_name || "Invoice",
         meta: inv.status,
         at: inv.created_date,
-        path: "/invoices",
+        path: inv.id ? `/invoices?id=${inv.id}` : "/invoices",
       })),
     ...unreadNotifs.slice(0, 3).map((n) => ({
       id: `notif-${n.id}`,

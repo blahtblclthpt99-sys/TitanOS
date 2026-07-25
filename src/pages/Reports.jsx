@@ -1,10 +1,12 @@
 import React, { Suspense, lazy } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { TrendingUp, Users, Briefcase, Receipt, DollarSign, ArrowDownRight, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { useEntityData } from "@/hooks/useEntityData";
 import { lastNMonthKeys } from "@/lib/date-utils";
 import { sumPaidRevenue, sumExpenses, sumOutstanding } from "@/lib/finance-metrics";
@@ -81,21 +83,44 @@ export default function Reports() {
   const hasExpCat = expCatData.length > 0;
 
   const downloadRevenue = () => {
+    if (!paidInvoices.length) {
+      toast({
+        variant: "destructive",
+        title: "Nothing to export",
+        description: "No paid invoices yet.",
+      });
+      return;
+    }
     exportCsv("titanos-revenue.csv", paidInvoices, [
       { label: "Invoice", value: (r) => r.invoice_number || r.id },
       { label: "Customer", value: (r) => r.customer_name || r.customer_id || "" },
       { label: "Total", value: (r) => r.total || 0 },
       { label: "Date", value: (r) => (r.created_date || "").slice(0, 10) },
     ]);
+    toast({ title: "Export started", description: `${paidInvoices.length} paid invoices.` });
   };
 
   return (
     <div className="page-pad max-w-7xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
         <PageHeader title="Reports" subtitle="Business analytics & insights" />
-        <Button type="button" onClick={downloadRevenue} variant="outline" className="border-border text-foreground">
-          <Download className="w-4 h-4 mr-2" aria-hidden="true" /> Export paid CSV
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild type="button" variant="outline" className="border-border text-foreground">
+            <Link to="/finances">Finances</Link>
+          </Button>
+          <Button asChild type="button" variant="outline" className="border-border text-foreground">
+            <Link to="/analytics">Analytics</Link>
+          </Button>
+          <Button
+            type="button"
+            onClick={downloadRevenue}
+            variant="outline"
+            className="border-border text-foreground"
+            disabled={!paidInvoices.length}
+          >
+            <Download className="w-4 h-4 mr-2" aria-hidden="true" /> Export paid CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">

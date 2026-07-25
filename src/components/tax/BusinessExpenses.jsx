@@ -124,8 +124,6 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
       });
     }
   };
-    onChanged?.();
-  };
 
   const exportCsv = () => {
     const columns = ["date", "category", "description", "vendor", "amount", "business_use_percent", "is_tax_deductible", "notes"];

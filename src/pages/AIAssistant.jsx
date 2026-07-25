@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw } from "lucide-react";
+import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
 import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 import ConfirmationCard from "@/components/ai/ConfirmationCard";
 import ActionResult from "@/components/ai/ActionResult";
 import { buildBusinessSummary } from "@/lib/ai-business-summary";
+import { useAuth } from "@/lib/AuthContext";
+import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
 
 const SUGGESTIONS = [
   { label: "Today's jobs", prompt: "What jobs do I have scheduled today?" },
@@ -20,7 +22,17 @@ const SUGGESTIONS = [
   { label: "Profit margin", prompt: "What's my net profit margin?" },
 ];
 
+const LAW_SUGGESTIONS = [
+  { label: "Contract red flags", prompt: "What red flags should I look for in a service contract?" },
+  { label: "Invoice dispute", prompt: "A customer disputes an invoice — what are my options and risks?" },
+  { label: "Independent contractor", prompt: "Explain independent contractor vs employee risk in plain language." },
+  { label: "Liability basics", prompt: "What liability issues should a field service business watch for?" },
+  { label: "NDA outline", prompt: "Outline a simple NDA checklist before I share client data." },
+  { label: "Late payment", prompt: "What steps can I take when a client is late on payment?" },
+];
+
 export default function AIAssistant() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +40,7 @@ export default function AIAssistant() {
   const [businessSummary, setBusinessSummary] = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
+  const [lawMastermind, setLawMastermind] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -55,6 +68,24 @@ export default function AIAssistant() {
   }, [loadBusinessData]);
 
   useEffect(() => {
+    if (!user?.id) {
+      setLawMastermind(false);
+      return undefined;
+    }
+    let alive = true;
+    fetchUserInstalls(user.id)
+      .then((installs) => {
+        if (alive) setLawMastermind(hasLawMastermind(installs));
+      })
+      .catch(() => {
+        if (alive) setLawMastermind(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -80,6 +111,7 @@ export default function AIAssistant() {
       const result = await api.functions.invoke("titanAI", {
         messages: history,
         businessSummary: businessSummary || undefined,
+        lawMastermind,
       });
 
       const data = result.data;
@@ -257,10 +289,12 @@ export default function AIAssistant() {
       <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">
-            <Bot className="w-5 h-5 text-foreground" />
+            {lawMastermind ? <Scale className="w-5 h-5 text-foreground" /> : <Bot className="w-5 h-5 text-foreground" />}
           </div>
           <div>
-            <h1 className="text-base font-bold text-foreground leading-tight">Titan AI</h1>
+            <h1 className="text-base font-bold text-foreground leading-tight">
+              {lawMastermind ? "Law Mastermind AI" : "Titan AI"}
+            </h1>
             <div className="flex items-center gap-1.5">
               {dataLoading ? (
                 <span className="text-xs text-muted-foreground">Loading snapshot…</span>
@@ -304,13 +338,16 @@ export default function AIAssistant() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center mb-5 ai-pulse">
               <Sparkles className="w-8 h-8 text-titan-cyan" />
             </div>
-            <h2 className="text-xl font-bold text-foreground mb-2">What can I do for you?</h2>
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              {lawMastermind ? "Legal strategy, plain language" : "What can I do for you?"}
+            </h2>
             <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
-              Ask about today&apos;s jobs, who owes money, revenue, or profit — answers use your TitanOS
-              records (and fall back to on-device summaries when cloud AI is unavailable).
+              {lawMastermind
+                ? "Educational legal coaching only — not a lawyer. Ask about contracts, disputes, and risk checklists."
+                : "Ask about jobs, invoices, customers, or tell me what you need done."}
             </p>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-              {SUGGESTIONS.map((s) => (
+            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+              {(lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS).map((s) => (
                 <button
                   key={s.label}
                   onClick={() => sendMessage(s.prompt)}

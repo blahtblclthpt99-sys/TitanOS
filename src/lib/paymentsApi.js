@@ -51,8 +51,12 @@ export async function listPayments(userId) {
  * Fail closed: only succeed when a live checkout URL exists.
  * Never invent a local “payment link created” success for money.
  */
-export async function createPaymentLink(user, { amount, customer_name, invoice_id, provider = "stripe", note }) {
-  const { base, fee, total, rate, percentLabel, planId } = calcPlatformFee(amount, user);
+export async function createPaymentLink(user, { amount, customer_name, invoice_id, provider = "stripe", note, purpose }) {
+  const useModuleFee = purpose === "module";
+  const preview = useModuleFee
+    ? { base: Number(amount), fee: 0, total: Number(amount), rate: 0, percentLabel: "0%", planId: "module" }
+    : calcPlatformFee(amount, user);
+  const { base, fee, total, rate, percentLabel, planId } = preview;
 
   let invokeError = null;
   try {
@@ -62,6 +66,7 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
       invoice_id,
       provider,
       note,
+      purpose: purpose || undefined,
     });
     const data = result?.data || result;
 

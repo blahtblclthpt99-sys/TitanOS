@@ -95,14 +95,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // Ignore any client-supplied fee / total — recalculate from Fee Engine
+    // Ignore any client-supplied fee / total — recalculate from Fee Engine.
+    // Module installs use marketplace_sales (0%) so checkout totals $1.99 flat.
+    const purpose = String(body.purpose || "").toLowerCase();
+    const categoryId = purpose === "module" ? "marketplace_sales" : "service_requests";
+    const contextKey = categoryId === "marketplace_sales" ? "*" : planId;
     const feeResult = await calculateCategoryFees(admin, {
-      categoryId: "service_requests",
-      contextKey: planId,
+      categoryId,
+      contextKey,
       grossAmount: amount,
       userId: user.id,
       currency,
-      context: { planId, endpoint: "createPaymentLink" },
+      context: { planId, endpoint: "createPaymentLink", purpose: purpose || "payment" },
       persistLog: false,
     });
 
@@ -112,7 +116,10 @@ export default async function handler(req, res) {
     const rate = feeResult.rate;
     const label = feeResult.label;
 
-    const feeNote = `TitanOS ${planId} fee ${label} ($${fee.toFixed(2)}). Total charged $${total.toFixed(2)}.`;
+    const feeNote =
+      categoryId === "marketplace_sales"
+        ? `Marketplace module $${base.toFixed(2)} (no platform surcharge).`
+        : `TitanOS ${planId} fee ${label} ($${fee.toFixed(2)}). Total charged $${total.toFixed(2)}.`;
     const insertPayload = {
       user_id: user.id,
       invoice_id: invoiceId,

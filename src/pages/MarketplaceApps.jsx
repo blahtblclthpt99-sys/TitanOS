@@ -28,6 +28,11 @@ import {
   Code2,
   ArrowRight,
   Gift,
+  Heart,
+  Palette,
+  PartyPopper,
+  Scale,
+  Hammer,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +43,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { useAuth } from "@/lib/AuthContext";
 import {
   MARKETPLACE_CATEGORIES,
+  MODULE_PRICE,
   formatInstallCount,
   formatModulePrice,
 } from "@/lib/marketplaceCatalog";
@@ -45,7 +51,7 @@ import {
   fetchMarketplaceModules,
   fetchUserInstalls,
   fetchUserWaitlist,
-  installModule,
+  purchaseAndInstallModule,
   uninstallModule,
   joinWaitlist,
   submitDeveloperApplication,
@@ -57,6 +63,13 @@ const CATEGORY_ICONS = {
   Cleaning: Sparkles,
   Roofing: Home,
   "Pest Control": Bug,
+  Trades: Hammer,
+  "Home & Lifestyle": Home,
+  "Pets & Care": Heart,
+  Creative: Palette,
+  Tech: Code2,
+  Events: PartyPopper,
+  "Legal & Security": Scale,
   Accounting: Calculator,
   Inventory: Package,
   "AI Agents": Bot,
@@ -280,7 +293,7 @@ export default function Marketplace() {
 
   const installedModules = modules.filter((module) => installedSlugs.has(module.slug));
   const installedCount = installedModules.length;
-  const freeCount = modules.filter((m) => m.price === 0).length;
+  const pricedCount = modules.filter((m) => Number(m.price) > 0).length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: marketplaceQueryKey });
 
@@ -293,11 +306,20 @@ export default function Marketplace() {
     clearMessages();
     setActionLoading(true);
     try {
-      await installModule(user, module);
+      const { payment, alreadyOwned } = await purchaseAndInstallModule(user, module);
       await invalidate();
-      setActionSuccess(`${module.name} installed successfully.`);
-    } catch {
-      setActionError("Failed to install module. Please try again.");
+      if (alreadyOwned) {
+        setActionSuccess(`${module.name} is already in your toolkit.`);
+        return;
+      }
+      setActionSuccess(
+        `${module.name} unlocked — complete $${Number(module.price || MODULE_PRICE).toFixed(2)} checkout to finish.`
+      );
+      if (payment?.checkout_url) {
+        window.open(payment.checkout_url, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      setActionError(error?.message || "Failed to purchase module. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -388,13 +410,13 @@ export default function Marketplace() {
                 TitanOS <span className="gradient-text">Marketplace</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Industry modules, AI agents &amp; integrations — one click away
+                {modules.length} modules · ${MODULE_PRICE.toFixed(2)} each · trades, care, AI &amp; more
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <StatPill icon={PackageCheck} label="Installed" value={installedCount} accent="border-titan-green/20" />
-            <StatPill icon={Gift} label="Free" value={freeCount} accent="border-titan-amber/20" />
+            <StatPill icon={Gift} label="$1.99" value={pricedCount} accent="border-titan-amber/20" />
             <StatPill icon={Store} label="Catalog" value={modules.length} accent="border-titan-cyan/20" />
           </div>
         </div>
@@ -416,18 +438,18 @@ export default function Marketplace() {
               <span className="text-xs font-semibold text-titan-amber uppercase tracking-wider">Beta Access</span>
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-              Every module is <span className="gradient-text">free</span> right now
+              Modules from <span className="gradient-text">$1.99</span> each
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Install industry-specific workflows, accounting syncs, and AI agents.
-              Your toolkit grows with your business.
+              Install industry workflows, creative tools, legal agents, and more.
+              Secure Stripe checkout unlocks each module instantly.
             </p>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
             {[
               { icon: Shield, label: "Verified secure" },
               { icon: Clock, label: "1-click install" },
-              { icon: Download, label: "No credit card" },
+              { icon: Download, label: "$1.99 unlock" },
             ].map(({ icon: Icon, label }) => (
               <span key={label} className="flex items-center gap-1.5 glass rounded-xl px-3 py-2 border border-border">
                 <Icon className="w-3.5 h-3.5 text-titan-cyan" />
@@ -762,7 +784,7 @@ export default function Marketplace() {
                     ) : (
                       <>
                         <Download className="w-4 h-4 mr-1.5" />
-                        Install free
+                        Get — {formatModulePrice(selected)}
                       </>
                     )}
                   </Button>

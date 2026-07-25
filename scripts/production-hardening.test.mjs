@@ -78,17 +78,32 @@ describe("PayPal membership path", () => {
 });
 
 describe("Marketplace free + payment fees", () => {
-  it("marketplace catalog modules are free", () => {
-    const src = read("src/lib/marketplaceCatalog.js");
-    assert.match(src, /return "Free"/);
-    assert.doesNotMatch(src, /price:\s*(?!0\b)\d+/);
+  it("marketplace catalog modules are priced at $1.99", async () => {
+    const { MODULE_PRICE, MARKETPLACE_MODULES, formatModulePrice } = await import(
+      "../src/lib/marketplaceCatalog.js"
+    );
+    assert.equal(MODULE_PRICE, 1.99);
+    assert.ok(MARKETPLACE_MODULES.length >= 25);
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "law-mastermind-ai"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "babysitting-pro"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "window-installer"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "carpet-layer"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "tile-setter"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "sheetrock-finisher"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "trim-work"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-car-wash"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-mechanic"));
+    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "christmas-light-installer"));
+    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 1.99));
+    assert.equal(formatModulePrice({ price: 1.99 }), "$1.99");
   });
 
-  it("createPaymentLink always uses service_requests Fee Engine", () => {
+  it("createPaymentLink supports module purpose without service fee", () => {
     const src = read("api/functions/createPaymentLink.js");
-    assert.match(src, /categoryId:\s*"service_requests"/);
+    assert.match(src, /service_requests/);
+    assert.match(src, /purpose === "module"/);
+    assert.match(src, /marketplace_sales/);
     assert.match(src, /calculateCategoryFees/);
-    assert.match(src, /Never trusts client fee|Ignore any client-supplied fee/i);
   });
 });
 
@@ -117,6 +132,7 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/026_protect_driver_trust_fields.sql",
     "supabase/migrations/027_paypal_webhook_events.sql",
     "supabase/migrations/028_marketplace_free.sql",
+    "supabase/migrations/029_marketplace_module_price.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {

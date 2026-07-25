@@ -1,8 +1,12 @@
 import { api } from "@/api/apiClient";
 import {
+  getCatalogModules,
   MARKETPLACE_MODULES,
+  MODULE_PRICE,
   normalizeModule,
 } from "@/lib/marketplaceCatalog";
+import { createPaymentLink } from "@/lib/paymentsApi";
+import { isLocalOrStub } from "@/lib/dataSource";
 
 const STORAGE_PREFIX = "titanos_marketplace";
 
@@ -27,26 +31,22 @@ function entityAvailable(entityName) {
   return Boolean(api.entities?.[entityName]);
 }
 
-async function trySeedCatalog() {
-  if (!entityAvailable("MarketplaceModule")) return null;
-  try {
-    const modules = await api.entities.MarketplaceModule.list("-install_count", 100);
-    if (modules.length > 0) return modules;
-    if (api.functions?.invoke) {
-      const result = await api.functions.invoke("seedMarketplace", {});
-      return result?.modules ?? [];
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export async function fetchMarketplaceModules() {
-  const seeded = await trySeedCatalog();
-  if (seeded?.length) return seeded.map(normalizeModule);
+  // Static catalog is source of truth so new modules always appear.
+  const catalog = getCatalogModules();
+  if (!entityAvailable("MarketplaceModule")) return catalog;
 
-  return MARKETPLACE_MODULES.map(normalizeModule);
+  try {
+    const remote = await api.entities.MarketplaceModule.list("-install_count", 200);
+    if (!remote?.length) return catalog;
+    const bySlug = new Map(remote.map((row) => [row.slug, row]));
+    return MARKETPLACE_MODULES.map((mod) => {
+      const remoteRow = bySlug.get(mod.slug);
+      return normalizeModule(remoteRow ? { ...mod, ...remoteRow, price: MODULE_PRICE } : mod);
+    });
+  } catch {
+    return catalog;
+  }
 }
 
 export async function fetchUserInstalls(userId) {
@@ -116,6 +116,36 @@ export async function installModule(user, module) {
     writeLocal(user.id, "installs", installs);
   }
   return payload;
+}
+
+/**
+ * Charge MODULE_PRICE via Stripe, then unlock install.
+ * Skips checkout if already installed. Returns { payment, installed, alreadyOwned }.
+ */
+export async function purchaseAndInstallModule(user, module) {
+  const existing = await fetchUserInstalls(user.id);
+  if (existing.some((i) => i.module_slug === module.slug && i.status !== "uninstalled")) {
+    return { payment: null, installed: existing.find((i) => i.module_slug === module.slug), alreadyOwned: true };
+  }
+
+  const amount = Number(module.price) > 0 ? Number(module.price) : MODULE_PRICE;
+  const payment = await createPaymentLink(user, {
+    amount,
+    customer_name: `Module: ${module.name}`,
+    note: `module:${module.slug}`,
+    purpose: "module",
+  });
+
+  if (isLocalOrStub(payment) || !payment.checkout_url) {
+    const err = new Error(
+      payment?.message || "Checkout isn't available. Configure Stripe to purchase modules."
+    );
+    err.code = "MODULE_CHECKOUT_UNAVAILABLE";
+    throw err;
+  }
+
+  const installed = await installModule(user, module);
+  return { payment, installed, alreadyOwned: false };
 }
 
 export async function uninstallModule(user, moduleSlug) {
@@ -201,4 +231,8 @@ export async function submitDeveloperApplication(user, { company, description })
   applications.push(record);
   writeLocal(user.id, "developer_apps", applications);
   return record;
+}
+
+export function hasLawMastermind(installs = []) {
+  return installs.some((i) => i.module_slug === "law-mastermind-ai" && i.status !== "uninstalled");
 }

@@ -155,7 +155,7 @@ export function applyTheme(pref = getStoredTheme()) {
   applyHighContrast(getHighContrast());
   applyTextScale(getTextScale());
   applyReduceMotionPref(getReduceMotionPref());
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#10141B" : "#EEF2F7");
+  const meta = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (meta) meta.setAttribute("content", dark ? "#0B1220" : "#2563EB");
   return dark;
 }

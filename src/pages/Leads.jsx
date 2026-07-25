@@ -87,12 +87,26 @@ export default function Leads() {
         </Button>
       </section>
 
-      <div className="flex gap-2 overflow-auto mb-4">
-        {["all", ...STATUSES].map((status) => (
-          <Button key={status} onClick={() => setFilter(status)} variant="outline" className={filter === status ? "border-titan-cyan text-titan-cyan" : "border-border text-muted-foreground"}>
-            {status}
-          </Button>
-        ))}
+      <div className="flex gap-2 overflow-auto mb-4 pb-1" role="tablist" aria-label="Lead status filter">
+        {["all", ...STATUSES].map((status) => {
+          const active = filter === status;
+          return (
+            <button
+              key={status}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setFilter(status)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition-colors focus-ring min-h-[40px] ${
+                active
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {status}
+            </button>
+          );
+        })}
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {display.map((row) => (

@@ -1,0 +1,13 @@
+{
+  "source": "public/brand/titanos-badge.png",
+  "background": "#0B1220",
+  "generatedAt": "2026-07-25T13:41:46.042Z",
+  "notes": "Circular-masked badge on navy full-bleed for Android adaptive icons",
+  "files": [
+    "pwa-192.png",
+    "pwa-512.png",
+    "pwa-192-maskable.png",
+    "pwa-512-maskable.png",
+    "apple-touch-icon.png"
+  ]
+}

@@ -39,6 +39,7 @@ import AnimatedCounter from "@/components/shared/AnimatedCounter";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
 import HomeAdClips from "@/components/dashboard/HomeAdClips";
+import OverviewTodayCard from "@/components/dashboard/OverviewTodayCard";
 import BusinessTimeline from "@/components/timeline/BusinessTimeline";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
 import TitanScoreBadge from "@/components/shared/TitanScoreBadge";
@@ -1155,6 +1156,28 @@ export default function Dashboard({ isActive = true }) {
           </Button>
         </div>
       </header>
+
+      <OverviewTodayCard
+        jobsCompleted={data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length}
+        jobsToday={data.todayJobs.length}
+        goalPct={
+          data.todayJobs.length
+            ? (data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length /
+                data.todayJobs.length) *
+              100
+            : 0
+        }
+        onTimePct={
+          data.todayJobs.length
+            ? Math.round(
+                (data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length /
+                  Math.max(data.todayJobs.length, 1)) *
+                  100
+              )
+            : null
+        }
+        onTimeDelta={null}
+      />
 
       {customize && (
         <div className="mb-4 space-y-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-4 text-sm text-foreground">

@@ -1,8 +1,6 @@
 /**
  * Temporary verification route for Sentry Node.js setup.
  * Enable with SENTRY_DEBUG_ROUTE=1, then GET/POST /api/functions/sentryDebug
- *
- * Sends a test span, log, metric, and captured exception (Sentry wizard snippet, ESM).
  */
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import {
@@ -31,26 +29,12 @@ export default async function handler(req, res) {
     });
   }
 
-  await Sentry.startSpan(
-    {
-      op: "test",
-      name: "My First Test Span",
-    },
-    async () => {
-      try {
-        // Send a log before throwing the error
-        Sentry.logger.info("User triggered test error", {
-          action: "test_error_span",
-        });
-        // Send a test metric before throwing the error
-        Sentry.metrics.count("test_counter", 1);
-        // Intentionally undefined — ReferenceError for setup verification
-        foo();
-      } catch (e) {
-        Sentry.captureException(e);
-      }
-    }
-  );
+  try {
+    // Intentionally undefined — ReferenceError for setup verification
+    foo();
+  } catch (e) {
+    Sentry.captureException(e);
+  }
 
   try {
     await Sentry.flush(2000);
@@ -60,8 +44,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
-    message:
-      "Test span + log + metric + exception sent. Check Sentry Issues / Traces / Logs within ~30s.",
+    message: "Test exception sent. Check Sentry Issues within ~30s.",
     sentryEnabled: true,
     profilingEnabled: isApiSentryProfilingEnabled(),
     environment: process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV,

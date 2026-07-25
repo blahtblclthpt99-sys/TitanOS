@@ -144,7 +144,10 @@ export default function Messages() {
 
   const loadInbox = useCallback(
     async (silent = false) => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        if (!silent) setLoading(false);
+        return;
+      }
       if (!silent) setLoading(true);
       try {
         await ensureDemoInbox(user);
@@ -180,6 +183,7 @@ export default function Messages() {
   );
 
   useEffect(() => {
+    if (authChecked && !user?.id) setLoading(false);
     if (authChecked && user?.id) loadInbox();
   }, [authChecked, user?.id, loadInbox]);
 
@@ -191,7 +195,7 @@ export default function Messages() {
       if (activeId) loadThread(activeId, true);
       if (activeId) setTypingPeer(getTyping(activeId, user.id));
     };
-    const poll = setInterval(tick, 12000);
+    const poll = setInterval(tick, 20000);
     const onVis = () => {
       if (document.visibilityState === "visible") tick();
     };
@@ -205,6 +209,14 @@ export default function Messages() {
   useEffect(() => {
     if (threadParam) setActiveId(threadParam);
   }, [threadParam]);
+
+  useEffect(() => {
+    if (!loading && threadParam && activeId && !active && !toParam) {
+      toast({ variant: "destructive", title: "Conversation not found" });
+      setActiveId(null);
+      setParams({}, { replace: true });
+    }
+  }, [loading, threadParam, activeId, active, toParam, setParams]);
 
   useEffect(() => {
     if (!user?.id || !toParam) return;

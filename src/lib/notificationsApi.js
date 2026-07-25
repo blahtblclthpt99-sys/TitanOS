@@ -123,13 +123,20 @@ export async function ensureNotificationCenter(userId) {
   purgeSampleNotifications(userId);
 }
 
+const NOTIFICATION_FETCH_CAP = 100;
+
 export async function listNotifications(userId, limit = 50, { category = "all", unreadOnly = false } = {}) {
   if (!userId) return [];
   purgeSampleNotifications(userId);
 
+  const fetchLimit = Math.min(Math.max(limit, 1), NOTIFICATION_FETCH_CAP);
   let rows = [];
   try {
-    const remote = await api.entities.Notification.filter({ user_id: userId });
+    const remote = await api.entities.Notification.filter(
+      { user_id: userId },
+      "-created_date",
+      fetchLimit
+    );
     rows = (remote || []).map(normalize).filter((n) => !isSampleNotification(n));
     const remoteIds = new Set(rows.map((r) => r.id));
     for (const local of readInbox(userId)) {
@@ -151,13 +158,31 @@ export async function listNotifications(userId, limit = 50, { category = "all", 
   return rows.slice(0, limit);
 }
 
+/**
+ * Prefer a head/count query for shell badges — never download the inbox just for a number.
+ * Category-scoped counts still use a capped list (category is client-derived).
+ */
 export async function unreadCount(userId, category = "all") {
-  const rows = await listNotifications(userId, 200, { category });
-  return rows.filter((n) => !n.read_at).length;
+  if (!userId) return 0;
+  purgeSampleNotifications(userId);
+
+  if (category === "all") {
+    try {
+      return await api.entities.Notification.count({
+        user_id: userId,
+        read_at: { is: null },
+      });
+    } catch {
+      return readInbox(userId).filter((n) => !n.read_at && !isSampleNotification(n)).length;
+    }
+  }
+
+  const rows = await listNotifications(userId, NOTIFICATION_FETCH_CAP, { category, unreadOnly: true });
+  return rows.length;
 }
 
 export async function categoryCounts(userId) {
-  const rows = await listNotifications(userId, 200);
+  const rows = await listNotifications(userId, NOTIFICATION_FETCH_CAP);
   const counts = { all: rows.length, unread: 0 };
   for (const cat of NOTIFICATION_CATEGORIES) {
     counts[cat.id] = 0;

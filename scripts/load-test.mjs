@@ -47,6 +47,14 @@ const PROFILES = {
       { concurrency: 1500, durationSec: 8 },
     ],
   },
+  /** Public-edge soak toward multi-thousand concurrency (not authenticated PostgREST). */
+  scale: {
+    phases: [
+      { concurrency: 500, durationSec: 12 },
+      { concurrency: 2000, durationSec: 15 },
+      { concurrency: 5000, durationSec: 10 },
+    ],
+  },
 };
 
 const customC = Number(arg("concurrency", ""));

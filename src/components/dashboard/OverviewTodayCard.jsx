@@ -76,7 +76,7 @@ export default function OverviewTodayCard({
             </defs>
           </svg>
           <p className="text-lg font-bold tabular-nums text-foreground -mt-1">{pct}%</p>
-          <p className="text-[10px] text-muted-foreground">of daily goal</p>
+          <p className="text-[10px] text-muted-foreground">completion today</p>
         </div>
 
         <div className="col-span-2 sm:col-span-1">
@@ -95,7 +95,7 @@ export default function OverviewTodayCard({
               {Math.round(onTimeDelta)}%
             </p>
           ) : (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">vs last week</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">No comparison yet</p>
           )}
         </div>
       </div>

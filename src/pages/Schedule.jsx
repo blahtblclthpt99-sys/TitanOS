@@ -42,9 +42,11 @@ export default function Schedule() {
     let alive = true;
     loadLocalWeather(user)
       .then((w) => {
-        if (alive) setWeather(w);
+        if (alive) setWeather(w || { unavailable: true, label: "Weather unavailable" });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) setWeather({ unavailable: true, label: "Weather unavailable" });
+      });
     return () => {
       alive = false;
     };
@@ -53,10 +55,12 @@ export default function Schedule() {
   const weekDays = getWeekDays(currentDate);
   const navigateWeek = (dir) => setCurrentDate((prev) => addWeeks(prev, dir));
 
-  const getJobsForDay = (date) =>
-    jobs
-      .filter((j) => j.scheduled_date === formatISO(date))
+  const getJobsForDay = (date) => {
+    const key = formatISO(date);
+    return jobs
+      .filter((j) => String(j.scheduled_date || "").slice(0, 10) === key)
       .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || ""));
+  };
 
   const totalThisWeek = weekDays.reduce((s, d) => s + getJobsForDay(d).length, 0);
   const weekEnd = addDays(weekDays[0], 6);
@@ -133,9 +137,24 @@ export default function Schedule() {
               </div>
               <div className="space-y-1 min-h-[120px]">
                 {dayJobs.map((job) => (
-                  <motion.div key={job.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-muted transition-colors cursor-pointer ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
-                    <p className="text-[11px] font-medium text-foreground truncate leading-tight">{job.title}</p>
+                  <motion.div
+                    key={job.id}
+                    role="button"
+                    tabIndex={0}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => navigate(`/jobs?id=${job.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate(`/jobs?id=${job.id}`);
+                      }
+                    }}
+                    className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-muted transition-colors cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
+                  >
+                    <p className="text-[11px] font-medium text-foreground truncate leading-tight">
+                      {job.title || "Untitled job"}
+                    </p>
                     {job.scheduled_time && (
                       <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                         <Clock className="w-2.5 h-2.5" />{job.scheduled_time}
@@ -148,6 +167,18 @@ export default function Schedule() {
           );
         })}
       </div>
+
+      {totalThisWeek === 0 && (
+        <div className="hidden md:block mt-6">
+          <EmptyState
+            icon={Calendar}
+            title="No jobs this week"
+            description="Nothing scheduled — enjoy the calm or add a new job."
+            onAction={() => navigate("/jobs?new=1")}
+            actionLabel="New job"
+          />
+        </div>
+      )}
 
       <div className="md:hidden space-y-4">
         {weekDays.map((day) => {
@@ -164,11 +195,24 @@ export default function Schedule() {
               ) : (
                 <div className="space-y-2">
                   {dayJobs.map((job) => (
-                    <motion.div key={job.id} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                      className={`glass rounded-md p-3 border-l-2 ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}>
+                    <motion.div
+                      key={job.id}
+                      role="button"
+                      tabIndex={0}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      onClick={() => navigate(`/jobs?id=${job.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/jobs?id=${job.id}`);
+                        }
+                      }}
+                      className={`glass rounded-md p-3 border-l-2 cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
+                          <p className="text-sm font-semibold text-foreground truncate">{job.title || "Untitled job"}</p>
                           <div className="flex items-center gap-3 mt-1">
                             {job.scheduled_time && (
                               <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -193,7 +237,13 @@ export default function Schedule() {
         })}
 
         {totalThisWeek === 0 && (
-          <EmptyState icon={Calendar} title="No jobs this week" description="Nothing scheduled — enjoy the calm or add a new job." />
+          <EmptyState
+            icon={Calendar}
+            title="No jobs this week"
+            description="Nothing scheduled — enjoy the calm or add a new job."
+            onAction={() => navigate("/jobs?new=1")}
+            actionLabel="New job"
+          />
         )}
       </div>
     </div>

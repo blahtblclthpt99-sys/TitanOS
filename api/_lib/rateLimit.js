@@ -6,7 +6,7 @@
 /** @type {Map<string, number[]>} */
 const buckets = new Map();
 
-const MAX_KEYS = 5000;
+const MAX_KEYS = 20_000;
 
 function clientIp(req) {
   const forwarded = req.headers?.["x-forwarded-for"];

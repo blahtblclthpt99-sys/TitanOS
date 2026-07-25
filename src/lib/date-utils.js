@@ -27,22 +27,41 @@ export const thisWeekRange = () => {
 export const addDaysISO = (days, from = new Date()) =>
   format(addDays(from, days), "yyyy-MM-dd");
 
-export const formatMonthDay = (date) =>
-  format(new Date(date), "MMM d");
+export const formatMonthDay = (date) => {
+  const d = safeDate(date);
+  return d ? format(d, "MMM d") : "—";
+};
 
-export const formatMonthDayYear = (date) =>
-  format(new Date(date), "MMM d, yyyy");
+export const formatMonthDayYear = (date) => {
+  const d = safeDate(date);
+  return d ? format(d, "MMM d, yyyy") : "—";
+};
 
-export const formatShortDay = (date) => format(date, "EEE");
+export const formatShortDay = (date) => {
+  const d = safeDate(date) || (date instanceof Date ? date : null);
+  return d ? format(d, "EEE") : "—";
+};
 
-export const formatDayNum = (date) => format(date, "d");
+export const formatDayNum = (date) => {
+  const d = safeDate(date) || (date instanceof Date ? date : null);
+  return d ? format(d, "d") : "—";
+};
 
-export const formatISO = (date) => format(date, "yyyy-MM-dd");
+export const formatISO = (date) => format(date instanceof Date ? date : new Date(date), "yyyy-MM-dd");
 
-export const formatMonthShort = (date) => format(date, "MMM");
+export const formatMonthShort = (date) => format(date instanceof Date ? date : new Date(date), "MMM");
 
-export const relativeTime = (date) =>
-  formatDistanceToNow(new Date(date), { addSuffix: true });
+export const relativeTime = (date) => {
+  const d = safeDate(date);
+  if (!d) return "soon";
+  return formatDistanceToNow(d, { addSuffix: true });
+};
+
+function safeDate(value) {
+  if (value == null || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export const getDateYear = (date) => getYear(new Date(date));
 

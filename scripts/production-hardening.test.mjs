@@ -38,6 +38,7 @@ describe("Health readiness", () => {
     assert.match(src, /readiness/);
     assert.match(src, /api\.stripe\.com\/v1\/balance/);
     assert.match(src, /sentryConfigured/);
+    assert.match(src, /paypalConfigured/);
   });
 });
 
@@ -53,6 +54,41 @@ describe("Stripe money path guards", () => {
     const src = read("api/functions/stripeWebhook.js");
     assert.match(src, /constructEvent/);
     assert.match(src, /stripe_webhook_events/);
+  });
+});
+
+describe("PayPal membership path", () => {
+  it("webhook verifies via PayPal API and uses idempotency table", () => {
+    const src = read("api/functions/paypalWebhook.js");
+    assert.match(src, /verifyPayPalWebhook/);
+    assert.match(src, /paypal_webhook_events/);
+    assert.match(src, /assertRateLimit/);
+  });
+
+  it("maps checkout amounts to plan tiers", async () => {
+    const { planTierFromAmount, extractPayerEmail } = await import("../api/_lib/paypal.js");
+    assert.equal(planTierFromAmount(29.99), "worker_premium");
+    assert.equal(planTierFromAmount(49.99), "business");
+    assert.equal(planTierFromAmount(10), null);
+    assert.equal(
+      extractPayerEmail({ payer: { email_address: "a@b.com" } }),
+      "a@b.com"
+    );
+  });
+});
+
+describe("Marketplace free + payment fees", () => {
+  it("marketplace catalog modules are free", () => {
+    const src = read("src/lib/marketplaceCatalog.js");
+    assert.match(src, /return "Free"/);
+    assert.doesNotMatch(src, /price:\s*(?!0\b)\d+/);
+  });
+
+  it("createPaymentLink always uses service_requests Fee Engine", () => {
+    const src = read("api/functions/createPaymentLink.js");
+    assert.match(src, /categoryId:\s*"service_requests"/);
+    assert.match(src, /calculateCategoryFees/);
+    assert.match(src, /Never trusts client fee|Ignore any client-supplied fee/i);
   });
 });
 
@@ -79,6 +115,8 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/024_driver_vehicle_capacity.sql",
     "supabase/migrations/025_job_location_tax_engine.sql",
     "supabase/migrations/026_protect_driver_trust_fields.sql",
+    "supabase/migrations/027_paypal_webhook_events.sql",
+    "supabase/migrations/028_marketplace_free.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {
@@ -124,5 +162,47 @@ describe("Critical workflow surfaces (structural)", () => {
     assert.match(sql, /protect_driver_trust_fields/);
     assert.match(sql, /insured/);
     assert.match(sql, /background_checked/);
+  });
+});
+
+describe("Scale / concurrent-session hardening", () => {
+  it("entity adapter caps page size and exposes count()", () => {
+    const src = read("src/api/entityAdapter.js");
+    assert.match(src, /DEFAULT_ENTITY_PAGE_SIZE\s*=\s*100/);
+    assert.match(src, /MAX_ENTITY_PAGE_SIZE\s*=\s*500/);
+    assert.match(src, /async count\(/);
+    assert.match(src, /resolvePageSize/);
+  });
+
+  it("shell notifications share one unread query (no dual interval polls)", () => {
+    const hook = read("src/hooks/useUnreadNotificationCount.js");
+    const bell = read("src/components/shared/NotificationBell.jsx");
+    const center = read("src/components/layout/NotificationCenter.jsx");
+    assert.match(hook, /refetchInterval/);
+    assert.match(hook, /visibilityState/);
+    assert.match(bell, /useUnreadNotificationCount/);
+    assert.match(center, /useUnreadNotificationCount/);
+    assert.doesNotMatch(bell, /setInterval/);
+    assert.doesNotMatch(center, /setInterval\(refreshCount/);
+  });
+
+  it("reconnect refetch is jittered; auth skips TOKEN_REFRESHED profile hammer", () => {
+    const qc = read("src/lib/query-client.js");
+    const auth = read("src/lib/AuthContext.jsx");
+    assert.match(qc, /refetchOnReconnect:\s*false/);
+    assert.match(qc, /Math\.random/);
+    assert.match(auth, /TOKEN_REFRESHED/);
+    assert.match(auth, /INITIAL_SESSION/);
+  });
+
+  it("CustomerDetail scopes related entities by customer_id", () => {
+    const src = read("src/pages/CustomerDetail.jsx");
+    assert.match(src, /customer_id:\s*id/);
+    assert.doesNotMatch(src, /list", args: \["-scheduled_date", 500\]/);
+  });
+
+  it("documents scale readiness and load profile", () => {
+    assert.ok(existsSync(join(root, "docs/SCALE_READINESS.md")));
+    assert.match(read("scripts/load-test.mjs"), /scale:/);
   });
 });

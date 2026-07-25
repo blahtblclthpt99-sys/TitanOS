@@ -16,7 +16,7 @@ function LiveActivityCard({ embedded = false }) {
     const load = async () => {
       try {
         const rows = await listActivity(8);
-        if (alive) setEvents(rows);
+        if (alive) setEvents(Array.isArray(rows) ? rows : []);
       } catch {
         if (alive) setEvents([]);
       }

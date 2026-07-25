@@ -7,7 +7,7 @@ export const DASHBOARD_JOB_COLUMNS =
   "id,title,status,scheduled_date,scheduled_time,amount,customer_name,assigned_name,created_at";
 
 export const DASHBOARD_INVOICE_COLUMNS =
-  "id,status,customer_name,total,balance_due,created_at";
+  "id,status,customer_name,total,balance_due,due_date,paid_at,invoice_number,created_at";
 
 export const DASHBOARD_ESTIMATE_COLUMNS =
   "id,status,customer_name,total,valid_until,created_at";

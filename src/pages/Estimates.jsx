@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { FileText, Search, Plus, Trash2 } from "lucide-react";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { Input } from "@/components/ui/input";
@@ -40,8 +41,15 @@ const BLANK_FORM = {
 };
 const BLANK_LINE = { description: "", quantity: 1, unit_price: 0, total: 0 };
 
+function customerDisplayName(c) {
+  if (!c) return "";
+  const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  return name || c.company_name || c.email || "Customer";
+}
+
 export default function Estimates() {
   const reduceMotion = usePrefersReducedMotion();
+  const navigate = useNavigate();
   const { data: [estimates, customers], loading, error, reload } = useEntityData([
     { entity: "Estimate", method: "list", args: ["-created_date", 100] },
     { entity: "Customer", method: "list", args: ["-created_date", 100] },
@@ -55,9 +63,20 @@ export default function Estimates() {
   const [jobLocation, setJobLocation] = useState(() => emptyJobLocation());
   const [taxPreview, setTaxPreview] = useState(null);
   const [saving, setSaving]       = useState(false);
+  const [focusId, setFocusId]     = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const deepId = params.get("id");
+    if (deepId) {
+      setFocusId(deepId);
+      setSearch("");
+      setStatus("all");
+      navigate("/estimates", { replace: true });
+      requestAnimationFrame(() => {
+        document.getElementById(`estimate-row-${deepId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
     const openNew = params.get("new") === "1" || params.get("prefill") === "1";
     if (!openNew) return;
 
@@ -74,7 +93,7 @@ export default function Estimates() {
         service_type: inputs.service_type || prev.service_type,
         notes: prev.notes || `Suggested price from Job Estimator: $${Number(est.suggested_price || 0).toLocaleString()}`,
       }));
-      setLineItems([
+      const nextLines = [
         {
           description: `${inputs.service_type || "Service"} — labor (${inputs.hours || 0} hrs)`,
           quantity: 1,
@@ -105,12 +124,13 @@ export default function Estimates() {
               Number(est.equipment || 0)
           ),
         },
-      ].filter((line) => line.unit_price > 0));
+      ].filter((line) => line.unit_price > 0);
+      setLineItems(nextLines.length ? nextLines : [{ ...BLANK_LINE }]);
       sessionStorage.removeItem("titanos_estimator_draft");
     } catch {
       /* ignore bad draft */
     }
-  }, []);
+  }, [navigate]);
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -223,17 +243,45 @@ export default function Estimates() {
   if (error) return <ErrorState title="Couldn't load estimates" onRetry={reload} />;
 
   const renderEstimateRow = (est) => (
-    <div className="titan-surface p-4 glass-hover">
+    <div
+      id={`estimate-row-${est.id}`}
+      className={`titan-surface p-4 glass-hover ${focusId === est.id ? "ring-2 ring-primary/40" : ""}`}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <p className="text-sm font-semibold text-foreground">{est.estimate_number || "Draft"}</p>
             <StatusBadge status={est.status} />
           </div>
-          <p className="text-xs text-muted-foreground">{est.customer_name} · {formatMonthDayYear(est.created_date)}</p>
+          <p className="text-xs text-muted-foreground">
+            {est.customer_name || "Customer"} · {formatMonthDayYear(est.created_date)}
+          </p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <p className="text-lg font-bold text-foreground">${(est.total || 0).toLocaleString()}</p>
+          {est.status === "draft" && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="text-xs min-h-[36px]"
+              onClick={async () => {
+                try {
+                  await api.entities.Estimate.update(est.id, { status: "sent" });
+                  toast({ title: "Estimate marked sent" });
+                  reload();
+                } catch (err) {
+                  toast({
+                    variant: "destructive",
+                    title: "Couldn't update estimate",
+                    description: err?.message || "Please try again.",
+                  });
+                }
+              }}
+            >
+              Mark sent
+            </Button>
+          )}
           <DeleteButton
             label={est.estimate_number || "this estimate"}
             onDelete={async () => {
@@ -299,13 +347,13 @@ export default function Estimates() {
                   setForm(prev => ({
                     ...prev,
                     customer_id: v,
-                    customer_name: c ? `${c.first_name} ${c.last_name}` : "",
+                    customer_name: customerDisplayName(c),
                     address: fromCustomer.address || prev.address,
                   }));
                   setJobLocation(fromCustomer);
                 }}
                 placeholder="Select customer"
-                options={customers.map(c => ({ value: c.id, label: `${c.first_name} ${c.last_name}` }))}
+                options={customers.map(c => ({ value: c.id, label: customerDisplayName(c) }))}
                 className="mt-1"
               />
             </FormField>

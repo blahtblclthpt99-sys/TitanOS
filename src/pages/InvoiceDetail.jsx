@@ -35,6 +35,13 @@ export default function InvoiceDetail() {
     try {
       await api.entities.Invoice.update(id, { status });
       reload();
+      toast({ title: "Status updated" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't update status",
+        description: err?.message || "Please try again.",
+      });
     } finally {
       setSaving(false);
     }

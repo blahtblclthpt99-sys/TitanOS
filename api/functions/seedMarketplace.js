@@ -35,7 +35,13 @@ export default async function handler(req, res) {
     if (countError) throw countError;
 
     if (count && count > 0) {
-      return res.status(200).json({ seeded: false, count });
+      // Keep catalog free even if rows already exist from an older paid seed
+      const { error: zeroErr } = await admin
+        .from("marketplace_modules")
+        .update({ price: 0, price_label: "Free" })
+        .not("slug", "is", null);
+      if (zeroErr) throw zeroErr;
+      return res.status(200).json({ seeded: false, pricesZeroed: true, count });
     }
 
     const rows = MARKETPLACE_MODULES.map((module) => ({

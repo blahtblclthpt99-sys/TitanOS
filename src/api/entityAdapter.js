@@ -26,28 +26,64 @@ async function currentUserId() {
   return data.user?.id ?? null;
 }
 
-function applyFilters(query, filters) {
-  let next = query;
-  for (const [key, value] of Object.entries(filters || {})) {
-    if (value === undefined || value === null) continue;
-    if (typeof value === "object" && !Array.isArray(value) && Array.isArray(value.in)) {
-      if (value.in.length === 0) {
-        // Empty IN should match nothing (PostgREST rejects empty .in())
-        next = next.eq(key, "__no_match__");
-      } else {
-        next = next.in(key, value.in);
-      }
-      continue;
-    }
-    next = next.eq(key, value);
-  }
-  return next;
-}
-
 function resolveSelect(columns) {
   if (!columns) return "*";
   if (Array.isArray(columns)) return columns.join(",");
   return String(columns);
+}
+
+/** Hard ceiling so accidental unbounded list/filter cannot pull PostgREST max rows. */
+export const DEFAULT_ENTITY_PAGE_SIZE = 100;
+export const MAX_ENTITY_PAGE_SIZE = 500;
+
+function resolvePageSize(limit) {
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
+    return DEFAULT_ENTITY_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(limit), MAX_ENTITY_PAGE_SIZE);
+}
+
+/**
+ * Support eq, in, and range operators used by scale-safe queries.
+ * Examples: { status: "open" }, { status: { in: ["a","b"] } }, { created_at: { gt: iso } }
+ */
+function applyFilters(query, filters) {
+  let next = query;
+  for (const [key, value] of Object.entries(filters || {})) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "object" && !Array.isArray(value)) {
+      if (Array.isArray(value.in)) {
+        if (value.in.length === 0) {
+          next = next.eq(key, "__no_match__");
+        } else {
+          next = next.in(key, value.in);
+        }
+        continue;
+      }
+      if (value.gt != null) {
+        next = next.gt(key, value.gt);
+        continue;
+      }
+      if (value.gte != null) {
+        next = next.gte(key, value.gte);
+        continue;
+      }
+      if (value.lt != null) {
+        next = next.lt(key, value.lt);
+        continue;
+      }
+      if (value.lte != null) {
+        next = next.lte(key, value.lte);
+        continue;
+      }
+      if (value.is === null) {
+        next = next.is(key, null);
+        continue;
+      }
+    }
+    next = next.eq(key, value);
+  }
+  return next;
 }
 
 const WEBHOOK_ONLY_PAYMENT_STATUS = new Set(["succeeded", "refunded", "paid"]);
@@ -99,11 +135,13 @@ function createEntityHandler(entityName) {
   return {
     async list(sort, limit, skip, columns) {
       const { column, ascending } = parseSort(sort);
-      let query = supabase.from(table).select(resolveSelect(columns)).order(column, { ascending });
-      if (typeof limit === "number") {
-        const from = typeof skip === "number" ? skip : 0;
-        query = query.range(from, from + limit - 1);
-      }
+      const pageSize = resolvePageSize(limit);
+      const from = typeof skip === "number" && skip > 0 ? skip : 0;
+      let query = supabase
+        .from(table)
+        .select(resolveSelect(columns))
+        .order(column, { ascending })
+        .range(from, from + pageSize - 1);
       const { data, error } = await query;
       throwIfError(error);
       return (data || []).map(toEntityRow);
@@ -111,17 +149,25 @@ function createEntityHandler(entityName) {
 
     async filter(filters, sort, limit, skip, columns) {
       const { column, ascending } = parseSort(sort);
-      let query = applyFilters(supabase.from(table).select(resolveSelect(columns)), filters).order(
-        column,
-        { ascending }
-      );
-      if (typeof limit === "number") {
-        const from = typeof skip === "number" ? skip : 0;
-        query = query.range(from, from + limit - 1);
-      }
+      const pageSize = resolvePageSize(limit);
+      const from = typeof skip === "number" && skip > 0 ? skip : 0;
+      let query = applyFilters(supabase.from(table).select(resolveSelect(columns)), filters)
+        .order(column, { ascending })
+        .range(from, from + pageSize - 1);
       const { data, error } = await query;
       throwIfError(error);
       return (data || []).map(toEntityRow);
+    },
+
+    /** Cheap head count — prefer this over downloading rows for badges/unread. */
+    async count(filters = {}) {
+      let query = applyFilters(
+        supabase.from(table).select("id", { count: "exact", head: true }),
+        filters
+      );
+      const { count, error } = await query;
+      throwIfError(error);
+      return typeof count === "number" ? count : 0;
     },
 
     async get(id, columns) {

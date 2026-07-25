@@ -65,7 +65,7 @@ export async function listConversations(userId) {
 
   // Merge marketplace_messages when remote works
   try {
-    const remote = await api.entities.MarketplaceMessage.list("-created_date", 200);
+    const remote = await api.entities.MarketplaceMessage.list("-created_date", 100);
     mergeRemoteMessages(userId, remote || []);
   } catch {
     /* local only */
@@ -151,7 +151,7 @@ export async function markThreadRead(userId, threadId) {
   saveMessages(rows);
 
   try {
-    const remote = await api.entities.MarketplaceMessage.filter({ thread_id: threadId });
+    const remote = await api.entities.MarketplaceMessage.filter({ thread_id: threadId }, "-created_date", 100);
     const ids = (remote || [])
       .filter((m) => m.recipient_id === userId && !m.read_at)
       .map((m) => m.id);

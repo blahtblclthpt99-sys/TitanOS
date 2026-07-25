@@ -176,10 +176,18 @@ export async function listActivity(limit = 30) {
   }
 }
 
-/** Poll-friendly activity fetch — UI should call on interval / focus. */
+/** Poll-friendly activity fetch — server-side since filter when possible. */
 export async function listActivitySince(isoTimestamp) {
-  const all = await listActivity(50);
-  if (!isoTimestamp) return all;
-  const t = new Date(isoTimestamp).getTime();
-  return all.filter((e) => new Date(e.created_at || e.created_date).getTime() > t);
+  if (!isoTimestamp) return listActivity(50);
+  try {
+    return await api.entities.ActivityEvent.filter(
+      { created_at: { gt: isoTimestamp } },
+      "-created_date",
+      50
+    );
+  } catch {
+    const all = await listActivity(50);
+    const t = new Date(isoTimestamp).getTime();
+    return all.filter((e) => new Date(e.created_at || e.created_date).getTime() > t);
+  }
 }

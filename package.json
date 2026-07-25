@@ -25,6 +25,7 @@
     "ops:load": "node scripts/load-test.mjs",
     "ops:load:smoke": "node scripts/load-test.mjs --profile smoke",
     "ops:load:spike": "node scripts/load-test.mjs --profile spike",
+    "ops:load:scale": "node scripts/load-test.mjs --profile scale",
     "ops:payments": "node scripts/payment-failure-scenarios.mjs",
     "ops:backup": "node scripts/backup-restore-drill.mjs --export",
     "ops:outage": "node scripts/outage-recovery-drill.mjs",

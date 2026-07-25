@@ -7,8 +7,8 @@ export function buildSmartScheduleTips(jobs = [], weather = null) {
   if (!todays.length) {
     tips.push({
       type: "empty",
-      text: "No jobs today — batch estimates or open Emergency Jobs for same-day work.",
-      path: "/emergency",
+      text: "No jobs today — create a job or send an estimate to fill the day.",
+      path: "/jobs?new=1",
     });
   } else {
     const byArea = {};

@@ -159,7 +159,8 @@ export function toggleFavorite(item) {
 }
 
 export function loadSavedItems() {
-  return readJson(SAVED_KEY, []);
+  const rows = readJson(SAVED_KEY, []);
+  return Array.isArray(rows) ? rows : [];
 }
 
 export function saveSavedItems(rows) {

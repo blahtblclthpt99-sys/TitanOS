@@ -20,6 +20,11 @@ export default async function handler(req, res) {
     api: "ok",
     stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
     webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+    paypalConfigured: Boolean(
+      process.env.PAYPAL_CLIENT_ID &&
+        process.env.PAYPAL_CLIENT_SECRET &&
+        process.env.PAYPAL_WEBHOOK_ID
+    ),
     supabaseConfigured: Boolean(
       (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
         process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -62,7 +67,9 @@ export default async function handler(req, res) {
     }
   }
 
-  const moneyReady = checks.stripeConfigured && checks.webhookConfigured && checks.supabaseConfigured;
+  const moneyReady =
+    checks.supabaseConfigured &&
+    ((checks.stripeConfigured && checks.webhookConfigured) || checks.paypalConfigured);
   const deepFail =
     checks.supabase === "degraded" ||
     checks.supabase === "down" ||
@@ -74,7 +81,7 @@ export default async function handler(req, res) {
     moneyPath: moneyReady ? "ready" : "incomplete",
     notes: moneyReady
       ? undefined
-      : "Stripe secret, webhook secret, and Supabase service role required for live payments.",
+      : "Need Supabase service role plus (Stripe secret+webhook) and/or (PayPal client+secret+webhook id).",
   };
 
   // Liveness stays 200 unless deep dependency is down; readiness is explicit in body.

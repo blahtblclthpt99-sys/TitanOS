@@ -7,6 +7,20 @@ function ts(value) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/** Safe ISO-ish stamp for scheduled_date + scheduled_time (HH:mm or HH:mm:ss). */
+function appointmentAt(date, time) {
+  if (!date) return null;
+  const day = String(date).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return date;
+  const raw = String(time || "09:00").trim();
+  const hm = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!hm) return `${day}T09:00:00`;
+  const hh = String(Math.min(23, Number(hm[1]))).padStart(2, "0");
+  const mm = String(Math.min(59, Number(hm[2]))).padStart(2, "0");
+  const ss = hm[3] != null ? String(Math.min(59, Number(hm[3]))).padStart(2, "0") : "00";
+  return `${day}T${hh}:${mm}:${ss}`;
+}
+
 function money(n) {
   return `$${Number(n || 0).toLocaleString()}`;
 }
@@ -45,18 +59,18 @@ export function buildBusinessTimeline({
       type: "job",
       title: `Job created: ${job.title || "Untitled"}`,
       detail: job.status,
-      path: "/jobs",
+      path: job.id ? `/jobs?id=${job.id}` : "/jobs",
       tone: "neutral",
       entity_id: job.id,
     });
     if (job.scheduled_date) {
       events.push({
         id: `job-sched-${job.id}`,
-        at: `${job.scheduled_date}T${job.scheduled_time || "09:00"}:00`,
+        at: appointmentAt(job.scheduled_date, job.scheduled_time) || job.scheduled_date,
         type: "appointment",
         title: `Appointment scheduled: ${job.title || "Job"}`,
         detail: [job.scheduled_date, job.scheduled_time].filter(Boolean).join(" · "),
-        path: "/schedule",
+        path: job.id ? `/jobs?id=${job.id}` : "/schedule",
         tone: "info",
         entity_id: job.id,
       });
@@ -68,7 +82,7 @@ export function buildBusinessTimeline({
         type: "completed",
         title: `Job completed: ${job.title || "Job"}`,
         detail: job.completion_summary ? String(job.completion_summary).slice(0, 120) : "Marked complete",
-        path: "/jobs",
+        path: job.id ? `/jobs?id=${job.id}` : "/jobs",
         tone: "success",
         entity_id: job.id,
       });
@@ -80,7 +94,7 @@ export function buildBusinessTimeline({
         type: "cancelled",
         title: `Job cancelled: ${job.title || "Job"}`,
         detail: "Cancelled",
-        path: "/jobs",
+        path: job.id ? `/jobs?id=${job.id}` : "/jobs",
         tone: "danger",
         entity_id: job.id,
       });
@@ -94,7 +108,7 @@ export function buildBusinessTimeline({
       type: "estimate",
       title: `Estimate ${est.estimate_number || ""}`.trim() || "Estimate created",
       detail: `${est.status || "draft"} · ${money(est.total)}`,
-      path: "/estimates",
+      path: est.id ? `/estimates?id=${est.id}` : "/estimates",
       tone: est.status === "accepted" ? "success" : "info",
       entity_id: est.id,
     });
@@ -105,7 +119,7 @@ export function buildBusinessTimeline({
         type: "estimate_accepted",
         title: "Estimate approved by customer",
         detail: money(est.total),
-        path: "/estimates",
+        path: est.id ? `/estimates?id=${est.id}` : "/estimates",
         tone: "success",
         entity_id: est.id,
       });
@@ -119,7 +133,7 @@ export function buildBusinessTimeline({
       type: "invoice",
       title: `Invoice ${inv.invoice_number || ""}`.trim() || "Invoice created",
       detail: `${inv.status || "draft"} · ${money(inv.total)}`,
-      path: "/invoices",
+      path: inv.id ? `/invoices/${inv.id}` : "/invoices",
       tone: inv.status === "overdue" ? "danger" : "info",
       entity_id: inv.id,
     });
@@ -130,7 +144,7 @@ export function buildBusinessTimeline({
         type: "payment",
         title: "Invoice paid",
         detail: money(inv.total || inv.amount_paid),
-        path: "/payments",
+        path: inv.id ? `/invoices/${inv.id}` : "/payments",
         tone: "success",
         entity_id: inv.id,
       });

@@ -10,6 +10,7 @@ export const MARKETPLACE_CATEGORIES = [
   "Reports",
 ];
 
+/** All marketplace apps are free to install — prices are display-only and always 0. */
 export const MARKETPLACE_MODULES = [
   {
     slug: "hvac-pro",
@@ -19,8 +20,8 @@ export const MARKETPLACE_MODULES = [
     category: "HVAC",
     rating: 4.9,
     review_count: 312,
-    price: 29,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "🌡️",
     gradient: "from-blue-500/20 to-cyan-500/20",
     features: ["Equipment registry", "Maintenance scheduler", "Refrigerant tracker", "Warranty management"],
@@ -37,8 +38,8 @@ export const MARKETPLACE_MODULES = [
     category: "Cleaning",
     rating: 4.8,
     review_count: 187,
-    price: 19,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "🧹",
     gradient: "from-purple-500/20 to-pink-500/20",
     features: ["Room checklists", "Photo inspections", "Supply inventory", "Customer ratings"],
@@ -55,8 +56,8 @@ export const MARKETPLACE_MODULES = [
     category: "Roofing",
     rating: 4.7,
     review_count: 94,
-    price: 49,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "🏠",
     gradient: "from-amber-500/20 to-orange-500/20",
     features: ["Satellite measurements", "AI material takeoffs", "Damage reports", "Manufacturer pricing"],
@@ -73,8 +74,8 @@ export const MARKETPLACE_MODULES = [
     category: "Pest Control",
     rating: 4.6,
     review_count: 58,
-    price: 24,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "🐛",
     gradient: "from-green-500/20 to-emerald-500/20",
     features: ["Inspection templates", "Chemical log", "Treatment history", "State compliance"],
@@ -109,8 +110,8 @@ export const MARKETPLACE_MODULES = [
     category: "Inventory",
     rating: 4.5,
     review_count: 145,
-    price: 34,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "📦",
     gradient: "from-titan-indigo/20 to-purple-500/20",
     features: ["Parts tracking", "Low-stock alerts", "Auto PO generation", "Vendor database"],
@@ -127,8 +128,8 @@ export const MARKETPLACE_MODULES = [
     category: "AI Agents",
     rating: 4.9,
     review_count: 231,
-    price: 39,
-    price_label: "/mo",
+    price: 0,
+    price_label: "Free",
     icon: "🤖",
     gradient: "from-titan-cyan/20 to-titan-indigo/20",
     features: ["Lead nurturing", "Review requests", "Win-back campaigns", "Custom triggers"],
@@ -162,9 +163,8 @@ export function formatInstallCount(count) {
   return String(count);
 }
 
-export function formatModulePrice(module) {
-  if (module.price === 0) return "Free";
-  return `$${module.price}${module.price_label || ""}`;
+export function formatModulePrice(_module) {
+  return "Free";
 }
 
 export function normalizeModule(record) {
@@ -177,8 +177,9 @@ export function normalizeModule(record) {
     category: record.category,
     rating: record.rating ?? 0,
     review_count: record.review_count ?? record.reviews ?? 0,
-    price: record.price ?? 0,
-    price_label: record.price_label ?? record.priceLabel ?? "",
+    // Marketplace apps are always free — ignore any legacy paid DB values
+    price: 0,
+    price_label: "Free",
     icon: record.icon ?? "📦",
     gradient: record.gradient ?? "from-titan-indigo/20 to-purple-500/20",
     features: record.features ?? [],

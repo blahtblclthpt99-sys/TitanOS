@@ -762,7 +762,7 @@ export default function Marketplace() {
                     ) : (
                       <>
                         <Download className="w-4 h-4 mr-1.5" />
-                        Install — {formatModulePrice(selected)}
+                        Install free
                       </>
                     )}
                   </Button>

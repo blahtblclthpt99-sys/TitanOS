@@ -17,7 +17,43 @@ function throwIfError(error, status = 400) {
 async function fetchProfile(userId) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("*")
+    .select(
+      [
+        "id",
+        "full_name",
+        "role",
+        "is_pro",
+        "lifetime_premium",
+        "paying_subscriber",
+        "plan_tier",
+        "account_type",
+        "phone",
+        "username",
+        "avatar_url",
+        "bio",
+        "city",
+        "state",
+        "company_name",
+        "company_address",
+        "company_city",
+        "company_state",
+        "company_zip",
+        "company_logo_url",
+        "theme_pref",
+        "notification_prefs",
+        "marketing_prefs",
+        "privacy_prefs",
+        "professional_profile",
+        "community_opt_in",
+        "referral_code",
+        "referred_by_code",
+        "verified_worker",
+        "verification_notes",
+        "active_company_id",
+        "created_at",
+        "updated_at",
+      ].join(",")
+    )
     .eq("id", userId)
     .maybeSingle();
   throwIfError(error);

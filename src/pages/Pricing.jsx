@@ -15,7 +15,7 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
-import { PLANS, betaBadgeLabel } from "@/lib/plan";
+import { PLANS, betaBadgeLabel, getPlanCheckoutUrl } from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
@@ -39,7 +39,7 @@ const CARDS = [
     features: [
       `${PLANS.worker_free.feeLabel} fee on payments you collect`,
       "No monthly cost to start",
-      `Up to ${PLANS.worker_free.maxActiveListings} marketplace listings`,
+      "Free unlimited marketplace listings",
       "Basic CRM, estimates & invoices",
       "Upgrade anytime as you book more work",
     ],
@@ -56,7 +56,10 @@ const CARDS = [
       "AI assistant, booking page, analytics",
       "Expanded photo & document storage",
     ],
-    cta: { to: "/register", label: "Go Premium" },
+    cta: {
+      href: getPlanCheckoutUrl("worker_premium"),
+      label: "Go Premium — $29.99",
+    },
     highlighted: true,
   },
   {
@@ -69,12 +72,16 @@ const CARDS = [
       "Priority placement & storage",
       "Best value as volume grows",
     ],
-    cta: { to: "/register", label: "Get Business" },
+    cta: {
+      href: getPlanCheckoutUrl("business"),
+      label: "Get Business — $49.99",
+    },
     highlighted: false,
   },
 ];
 
 function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
+  const checkoutHref = cta.href || plan.checkoutUrl || null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -121,10 +128,19 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
             : "bg-muted hover:bg-muted/80 text-foreground border border-border"
         }`}
       >
-        <Link to={cta.to}>
-          {cta.label} <ArrowRight className="w-4 h-4" />
-        </Link>
+        {checkoutHref ? (
+          <a href={checkoutHref} target="_blank" rel="noopener noreferrer">
+            {cta.label} <ArrowRight className="w-4 h-4" />
+          </a>
+        ) : (
+          <Link to={cta.to || "/register"}>
+            {cta.label} <ArrowRight className="w-4 h-4" />
+          </Link>
+        )}
       </Button>
+      {checkoutHref ? (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure checkout via PayPal</p>
+      ) : null}
     </motion.div>
   );
 }

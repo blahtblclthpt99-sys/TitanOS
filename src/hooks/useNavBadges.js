@@ -1,25 +1,37 @@
 import { useMemo } from "react";
 import { useEntityData } from "@/hooks/useEntityData";
 
+/**
+ * Nav badges via status-filtered queries — not full list downloads.
+ */
 export function useNavBadges(enabled = true) {
-  const { data: [invoices, estimates, jobs] } = useEntityData([
-    { entity: "Invoice", method: "list", args: ["-created_date", 100] },
-    { entity: "Estimate", method: "list", args: ["-created_date", 100] },
-    { entity: "Job", method: "list", args: ["-scheduled_date", 100] },
-  ], { enabled });
+  const { data: [overdueInvoices, pendingEstimates, activeJobs] } = useEntityData(
+    [
+      { entity: "Invoice", method: "filter", args: [{ status: "overdue" }, "-created_date", 50, 0, ["id", "status"]] },
+      {
+        entity: "Estimate",
+        method: "filter",
+        args: [{ status: { in: ["sent", "viewed"] } }, "-created_date", 50, 0, ["id", "status"]],
+      },
+      {
+        entity: "Job",
+        method: "filter",
+        args: [{ status: "in_progress" }, "-scheduled_date", 50, 0, ["id", "status"]],
+      },
+    ],
+    { enabled }
+  );
 
   return useMemo(() => {
-    const overdueInvoices = invoices.filter((i) => i.status === "overdue").length;
-    const pendingEstimates = estimates.filter((e) =>
-      ["sent", "viewed"].includes(e.status)
-    ).length;
-    const activeJobs = jobs.filter((j) => j.status === "in_progress").length;
+    const overdue = overdueInvoices.length;
+    const pending = pendingEstimates.length;
+    const active = activeJobs.length;
 
     return {
-      "/": overdueInvoices + pendingEstimates,
-      "/jobs": activeJobs,
-      "/invoices": overdueInvoices,
-      "/estimates": pendingEstimates,
+      "/": overdue + pending,
+      "/jobs": active,
+      "/invoices": overdue,
+      "/estimates": pending,
     };
-  }, [invoices, estimates, jobs]);
+  }, [overdueInvoices, pendingEstimates, activeJobs]);
 }

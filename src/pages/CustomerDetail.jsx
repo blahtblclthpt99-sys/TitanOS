@@ -23,8 +23,9 @@ import BusinessTimeline from "@/components/timeline/BusinessTimeline";
 const COMMUNICATION_TYPES = ["call", "email", "text"];
 
 function customerMatches(record, id, fullName) {
-  return record.customer_id === id
-    || record.customer_name?.trim().toLowerCase() === fullName.toLowerCase();
+  if (String(record?.customer_id || "") === String(id)) return true;
+  if (!fullName) return false;
+  return String(record?.customer_name || "").trim().toLowerCase() === fullName.toLowerCase();
 }
 
 function RecordList({ title, icon: Icon, records, empty, renderRecord, to }) {
@@ -80,11 +81,11 @@ export default function CustomerDetail() {
     };
   }, [id, fetched, seed]);
   const [deleting, setDeleting] = useState(false);
-  const { data: [allJobs, allEstimates, allInvoices], reload: reloadRelated } = useEntityData([
-    { entity: "Job", method: "list", args: ["-scheduled_date", 500] },
-    { entity: "Estimate", method: "list", args: ["-created_date", 500] },
-    { entity: "Invoice", method: "list", args: ["-created_date", 500] },
-  ]);
+  const { data: [relatedJobs, relatedEstimates, relatedInvoices], reload: reloadRelated } = useEntityData([
+    { entity: "Job", method: "filter", args: [{ customer_id: id }, "-scheduled_date", 50] },
+    { entity: "Estimate", method: "filter", args: [{ customer_id: id }, "-created_date", 50] },
+    { entity: "Invoice", method: "filter", args: [{ customer_id: id }, "-created_date", 50] },
+  ], { enabled: Boolean(id) });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -102,7 +103,7 @@ export default function CustomerDetail() {
     let active = true;
     const loadCustomerData = async () => {
       try {
-        const rows = await api.entities.CustomerCommunication.filter({ customer_id: id });
+        const rows = await api.entities.CustomerCommunication.filter({ customer_id: id }, "-created_date", 100);
         if (active) {
           setCommunications(rows.sort((a, b) => new Date(b.created_at || b.created_date || b.date) - new Date(a.created_at || a.created_date || a.date)));
           setCommunicationFallback(false);
@@ -116,7 +117,7 @@ export default function CustomerDetail() {
         if (active) setCommunicationFallback(true);
       }
       try {
-        const rows = await api.entities.CustomerFile.filter({ customer_id: id });
+        const rows = await api.entities.CustomerFile.filter({ customer_id: id }, "-created_date", 100);
         if (active) setCustomerFiles(rows);
       } catch {
         if (active) setCustomerFiles([]);
@@ -136,7 +137,16 @@ export default function CustomerDetail() {
       setEditing(false);
       reload();
       reloadRelated();
-    } finally { setSaving(false); }
+      toast({ title: "Customer updated" });
+    } catch (err) {
+      toast({
+        title: "Couldn't save customer",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading && !customer) return <PageLoader variant="detail" label="Loading customer" />;
@@ -151,18 +161,22 @@ export default function CustomerDetail() {
   }
   if (!customer) {
     return (
-      <div className="p-8 text-muted-foreground text-center" role="status">
-        Customer not found.
-      </div>
+      <ErrorState
+        title="Customer not found"
+        message="This contact may have been deleted or you may not have access."
+        onRetry={() => navigate("/customers")}
+      />
     );
   }
 
-  const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim();
-  const jobs = allJobs.filter(record => customerMatches(record, id, fullName));
-  const estimates = allEstimates.filter(record => customerMatches(record, id, fullName));
-  const invoices = allInvoices.filter(record => customerMatches(record, id, fullName));
-  const completedJobs = jobs.filter(job => job.status === "completed");
-  const paidTotal = invoices.filter(invoice => invoice.status === "paid").reduce((sum, invoice) => sum + Number(invoice.total || invoice.amount_paid || 0), 0);
+  const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer";
+  const jobs = (relatedJobs || []).filter((record) => customerMatches(record, id, fullName));
+  const estimates = (relatedEstimates || []).filter((record) => customerMatches(record, id, fullName));
+  const invoices = (relatedInvoices || []).filter((record) => customerMatches(record, id, fullName));
+  const completedJobs = jobs.filter((job) => job.status === "completed");
+  const paidTotal = invoices
+    .filter((invoice) => invoice.status === "paid")
+    .reduce((sum, invoice) => sum + Number(invoice.total || invoice.amount_paid || 0), 0);
   const outstandingTotal = invoices.reduce((sum, invoice) => {
     if (invoice.status === "paid") return sum;
     return sum + Number(invoice.balance_due ?? invoice.total ?? 0);
@@ -190,6 +204,10 @@ export default function CustomerDetail() {
       setCommunications(next);
       setCommunicationFallback(true);
       localStorage.setItem(`titanos_comm_${id}`, JSON.stringify(next));
+      toast({
+        title: "Saved on this device",
+        description: "Couldn’t sync the note to the cloud — it’s kept locally for now.",
+      });
     }
     setCommunicationForm({ type: "call", body: "" });
   };
@@ -207,10 +225,14 @@ export default function CustomerDetail() {
         created_by_id: customer.created_by_id,
       });
       setCustomerFiles((current) => [saved, ...current]);
+      toast({ title: "File uploaded" });
     } catch {
-      // CustomerFile is optional on older deployments; uploads remain accessible in the session.
       const fileEntry = { id: `local-${Date.now()}`, name: file.name, file_url: URL.createObjectURL(file), content_type: file.type };
       setCustomerFiles((current) => [fileEntry, ...current]);
+      toast({
+        title: "Saved on this device only",
+        description: "Cloud upload isn’t available — the file is available in this session.",
+      });
     } finally {
       setUploadingFile(false);
     }

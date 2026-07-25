@@ -5,7 +5,7 @@
  *
  * Customers — Free to join and hire (no platform fee)
  * Workers (Free) — 8% transaction fee
- * Workers (Premium) — $19.99/mo + 2.5% fee
+ * Workers (Premium) — $29.99/mo + 2.5% fee
  * Businesses — $49.99/mo + 1.5% fee
  *
  * FREE_DURING_BETA: premium features stay unlocked; fees & free-worker limits still apply.
@@ -14,6 +14,12 @@ export const FREE_DURING_BETA = true;
 
 /** @deprecated Use FREE_DURING_BETA */
 export const FREE_LAUNCH = FREE_DURING_BETA;
+
+/** Live PayPal No-Code Payment links for paid memberships. */
+export const PAYPAL_CHECKOUT = Object.freeze({
+  worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
+  business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
+});
 
 export const PLANS = Object.freeze({
   customer: Object.freeze({
@@ -31,6 +37,7 @@ export const PLANS = Object.freeze({
     searchPriority: false,
     storageLabel: "Hire locally at no cost",
     blurb: "Free to join and hire professionals.",
+    checkoutUrl: null,
   }),
   worker_free: Object.freeze({
     id: "worker_free",
@@ -39,7 +46,7 @@ export const PLANS = Object.freeze({
     priceMonthly: 0,
     feeRate: 0.08,
     feeLabel: "8%",
-    maxActiveListings: 3,
+    maxActiveListings: Infinity,
     maxActiveHirePosts: 2,
     maxEstimatesPerMonth: 15,
     maxInvoicesPerMonth: 15,
@@ -47,12 +54,13 @@ export const PLANS = Object.freeze({
     searchPriority: false,
     storageLabel: "Standard photo & document storage",
     blurb: "Try TitanOS with no monthly fee — 8% on payments you collect.",
+    checkoutUrl: null,
   }),
   worker_premium: Object.freeze({
     id: "worker_premium",
     name: "Worker Premium",
     audience: "Workers",
-    priceMonthly: 19.99,
+    priceMonthly: 29.99,
     feeRate: 0.025,
     feeLabel: "2.5%",
     maxActiveListings: Infinity,
@@ -62,7 +70,8 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
-    blurb: "$19.99/mo with a lower 2.5% fee as you book more work.",
+    blurb: "$29.99/mo with a lower 2.5% fee as you book more work.",
+    checkoutUrl: PAYPAL_CHECKOUT.worker_premium,
   }),
   business: Object.freeze({
     id: "business",
@@ -79,12 +88,13 @@ export const PLANS = Object.freeze({
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
     blurb: "$49.99/mo for teams — lowest 1.5% transaction fee.",
+    checkoutUrl: PAYPAL_CHECKOUT.business,
   }),
 });
 
 export const MARKETPLACE_PREMIUM = Object.freeze({
-  enabled: true,
-  featuredListingPrice: 9.99,
+  enabled: false,
+  featuredListingPrice: 0,
   boostDays: 7,
 });
 
@@ -231,7 +241,13 @@ export function assertWithinFreeLimit(user, kind, currentCount) {
           ? "hire job posts"
           : kind;
     throw new Error(
-      `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($19.99/mo) for unlimited.`
+      `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($29.99/mo) for unlimited.`
     );
   }
+}
+
+/** PayPal / external checkout URL for a plan id, or null for free tiers. */
+export function getPlanCheckoutUrl(planId) {
+  const id = PLAN_ALIASES[planId] || planId;
+  return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

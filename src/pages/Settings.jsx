@@ -5,7 +5,7 @@ import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
 import {
   User, Building2, Bell, Shield, Palette, Lock, LogOut, ChevronRight, Check,
-  Trash2, Gift, Upload, ShieldAlert, Megaphone, BadgeCheck,
+  Trash2, Gift, Upload, ShieldAlert, Megaphone, BadgeCheck, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import SuccessCheck from "@/components/shared/SuccessCheck";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
-import { betaBadgeLabel } from "@/lib/plan";
+import { betaBadgeLabel, getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
@@ -303,6 +303,42 @@ export default function Settings() {
           </motion.button>
         ))}
       </div>
+
+      {/* Membership / PayPal upgrade */}
+      {!isPaidPlan(user) && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="titan-surface p-4 mb-3 border border-titan-cyan/25 bg-titan-cyan/5"
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-md bg-titan-cyan/20 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-titan-cyan" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Upgrade your plan</p>
+              <p className="text-xs text-muted-foreground">
+                Current: {getPlanConfig(user).name}. Pay securely with PayPal — Premium ${PLANS.worker_premium.priceMonthly}/mo or Business ${PLANS.business.priceMonthly}/mo.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold">
+              <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
+                Premium ${PLANS.worker_premium.priceMonthly}
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="border-border">
+              <a href={getPlanCheckoutUrl("business")} target="_blank" rel="noopener noreferrer">
+                Business ${PLANS.business.priceMonthly}
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/pricing">Compare plans</Link>
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Referral Banner */}
       <Link to="/referral">

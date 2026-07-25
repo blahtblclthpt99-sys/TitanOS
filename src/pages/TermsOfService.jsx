@@ -30,7 +30,7 @@ const SECTIONS = [
   },
   {
     title: "Payments & Billing",
-    body: `Paid plans, marketplace fees, or payment processing (including Stripe) are subject to the pricing shown in the product and any third-party processor terms. You are responsible for applicable taxes. Refunds, if any, are handled according to our published billing policy or as required by law. [Legal review: insert refund/chargeback policy details.]`,
+    body: `Paid membership plans or payment processing (including Stripe) are subject to the pricing shown in the product and any third-party processor terms. The marketplace for browsing, posting, and messaging is free. You are responsible for applicable taxes. Refunds, if any, are handled according to our published billing policy or as required by law. [Legal review: insert refund/chargeback policy details.]`,
   },
   {
     title: "Third-Party Services",

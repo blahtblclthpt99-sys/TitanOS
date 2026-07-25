@@ -47,6 +47,22 @@ const BLANK_FORM = {
 
 const JOB_STATUSES = ["scheduled", "in_progress", "completed", "cancelled"];
 
+function normalizeChecklist(job) {
+  if (Array.isArray(job?.checklist)) return job.checklist;
+  return checklistForService(job?.service_type).map((label) => ({ label, done: false }));
+}
+
+function customerDisplayName(c) {
+  if (!c) return "";
+  const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  return name || c.company_name || c.email || "Customer";
+}
+
+function moneyAmount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 export default function Jobs({ isActive = true }) {
   const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
@@ -75,8 +91,11 @@ export default function Jobs({ isActive = true }) {
   const [jobPhotos, setJobPhotos] = useState({});
   const [opsSaving, setOpsSaving] = useState(false);
   const [checklists, setChecklists] = useState({});
+  const [focusJobId, setFocusJobId] = useState(null);
 
-  const showForm = new URLSearchParams(location.search).get("new") === "1";
+  const searchParams = new URLSearchParams(location.search);
+  const showForm = searchParams.get("new") === "1";
+  const deepLinkId = searchParams.get("id");
   const openForm  = () => navigate("?new=1");
   const closeForm = () => navigate("/jobs", { replace: true });
 
@@ -84,21 +103,110 @@ export default function Jobs({ isActive = true }) {
 
   useEffect(() => { setLocalJobs(null); }, [jobs]);
 
+  // Home / deep links: /jobs?id=...
+  useEffect(() => {
+    if (!isActive || !deepLinkId) return undefined;
+    let alive = true;
+    (async () => {
+      const inList = (localJobs ?? jobs).find((j) => String(j.id) === String(deepLinkId));
+      let job = inList;
+      if (!job) {
+        try {
+          job = await api.entities.Job.get(deepLinkId);
+          if (alive && job) {
+            setLocalJobs((prev) => {
+              const base = prev ?? jobs;
+              if (base.some((j) => String(j.id) === String(job.id))) return base;
+              return [job, ...base];
+            });
+          }
+        } catch {
+          if (alive) {
+            toast({ title: "Job not found", description: "That job may have been deleted.", variant: "destructive" });
+          }
+          return;
+        }
+      }
+      if (!alive || !job) return;
+      setFocusJobId(job.id);
+      setExpandedJobId(job.id);
+      setChecklists((current) => ({
+        ...current,
+        [job.id]: current[job.id] || normalizeChecklist(job),
+      }));
+      try {
+        const photos = await listJobPhotos(job.id);
+        if (alive) setJobPhotos((current) => ({ ...current, [job.id]: photos }));
+      } catch {
+        if (alive) setJobPhotos((current) => ({ ...current, [job.id]: [] }));
+      }
+      navigate("/jobs", { replace: true });
+      requestAnimationFrame(() => {
+        document.getElementById(`job-row-${job.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isActive, deepLinkId, jobs, localJobs, navigate]);
+
+  // Hydrate field-ops when panel auto-opens for in-progress/completed
+  useEffect(() => {
+    if (!isActive || !displayJobs.length) return undefined;
+    let alive = true;
+    const autoOpen = displayJobs.filter((j) => ["in_progress", "completed"].includes(j.status));
+    autoOpen.forEach(async (job) => {
+      if (!checklists[job.id]) {
+        setChecklists((current) =>
+          current[job.id] ? current : { ...current, [job.id]: normalizeChecklist(job) }
+        );
+      }
+      if (jobPhotos[job.id] === undefined) {
+        try {
+          const photos = await listJobPhotos(job.id);
+          if (alive) setJobPhotos((current) => ({ ...current, [job.id]: photos }));
+        } catch {
+          if (alive) setJobPhotos((current) => ({ ...current, [job.id]: [] }));
+        }
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, displayJobs.map((j) => `${j.id}:${j.status}`).join("|")]);
+
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
   const handleSave = async () => {
-    if (!form.title || !form.scheduled_date) return;
+    if (!form.title?.trim()) {
+      toast({ title: "Title required", description: "Add a job title before creating.", variant: "destructive" });
+      return;
+    }
+    if (!form.scheduled_date) {
+      toast({ title: "Date required", description: "Pick a scheduled date.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
+    const payload = { ...form };
     const tempId = `temp_${Date.now()}`;
-    setLocalJobs(prev => [{ ...form, id: tempId }, ...(prev ?? jobs)]);
+    setLocalJobs((prev) => [{ ...payload, id: tempId }, ...(prev ?? jobs)]);
     setForm(BLANK_FORM);
     closeForm();
     try {
-      await api.entities.Job.create(form);
+      await api.entities.Job.create(payload);
       reload();
-    } catch {
+      toast({ title: "Job created" });
+    } catch (err) {
       setLocalJobs(null);
-    } finally { setSaving(false); }
+      toast({
+        title: "Couldn't create job",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const { containerRef, pullProgress, isRefreshing, pullDist } = usePullToRefresh(
@@ -140,6 +248,13 @@ export default function Jobs({ isActive = true }) {
         (prev ?? jobs).map(j => selected.has(j.id) ? { ...j, status } : j)
       );
       exitBulk();
+      toast({ title: "Jobs updated" });
+    } catch (err) {
+      toast({
+        title: "Couldn't update jobs",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally { setBulkSaving(false); }
   };
 
@@ -154,6 +269,13 @@ export default function Jobs({ isActive = true }) {
         (prev ?? jobs).map(j => selected.has(j.id) ? { ...j, assigned_name: employee.name, assigned_to: employee.id } : j)
       );
       exitBulk();
+      toast({ title: "Assignees updated" });
+    } catch (err) {
+      toast({
+        title: "Couldn't assign jobs",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally { setBulkSaving(false); }
   };
 
@@ -162,7 +284,9 @@ export default function Jobs({ isActive = true }) {
     setCompletingId(job.id);
     try {
       const photos = jobPhotos[job.id] || [];
-      const checklist = checklists[job.id] || job.checklist || [];
+      const checklist = Array.isArray(checklists[job.id])
+        ? checklists[job.id]
+        : normalizeChecklist(job);
       const summary = await generateJobSummary(job, { photos, checklist });
       await api.entities.Job.update(job.id, {
         status: "completed",
@@ -172,7 +296,11 @@ export default function Jobs({ isActive = true }) {
         customer_notes_draft: summary.customer_notes,
         maintenance_reminder: summary.maintenance_reminder,
       });
-      if (user?.id) await enqueueFollowUpsForJob(user, job, customers.find((customer) => customer.id === job.customer_id));
+      try {
+        if (user?.id) await enqueueFollowUpsForJob(user, job, customers.find((customer) => customer.id === job.customer_id));
+      } catch {
+        /* follow-up enqueue is best-effort after complete */
+      }
       setLocalJobs((prev) =>
         (prev ?? jobs).map((item) =>
           item.id === job.id
@@ -206,12 +334,16 @@ export default function Jobs({ isActive = true }) {
   const openOps = async (job) => {
     const nextId = expandedJobId === job.id ? null : job.id;
     setExpandedJobId(nextId);
-    if (nextId && !checklists[job.id]) setChecklists((current) => ({ ...current, [job.id]: job.checklist || checklistForService(job.service_type).map((label) => ({ label, done: false })) }));
-    if (nextId && !jobPhotos[job.id]) {
+    if (nextId && !checklists[job.id]) {
+      setChecklists((current) => ({ ...current, [job.id]: normalizeChecklist(job) }));
+    }
+    if (nextId && jobPhotos[job.id] === undefined) {
       try {
         const photos = await listJobPhotos(job.id);
         setJobPhotos((current) => ({ ...current, [job.id]: photos }));
-      } catch { setJobPhotos((current) => ({ ...current, [job.id]: [] })); }
+      } catch {
+        setJobPhotos((current) => ({ ...current, [job.id]: [] }));
+      }
     }
   };
 
@@ -244,12 +376,31 @@ export default function Jobs({ isActive = true }) {
       const { file_url } = await api.integrations.Core.UploadFile({ file });
       const photo = await addJobPhoto(user, { jobId: job.id, kind, url: file_url });
       setJobPhotos((current) => ({ ...current, [job.id]: [photo, ...(current[job.id] || [])] }));
+      toast({ title: "Photo uploaded" });
+    } catch (err) {
+      toast({
+        title: "Couldn't upload photo",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally { setOpsSaving(false); }
   };
   const toggleChecklist = async (job, index) => {
-    const items = (checklists[job.id] || []).map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item);
+    const base = Array.isArray(checklists[job.id]) ? checklists[job.id] : normalizeChecklist(job);
+    const items = base.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, done: !item.done } : item
+    );
     setChecklists((current) => ({ ...current, [job.id]: items }));
-    await api.entities.Job.update(job.id, { checklist: items });
+    try {
+      await api.entities.Job.update(job.id, { checklist: items });
+    } catch (err) {
+      setChecklists((current) => ({ ...current, [job.id]: base }));
+      toast({
+        title: "Couldn't save checklist",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!isActive && !jobs.length) return null;
@@ -258,10 +409,11 @@ export default function Jobs({ isActive = true }) {
 
   const renderJobRow = (job) => (
     <div
-      onClick={() => bulkMode ? toggleSelect(job.id) : null}
-      className={`glass rounded-2xl p-4 transition-all ${bulkMode ? "cursor-pointer" : "glass-hover"} ${
+      id={`job-row-${job.id}`}
+      onClick={() => (bulkMode ? toggleSelect(job.id) : openOps(job))}
+      className={`glass rounded-2xl p-4 transition-all ${bulkMode ? "cursor-pointer" : "glass-hover cursor-pointer"} ${
         bulkMode && selected.has(job.id) ? "border border-primary/40 bg-primary/5" : ""
-      }`}
+      } ${focusJobId === job.id ? "ring-2 ring-primary/40" : ""}`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
         <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
@@ -277,7 +429,9 @@ export default function Jobs({ isActive = true }) {
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <p className="text-sm font-semibold text-foreground break-words">{job.title}</p>
               <StatusBadge status={job.status} />
-              <span className={`text-xs font-semibold ${PRIORITY_COLORS[job.priority]}`}>● {job.priority}</span>
+              <span className={`text-xs font-semibold ${PRIORITY_COLORS[job.priority] || PRIORITY_COLORS.medium}`}>
+                ● {job.priority || "medium"}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               {job.customer_name && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="w-3 h-3 flex-shrink-0" />{job.customer_name}</span>}
@@ -289,23 +443,48 @@ export default function Jobs({ isActive = true }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end pl-4 sm:pl-0">
-          {job.amount > 0 && <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${job.amount.toLocaleString()}</p>}
+          {moneyAmount(job.amount) > 0 && (
+            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+              ${moneyAmount(job.amount).toLocaleString()}
+            </p>
+          )}
           {job.status !== "completed" && !bulkMode && (
-            <Button onClick={() => markComplete(job)} disabled={completingId === job.id} size="sm"
-              className="bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-700 dark:text-emerald-300 border border-emerald-400/20 rounded-lg text-xs min-h-[36px]">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                markComplete(job);
+              }}
+              disabled={completingId === job.id}
+              size="sm"
+              className="bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-700 dark:text-emerald-300 border border-emerald-400/20 rounded-lg text-xs min-h-[36px]"
+            >
               {completingId === job.id ? "Saving…" : "Complete"}
             </Button>
           )}
-          {!bulkMode && <Button onClick={() => openOps(job)} variant="outline" size="sm" className="border-border text-foreground/90 rounded-lg text-xs min-h-[36px]">Field ops</Button>}
           {!bulkMode && (
-            <DeleteButton
-              label={job.title || "this job"}
-              onDelete={async () => {
-                await api.entities.Job.delete(job.id);
-                setLocalJobs((prev) => (prev ?? jobs).filter((j) => j.id !== job.id));
-                reload();
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                openOps(job);
               }}
-            />
+              variant="outline"
+              size="sm"
+              className="border-border text-foreground/90 rounded-lg text-xs min-h-[36px]"
+            >
+              Field ops
+            </Button>
+          )}
+          {!bulkMode && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <DeleteButton
+                label={job.title || "this job"}
+                onDelete={async () => {
+                  await api.entities.Job.delete(job.id);
+                  setLocalJobs((prev) => (prev ?? jobs).filter((j) => j.id !== job.id));
+                  reload();
+                }}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -326,7 +505,26 @@ export default function Jobs({ isActive = true }) {
               </div>
             );
           })()}
-          {!!checklists[job.id]?.length && <div className="mt-3 grid sm:grid-cols-2 gap-2">{checklists[job.id].map((item, index) => <button key={item.label} onClick={() => toggleChecklist(job, index)} className="text-left text-xs text-foreground/85 flex items-center gap-2"><span className={item.done ? "text-primary" : "text-muted-foreground"}>{item.done ? "✓" : "○"}</span>{item.label}</button>)}</div>}
+          {!!(checklists[job.id] || normalizeChecklist(job)).length && (
+            <div className="mt-3 grid sm:grid-cols-2 gap-2">
+              {(checklists[job.id] || normalizeChecklist(job)).map((item, index) => (
+                <button
+                  key={`${item.label}-${index}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleChecklist(job, index);
+                  }}
+                  className="text-left text-xs text-foreground/85 flex items-center gap-2"
+                >
+                  <span className={item.done ? "text-primary" : "text-muted-foreground"}>
+                    {item.done ? "✓" : "○"}
+                  </span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
           {!!jobPhotos[job.id]?.length && (
             <div className="mt-3 space-y-2">
               <div className="flex flex-wrap gap-2">
@@ -543,10 +741,15 @@ export default function Jobs({ isActive = true }) {
                 value={form.customer_id}
                 onValueChange={v => {
                   const c = customers.find(c => c.id === v);
-                  setForm(prev => ({ ...prev, customer_id: v, customer_name: c ? `${c.first_name} ${c.last_name}` : "", address: c?.address || prev.address }));
+                  setForm(prev => ({
+                    ...prev,
+                    customer_id: v,
+                    customer_name: customerDisplayName(c),
+                    address: c?.address || prev.address,
+                  }));
                 }}
                 placeholder="Select customer"
-                options={customers.map(c => ({ value: c.id, label: `${c.first_name} ${c.last_name}` }))}
+                options={customers.map(c => ({ value: c.id, label: customerDisplayName(c) }))}
                 className="mt-1"
               />
             </FormField>
@@ -575,7 +778,7 @@ export default function Jobs({ isActive = true }) {
                 className="bg-muted border-border text-foreground rounded-md min-h-[80px]"
               />
             </FormField>
-            <Button onClick={handleSave} disabled={saving || !form.title} className="w-full h-11">
+            <Button onClick={handleSave} disabled={saving || !form.title?.trim() || !form.scheduled_date} className="w-full h-11">
               {saving ? "Creating..." : "Create job"}
             </Button>
           </div>

@@ -46,11 +46,20 @@ describe("percentage fees", () => {
 });
 
 describe("flat fees", () => {
-  it("featured listing flat", () => {
+  it("featured listing is free", () => {
     const rule = pickSeedRule("featured_listings", "*");
     const r = calculateFees({ grossAmount: 0, rule });
-    assert.equal(r.platformFee, 9.99);
-    assert.equal(r.finalTotal, 9.99);
+    assert.equal(r.platformFee, 0);
+    assert.equal(r.finalTotal, 0);
+  });
+});
+
+describe("marketplace fees", () => {
+  it("marketplace sales are 0%", () => {
+    const rule = pickSeedRule("marketplace_sales", "*");
+    const r = calculateFees({ grossAmount: 100, rule });
+    assert.equal(r.platformFee, 0);
+    assert.equal(r.finalTotal, 100);
   });
 });
 

@@ -41,6 +41,12 @@ const BLANK_FORM = {
 
 const BLANK_LINE = { description: "", quantity: 1, unit_price: 0, total: 0 };
 
+function customerDisplayName(c) {
+  if (!c) return "";
+  const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  return name || c.company_name || c.email || "Customer";
+}
+
 export default function Invoices({ isActive = true }) {
   const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
@@ -60,6 +66,11 @@ export default function Invoices({ isActive = true }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const deepId = params.get("id");
+    if (deepId) {
+      navigate(`/invoices/${deepId}`, { replace: true });
+      return;
+    }
     if (params.get("new") !== "1") return;
 
     setShowForm(true);
@@ -86,7 +97,7 @@ export default function Invoices({ isActive = true }) {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [navigate]);
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -183,7 +194,7 @@ export default function Invoices({ isActive = true }) {
     } catch (err) {
       toast({
         title: "Couldn't save invoice",
-        description: err.message || "Please try again.",
+        description: err?.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -316,14 +327,14 @@ export default function Invoices({ isActive = true }) {
                     setForm((prev) => ({
                       ...prev,
                       customer_id: v,
-                      customer_name: c ? `${c.first_name} ${c.last_name}` : "",
+                      customer_name: customerDisplayName(c),
                     }));
                     setJobLocation(fromCustomer);
                   }}
                   placeholder="Select customer"
                   options={customers.map((c) => ({
                     value: c.id,
-                    label: `${c.first_name} ${c.last_name}`,
+                    label: customerDisplayName(c),
                   }))}
                   className="mt-1"
                 />

@@ -26,3 +26,7 @@ npm run ops:payments
 - Invoice / Driver Hub `.toFixed` guarded with `Number(...)`
 - Android install banner raised above mobile action dock
 - Production banner if Supabase env is missing
+
+## Scale / concurrent users
+
+See [SCALE_READINESS.md](./SCALE_READINESS.md). UI and client query hardening for multi-thousand sessions is required before any “10k online” claim; verify against Supabase capacity separately.

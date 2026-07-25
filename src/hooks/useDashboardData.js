@@ -51,7 +51,7 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
     return i.status === "paid" && d >= prevMonthStart && d <= prevMonthEnd;
   });
   const weekPaid = invoices.filter((i) => {
-    const d = (i.created_date || i.paid_at || "").slice(0, 10);
+    const d = (i.paid_at || i.created_date || i.created_at || "").slice(0, 10);
     return i.status === "paid" && d >= weekStart && d <= weekEnd;
   });
   const monthRevenue = thisMonthPaid.reduce((s, i) => s + (i.total || 0), 0);
@@ -71,7 +71,7 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
     const top = overdueInv[0];
     nextActions.push({
       icon: Phone,
-      text: `Follow up with ${top.customer_name}`,
+      text: `Follow up with ${top.customer_name || "customer"}`,
       sub: `Invoice overdue · $${(top.balance_due || top.total || 0).toLocaleString()}`,
       cta: "Call",
       path: "/invoices",
@@ -81,7 +81,7 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
     const top = pendingEst[0];
     nextActions.push({
       icon: FileText,
-      text: `Chase estimate for ${top.customer_name}`,
+      text: `Chase estimate for ${top.customer_name || "customer"}`,
       sub: `Sent · $${(top.total || 0).toLocaleString()} · expires ${top.valid_until ? relativeTime(top.valid_until) : "soon"}`,
       cta: "View",
       path: "/estimates",
@@ -151,18 +151,27 @@ export function useDashboardData({ enabled = true } = {}) {
     })),
   });
 
-  const [jobs, invoices, estimates, customers, employees] = queries.map(
-    (query) => query.data
-  );
+  const jobs = queries[0]?.data;
+  const invoices = queries[1]?.data;
+  const estimates = queries[2]?.data;
+  const customers = queries[3]?.data;
+  const employees = queries[4]?.data;
 
-  const loading = enabled && queries.some((query) => query.isLoading);
-  const error = queries.find((query) => query.error)?.error ?? null;
-  const isReady = [jobs, invoices, estimates, customers, employees].every(
-    (result) => result !== undefined
-  );
+  const loading = Boolean(enabled && queries.some((query) => query.isPending));
+  const anyLoaded = [jobs, invoices, estimates, customers, employees].some((row) => row !== undefined);
+  const allFailed =
+    !loading &&
+    queries.length > 0 &&
+    queries.every((query) => Boolean(query.error)) &&
+    !anyLoaded;
+  const error = allFailed ? queries.find((query) => query.error)?.error ?? null : null;
+  const partialError =
+    anyLoaded && queries.some((query) => query.error)
+      ? queries.find((query) => query.error)?.error ?? null
+      : null;
 
   const data = useMemo(() => {
-    if (!isReady || error) return null;
+    if (!anyLoaded) return null;
     return buildDashboardData(
       jobs ?? [],
       invoices ?? [],
@@ -170,7 +179,7 @@ export function useDashboardData({ enabled = true } = {}) {
       customers ?? [],
       employees ?? []
     );
-  }, [isReady, error, jobs, invoices, estimates, customers, employees]);
+  }, [anyLoaded, jobs, invoices, estimates, customers, employees]);
 
   const reload = async () => {
     await Promise.all(
@@ -180,5 +189,5 @@ export function useDashboardData({ enabled = true } = {}) {
     );
   };
 
-  return { data, loading, error, reload };
+  return { data, loading, error, partialError, reload };
 }

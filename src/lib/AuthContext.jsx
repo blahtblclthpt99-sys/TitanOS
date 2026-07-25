@@ -158,8 +158,12 @@ export const AuthProvider = ({ children }) => {
       try {
         const supabase = await loadSupabase();
         if (cancelled) return;
-        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data } = supabase.auth.onAuthStateChange((event, session) => {
           if (session) {
+            // Boot already loaded the profile; silent JWT refresh must not re-hit profiles.
+            if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+              return;
+            }
             checkUserAuth();
           } else {
             applyUser(null);

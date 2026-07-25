@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import PageShell from "@/components/shared/PageShell";
@@ -211,7 +212,7 @@ const RowButton = memo(function RowButton({ icon: Icon, iconClass, label, sub, v
 export default function Dashboard({ isActive = true }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, loading, error, reload } = useDashboardData({ enabled: isActive });
+  const { data, loading, error, partialError, reload } = useDashboardData({ enabled: isActive });
   const { containerRef, pullProgress, isRefreshing, pullDist } = usePullToRefresh(
     useCallback(async () => {
       await reload();
@@ -241,9 +242,11 @@ export default function Dashboard({ isActive = true }) {
     let alive = true;
     loadLocalWeather(user)
       .then((w) => {
-        if (alive) setWeather(w);
+        if (alive) setWeather(w || { unavailable: true, label: "Weather unavailable" });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) setWeather({ unavailable: true, label: "Weather unavailable" });
+      });
     return () => {
       alive = false;
     };
@@ -347,7 +350,7 @@ export default function Dashboard({ isActive = true }) {
   };
 
   if (!isActive && !data) return null;
-  if (loading && !data) return <DashboardSkeleton />;
+  if ((loading || isActive) && !data && !error) return <DashboardSkeleton />;
   if (error && !data) {
     return (
       <ErrorState
@@ -357,7 +360,7 @@ export default function Dashboard({ isActive = true }) {
       />
     );
   }
-  if (!data) return null;
+  if (!data) return <DashboardSkeleton />;
 
   const trustState = user?.id ? getLocalTrustState(user.id) : null;
   const verificationLevel = verificationLevelFromTrust(trustState);
@@ -566,19 +569,19 @@ export default function Dashboard({ isActive = true }) {
               <div key={job.id} className="flex items-center gap-2 border-b border-border last:border-0">
                 <button
                   type="button"
-                  onClick={() => navigate("/jobs")}
+                  onClick={() => navigate(job.id ? `/jobs?id=${job.id}` : "/jobs")}
                   className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 rounded-md px-1 py-3 text-left hover:bg-muted/60 focus-ring"
                 >
                   <div className="h-10 w-1.5 flex-shrink-0 rounded-full bg-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{job.title}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{job.title || "Untitled job"}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {job.customer_name}
+                      {job.customer_name || "Customer"}
                       {job.scheduled_time ? ` · ${job.scheduled_time}` : " · Today"}
                     </p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${JOB_STATUS[job.status] || JOB_STATUS.scheduled}`}>
-                    {job.status?.replace("_", " ")}
+                    {job.status?.replaceAll?.("_", " ") || job.status?.replace("_", " ")}
                   </span>
                 </button>
                 <button
@@ -780,6 +783,9 @@ export default function Dashboard({ isActive = true }) {
     favorites: withPos(
       "favorites",
       <WidgetShell key="favorites" id="favorites" title="Favorites" icon={Star} color="text-warning" {...shellProps}>
+        {favorites.length === 0 ? (
+          <p className="mb-3 py-1 text-sm text-muted-foreground">No favorites yet — tap below to pin a shortcut.</p>
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           {favorites.map((f) => (
             <div key={f.path} className="group relative">
@@ -893,11 +899,11 @@ export default function Dashboard({ isActive = true }) {
                 key={inv.id}
                 icon={AlertTriangle}
                 iconClass="bg-destructive/10 text-destructive"
-                label={`Overdue — ${inv.customer_name}`}
+                label={`Overdue — ${inv.customer_name || "Customer"}`}
                 sub={`Due ${inv.due_date ? relativeTime(inv.due_date) : "unknown"}`}
                 value={formatCurrency(inv.balance_due || inv.total || 0)}
                 valueClass="text-destructive"
-                onClick={() => navigate("/invoices")}
+                onClick={() => navigate(inv.id ? `/invoices?id=${inv.id}` : "/invoices")}
               />
             ))}
             {data.pendingEst.slice(0, 2).map((est) => (
@@ -905,11 +911,11 @@ export default function Dashboard({ isActive = true }) {
                 key={est.id}
                 icon={FileText}
                 iconClass="bg-warning/15 text-warning"
-                label={`Estimate — ${est.customer_name}`}
+                label={`Estimate — ${est.customer_name || "Customer"}`}
                 sub={est.valid_until ? `Expires ${relativeTime(est.valid_until)}` : "Awaiting reply"}
                 value={formatCurrency(est.total || 0)}
                 valueClass="text-warning"
-                onClick={() => navigate("/estimates")}
+                onClick={() => navigate(est.id ? `/estimates?id=${est.id}` : "/estimates")}
               />
             ))}
           </>
@@ -935,11 +941,11 @@ export default function Dashboard({ isActive = true }) {
               key={inv.id}
               icon={DollarSign}
               iconClass="bg-success/15 text-success"
-              label={inv.customer_name}
+              label={inv.customer_name || "Customer"}
               sub={inv.invoice_number || "Invoice"}
               value={formatCurrency(inv.total || 0)}
               valueClass="text-success"
-              onClick={() => navigate("/invoices")}
+              onClick={() => navigate(inv.id ? `/invoices?id=${inv.id}` : "/invoices")}
             />
           ))
         )}
@@ -1064,11 +1070,13 @@ export default function Dashboard({ isActive = true }) {
         linkLabel="Customers"
         {...shellProps}
       >
-        <BusinessTimeline
-          events={timelineEvents}
-          empty="Complete a job or send an invoice — your timeline starts here."
-          max={8}
-        />
+        <ErrorBoundary>
+          <BusinessTimeline
+            events={timelineEvents}
+            empty="Complete a job or send an invoice — your timeline starts here."
+            max={8}
+          />
+        </ErrorBoundary>
       </WidgetShell>
     ),
   };
@@ -1095,6 +1103,15 @@ export default function Dashboard({ isActive = true }) {
       ref={containerRef}
     >
       <PullToRefreshIndicator pullProgress={pullProgress} isRefreshing={isRefreshing} pullDist={pullDist} />
+
+      {partialError ? (
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+          Some Command Center data didn&apos;t load.{" "}
+          <button type="button" className="font-semibold underline focus-ring" onClick={() => reload()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -1225,7 +1242,11 @@ export default function Dashboard({ isActive = true }) {
             }`}
             style={{ overflowAnchor: "none" }}
           >
-            {widgetMap[id]}
+            {widgetMap[id] || (
+              <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                Unknown widget
+              </p>
+            )}
           </div>
         ))}
       </div>

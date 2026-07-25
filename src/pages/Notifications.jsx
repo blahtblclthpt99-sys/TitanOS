@@ -71,8 +71,16 @@ export default function Notifications() {
 
   useEffect(() => {
     if (!user?.id) return undefined;
-    const poll = setInterval(() => load(true), 30000);
-    return () => clearInterval(poll);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      load(true);
+    };
+    const poll = setInterval(tick, 45000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [user?.id, load]);
 
   const setCategory = (id) => {

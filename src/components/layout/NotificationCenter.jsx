@@ -10,12 +10,12 @@ import {
   markAllRead,
   markRead,
   resolveNotificationCategory,
-  unreadCount,
 } from "@/lib/notificationsApi";
 import { categoryAccentClass, categoryIcon } from "@/lib/notificationCategories";
 import { buildNotificationDigest, rankNotifications } from "@/lib/aiInsights";
 import { timeAgo } from "@/lib/platformConstants";
 import NavBadge from "@/components/shared/NavBadge";
+import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
 
 const QUICK_FILTERS = [{ id: "all", label: "All" }, ...NOTIFICATION_CATEGORIES.map((c) => ({ id: c.id, label: c.label.split(" ")[0] }))];
 
@@ -28,25 +28,12 @@ export default function NotificationCenter() {
   const reduceMotion = useReducedMotion();
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(0);
+  const { count, setCount, invalidate: invalidateUnread } = useUnreadNotificationCount(user?.id);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [marking, setMarking] = useState(false);
   const [filter, setFilter] = useState("all");
   const [digest, setDigest] = useState(null);
-
-  const refreshCount = async () => {
-    if (!user?.id) {
-      setCount(0);
-      return;
-    }
-    try {
-      await ensureNotificationCenter(user.id);
-      setCount(await unreadCount(user.id));
-    } catch {
-      setCount(0);
-    }
-  };
 
   const loadInbox = async () => {
     if (!user?.id) return;
@@ -56,7 +43,7 @@ export default function NotificationCenter() {
       const rows = await listNotifications(user.id, 20, { category: filter });
       const ranked = rankNotifications(rows).slice(0, 12);
       setItems(ranked);
-      setCount(await unreadCount(user.id));
+      await invalidateUnread();
       setDigest(buildNotificationDigest(rows));
     } catch {
       setItems([]);
@@ -64,13 +51,6 @@ export default function NotificationCenter() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    refreshCount();
-    const poll = setInterval(refreshCount, 30000);
-    return () => clearInterval(poll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
 
   useEffect(() => {
     if (open) loadInbox();
@@ -118,7 +98,8 @@ export default function NotificationCenter() {
     try {
       await markAllRead(user.id, filter === "all" ? "all" : filter);
       setItems((cur) => cur.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
-      setCount(await unreadCount(user.id));
+      setCount(0);
+      await invalidateUnread();
     } catch {
       /* ignore */
     } finally {

@@ -61,18 +61,23 @@ export default function Customers({ isActive = true }) {
     }
     setFormError("");
     setSaving(true);
+    const payload = { ...form };
     const tempId = `temp_${Date.now()}`;
-    setLocal(prev => [{ ...form, id: tempId }, ...(prev ?? customers)]);
+    setLocal((prev) => [{ ...payload, id: tempId }, ...(prev ?? customers)]);
     setForm(BLANK_FORM);
     closeForm();
     try {
-      await api.entities.Customer.create(form);
+      await api.entities.Customer.create(payload);
       reload();
+      toast({ title: "Customer added" });
     } catch (err) {
       setLocal(null);
+      setForm(payload);
       setFormError(err.message || "Could not save customer. Try again.");
       navigate("?new=1");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const { containerRef, pullProgress, isRefreshing, pullDist } = usePullToRefresh(
@@ -106,11 +111,14 @@ export default function Customers({ isActive = true }) {
       >
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 rounded-md bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-            <span className="text-sm font-bold text-primary">{c.first_name?.[0]}{c.last_name?.[0]}</span>
+            <span className="text-sm font-bold text-primary">
+              {(c.first_name?.[0] || c.last_name?.[0] || name[0] || "?").toUpperCase()}
+              {c.first_name && c.last_name ? c.last_name[0].toUpperCase() : ""}
+            </span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <p className="text-sm font-semibold text-foreground truncate">{c.first_name} {c.last_name}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{name}</p>
               <StatusBadge status={c.status} />
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -118,8 +126,10 @@ export default function Customers({ isActive = true }) {
               {c.email && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="w-3 h-3" aria-hidden="true" />{c.email}</span>}
             </div>
           </div>
-          {c.lifetime_value > 0 && (
-            <p className="text-sm font-semibold text-emerald-400 flex-shrink-0">${c.lifetime_value.toLocaleString()}</p>
+          {Number(c.lifetime_value) > 0 && (
+            <p className="text-sm font-semibold text-emerald-400 flex-shrink-0">
+              ${Number(c.lifetime_value).toLocaleString()}
+            </p>
           )}
           <div
             onClick={(e) => e.stopPropagation()}
@@ -131,7 +141,6 @@ export default function Customers({ isActive = true }) {
                 await api.entities.Customer.delete(c.id);
                 setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
                 reload();
-                toast({ title: "Contact deleted" });
               }}
             />
           </div>
@@ -143,7 +152,7 @@ export default function Customers({ isActive = true }) {
   return (
     <div ref={containerRef} className="page-pad max-w-7xl mx-auto pb-28 md:pb-10 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
       <PullToRefreshIndicator pullProgress={pullProgress} isRefreshing={isRefreshing} pullDist={pullDist} />
-      <PageHeader title="Customers" subtitle={`${customers.length} total`} onAdd={openForm} addLabel="Add Customer" />
+      <PageHeader title="Customers" subtitle={`${displayCustomers.length} total`} onAdd={openForm} addLabel="Add Customer" />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">

@@ -61,6 +61,7 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = React.useState(null);
   const [authChecked, setAuthChecked] = React.useState(() => !hasCachedAuthSession());
   const [appPublicSettings] = React.useState({ appName: "TitanOS" });
+  const isAuthenticatedRef = React.useRef(false);
 
   const applyUser = React.useCallback((next) => {
     setUser(next);
@@ -80,6 +81,7 @@ export const AuthProvider = ({ children }) => {
       const api = await loadApi();
       const currentUser = await withRetry(() => api.auth.me());
       applyUser(currentUser);
+      isAuthenticatedRef.current = true;
       setIsAuthenticated(true);
       setAuthError(null);
     } catch (error) {
@@ -109,6 +111,7 @@ export const AuthProvider = ({ children }) => {
         // Do not invent isAuthenticated=true without a loaded profile.
       } else {
         applyUser(null);
+        isAuthenticatedRef.current = false;
         setIsAuthenticated(false);
         if (status === 401 || status === 403) {
           setAuthError({
@@ -130,6 +133,7 @@ export const AuthProvider = ({ children }) => {
     // Fast path: anonymous visitors never download Supabase on first paint
     if (!hasCachedAuthSession()) {
       applyUser(null);
+      isAuthenticatedRef.current = false;
       setIsAuthenticated(false);
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -147,6 +151,7 @@ export const AuthProvider = ({ children }) => {
         await withTimeout(checkUserAuth(), AUTH_BOOT_TIMEOUT_MS, "auth_me_timeout");
       } else {
         applyUser(null);
+        isAuthenticatedRef.current = false;
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
         setAuthChecked(true);
@@ -166,6 +171,7 @@ export const AuthProvider = ({ children }) => {
         setAuthChecked(true);
       } else {
         applyUser(null);
+        isAuthenticatedRef.current = false;
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
         setAuthChecked(true);
@@ -194,13 +200,14 @@ export const AuthProvider = ({ children }) => {
         if (cancelled) return;
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
           if (session) {
-            // Boot already loaded the profile; silent JWT refresh must not re-hit profiles.
-            if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
-              return;
-            }
+            // Silent JWT refresh must not re-hit profiles.
+            if (event === "TOKEN_REFRESHED") return;
+            // INITIAL_SESSION: hydrate if boot skipped us (e.g. session peek miss).
+            if (event === "INITIAL_SESSION" && isAuthenticatedRef.current) return;
             checkUserAuth();
           } else {
             applyUser(null);
+            isAuthenticatedRef.current = false;
             setIsAuthenticated(false);
             setIsLoadingAuth(false);
             setAuthChecked(true);
@@ -220,6 +227,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = React.useCallback(async (redirectTo = window.location.href) => {
     applyUser(null);
+    isAuthenticatedRef.current = false;
     setIsAuthenticated(false);
     setAuthError(null);
     const api = await loadApi();

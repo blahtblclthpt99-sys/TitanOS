@@ -41,10 +41,6 @@ export default function Login() {
     checkUserAuth().catch(() => {});
   }, [sessionRecover, authChecked, isAuthenticated, isLoadingAuth, checkUserAuth]);
 
-  const goAfterAuth = () => {
-    navigate(consumeReturnTo(returnTo), { replace: true });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -52,7 +48,8 @@ export default function Login() {
     try {
       await api.auth.loginViaEmailPassword(email, password);
       await checkUserAuth();
-      goAfterAuth();
+      // Navigate via the isAuthenticated effect so the shell gate sees auth=true
+      // in the same render as `/` (avoids a one-frame Landing flash → loop feel).
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {

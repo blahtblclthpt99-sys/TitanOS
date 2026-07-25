@@ -24,6 +24,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * AuthCallback exchanges the PKCE code once. Auto-detect + callback = double
  * exchange → "PKCE code verifier not found in storage" (also triggered by React StrictMode).
  */
+/** Keep in sync with `AUTH_STORAGE_KEYS` in `src/lib/sessionPeek.js`. */
+export const SUPABASE_AUTH_STORAGE_KEY = Capacitor.isNativePlatform()
+  ? "titanos-auth-native"
+  : "titanos-auth";
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -32,9 +37,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: "pkce",
     storage: createAuthStorage(),
     // Keep native sessions on device storage even if WebView is cleared mid-OAuth
-    storageKey: Capacitor.isNativePlatform()
-      ? "titanos-auth-native"
-      : "titanos-auth",
+    storageKey: SUPABASE_AUTH_STORAGE_KEY,
   },
 });
 

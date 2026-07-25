@@ -1,14 +1,17 @@
 {
   "name": "titanos",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc -p ./tsconfig.json --pretty false",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "package": "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1",
     "android:build": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1",
@@ -25,7 +28,16 @@
     "ops:payments": "node scripts/payment-failure-scenarios.mjs",
     "ops:backup": "node scripts/backup-restore-drill.mjs --export",
     "ops:outage": "node scripts/outage-recovery-drill.mjs",
-    "ops:readiness": "node scripts/payment-failure-scenarios.mjs && node scripts/backup-restore-drill.mjs --export && node scripts/outage-recovery-drill.mjs && node scripts/load-test.mjs --profile storm"
+    "ops:readiness": "node scripts/payment-failure-scenarios.mjs && node scripts/backup-restore-drill.mjs --export && node scripts/outage-recovery-drill.mjs && node scripts/load-test.mjs --profile storm",
+    "test:fees": "node --test scripts/fee-engine.test.mjs",
+    "test:hire": "node --test scripts/hire-security.test.mjs",
+    "test:payments": "node --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs",
+    "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs",
+    "test:money": "node --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
+    "test:tax": "node --test scripts/tax-engine.test.mjs",
+    "test:auth": "node --test scripts/auth-guards.test.mjs",
+    "test:db-security": "node scripts/verify-db-security.mjs",
+    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -64,6 +76,8 @@
     "@radix-ui/react-toggle": "^1.1.2",
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@sentry/node": "^10.67.0",
+    "@sentry/react": "^10.67.0",
     "@supabase/supabase-js": "^2.110.2",
     "@tanstack/react-query": "^5.84.1",
     "@tanstack/react-virtual": "^3.13.12",
@@ -75,7 +89,6 @@
     "framer-motion": "^11.16.4",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.475.0",
-    "next-themes": "^0.4.4",
     "react": "^18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",
@@ -84,7 +97,7 @@
     "react-resizable-panels": "^2.1.7",
     "react-router-dom": "^6.26.0",
     "recharts": "^2.15.4",
-    "sonner": "^2.0.1",
+    "stripe": "^22.3.2",
     "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",

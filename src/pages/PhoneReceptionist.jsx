@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import PageShell from "@/components/shared/PageShell";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import {
   answerFromScript,
   createPhoneScript,
@@ -78,22 +80,20 @@ export default function PhoneReceptionist() {
   };
 
   const removeScript = async () => {
-    if (!script) return;
-    if (scripts.length <= 1) {
+    if (!script || scripts.length <= 1) {
       toast({ title: "Keep at least one script", variant: "destructive" });
       return;
     }
-    if (!window.confirm(`Delete “${script.name || "this script"}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete “${script.name || "this script"}”?`)) return;
     setDeleting(true);
     try {
-      const id = script.id;
-      await deletePhoneScript(user.id, id);
-      const next = scripts.filter((r) => r.id !== id);
+      await deletePhoneScript(user.id, script.id);
+      const next = scripts.filter((r) => r.id !== script.id);
       setScripts(next);
       selectScript(next[0]);
       toast({ title: "Script deleted" });
     } catch (err) {
-      toast({ title: "Couldn't delete script", description: err.message, variant: "destructive" });
+      toast({ title: "Couldn't delete", description: err.message, variant: "destructive" });
     } finally {
       setDeleting(false);
     }
@@ -119,103 +119,98 @@ export default function PhoneReceptionist() {
     setUtterance("");
   };
 
-  if (!script) return <div className="p-8 text-muted-foreground">Loading receptionist…</div>;
+  if (!script) return <div className="p-8 text-muted-foreground">Loading scripts…</div>;
 
   const faqs = Array.isArray(script.faq_json) ? script.faq_json : [];
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-28">
-      <PageHeader title="AI Phone Receptionist" subtitle="Scripts, FAQs, and a call simulator (telephony connect later)" />
+    <PageShell maxWidth="lg">
+      <PageHeader
+        eyebrow="Labs · Coming soon"
+        title="Phone scripts"
+        subtitle="Write a greeting and FAQ, then practice replies — not a live phone line."
+      />
+      <FeatureHonestyBanner>
+        Script editor and practice simulator only. No Twilio, carrier, transfer, or voicemail. Scripts may
+        save on this device if cloud sync is unavailable.
+      </FeatureHonestyBanner>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {scripts.map((row) => (
           <button
             key={row.id}
             type="button"
             onClick={() => selectScript(row)}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+            className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
               row.id === script.id
-                ? "bg-titan-cyan/15 text-titan-cyan border-titan-cyan/30"
-                : "bg-muted text-muted-foreground border-border hover:text-foreground"
+                ? "border-primary/30 bg-primary/15 text-primary"
+                : "border-border bg-muted text-muted-foreground hover:text-foreground"
             }`}
           >
             {row.name || "Untitled script"}
           </button>
         ))}
-        <Button type="button" variant="outline" onClick={addScript} className="border-border text-foreground h-9">
-          <Plus className="w-4 h-4 mr-1" /> New script
+        <Button type="button" variant="outline" onClick={addScript} className="h-9">
+          <Plus className="mr-1 h-4 w-4" aria-hidden="true" /> New script
         </Button>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
-        <section className="glass rounded-2xl p-5 space-y-3">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="titan-surface space-y-4 p-5">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-primary font-semibold">
-              <Phone className="w-5 h-5" /> Script setup
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <Phone className="h-5 w-5" aria-hidden="true" /> Script editor
             </div>
             <Button
               type="button"
-              variant="outline"
-              onClick={removeScript}
+              variant="ghost"
+              size="sm"
               disabled={deleting || scripts.length <= 1}
-              className="border-red-500/30 text-red-400 hover:bg-red-500/10 h-9"
+              onClick={removeScript}
+              className="text-destructive"
             >
-              <Trash2 className="w-4 h-4 mr-1" /> Delete script
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
-          <label className="block text-sm text-muted-foreground">
-            Script name
-            <Input
-              value={script.name || ""}
-              onChange={(e) => setScript({ ...script, name: e.target.value })}
-              className="mt-1 bg-muted border-border text-foreground"
-            />
-          </label>
-          <label className="block text-sm text-muted-foreground">
-            Greeting
-            <Textarea
-              value={script.greeting}
-              onChange={(e) => setScript({ ...script, greeting: e.target.value })}
-              rows={3}
-              className="mt-1 bg-muted border-border text-foreground"
-            />
-          </label>
-          <label className="block text-sm text-muted-foreground">
-            Transfer number
-            <Input
-              value={script.transfer_number || ""}
-              onChange={(e) => setScript({ ...script, transfer_number: e.target.value })}
-              className="mt-1 bg-muted border-border text-foreground"
-            />
-          </label>
-          <div className="space-y-2">
+          <Input
+            value={script.name || ""}
+            onChange={(e) => setScript({ ...script, name: e.target.value })}
+            placeholder="Script name"
+          />
+          <Textarea
+            value={script.greeting || ""}
+            onChange={(e) => setScript({ ...script, greeting: e.target.value })}
+            placeholder="Greeting"
+            rows={3}
+          />
+          <Input
+            value={script.transfer_number || ""}
+            onChange={(e) => setScript({ ...script, transfer_number: e.target.value })}
+            placeholder="Transfer number (display only)"
+          />
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">FAQ answers</p>
-              <Button type="button" variant="ghost" onClick={addFaq} className="h-8 text-titan-cyan">
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add FAQ
+              <p className="text-sm font-medium text-foreground">FAQ matches</p>
+              <Button type="button" variant="outline" size="sm" onClick={addFaq}>
+                Add FAQ
               </Button>
             </div>
             {faqs.map((item, index) => (
-              <div key={index} className="rounded-xl bg-muted/50 p-3 space-y-2">
-                <div className="flex items-start gap-2">
-                  <Input
-                    value={item.q}
-                    onChange={(e) => {
-                      const next = [...faqs];
-                      next[index] = { ...next[index], q: e.target.value };
-                      setScript({ ...script, faq_json: next });
-                    }}
-                    className="bg-muted border-border text-foreground"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeFaq(index)}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 min-h-[44px] min-w-[44px]"
-                    aria-label={`Delete FAQ ${index + 1}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              <div key={index} className="space-y-2 rounded-md border border-border p-3">
+                <div className="flex justify-end">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeFaq(index)}>
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
                 </div>
+                <Input
+                  value={item.q}
+                  onChange={(e) => {
+                    const next = [...faqs];
+                    next[index] = { ...next[index], q: e.target.value };
+                    setScript({ ...script, faq_json: next });
+                  }}
+                  placeholder="Question keywords"
+                />
                 <Textarea
                   value={item.a}
                   onChange={(e) => {
@@ -224,29 +219,31 @@ export default function PhoneReceptionist() {
                     setScript({ ...script, faq_json: next });
                   }}
                   rows={2}
-                  className="bg-muted border-border text-foreground"
+                  placeholder="Answer"
                 />
               </div>
             ))}
             {!faqs.length && (
-              <p className="text-xs text-muted-foreground">No FAQ entries. Add one or save defaults from a new script.</p>
+              <p className="text-xs text-muted-foreground">
+                No FAQ entries. Add one or save defaults from a new script.
+              </p>
             )}
           </div>
-          <Button onClick={save} disabled={saving} className="bg-titan-cyan text-black">
+          <Button onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save script"}
           </Button>
         </section>
 
-        <section className="glass rounded-2xl p-5 flex flex-col min-h-[420px]">
-          <h2 className="font-semibold text-foreground mb-3">Call simulator</h2>
-          <div className="flex-1 space-y-2 overflow-y-auto mb-3 max-h-80">
+        <section className="titan-surface flex min-h-[420px] flex-col p-5">
+          <h2 className="mb-3 font-semibold text-foreground">Practice simulator</h2>
+          <div className="mb-3 max-h-80 flex-1 space-y-2 overflow-y-auto">
             {log.map((msg, i) => (
               <div
                 key={i}
-                className={`rounded-xl px-3 py-2 text-sm max-w-[90%] ${
+                className={`max-w-[90%] rounded-md px-3 py-2 text-sm ${
                   msg.role === "bot"
                     ? "bg-primary/10 text-foreground"
-                    : "bg-muted text-foreground ml-auto"
+                    : "ml-auto bg-muted text-foreground"
                 }`}
               >
                 {msg.text}
@@ -258,12 +255,13 @@ export default function PhoneReceptionist() {
               value={utterance}
               onChange={(e) => setUtterance(e.target.value)}
               placeholder="Caller says…"
-              className="bg-muted border-border text-foreground"
             />
-            <Button type="submit"><Send className="w-4 h-4" /></Button>
+            <Button type="submit" size="icon" aria-label="Send practice message">
+              <Send className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </form>
         </section>
       </div>
-    </div>
+    </PageShell>
   );
 }

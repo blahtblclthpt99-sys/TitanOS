@@ -1,5 +1,8 @@
 import { getSupabaseAdmin } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
 
 /**
  * Stripe webhook — only trusted path to mark payments/invoices paid.
@@ -59,14 +62,42 @@ async function markPaymentStatus(admin, { paymentId, sessionId, status, extraNot
   return null;
 }
 
-async function markInvoicePaid(admin, invoiceId, amountTotal) {
+async function markInvoicePaid(
+  admin,
+  invoiceId,
+  amountTotal,
+  expectedUserId,
+  { expectedBaseAmount = null, expectedPlatformFee = null } = {}
+) {
   if (!invoiceId) return;
   const { data: inv } = await admin
     .from("invoices")
-    .select("id, status")
+    .select("id, status, balance_due, total, created_by_id")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!inv || inv.status === "paid") return;
+  if (expectedUserId && inv.created_by_id && inv.created_by_id !== expectedUserId) {
+    logError("stripeWebhook:invoice_owner_mismatch", {
+      invoiceId,
+      expectedUserId,
+      owner: inv.created_by_id,
+    });
+    return;
+  }
+  const due = Number(inv.balance_due ?? inv.total ?? 0);
+  // Compare service base (excluding platform fee) against invoice due.
+  // amountTotal from Stripe includes fees; using it alone could mark underpaid invoices paid.
+  const basePaid =
+    expectedBaseAmount != null && Number.isFinite(Number(expectedBaseAmount))
+      ? Number(expectedBaseAmount)
+      : Number(amountTotal) -
+        (expectedPlatformFee != null && Number.isFinite(Number(expectedPlatformFee))
+          ? Number(expectedPlatformFee)
+          : 0);
+  if (due > 0 && basePaid + 0.01 < due) {
+    logError("stripeWebhook:underpayment", { invoiceId, amountTotal, basePaid, due });
+    return;
+  }
   await admin
     .from("invoices")
     .update({
@@ -83,6 +114,8 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  // High ceiling so Stripe retries are not blocked; still guards extreme abuse.
+  if (!assertRateLimit(req, res, { limit: 600, windowMs: 60_000, key: "stripeWebhook" })) return;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -108,21 +141,79 @@ export default async function handler(req, res) {
       const stripe = new Stripe(stripeKey);
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (sigErr) {
-      console.error("Stripe signature verify failed:", sigErr.message);
+      logError("stripeWebhook:signature", sigErr);
+      captureApiException(sigErr, { tags: { route: "stripeWebhook", stage: "signature" } });
       // Never process unverified events — including when STRIPE_WEBHOOK_RELAXED is set.
       return res.status(400).json({ error: "Invalid signature" });
     }
 
     const admin = getSupabaseAdmin();
+    let idempotencyClaimed = false;
+
+    // Idempotency — claim event id; on failure after claim, release so Stripe can retry
+    if (event.id) {
+      try {
+        const { error: idemErr } = await admin.from("stripe_webhook_events").insert({
+          event_id: event.id,
+          event_type: event.type,
+          payment_id: event.data?.object?.metadata?.payment_id || null,
+          payload_summary: {
+            type: event.type,
+            object_id: event.data?.object?.id || null,
+          },
+        });
+        if (idemErr) {
+          if (idemErr.code === "23505" || /duplicate|unique/i.test(idemErr.message || "")) {
+            return res.status(200).json({ received: true, type: event.type, duplicate: true });
+          }
+          if (idemErr.code === "42P01" || /does not exist|relation/i.test(idemErr.message || "")) {
+            logError("stripeWebhook:idempotency_table_missing", idemErr);
+            captureApiException(idemErr, { tags: { route: "stripeWebhook", stage: "idempotency" } });
+            return res.status(503).json({
+              error: "Webhook idempotency table missing. Apply migration 018_stripe_webhook_idempotency.sql",
+            });
+          }
+          logError("stripeWebhook:idempotency", idemErr);
+          captureApiException(idemErr, { tags: { route: "stripeWebhook", stage: "idempotency" } });
+          return res.status(500).json({ error: "Webhook idempotency failed" });
+        }
+        idempotencyClaimed = true;
+      } catch (idemCatch) {
+        logError("stripeWebhook:idempotency", idemCatch);
+        return res.status(500).json({ error: "Webhook idempotency failed" });
+      }
+    }
+
+    try {
     const session = event.data?.object || {};
     const invoiceId =
       session.metadata?.invoice_id || session.client_reference_id || null;
     const paymentId = session.metadata?.payment_id || null;
+    const expectedUserId = session.metadata?.user_id || null;
     const sessionId = session.id || null;
     const amountTotal = (session.amount_total || 0) / 100;
+    const expectedBaseAmount =
+      session.metadata?.base_amount != null ? Number(session.metadata.base_amount) : null;
+    const expectedPlatformFee =
+      session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
     if (event.type === "checkout.session.completed") {
-      await markInvoicePaid(admin, invoiceId, amountTotal);
+      // Prefer payment row linkage; verify ownership before marking invoice
+      if (paymentId) {
+        const { data: payRow } = await admin
+          .from("payments")
+          .select("id, user_id, created_by_id, invoice_id, amount, amount_total, status")
+          .eq("id", paymentId)
+          .maybeSingle();
+        if (payRow && expectedUserId && payRow.user_id !== expectedUserId && payRow.created_by_id !== expectedUserId) {
+          logError("stripeWebhook:payment_user_mismatch", { paymentId, expectedUserId });
+          return res.status(200).json({ received: true, type: event.type, ignored: "ownership" });
+        }
+      }
+      await markInvoicePaid(admin, invoiceId, amountTotal, expectedUserId, {
+        expectedBaseAmount,
+        expectedPlatformFee,
+      });
       await markPaymentStatus(admin, {
         paymentId,
         sessionId,
@@ -149,11 +240,30 @@ export default async function handler(req, res) {
         status: "failed",
         extraNote: `Stripe ${event.type}: ${session.last_payment_error?.message || "failed"}`,
       });
+    } else if (event.type === "charge.refunded") {
+      const piMeta = session.metadata || {};
+      await markPaymentStatus(admin, {
+        paymentId: piMeta.payment_id || paymentId,
+        sessionId: sessionId || session.payment_intent || null,
+        status: "refunded",
+        extraNote: `Stripe ${event.type}`,
+      });
     }
 
     return res.status(200).json({ received: true, type: event.type });
+    } catch (processErr) {
+      if (idempotencyClaimed && event.id) {
+        try {
+          await admin.from("stripe_webhook_events").delete().eq("event_id", event.id);
+        } catch {
+          /* allow Stripe retry even if release fails */
+        }
+      }
+      throw processErr;
+    }
   } catch (error) {
-    console.error("stripeWebhook error:", error);
+    logError("stripeWebhook", error);
+    captureApiException(error, { tags: { route: "stripeWebhook" } });
     return res.status(500).json({ error: "Webhook handler failed" });
   }
 }

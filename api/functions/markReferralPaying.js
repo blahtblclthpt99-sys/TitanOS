@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { logError } from "../_lib/safeLog.js";
 
 /**
  * Marks a referred user as paying and grants lifetime premium when eligible.
@@ -110,7 +111,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, updated: updated.length });
   } catch (error) {
-    console.error("[markReferralPaying]", error);
+    logError("markReferralPaying", error);
     return res.status(500).json({ error: error.message || "Failed" });
   }
 }

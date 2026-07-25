@@ -1,6 +1,6 @@
 /**
- * TabStack — keeps each primary tab mounted so scroll position + state survive
- * tab switches. Pages are hidden with `display:none` when inactive.
+ * TabStack — keeps a small LRU of primary tabs mounted so scroll/state survive
+ * nearby switches, but unmounts colder tabs to cut memory + background work.
  * Non-tab pages (Reports, Assistant, etc.) render in normal document flow so
  * they keep a real height (absolute overlays collapse when all tabs are hidden).
  */
@@ -13,7 +13,9 @@ import PageNotFound from "@/lib/PageNotFound";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
-const TAB_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/settings", "/more"];
+const TAB_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
+/** Home always warm + last N tab visits (including active). */
+const TAB_LRU_SIZE = 3;
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
@@ -22,7 +24,7 @@ const Invoices = lazy(() => import("@/pages/Invoices"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const MarketplaceTab = lazy(() => import("@/pages/Marketplace"));
 const MessagesTab = lazy(() => import("@/pages/Messages"));
-const SettingsTab = lazy(() => import("@/pages/Settings"));
+const ProfileTab = lazy(() => import("@/pages/Profile"));
 const Community = lazy(() => import("@/pages/Community"));
 
 const TAB_COMPONENTS = {
@@ -30,7 +32,7 @@ const TAB_COMPONENTS = {
   "/jobs": Jobs,
   "/marketplace": MarketplaceTab,
   "/messages": MessagesTab,
-  "/settings": SettingsTab,
+  "/profile": ProfileTab,
   "/more": MoreMenu,
 };
 
@@ -50,6 +52,8 @@ const Hire = lazy(() => import("@/pages/Hire"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
+const AdminFees = lazy(() => import("@/pages/AdminFees"));
+const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 const Booking = lazy(() => import("@/pages/Booking"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
 const Payments = lazy(() => import("@/pages/Payments"));
@@ -71,7 +75,7 @@ const Escrow = lazy(() => import("@/pages/Escrow"));
 const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 const DriverHub = lazy(() => import("@/pages/DriverHub"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
-const Profile = lazy(() => import("@/pages/Profile"));
+const Settings = lazy(() => import("@/pages/Settings"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
 
@@ -93,6 +97,8 @@ const NON_TAB_ROUTES = {
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
   "/admin/moderation": AdminModeration,
+  "/admin/fees": AdminFees,
+  "/admin/tax-rules": AdminTaxRules,
   "/booking": Booking,
   "/contracts": Contracts,
   "/payments": Payments,
@@ -113,7 +119,7 @@ const NON_TAB_ROUTES = {
   "/escrow": Escrow,
   "/phone": PhoneReceptionist,
   "/driver": DriverHub,
-  "/profile": Profile,
+  "/settings": Settings,
   "/trust-safety": TrustSafety,
   "/design-system": DesignSystem,
 };
@@ -157,20 +163,27 @@ function NonTabPage() {
 
 export default function TabStack() {
   const location = useLocation();
-  const mountedTabs = useRef(new Set(["/"]));
+  const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
 
   const isTab = TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
 
-  if (activeTab) mountedTabs.current.add(activeTab);
+  if (activeTab) {
+    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(
+      0,
+      TAB_LRU_SIZE
+    );
+  }
+  const mountedTabs = new Set(["/", ...recentTabs.current]);
+  if (activeTab) mountedTabs.add(activeTab);
 
   return (
     <div className="relative w-full min-h-[calc(100svh-8rem)]">
       {TAB_PATHS.map((path) => {
         const Page = TAB_COMPONENTS[path];
-        const isMounted = mountedTabs.current.has(path);
+        const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
 
         if (!isMounted) return null;

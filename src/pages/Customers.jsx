@@ -20,6 +20,8 @@ import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import { useEntityData } from "@/hooks/useEntityData";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { listItemMotion } from "@/lib/listMotion";
 
 const BLANK_FORM = {
   first_name: "", last_name: "", email: "", phone: "",
@@ -28,6 +30,7 @@ const BLANK_FORM = {
 };
 
 export default function Customers({ isActive = true }) {
+  const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: [customers], loading, error, reload } = useEntityData([
@@ -175,7 +178,7 @@ export default function Customers({ isActive = true }) {
       ) : (
         <div className="space-y-2">
           {filtered.map((c, i) => (
-            <motion.div key={c.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+            <motion.div key={c.id} {...listItemMotion(reduceMotion, i)}>
               {renderCustomerRow(c)}
             </motion.div>
           ))}

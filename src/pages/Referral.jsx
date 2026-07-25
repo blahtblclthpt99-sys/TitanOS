@@ -61,12 +61,25 @@ export default function Referral() {
     if (sending || !email.trim()) return;
     setSending(true);
     try {
-      await inviteReferral(user, email, code);
+      const result = await inviteReferral(user, email, code);
       setEmail("");
       await loadDashboard();
-      toast({ title: "Invite sent", description: "We'll track their progress here." });
+      if (result.emailed && !result.emailStub) {
+        toast({
+          title: "Invite emailed",
+          description: "We’ll track their signup progress here.",
+        });
+      } else {
+        toast({
+          title: "Invite saved — email not sent",
+          description:
+            result.source === "local"
+              ? "Saved on this device. Copy your referral link to share — mail provider isn’t configured."
+              : "Invite recorded, but email delivery returned a stub or failed. Copy your link to share.",
+        });
+      }
     } catch (error) {
-      toast({ title: "Couldn't send invite", description: error.message || "Please try again.", variant: "destructive" });
+      toast({ title: "Couldn't save invite", description: error.message || "Please try again.", variant: "destructive" });
     } finally {
       setSending(false);
     }
@@ -76,7 +89,10 @@ export default function Referral() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
-      <PageHeader title="Referral Program" subtitle="Invite your network. Unlock premium for life." />
+      <PageHeader
+        title="Referral Program"
+        subtitle="Invite your network. Unlock premium for life. Email invites need a configured mail provider."
+      />
 
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6 mb-5 border border-titan-cyan/20 bg-titan-cyan/5">
         <div className="flex gap-4">

@@ -1,5 +1,30 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
+
+async function assertOwnedCustomer(admin, userId, customerId) {
+  if (!customerId) return { ok: true, customerId: null };
+  const { data, error } = await admin
+    .from("customers")
+    .select("id, first_name, last_name")
+    .eq("id", customerId)
+    .eq("created_by_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, error: "Customer not found or not owned by you" };
+  return { ok: true, customerId: data.id, customer: data };
+}
+
+function sanitizeMoney(value, { allowZero = true } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n < 0) return null;
+  if (!allowZero && n <= 0) return null;
+  if (n > 1_000_000) return null;
+  return Math.round(n * 100) / 100;
+}
 
 /**
  * Execute confirmed Titan AI office actions: schedule job, create estimate, create invoice.
@@ -8,6 +33,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 30, windowMs: 60_000, key: "aiExecuteAction" })) return;
 
   try {
     const authHeader = req.headers.authorization || "";
@@ -20,17 +46,22 @@ export default async function handler(req, res) {
     const user = userData.user;
     const { intent, params = {} } = readJson(req);
 
+    const ownership = await assertOwnedCustomer(admin, user.id, params.customer_id || null);
+    if (!ownership.ok) return res.status(403).json({ error: ownership.error });
+
     if (intent === "schedule_job" || intent === "create_job") {
+      const amount = sanitizeMoney(params.amount ?? 0);
+      if (amount == null) return res.status(400).json({ error: "Invalid amount" });
       const row = {
-        title: params.title || `Job for ${params.customer_name || "Customer"}`,
-        customer_name: params.customer_name || "",
-        customer_id: params.customer_id || null,
+        title: String(params.title || `Job for ${params.customer_name || "Customer"}`).slice(0, 200),
+        customer_name: String(params.customer_name || "").slice(0, 200),
+        customer_id: ownership.customerId,
         scheduled_date: params.scheduled_date || new Date().toISOString().slice(0, 10),
         scheduled_time: params.scheduled_time || "09:00",
         status: "scheduled",
-        service_type: params.service_type || "General",
-        amount: Number(params.amount) || 0,
-        notes: params.notes || "Created by Titan AI",
+        service_type: String(params.service_type || "General").slice(0, 100),
+        amount,
+        notes: String(params.notes || "Created by Titan AI").slice(0, 2000),
         created_by_id: user.id,
         user_id: user.id,
       };
@@ -48,15 +79,18 @@ export default async function handler(req, res) {
     }
 
     if (intent === "create_estimate") {
-      const total = Number(params.total) || Number(params.amount) || 0;
+      const total = sanitizeMoney(params.total ?? params.amount ?? 0);
+      if (total == null) return res.status(400).json({ error: "Invalid estimate total" });
       const row = {
-        customer_name: params.customer_name || "",
-        customer_id: params.customer_id || null,
-        service_type: params.service_type || "General",
+        customer_name: String(params.customer_name || "").slice(0, 200),
+        customer_id: ownership.customerId,
+        service_type: String(params.service_type || "General").slice(0, 100),
         status: "draft",
         total,
-        line_items: params.line_items || [{ description: params.title || "Service", qty: 1, unit_price: total, total }],
-        notes: params.notes || "Drafted by Titan AI",
+        line_items: Array.isArray(params.line_items)
+          ? params.line_items.slice(0, 50)
+          : [{ description: params.title || "Service", qty: 1, unit_price: total, total }],
+        notes: String(params.notes || "Drafted by Titan AI").slice(0, 2000),
         created_by_id: user.id,
         user_id: user.id,
       };
@@ -74,15 +108,16 @@ export default async function handler(req, res) {
     }
 
     if (intent === "create_invoice" || intent === "send_invoice") {
-      const total = Number(params.total) || Number(params.amount) || 0;
+      const total = sanitizeMoney(params.total ?? params.amount ?? 0, { allowZero: false });
+      if (total == null) return res.status(400).json({ error: "Invalid invoice total" });
       const row = {
-        customer_name: params.customer_name || "",
-        customer_id: params.customer_id || null,
+        customer_name: String(params.customer_name || "").slice(0, 200),
+        customer_id: ownership.customerId,
         status: intent === "send_invoice" ? "sent" : "draft",
         total,
         balance_due: total,
         due_date: params.due_date || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-        notes: params.notes || "Created by Titan AI",
+        notes: String(params.notes || "Created by Titan AI").slice(0, 2000),
         created_by_id: user.id,
         user_id: user.id,
       };
@@ -101,10 +136,11 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: `Unknown intent: ${intent}` });
   } catch (error) {
-    console.error("aiExecuteAction error:", error);
+    logError("aiExecuteAction", error);
+    captureApiException(error, { tags: { route: "aiExecuteAction" } });
     return res.status(500).json({
-      error: error.message || "Could not complete action",
-      hint: "Tables may need RLS policies; try creating from the Jobs/Estimates/Invoices screens.",
+      error: "Could not complete action",
+      hint: "Try creating from the Jobs, Estimates, or Invoices screens.",
     });
   }
 }

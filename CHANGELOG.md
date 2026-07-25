@@ -2,6 +2,14 @@
 
 All notable improvements from the production refactor. Functionality, routes, API contracts, and Base44 entities/server functions are preserved unless noted as a bug fix.
 
+## 1.5.1 (Play AAB 16) — Security hardening
+
+- Payment status webhook-only; invoice paid locked from client
+- Profile role/plan privilege triggers; hire/notify lockdowns
+- Stripe webhook idempotency + portal OTP rate limits
+- Private upload path support; Sentry/rate-limit wiring
+- Android versionCode 16 / versionName 1.5.1
+
 ## Phase 1 — Critical Stability
 
 - Added root and in-app ErrorBoundary components with retry UI

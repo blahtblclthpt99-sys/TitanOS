@@ -18,11 +18,30 @@ import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import { useEntityData } from "@/hooks/useEntityData";
 import { addDaysISO, formatMonthDayYear } from "@/lib/date-utils";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { listItemMotion } from "@/lib/listMotion";
+import { toast } from "@/components/ui/use-toast";
+import { sanitizeLineItems, totalsFromTaxResult } from "@/lib/moneyDocument";
+import JobLocationFields from "@/components/location/JobLocationFields";
+import {
+  emptyJobLocation,
+  jobLocationFromCustomer,
+  normalizeJobLocation,
+} from "@/lib/jobLocation";
+import { calculateDocumentTax } from "@/lib/taxEngine";
 
-const BLANK_FORM = { customer_id: "", customer_name: "", notes: "", service_type: "", address: "", tax_rate: 0 };
+const BLANK_FORM = {
+  customer_id: "",
+  customer_name: "",
+  notes: "",
+  service_type: "",
+  address: "",
+  tax_exempt: false,
+};
 const BLANK_LINE = { description: "", quantity: 1, unit_price: 0, total: 0 };
 
 export default function Estimates() {
+  const reduceMotion = usePrefersReducedMotion();
   const { data: [estimates, customers], loading, error, reload } = useEntityData([
     { entity: "Estimate", method: "list", args: ["-created_date", 100] },
     { entity: "Customer", method: "list", args: ["-created_date", 100] },
@@ -33,6 +52,8 @@ export default function Estimates() {
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState(BLANK_FORM);
   const [lineItems, setLineItems] = useState([{ ...BLANK_LINE }]);
+  const [jobLocation, setJobLocation] = useState(() => emptyJobLocation());
+  const [taxPreview, setTaxPreview] = useState(null);
   const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
@@ -102,25 +123,96 @@ export default function Estimates() {
     });
   };
 
-  const subtotal  = lineItems.reduce((s, i) => s + (i.total || 0), 0);
-  const taxAmount = subtotal * ((form.tax_rate || 0) / 100);
-  const total     = subtotal + taxAmount;
+  const subtotal = lineItems.reduce((s, i) => s + (i.total || 0), 0);
+  const liveTax =
+    taxPreview ||
+    calculateDocumentTax({
+      lineItems,
+      jobLocation,
+      taxExempt: Boolean(form.tax_exempt),
+    });
+  const taxAmount = liveTax.taxAmount || 0;
+  const total = liveTax.total || subtotal;
 
   const handleSave = async () => {
-    if (!form.customer_name) return;
+    if (!form.customer_name?.trim()) {
+      toast({ title: "Customer name required", variant: "destructive" });
+      return;
+    }
+    const lines = sanitizeLineItems(lineItems);
+    if (!lines.ok) {
+      toast({ title: "Invalid line items", description: lines.error, variant: "destructive" });
+      return;
+    }
+    const loc = normalizeJobLocation(jobLocation);
+    if (!loc.city && !loc.zip && !loc.address) {
+      toast({
+        title: "Job Location required",
+        description: "Enter where the work happens so sales tax can be calculated.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const tax = calculateDocumentTax({
+      lineItems: lines.items,
+      jobLocation: loc,
+      taxExempt: Boolean(form.tax_exempt),
+      recalculate: true,
+    });
+    if (!tax.ok && !form.tax_exempt) {
+      toast({
+        title: "Could not resolve tax",
+        description: tax.error || "Add a matching Tax Rule or refine Job Location.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const totals = totalsFromTaxResult(tax);
+    if (totals.total <= 0) {
+      toast({ title: "Total must be greater than $0", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       await api.entities.Estimate.create({
         ...form,
+        customer_name: form.customer_name.trim(),
+        address: loc.address || form.address || "",
+        job_city: loc.city,
+        job_state: loc.state,
+        job_zip: loc.zip,
+        job_county: loc.county,
+        job_country: loc.country,
+        job_lat: loc.lat,
+        job_lng: loc.lng,
+        job_location: loc,
+        tax_exempt: Boolean(form.tax_exempt),
+        tax_rate: totals.taxRate,
+        tax_snapshot: totals.taxSnapshot,
         estimate_number: `EST-${Date.now().toString().slice(-6)}`,
-        line_items: lineItems, subtotal, tax_amount: taxAmount, total, status: "draft",
+        line_items: lines.items,
+        subtotal: totals.subtotal,
+        tax_amount: totals.taxAmount,
+        total: totals.total,
+        status: "draft",
         valid_until: addDaysISO(30),
       });
       setForm(BLANK_FORM);
       setLineItems([{ ...BLANK_LINE }]);
+      setJobLocation(emptyJobLocation());
+      setTaxPreview(null);
       setShowForm(false);
       reload();
-    } finally { setSaving(false); }
+      toast({ title: "Estimate created" });
+    } catch (err) {
+      toast({
+        title: "Couldn't save estimate",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = estimates
@@ -182,18 +274,20 @@ export default function Estimates() {
       ) : (
         <div className="space-y-2">
           {filtered.map((est, i) => (
-            <motion.div key={est.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+            <motion.div key={est.id} {...listItemMotion(reduceMotion, i)}>
               {renderEstimateRow(est)}
             </motion.div>
           ))}
         </div>
       )}
 
-      <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) { setForm(BLANK_FORM); setLineItems([{ ...BLANK_LINE }]); } }}>
+      <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) { setForm(BLANK_FORM); setLineItems([{ ...BLANK_LINE }]); setJobLocation(emptyJobLocation()); setTaxPreview(null); } }}>
         <DialogContent className="bg-card border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">New Estimate</DialogTitle>
-            <DialogDescription>Build a quote with customer details and line items.</DialogDescription>
+            <DialogDescription>
+              Build a quote with Job Location–based sales tax. Driver Location is not used for tax.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Customer">
@@ -201,13 +295,38 @@ export default function Estimates() {
                 value={form.customer_id}
                 onValueChange={v => {
                   const c = customers.find(c => c.id === v);
-                  setForm(prev => ({ ...prev, customer_id: v, customer_name: c ? `${c.first_name} ${c.last_name}` : "", address: c?.address || prev.address }));
+                  const fromCustomer = c ? jobLocationFromCustomer(c) : emptyJobLocation();
+                  setForm(prev => ({
+                    ...prev,
+                    customer_id: v,
+                    customer_name: c ? `${c.first_name} ${c.last_name}` : "",
+                    address: fromCustomer.address || prev.address,
+                  }));
+                  setJobLocation(fromCustomer);
                 }}
                 placeholder="Select customer"
                 options={customers.map(c => ({ value: c.id, label: `${c.first_name} ${c.last_name}` }))}
                 className="mt-1"
               />
             </FormField>
+
+            <JobLocationFields
+              value={jobLocation}
+              onChange={setJobLocation}
+              lineItems={lineItems}
+              taxExempt={Boolean(form.tax_exempt)}
+              onTaxChange={setTaxPreview}
+            />
+
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={Boolean(form.tax_exempt)}
+                onChange={(e) => f("tax_exempt", e.target.checked)}
+                className="rounded border-border"
+              />
+              Tax-exempt customer (Job Location still recorded)
+            </label>
 
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-2">Line Items</label>
@@ -240,15 +359,17 @@ export default function Estimates() {
 
             <div className="bg-muted/50 rounded-md p-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span className="text-foreground tabular-nums">${subtotal.toFixed(2)}</span></div>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Tax</span>
-                  <Input type="number" value={form.tax_rate} onChange={e => f("tax_rate", parseFloat(e.target.value) || 0)}
-                    className="bg-muted border-border text-foreground rounded-lg w-16 h-7 text-xs" />
-                  <span className="text-muted-foreground">%</span>
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Tax{form.tax_exempt ? " (exempt)" : liveTax.taxRate ? ` (${liveTax.taxRate}%)` : ""}
+                </span>
                 <span className="text-foreground tabular-nums">${taxAmount.toFixed(2)}</span>
               </div>
+              {liveTax.jurisdiction?.rule?.label ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Jurisdiction: {liveTax.jurisdiction.rule.label} · from Job Location
+                </p>
+              ) : null}
               <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
                 <span className="text-foreground">Total</span>
                 <span className="text-primary tabular-nums">${total.toFixed(2)}</span>

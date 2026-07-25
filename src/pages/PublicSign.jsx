@@ -82,7 +82,7 @@ export default function PublicSign() {
             <SignaturePad onChange={setSignatureImage} />
           </div>
           {status === "error" && <p className="text-sm text-red-300">Unable to sign. Please try again.</p>}
-          <Button disabled={saving} type="submit" className="w-full bg-titan-cyan text-black">
+          <Button disabled={saving} type="submit" className="w-full">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign agreement"}
           </Button>
         </form>

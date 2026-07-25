@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, readJson, toEntityRow } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { logError } from "../_lib/safeLog.js";
 
 async function requirePortalSession(admin, token) {
   if (!token || typeof token !== "string") return { error: "Missing session token", status: 400 };
@@ -53,7 +54,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ estimate: toEntityRow(updated) });
   } catch (error) {
-    console.error("portalAcceptEstimate error:", error);
+    logError("portalAcceptEstimate", error);
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

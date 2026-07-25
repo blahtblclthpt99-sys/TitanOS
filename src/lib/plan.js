@@ -1,5 +1,7 @@
 /**
- * TitanOS launch pricing
+ * TitanOS launch pricing (membership catalog + limit UX).
+ * Transaction fee *rates* are owned by the Fee Engine (`shared/feeEngine.js` + DB).
+ * plan.feeRate values seed / display defaults and must stay aligned with fee seed rules.
  *
  * Customers — Free to join and hire (no platform fee)
  * Workers (Free) — 8% transaction fee

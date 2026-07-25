@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { CheckCircle2, CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
+import { CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
+import FormField from "@/components/shared/FormField";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { useAuth } from "@/lib/AuthContext";
 import { betaBadgeLabel } from "@/lib/plan";
 import { calcPlatformFee, formatMoney } from "@/lib/platformFee";
 import { getPlanConfig } from "@/lib/plan";
 import { createPaymentLink, deletePayment, listPaymentAccounts, listPayments, markPaymentStatus, upsertPaymentAccount } from "@/lib/paymentsApi";
+import { getSource, DATA_SOURCE, isLocalOrStub } from "@/lib/dataSource";
 import DeleteButton from "@/components/shared/DeleteButton";
+import EmptyState from "@/components/shared/EmptyState";
+import PageLoader from "@/components/shared/PageLoader";
 
 const PROVIDERS = ["stripe", "square", "paypal"];
 const EMPTY_FORM = { amount: "", customer_name: "", invoice_id: "", provider: "stripe" };
@@ -40,6 +44,7 @@ export default function Payments() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deviceOnly, setDeviceOnly] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -59,6 +64,9 @@ export default function Payments() {
     setLoading(true);
     try {
       const [accountRows, paymentRows] = await Promise.all([listPaymentAccounts(user.id), listPayments(user.id)]);
+      setDeviceOnly(
+        getSource(accountRows) === DATA_SOURCE.local || getSource(paymentRows) === DATA_SOURCE.local
+      );
       setAccounts(accountRows);
       setPayments(
         paymentRows.sort(
@@ -83,7 +91,14 @@ export default function Payments() {
         : new URLSearchParams(window.location.search).get("canceled") === "1"
           ? "Payment canceled"
           : "";
-    if (result) toast({ title: result });
+    if (result === "Payment completed") {
+      toast({
+        title: "Checkout returned success",
+        description: "Confirm in your provider dashboard — this app may only have recorded a pending link.",
+      });
+    } else if (result) {
+      toast({ title: result });
+    }
   }, []);
 
   const toggleProvider = async (provider) => {
@@ -97,7 +112,17 @@ export default function Payments() {
         is_connected: !existing?.is_connected,
       });
       setAccounts((current) => [...current.filter((item) => item.provider !== provider), account]);
-      toast({ title: account.is_connected ? `${provider} connected` : `${provider} disconnected` });
+      toast({
+        title: account.is_connected
+          ? `${provider}: marked connected (app flag only)`
+          : `${provider}: marked disconnected`,
+        description:
+          getSource(account) === DATA_SOURCE.local
+            ? "Saved on this device only — not a live provider OAuth connection."
+            : provider === "stripe"
+              ? "Live Stripe Checkout still needs a configured server secret key."
+              : "This does not OAuth into Square/PayPal yet — preference flag only.",
+      });
     } catch {
       toast({ variant: "destructive", title: "Couldn't update payment account" });
     } finally {
@@ -115,21 +140,31 @@ export default function Payments() {
         amount: Number(form.amount),
         customer_name: form.customer_name.trim(),
       });
+      if (isLocalOrStub(payment) || !payment.checkout_url) {
+        toast({
+          variant: "destructive",
+          title: "No live payment link",
+          description: "Checkout was not created. Configure Stripe on the server — nothing was charged.",
+        });
+        return;
+      }
       setPayments((current) => [payment, ...current]);
       setForm(EMPTY_FORM);
       const fee = Number(payment.platform_fee || 0);
       const feeLabel = payment.fee_label || getPlanConfig(user).feeLabel;
       toast({
         title: "Payment link created",
-        description: payment.checkout_url
-          ? fee
-            ? `Includes ${feeLabel} TitanOS fee (${formatMoney(fee)}). Opening checkout…`
-            : "Opening checkout…"
-          : "It is saved as pending.",
+        description: fee
+          ? `Includes ${feeLabel} TitanOS fee (${formatMoney(fee)}). Opening checkout…`
+          : "Opening checkout…",
       });
-      if (payment.checkout_url) window.open(payment.checkout_url, "_blank", "noopener,noreferrer");
+      window.open(payment.checkout_url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't create payment link", description: error.message });
+      toast({
+        variant: "destructive",
+        title: "Couldn't create payment link",
+        description: error.message || "Live checkout unavailable.",
+      });
     } finally {
       setSaving(false);
     }
@@ -137,14 +172,30 @@ export default function Payments() {
 
   const updateStatus = async (payment, status) => {
     if (saving) return;
+    if (status === "succeeded" || status === "refunded" || status === "paid") {
+      toast({
+        variant: "destructive",
+        title: "Webhook only",
+        description: "Paid status comes from Stripe after checkout — it cannot be set in the browser.",
+      });
+      return;
+    }
     setSaving(true);
     try {
-      await markPaymentStatus(payment.id, status);
+      const saved = await markPaymentStatus(payment.id, status);
       setPayments((current) =>
-        current.map((item) => (item.id === payment.id ? { ...item, status } : item))
+        current.map((item) => (item.id === payment.id ? { ...item, status: saved.status || status } : item))
       );
-    } catch {
-      toast({ variant: "destructive", title: "Couldn't update payment" });
+      toast({
+        title: "Payment updated",
+        description: `Status set to ${saved.status || status}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't update payment",
+        description: error.message || "Status was not changed.",
+      });
     } finally {
       setSaving(false);
     }
@@ -155,7 +206,19 @@ export default function Payments() {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
-      <PageHeader title="Payments" subtitle="Connect providers and collect customer payments" />
+      <PageHeader
+        title="Payments"
+        subtitle="Checkout is live when Stripe is configured — paid status comes only from the Stripe webhook"
+      />
+      <FeatureHonestyBanner>
+        Square and PayPal OAuth are not available yet (buttons disabled). Stripe Checkout collects live
+        payments when configured. TitanOS never marks a payment paid from the browser — only the Stripe
+        webhook can set succeeded/refunded. Creating a link fails closed unless Stripe returns a real
+        checkout URL.
+        {deviceOnly
+          ? " Payment records below are from this device — the payments table was unreachable."
+          : ""}
+      </FeatureHonestyBanner>
       <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/90">
         <span className="text-titan-cyan font-semibold">
           Your plan: {plan.name} · {plan.feeLabel} fee
@@ -184,23 +247,33 @@ export default function Payments() {
                     connected ? "bg-emerald-400/15 text-emerald-300" : "bg-muted text-foreground/45"
                   }`}
                 >
-                  {connected ? "Connected" : "Not connected"}
+                  {connected
+                    ? provider === "stripe"
+                      ? "Flagged connected"
+                      : "Flagged (local)"
+                    : "Not connected"}
                 </span>
               </div>
               <h2 className="text-lg font-semibold text-foreground capitalize mt-4">{provider}</h2>
               <p className="text-xs text-muted-foreground mt-1 min-h-8">
                 {provider === "stripe"
                   ? "Stripe Checkout is live when your secret key is configured on the server."
-                  : "Mark connected locally while provider setup is in beta."}
+                  : "Square and PayPal OAuth are not available yet. Use Stripe Checkout for live payments."}
               </p>
-              <Button
-                onClick={() => toggleProvider(provider)}
-                disabled={saving}
-                variant="outline"
-                className="mt-4 w-full border-border text-foreground"
-              >
-                {connected ? "Disconnect" : "Connect"}
-              </Button>
+              {provider === "stripe" ? (
+                <Button
+                  onClick={() => toggleProvider(provider)}
+                  disabled={saving}
+                  variant="outline"
+                  className="mt-4 w-full border-border text-foreground"
+                >
+                  {connected ? "Clear preference" : "Remember Stripe preference"}
+                </Button>
+              ) : (
+                <Button disabled variant="outline" className="mt-4 w-full border-border text-muted-foreground">
+                  Coming soon
+                </Button>
+              )}
             </article>
           );
         })}
@@ -209,15 +282,14 @@ export default function Payments() {
       <div className="grid lg:grid-cols-5 gap-6">
         <form onSubmit={submit} className="glass rounded-2xl p-6 border border-border lg:col-span-2 space-y-4">
           <h2 className="font-semibold text-foreground">Create payment link</h2>
-          <Input
+          <FormField
+            label="Amount ($)"
             required
             type="number"
             min="0.01"
             step="0.01"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            placeholder="Amount ($)"
-            className="bg-titan-surface2 border-border text-foreground"
           />
           {feePreview && (
             <div className="rounded-xl bg-muted/50 border border-border p-3 text-xs text-muted-foreground space-y-1">
@@ -235,26 +307,27 @@ export default function Payments() {
               </div>
             </div>
           )}
-          <Input
+          <FormField
+            label="Customer name"
             required
             value={form.customer_name}
             onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-            placeholder="Customer name"
-            className="bg-titan-surface2 border-border text-foreground"
           />
-          <Input
+          <FormField
+            label="Invoice ID"
+            hint="Optional"
             value={form.invoice_id}
             onChange={(e) => setForm({ ...form, invoice_id: e.target.value })}
-            placeholder="Invoice ID (optional)"
-            className="bg-titan-surface2 border-border text-foreground"
           />
-          <NativeSelect
-            value={form.provider}
-            onValueChange={(provider) => setForm({ ...form, provider })}
-            placeholder="Provider"
-            options={PROVIDERS.map((value) => ({ value, label: value }))}
-          />
-          <Button disabled={saving} type="submit" className="w-full bg-titan-cyan text-black font-semibold">
+          <FormField label="Provider">
+            <NativeSelect
+              value={form.provider}
+              onValueChange={(provider) => setForm({ ...form, provider })}
+              placeholder="Provider"
+              options={PROVIDERS.map((value) => ({ value, label: value }))}
+            />
+          </FormField>
+          <Button disabled={saving} type="submit" className="w-full min-h-[44px]">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create payment link"}
           </Button>
         </form>
@@ -262,7 +335,7 @@ export default function Payments() {
         <section className="glass rounded-2xl p-6 border border-border lg:col-span-3">
           <h2 className="font-semibold text-foreground mb-4">Payment history</h2>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading payments…</p>
+            <PageLoader variant="list" label="Loading payments" />
           ) : payments.length ? (
             <div className="space-y-3">
               {payments.map((payment) => {
@@ -293,27 +366,25 @@ export default function Payments() {
                         {payment.status || "pending"}
                       </span>
                       {payment.checkout_url && (
-                        <a href={payment.checkout_url} target="_blank" rel="noreferrer" className="text-titan-cyan">
-                          <ExternalLink className="w-4 h-4" />
+                        <a
+                          href={payment.checkout_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-titan-cyan"
+                          aria-label={`Open Stripe checkout for ${payment.customer_name || "payment"}`}
+                        >
+                          <ExternalLink className="w-4 h-4" aria-hidden="true" />
                         </a>
                       )}
                       {payment.status === "pending" && (
-                        <>
-                          <button
-                            onClick={() => updateStatus(payment, "succeeded")}
-                            aria-label="Mark succeeded"
-                            disabled={saving}
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          </button>
-                          <button
-                            onClick={() => updateStatus(payment, "failed")}
-                            aria-label="Mark failed"
-                            disabled={saving}
-                          >
-                            <XCircle className="w-4 h-4 text-red-400" />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => updateStatus(payment, "canceled")}
+                          aria-label="Mark canceled"
+                          disabled={saving}
+                          title="Cancel this pending payment record (does not refund Stripe)"
+                        >
+                          <XCircle className="w-4 h-4 text-red-400" />
+                        </button>
                       )}
                       <DeleteButton
                         label={`payment for ${payment.customer_name || "customer"}`}
@@ -328,7 +399,10 @@ export default function Payments() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No payment links yet.</p>
+            <EmptyState
+              title="No payments yet"
+              description="Create a Stripe checkout link above. Paid status updates only after a successful webhook."
+            />
           )}
         </section>
       </div>

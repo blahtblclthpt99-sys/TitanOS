@@ -20,15 +20,29 @@ import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import { useEntityData } from "@/hooks/useEntityData";
 import { addDaysISO, formatMonthDayYear } from "@/lib/date-utils";
 import { toast } from "@/components/ui/use-toast";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { listItemMotion } from "@/lib/listMotion";
+import { sanitizeLineItems, totalsFromTaxResult } from "@/lib/moneyDocument";
+import JobLocationFields from "@/components/location/JobLocationFields";
+import {
+  emptyJobLocation,
+  jobLocationFromCustomer,
+  normalizeJobLocation,
+} from "@/lib/jobLocation";
+import { calculateDocumentTax } from "@/lib/taxEngine";
 
 const BLANK_FORM = {
-  customer_id: "", customer_name: "", notes: "", tax_rate: 0,
+  customer_id: "",
+  customer_name: "",
+  notes: "",
+  tax_exempt: false,
   due_date: addDaysISO(30),
 };
 
 const BLANK_LINE = { description: "", quantity: 1, unit_price: 0, total: 0 };
 
 export default function Invoices({ isActive = true }) {
+  const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
   const { data: [invoices, customers], loading, error, reload } = useEntityData([
     { entity: "Invoice",  method: "list", args: ["-created_date", 100] },
@@ -40,6 +54,8 @@ export default function Invoices({ isActive = true }) {
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState(BLANK_FORM);
   const [lineItems, setLineItems] = useState([{ ...BLANK_LINE }]);
+  const [jobLocation, setJobLocation] = useState(() => emptyJobLocation());
+  const [taxPreview, setTaxPreview] = useState(null);
   const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
@@ -83,21 +99,84 @@ export default function Invoices({ isActive = true }) {
     });
   };
 
-  const subtotal  = lineItems.reduce((s, i) => s + (i.total || 0), 0);
-  const taxAmount = subtotal * ((form.tax_rate || 0) / 100);
-  const total     = subtotal + taxAmount;
+  const subtotal = lineItems.reduce((s, i) => s + (i.total || 0), 0);
+  const liveTax =
+    taxPreview ||
+    calculateDocumentTax({
+      lineItems,
+      jobLocation,
+      taxExempt: Boolean(form.tax_exempt),
+    });
+  const taxAmount = liveTax.taxAmount || 0;
+  const total = liveTax.total || subtotal;
 
   const handleSave = async () => {
-    if (!form.customer_name) return;
+    if (!form.customer_name?.trim()) {
+      toast({ title: "Customer name required", variant: "destructive" });
+      return;
+    }
+    const lines = sanitizeLineItems(lineItems);
+    if (!lines.ok) {
+      toast({ title: "Invalid line items", description: lines.error, variant: "destructive" });
+      return;
+    }
+    const loc = normalizeJobLocation(jobLocation);
+    if (!loc.city && !loc.zip && !loc.address) {
+      toast({
+        title: "Job Location required",
+        description: "Enter where the work happens so sales tax can be calculated.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const tax = calculateDocumentTax({
+      lineItems: lines.items,
+      jobLocation: loc,
+      taxExempt: Boolean(form.tax_exempt),
+      recalculate: true,
+    });
+    if (!tax.ok && !form.tax_exempt) {
+      toast({
+        title: "Could not resolve tax",
+        description: tax.error || "Add a matching Tax Rule or refine Job Location.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const totals = totalsFromTaxResult(tax);
+    if (totals.total <= 0) {
+      toast({ title: "Total must be greater than $0", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       await api.entities.Invoice.create({
-        ...form, invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-        line_items: lineItems, subtotal, tax_amount: taxAmount, total,
-        balance_due: total, status: "draft",
+        ...form,
+        customer_name: form.customer_name.trim(),
+        address: loc.address || "",
+        job_city: loc.city,
+        job_state: loc.state,
+        job_zip: loc.zip,
+        job_county: loc.county,
+        job_country: loc.country,
+        job_lat: loc.lat,
+        job_lng: loc.lng,
+        job_location: loc,
+        tax_exempt: Boolean(form.tax_exempt),
+        tax_rate: totals.taxRate,
+        tax_snapshot: totals.taxSnapshot,
+        invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+        line_items: lines.items,
+        subtotal: totals.subtotal,
+        tax_amount: totals.taxAmount,
+        total: totals.total,
+        balance_due: totals.total,
+        status: "draft",
       });
       setForm(BLANK_FORM);
       setLineItems([{ ...BLANK_LINE }]);
+      setJobLocation(emptyJobLocation());
+      setTaxPreview(null);
       setShowForm(false);
       reload();
       toast({ title: "Invoice created" });
@@ -200,36 +279,80 @@ export default function Invoices({ isActive = true }) {
       ) : (
         <div className="space-y-2">
           {filtered.map((inv, i) => (
-            <motion.div key={inv.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+            <motion.div key={inv.id} {...listItemMotion(reduceMotion, i)}>
               {renderInvoiceRow(inv)}
             </motion.div>
           ))}
         </div>
       )}
 
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog
+        open={showForm}
+        onOpenChange={(v) => {
+          setShowForm(v);
+          if (!v) {
+            setForm(BLANK_FORM);
+            setLineItems([{ ...BLANK_LINE }]);
+            setJobLocation(emptyJobLocation());
+            setTaxPreview(null);
+          }
+        }}
+      >
         <DialogContent className="bg-card border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">New Invoice</DialogTitle>
-            <DialogDescription>Create an invoice with customer, line items, and due date.</DialogDescription>
+            <DialogDescription>
+              Sales tax uses Job Location (service situs), not your Driver Location.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Customer">
                 <NativeSelect
                   value={form.customer_id}
-                  onValueChange={v => {
-                    const c = customers.find(c => c.id === v);
-                    f("customer_id", v);
-                    f("customer_name", c ? `${c.first_name} ${c.last_name}` : "");
+                  onValueChange={(v) => {
+                    const c = customers.find((cust) => cust.id === v);
+                    const fromCustomer = c ? jobLocationFromCustomer(c) : emptyJobLocation();
+                    setForm((prev) => ({
+                      ...prev,
+                      customer_id: v,
+                      customer_name: c ? `${c.first_name} ${c.last_name}` : "",
+                    }));
+                    setJobLocation(fromCustomer);
                   }}
                   placeholder="Select customer"
-                  options={customers.map(c => ({ value: c.id, label: `${c.first_name} ${c.last_name}` }))}
+                  options={customers.map((c) => ({
+                    value: c.id,
+                    label: `${c.first_name} ${c.last_name}`,
+                  }))}
                   className="mt-1"
                 />
               </FormField>
-              <FormField label="Due Date" type="date" value={form.due_date} onChange={e => f("due_date", e.target.value)} />
+              <FormField
+                label="Due Date"
+                type="date"
+                value={form.due_date}
+                onChange={(e) => f("due_date", e.target.value)}
+              />
             </div>
+
+            <JobLocationFields
+              value={jobLocation}
+              onChange={setJobLocation}
+              lineItems={lineItems}
+              taxExempt={Boolean(form.tax_exempt)}
+              onTaxChange={setTaxPreview}
+            />
+
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={Boolean(form.tax_exempt)}
+                onChange={(e) => f("tax_exempt", e.target.checked)}
+                className="rounded border-border"
+              />
+              Tax-exempt customer
+            </label>
 
             <div>
               <label className="text-muted-foreground text-xs font-medium block mb-2">Line Items</label>
@@ -239,7 +362,7 @@ export default function Invoices({ isActive = true }) {
                     <Input
                       placeholder="Description"
                       value={item.description}
-                      onChange={e => updateLine(idx, "description", e.target.value)}
+                      onChange={(e) => updateLine(idx, "description", e.target.value)}
                       aria-label={`Line ${idx + 1} description`}
                       className="bg-muted border-border text-foreground rounded-md flex-1 text-sm h-9"
                     />
@@ -247,7 +370,7 @@ export default function Invoices({ isActive = true }) {
                       type="number"
                       placeholder="Qty"
                       value={item.quantity}
-                      onChange={e => updateLine(idx, "quantity", e.target.value)}
+                      onChange={(e) => updateLine(idx, "quantity", e.target.value)}
                       aria-label={`Line ${idx + 1} quantity`}
                       className="bg-muted border-border text-foreground rounded-md w-16 text-sm h-9"
                     />
@@ -255,11 +378,14 @@ export default function Invoices({ isActive = true }) {
                       type="number"
                       placeholder="Price"
                       value={item.unit_price}
-                      onChange={e => updateLine(idx, "unit_price", e.target.value)}
+                      onChange={(e) => updateLine(idx, "unit_price", e.target.value)}
                       aria-label={`Line ${idx + 1} unit price`}
                       className="bg-muted border-border text-foreground rounded-md w-24 text-sm h-9"
                     />
-                    <span className="text-sm text-muted-foreground w-20 text-right tabular-nums" aria-label={`Line ${idx + 1} total`}>
+                    <span
+                      className="text-sm text-muted-foreground w-20 text-right tabular-nums"
+                      aria-label={`Line ${idx + 1} total`}
+                    >
                       ${(item.total || 0).toFixed(2)}
                     </span>
                     {lineItems.length > 1 && (
@@ -275,23 +401,36 @@ export default function Invoices({ isActive = true }) {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setLineItems([...lineItems, { ...BLANK_LINE }])}
-                className="flex items-center gap-1 text-xs text-primary mt-3 hover:text-primary/80 transition-colors">
+              <button
+                type="button"
+                onClick={() => setLineItems([...lineItems, { ...BLANK_LINE }])}
+                className="flex items-center gap-1 text-xs text-primary mt-3 hover:text-primary/80 transition-colors"
+              >
                 <Plus className="w-3 h-3" /> Add line item
               </button>
             </div>
 
             <div className="bg-muted/50 rounded-md p-4 space-y-2">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span className="text-foreground tabular-nums">${subtotal.toFixed(2)}</span></div>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Tax</span>
-                  <Input type="number" value={form.tax_rate} onChange={e => f("tax_rate", parseFloat(e.target.value) || 0)}
-                    className="bg-muted border-border text-foreground rounded-lg w-16 h-7 text-xs" />
-                  <span className="text-muted-foreground">%</span>
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-foreground tabular-nums">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Tax
+                  {form.tax_exempt
+                    ? " (exempt)"
+                    : liveTax.taxRate
+                      ? ` (${liveTax.taxRate}%)`
+                      : ""}
+                </span>
                 <span className="text-foreground tabular-nums">${taxAmount.toFixed(2)}</span>
               </div>
+              {liveTax.jurisdiction?.rule?.label ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Jurisdiction: {liveTax.jurisdiction.rule.label} · from Job Location
+                </p>
+              ) : null}
               <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
                 <span className="text-foreground">Total</span>
                 <span className="text-primary tabular-nums">${total.toFixed(2)}</span>
@@ -300,12 +439,18 @@ export default function Invoices({ isActive = true }) {
 
             <div className="flex flex-col gap-1">
               <label className="text-muted-foreground text-xs font-medium">Notes</label>
-              <Textarea value={form.notes} onChange={e => f("notes", e.target.value)}
-                className="bg-muted border-border text-foreground rounded-md min-h-[60px]" />
+              <Textarea
+                value={form.notes}
+                onChange={(e) => f("notes", e.target.value)}
+                className="bg-muted border-border text-foreground rounded-md min-h-[60px]"
+              />
             </div>
 
-            <Button onClick={handleSave} disabled={saving || !form.customer_name}
-              className="w-full h-11">
+            <Button
+              onClick={handleSave}
+              disabled={saving || !form.customer_name}
+              className="w-full h-11"
+            >
               {saving ? "Creating…" : "Create Invoice"}
             </Button>
           </div>

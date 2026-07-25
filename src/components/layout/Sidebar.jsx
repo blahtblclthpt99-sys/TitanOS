@@ -15,6 +15,7 @@ import {
 import { normalizeAppPath } from "@/lib/routing";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { useAuth } from "@/lib/AuthContext";
+import { isUserAdmin } from "@/lib/isAdmin";
 
 const OPEN_GROUPS_KEY = "titanos_sidebar_open_groups";
 
@@ -73,7 +74,7 @@ export default function Sidebar() {
   const badges = useNavBadges();
   const reduceMotion = useReducedMotion();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isUserAdmin(user);
   const pathname = normalizeAppPath(location.pathname);
   const [openGroups, setOpenGroups] = useState(() => loadOpenState(pathname));
 

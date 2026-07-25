@@ -9,7 +9,9 @@ import ErrorState from "@/components/shared/ErrorState";
 import EmptyState from "@/components/shared/EmptyState";
 import FormField from "@/components/shared/FormField";
 import DeleteButton from "@/components/shared/DeleteButton";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
+import { getSource, DATA_SOURCE } from "@/lib/dataSource";
 import {
   confirmEscrowSide,
   createEscrowHold,
@@ -17,6 +19,7 @@ import {
   listEscrowHolds,
   updateEscrowHold,
 } from "@/lib/escrowApi";
+import { toast } from "@/components/ui/use-toast";
 
 export default function Escrow() {
   const { user } = useAuth();
@@ -26,6 +29,7 @@ export default function Escrow() {
     { enabled: Boolean(user?.id), initial: [] }
   );
   const [form, setForm] = useState({ customer_name: "", job_title: "", amount: "" });
+  const deviceOnly = getSource(rows) === DATA_SOURCE.local;
 
   const add = async (e) => {
     e.preventDefault();
@@ -33,6 +37,12 @@ export default function Escrow() {
     const row = await createEscrowHold(user, form);
     setRows([row, ...rows]);
     setForm({ customer_name: "", job_title: "", amount: "" });
+    if (getSource(row) === DATA_SOURCE.local) {
+      toast({
+        title: "Hold saved on this device only",
+        description: "Demo status tracking — no funds are held.",
+      });
+    }
   };
 
   const confirm = async (row, side) => {
@@ -51,14 +61,15 @@ export default function Escrow() {
   return (
     <PageShell maxWidth="md">
       <PageHeader
-        eyebrow="Money · Beta"
+        eyebrow="Money · Coming soon"
         title="Job holds"
-        subtitle="Track mutual confirmation before you mark a job complete. This does not move or hold real funds yet."
+        subtitle="Status tracking only — TitanOS does not move or hold real funds yet."
       />
-      <div className="mb-5 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-foreground leading-relaxed">
-        Status tracking only — TitanOS does not charge cards or hold money in escrow during public beta.
-        Use Payments when you are ready to collect.
-      </div>
+      <FeatureHonestyBanner>
+        Practice hold records only. Confirms do not charge cards or release money. Real escrow needs Stripe
+        Connect (or similar) before this can go live.
+        {deviceOnly ? " Holds below are stored on this device until Escrow sync is live." : ""}
+      </FeatureHonestyBanner>
       <form onSubmit={add} className="titan-surface p-5 mb-5 space-y-3">
         <div className="flex items-center gap-2 text-primary font-semibold text-sm">
           <ShieldCheck className="w-5 h-5" aria-hidden="true" /> New job hold

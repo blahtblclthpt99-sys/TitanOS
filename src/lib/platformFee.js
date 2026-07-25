@@ -1,4 +1,9 @@
+/**
+ * Display helpers for platform fees.
+ * WARNING: Never use client results to charge money — createPaymentLink recalculates server-side.
+ */
 import { getPlanConfig, PLANS } from "@/lib/plan";
+import { calculateFees, formatFeePercent, pickSeedRule } from "@/lib/feeEngine";
 
 /** @deprecated Prefer calcPlatformFee(amount, user) */
 export const PLATFORM_FEE_RATE = PLANS.worker_free.feeRate;
@@ -13,23 +18,45 @@ export function getFeeLabelForPlan(planIdOrUser) {
 }
 
 /**
+ * UI/preview fee estimate from Fee Engine + plan context seed/DB-compatible rules.
  * @param {number|string} amount
  * @param {object|string} [userOrPlanId]
  */
 export function calcPlatformFee(amount, userOrPlanId = "worker_free") {
   const plan = getPlanConfig(userOrPlanId);
-  const rate = plan.feeRate;
-  const base = Math.round((Number(amount) || 0) * 100) / 100;
-  const fee = Math.round(base * rate * 100) / 100;
-  const total = Math.round((base + fee) * 100) / 100;
+  const rule = pickSeedRule("service_requests", plan.id) || {
+    category_id: "service_requests",
+    context_key: plan.id,
+    version: 1,
+    enabled: true,
+    rule_type: "percentage",
+    percentage_rate: plan.feeRate,
+    flat_amount: 0,
+    fee_bearer: "buyer",
+    label: plan.feeLabel,
+  };
+
+  // Prefer live plan rate if seed drifts (plan.js remains catalog for membership UX)
+  const merged = {
+    ...rule,
+    percentage_rate: plan.feeRate,
+    label: plan.feeLabel || formatFeePercent(plan.feeRate),
+  };
+
+  const result = calculateFees({ grossAmount: amount, rule: merged });
   return {
-    base,
-    fee,
-    total,
-    rate,
-    percentLabel: plan.feeLabel,
+    base: result.gross,
+    fee: result.platformFee,
+    total: result.finalTotal,
+    rate: result.rate,
+    percentLabel: result.label,
     planId: plan.id,
     planName: plan.name,
+    processingFee: result.processingFee,
+    taxAmount: result.taxAmount,
+    netAmount: result.netAmount,
+    appliedRules: result.appliedRules,
+    _displayOnly: true,
   };
 }
 

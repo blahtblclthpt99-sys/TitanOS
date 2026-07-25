@@ -14,6 +14,8 @@ import {
   setVerificationStatus,
 } from "@/lib/trustSafetyApi";
 
+import { isUserAdmin } from "@/lib/isAdmin";
+
 export default function AdminModeration() {
   const { user, authChecked, isLoadingAuth } = useAuth();
   const [reports, setReports] = useState([]);
@@ -44,8 +46,8 @@ export default function AdminModeration() {
   };
 
   useEffect(() => {
-    if (authChecked && user?.role === "admin") load();
-  }, [authChecked, user?.role]);
+    if (authChecked && isUserAdmin(user)) load();
+  }, [authChecked, user]);
 
   const dismiss = async (report) => {
     if (actingId) return;
@@ -101,7 +103,7 @@ export default function AdminModeration() {
   };
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Checking access" />;
-  if (user?.role !== "admin") {
+  if (!isUserAdmin(user)) {
     return (
       <div className="p-4 md:p-8 max-w-3xl mx-auto">
         <PageHeader title="Moderation" subtitle="Marketplace safety tools" />
@@ -155,7 +157,7 @@ export default function AdminModeration() {
                           <>
                             <Button
                               disabled={!!actingId}
-                              className="bg-titan-cyan text-black hover:bg-titan-cyan/90"
+                             
                               onClick={() => resolveTrust(report, "resolved", "verified")}
                             >
                               Approve
@@ -173,7 +175,7 @@ export default function AdminModeration() {
                         {report.kind === "user" && (
                           <Button
                             disabled={!!actingId}
-                            className="bg-titan-cyan text-black hover:bg-titan-cyan/90"
+                           
                             onClick={() => resolveTrust(report, "resolved")}
                           >
                             Mark resolved

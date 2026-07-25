@@ -7,7 +7,10 @@ import NavBadge from "@/components/shared/NavBadge";
 import { MOBILE_TAB_ITEMS, MORE_MENU_GROUPS } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 
-const MORE_PATHS = MORE_MENU_GROUPS.flatMap((g) => g.paths).filter((p) => p !== "/more");
+const TAB_ROOTS = new Set(MOBILE_TAB_ITEMS.map((item) => item.path));
+const MORE_PATHS = MORE_MENU_GROUPS.flatMap((g) => g.paths).filter(
+  (p) => p !== "/more" && !TAB_ROOTS.has(p)
+);
 
 const TABS = [...MOBILE_TAB_ITEMS, { path: "/more", label: "More", icon: LayoutGrid }];
 

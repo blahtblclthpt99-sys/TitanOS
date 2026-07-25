@@ -53,7 +53,7 @@ import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/date-utils";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { fetchOpenMeteo } from "@/lib/weatherApi";
+import { loadLocalWeather } from "@/lib/weatherApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { listNotifications, markRead, resolveNotificationCategory, ensureNotificationCenter } from "@/lib/notificationsApi";
@@ -237,15 +237,16 @@ export default function Dashboard({ isActive = true }) {
 
   useEffect(() => {
     if (!isActive) return;
-    const load = (lat = 41.88, lon = -87.63) => fetchOpenMeteo(lat, lon).then(setWeather).catch(() => {});
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => load(p.coords.latitude, p.coords.longitude),
-        () => load(),
-        { timeout: 5000 }
-      );
-    } else load();
-  }, [isActive]);
+    let alive = true;
+    loadLocalWeather(user)
+      .then((w) => {
+        if (alive) setWeather(w);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [isActive, user?.id, user?.city, user?.state, user?.company_city, user?.company_state]);
 
   useEffect(() => {
     if (!isActive || !user?.id) return undefined;
@@ -989,12 +990,24 @@ export default function Dashboard({ isActive = true }) {
       >
         {weather ? (
           <div>
-            <p className="text-2xl font-bold text-foreground">
-              {weather.temp}° <span className="text-base font-medium text-muted-foreground">{weather.label}</span>
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">Wind {weather.wind} mph</p>
-            {weather.warning && (
-              <p className="mt-3 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">{weather.warning}</p>
+            {weather.unavailable ? (
+              <p className="text-sm text-muted-foreground">{weather.locationError || weather.label}</p>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-foreground">
+                  {weather.temp}°{" "}
+                  <span className="text-base font-medium text-muted-foreground">{weather.label}</span>
+                </p>
+                {weather.place ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{weather.place}</p>
+                ) : null}
+                <p className="mt-1 text-sm text-muted-foreground">Wind {weather.wind} mph</p>
+                {weather.warning && (
+                  <p className="mt-3 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
+                    {weather.warning}
+                  </p>
+                )}
+              </>
             )}
           </div>
         ) : (

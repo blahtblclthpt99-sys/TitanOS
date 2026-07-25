@@ -114,7 +114,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
             className="rounded-xl bg-muted"
           />
           <Button
-            className="rounded-xl bg-titan-cyan text-black hover:bg-titan-cyan/90"
+            className="rounded-xl"
             disabled={busy}
             onClick={onReport}
           >

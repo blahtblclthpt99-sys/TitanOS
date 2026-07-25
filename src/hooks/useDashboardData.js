@@ -30,7 +30,14 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
   const overdueInv = invoices.filter((i) => i.status === "overdue");
   const pendingInv = invoices.filter((i) => ["sent", "viewed"].includes(i.status));
   const pendingEst = estimates.filter((e) => ["sent", "viewed"].includes(e.status));
-  const recentCust = customers.slice(0, 5);
+  const recentCust = customers.slice(0, 5).map((c) => ({
+    ...c,
+    name:
+      c.name ||
+      [c.first_name, c.last_name].filter(Boolean).join(" ") ||
+      c.company_name ||
+      "Customer",
+  }));
   const recentPaid = invoices
     .filter((i) => i.status === "paid")
     .slice(0, 5);

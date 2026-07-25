@@ -2,6 +2,21 @@ import { api } from "@/api/apiClient";
 import { listEquipment } from "@/lib/equipmentApi";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { todayISO } from "@/lib/date-utils";
+import {
+  IRS_MILEAGE_RATE_USD,
+  calcFuelCost,
+  estimateShiftEarnings,
+  parseMilesInput,
+  summarizeRecordedShifts,
+} from "@/lib/driverHubMath";
+
+export {
+  IRS_MILEAGE_RATE_USD,
+  calcFuelCost,
+  estimateShiftEarnings,
+  parseMilesInput,
+  summarizeRecordedShifts,
+} from "@/lib/driverHubMath";
 
 const PREFIX = "titanos_driver";
 const SESSION_KEY = "session";
@@ -98,18 +113,6 @@ export function estimateMpg(vehicle) {
   return 26;
 }
 
-export function calcFuelCost({ miles, mpg, gasPriceLocal, currency }) {
-  const safeMpg = Math.max(Number(mpg) || 25, 1);
-  const gallons = Number(miles || 0) / safeMpg;
-  const cost = gallons * Number(gasPriceLocal || 0);
-  return {
-    gallons: Math.round(gallons * 100) / 100,
-    cost: Math.round(cost * 100) / 100,
-    currency,
-    perMile: miles > 0 ? Math.round((cost / miles) * 1000) / 1000 : 0,
-  };
-}
-
 /**
  * Time-of-day helpers for hotspot ranking.
  * Buckets: morning 5–10, lunch 10–14, afternoon 14–17, dinner 17–21, late 21–5
@@ -156,8 +159,10 @@ function heatForNow(spot, hour) {
  * mode: "driving" | "riding"
  */
 export function buildHotspots({ lat, lng, city, mode = "driving", now = new Date(), previewPart = null }) {
-  const baseLat = Number(lat) || 32.7767;
-  const baseLng = Number(lng) || -96.797;
+  const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+  if (!hasCoords) return [];
+  const baseLat = Number(lat);
+  const baseLng = Number(lng);
   const label = city || "your area";
   const riding = mode === "riding";
   const hour = previewPart ? hourForDayPart(previewPart) : now.getHours();
@@ -471,19 +476,46 @@ export async function startDrivingSession(user, prefs) {
   return session;
 }
 
-export async function stopDrivingSession(userId) {
+export async function stopDrivingSession(userId, snapshot = {}) {
   const session = readSession(userId);
   if (!session) return null;
   const stops = readStops(userId);
+  const miles = Number(
+    snapshot.miles != null ? snapshot.miles : session.miles || 0
+  );
+  const elapsedSec =
+    snapshot.elapsedSec != null
+      ? Number(snapshot.elapsedSec)
+      : Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.started_at || Date.now()).getTime()) / 1000
+          )
+        );
+  const jobsCompleted =
+    snapshot.jobsCompleted != null
+      ? Number(snapshot.jobsCompleted)
+      : stops.filter((s) => s.ended_at).length;
   const ended = {
     ...session,
     active: false,
     ended_at: new Date().toISOString(),
     stops: stops.length,
-    miles: Number(session.miles || 0),
+    miles,
+    // Persist every recorded number so Hub history can display them later
+    elapsed_sec: elapsedSec,
+    hours: snapshot.hours != null ? Number(snapshot.hours) : Math.round((elapsedSec / 3600) * 100) / 100,
+    jobs_completed: jobsCompleted,
+    earnings_gross: Number(snapshot.earningsGross ?? 0),
+    earnings_per_hour: Number(snapshot.earningsPerHour ?? 0),
+    fuel_cost: Number(snapshot.fuelCost ?? 0),
+    fuel_gallons: Number(snapshot.fuelGallons ?? 0),
+    profit: Number(snapshot.profit ?? 0),
+    tax_estimate: Number(snapshot.taxEstimate ?? 0),
+    mpg: Number(snapshot.mpg ?? session.mpg ?? 0),
+    currency: snapshot.currency || session.currency || "USD",
   };
   writeLocal(PREFIX, userId, SESSION_KEY, ended);
-  // Archive recent shifts for the Hub history card
   const history = readLocal(PREFIX, userId, "history", []);
   writeLocal(PREFIX, userId, "history", [ended, ...history].slice(0, 12));
   return ended;
@@ -491,21 +523,6 @@ export async function stopDrivingSession(userId) {
 
 export function readShiftHistory(userId) {
   return readLocal(PREFIX, userId, "history", []);
-}
-
-/** Rough earnings estimate for gig driving (USD-ish, before fees). */
-export function estimateShiftEarnings({ miles = 0, elapsedSec = 0, stops = 0 }) {
-  const hours = Math.max(elapsedSec / 3600, 0);
-  // Heuristic: ~$18–28/hr active + ~$0.55–0.90/mi depending on density
-  const perHour = 22;
-  const perMile = 0.65;
-  const perStop = 2.5;
-  const gross = hours * perHour + Number(miles) * perMile + Number(stops) * perStop;
-  return {
-    gross: Math.round(gross * 100) / 100,
-    perHourEst: hours > 0.05 ? Math.round((gross / hours) * 100) / 100 : 0,
-    hours: Math.round(hours * 100) / 100,
-  };
 }
 
 export function coachTip(mode, dayPart) {
@@ -563,9 +580,41 @@ export function endStop(userId, stopId) {
 export function updateSessionMiles(userId, miles) {
   const session = readSession(userId);
   if (!session) return null;
-  const next = { ...session, miles: Number(miles) || 0 };
+  const parsed = parseMilesInput(miles);
+  if (!parsed.ok) return { error: parsed.error, session };
+  const next = { ...session, miles: parsed.miles };
   writeLocal(PREFIX, userId, SESSION_KEY, next);
   return next;
+}
+
+/**
+ * Full shift dashboard metrics (miles, time, fuel, earnings, profit, tax estimate).
+ */
+export function computeShiftDashboard(session, stops, { mpg, gasPriceLocal, currency } = {}) {
+  const base = sessionStats(session, stops);
+  if (!base) return null;
+  const fuel = calcFuelCost({
+    miles: base.miles,
+    mpg: mpg || 25,
+    gasPriceLocal: gasPriceLocal || 0,
+    currency: currency || "USD",
+  });
+  const earnings = estimateShiftEarnings({
+    miles: base.miles,
+    elapsedSec: base.elapsedSec,
+    stops: base.stops,
+  });
+  const profit = Math.round((earnings.gross - fuel.cost) * 100) / 100;
+  const taxEstimate = Math.round(base.miles * IRS_MILEAGE_RATE_USD * 100) / 100;
+  return {
+    ...base,
+    mpg: Math.max(Number(mpg) || 25, 1),
+    fuel,
+    earnings,
+    profit,
+    taxEstimate,
+    jobsCompleted: (stops || []).filter((s) => s.ended_at).length,
+  };
 }
 
 /**

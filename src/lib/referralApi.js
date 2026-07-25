@@ -70,24 +70,35 @@ export async function inviteReferral(user, email, code) {
     created_by_id: user.id,
   };
 
+  let row;
+  let source = "remote";
   try {
-    const row = await api.entities.Referral.create(payload);
-    try {
-      await api.integrations.Core.SendEmail({
-        to: normalized,
-        from_name: user.full_name || "TitanOS",
-        subject: `${user.full_name || "Someone"} invited you to TitanOS`,
-        body: `You're invited to TitanOS — Free During Beta.\n\nSign up: ${getReferralLink(code)}\n\nAfter paid launch, 3 paying referrals unlock Lifetime Premium.`,
-      });
-    } catch {
-      /* optional */
-    }
-    return row;
+    row = await api.entities.Referral.create(payload);
   } catch {
-    const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
+    row = { id: uid(), created_at: new Date().toISOString(), ...payload };
     writeLocal(PREFIX, user.id, "rows", [row, ...existing]);
-    return row;
+    source = "local";
   }
+
+  let emailed = false;
+  let emailStub = false;
+  try {
+    const mail = await api.integrations.Core.SendEmail({
+      to: normalized,
+      from_name: user.full_name || "TitanOS",
+      subject: `${user.full_name || "Someone"} invited you to TitanOS`,
+      body: `You're invited to TitanOS — Free During Beta.\n\nSign up: ${getReferralLink(code)}\n\nAfter paid launch, 3 paying referrals unlock Lifetime Premium.`,
+    });
+    if (mail?.stub) {
+      emailStub = true;
+    } else {
+      emailed = true;
+    }
+  } catch {
+    emailStub = true;
+  }
+
+  return { row, source, emailed, emailStub };
 }
 
 /** Call on register when ?ref=CODE is present — uses server for correct attribution. */
@@ -129,24 +140,6 @@ export async function attachReferralOnSignup({ userId, email, refCode }) {
  * Grants lifetime premium at 3 verified paying referrals.
  */
 export async function markReferralPaying(referredUserId) {
-  try {
-    return await api.functions.invoke("markReferralPaying", { referredUserId });
-  } catch (error) {
-    // Local/dev fallback: mark rows only (cannot set another user's lifetime_premium)
-    try {
-      const rows = await api.entities.Referral.filter({ referred_user_id: referredUserId });
-      for (const row of rows) {
-        if (row.fraud_flag) continue;
-        await api.entities.Referral.update(row.id, {
-          status: "completed",
-          is_paying: true,
-          verified_at: new Date().toISOString(),
-          completed_at: new Date().toISOString(),
-        });
-      }
-    } catch {
-      /* ignore */
-    }
-    throw error;
-  }
+  // Server-only: never fall back to a client update that can forge is_paying / completed.
+  return api.functions.invoke("markReferralPaying", { referredUserId });
 }

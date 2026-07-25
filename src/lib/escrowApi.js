@@ -1,15 +1,17 @@
 import { api } from "@/api/apiClient";
 import { readLocal, uid, writeLocal } from "@/lib/localStore";
+import { DATA_SOURCE, withSource, getSource } from "@/lib/dataSource";
 
 const PREFIX = "titanos_escrow";
 const local = (userId) => readLocal(PREFIX, userId, "all", []);
 const save = (userId, rows) => writeLocal(PREFIX, userId, "all", rows);
 
+/** List holds — remote when available; otherwise device store tagged `_source: local`. */
 export async function listEscrowHolds(userId) {
   try {
-    return await api.entities.EscrowHold.filter({ user_id: userId }, "-created_date");
+    return withSource(await api.entities.EscrowHold.filter({ user_id: userId }, "-created_date"), DATA_SOURCE.remote);
   } catch {
-    return local(userId);
+    return withSource(local(userId), DATA_SOURCE.local);
   }
 }
 
@@ -24,21 +26,24 @@ export async function createEscrowHold(user, values) {
     created_by_id: user.id,
   };
   try {
-    return await api.entities.EscrowHold.create(row);
+    return withSource(await api.entities.EscrowHold.create(row), DATA_SOURCE.remote);
   } catch {
     const item = { id: uid(), created_at: new Date().toISOString(), ...row };
     save(user.id, [item, ...local(user.id)]);
-    return item;
+    return withSource(item, DATA_SOURCE.local);
   }
 }
 
 export async function updateEscrowHold(userId, id, values) {
   try {
-    return await api.entities.EscrowHold.update(id, values);
+    return withSource(await api.entities.EscrowHold.update(id, values), DATA_SOURCE.remote);
   } catch {
     const item = { ...local(userId).find((r) => r.id === id), ...values };
-    save(userId, local(userId).map((r) => (r.id === id ? item : r)));
-    return item;
+    save(
+      userId,
+      local(userId).map((r) => (r.id === id ? item : r))
+    );
+    return withSource(item, DATA_SOURCE.local);
   }
 }
 
@@ -59,6 +64,11 @@ export async function deleteEscrowHold(userId, id) {
   try {
     await api.entities.EscrowHold.delete(id);
   } catch {
-    save(userId, local(userId).filter((r) => r.id !== id));
+    save(
+      userId,
+      local(userId).filter((r) => r.id !== id)
+    );
   }
 }
+
+export { getSource, DATA_SOURCE };

@@ -14,9 +14,12 @@ import EmptyState from "@/components/shared/EmptyState";
 import FilterChip from "@/components/shared/FilterChip";
 import NativeSelect from "@/components/shared/NativeSelect";
 import DriverCard from "@/components/driver/DriverCard";
+import DriverPublishPanel from "@/components/driver/DriverPublishPanel";
+import VehicleCapacityEditor from "@/components/driver/VehicleCapacityEditor";
 import HireRequestDialog from "@/components/driver/HireRequestDialog";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
+import { resolveWeatherLocation } from "@/lib/weatherApi";
 import {
   AVAILABILITY_FILTERS,
   COLLECTION_FILTERS,
@@ -28,7 +31,7 @@ import {
   TRUST_FILTERS,
   VEHICLE_FILTERS,
   filterDrivers,
-  listDrivers,
+  listDriversAsync,
   sortDrivers,
 } from "@/lib/driverDirectoryApi";
 import {
@@ -68,6 +71,28 @@ export default function DriverDirectory({ initialQuery = "" }) {
   const [favoriteIds, setFavoriteIds] = useState(() => listFavoriteDriverIds(userId));
   const [savedIds, setSavedIds] = useState(() => listSavedDriverIds(userId));
   const [hireTarget, setHireTarget] = useState(null);
+  const [all, setAll] = useState([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(true);
+
+  const refreshDrivers = async () => {
+    setLoadingDrivers(true);
+    try {
+      const loc = await resolveWeatherLocation(user);
+      const rows = await listDriversAsync(
+        loc.lat != null ? { lat: loc.lat, lng: loc.lon } : null
+      );
+      setAll(rows);
+    } catch {
+      setAll([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshDrivers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on auth user change
+  }, [userId]);
 
   useEffect(() => {
     if (initialQuery) setQuery(initialQuery);
@@ -86,7 +111,6 @@ export default function DriverDirectory({ initialQuery = "" }) {
     return () => mq.removeEventListener?.("change", sync);
   }, []);
 
-  const all = useMemo(() => listDrivers(), []);
   const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
   const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
 
@@ -191,20 +215,23 @@ export default function DriverDirectory({ initialQuery = "" }) {
             description: "Bookmark drivers you want to hire later.",
           }
         : {
-            title: "No drivers match",
-            description: "Try clearing filters, widening distance, or posting a haul job.",
+            title: "No drivers listed yet",
+            description:
+              "Be the first — publish your profile above, or post a haul on Hire to find help.",
           };
 
   return (
     <div className="space-y-4">
+      <DriverPublishPanel onSaved={refreshDrivers} />
+      <VehicleCapacityEditor onSaved={refreshDrivers} />
+
       {/* Trust strip */}
       <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-3.5 py-3 sm:items-center">
         <ShieldCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary sm:mt-0" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">Verified drivers you can hire with confidence</p>
+          <p className="text-sm font-semibold text-foreground">Live directory</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Check ID, insurance, ratings, and vehicle details before you request. Favorites and saved lists stay on this
-            device.
+            Only published driver profiles appear here. Hire posts still work from Hire board.
           </p>
         </div>
       </div>
@@ -411,22 +438,30 @@ export default function DriverDirectory({ initialQuery = "" }) {
 
       {results.length === 0 ? (
         <div className="titan-surface px-6 py-10 text-center">
-          <EmptyState
-            title={emptyCopy.title}
-            description={emptyCopy.description}
-            onAction={
-              collection === "favorites" || collection === "saved"
-                ? () => setCollection("all")
-                : clearFilters
-            }
-            actionLabel={
-              collection === "favorites" || collection === "saved" ? "Browse all drivers" : "Clear filters"
-            }
-          />
-          {collection === "all" && (
-            <Button type="button" className="mt-2" onClick={() => navigate("/hire?new=1")}>
-              Post a haul job
-            </Button>
+          {loadingDrivers ? (
+            <p className="text-sm text-muted-foreground">Loading drivers…</p>
+          ) : (
+            <>
+              <EmptyState
+                title={emptyCopy.title}
+                description={emptyCopy.description}
+                onAction={
+                  collection === "favorites" || collection === "saved"
+                    ? () => setCollection("all")
+                    : clearFilters
+                }
+                actionLabel={
+                  collection === "favorites" || collection === "saved"
+                    ? "Browse all drivers"
+                    : "Clear filters"
+                }
+              />
+              {collection === "all" && (
+                <Button type="button" className="mt-2" onClick={() => navigate("/hire?new=1")}>
+                  Post a haul job
+                </Button>
+              )}
+            </>
           )}
         </div>
       ) : (
@@ -440,9 +475,11 @@ export default function DriverDirectory({ initialQuery = "" }) {
               onToggleFavorite={handleFavorite}
               onToggleSaved={handleSaved}
               onMessage={() => {
-                navigate(
-                  `/messages?to=${encodeURIComponent(driver.id)}&name=${encodeURIComponent(driver.name)}`
-                );
+                toast({
+                  title: "Open Messages",
+                  description: "Start a conversation from Messages, or hire this driver for a haul.",
+                });
+                navigate("/messages");
               }}
               onHire={openHire}
             />

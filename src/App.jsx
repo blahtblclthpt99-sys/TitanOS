@@ -8,6 +8,7 @@ import PathNormalizer from "./lib/PathNormalizer";
 import { normalizeAppPath, shouldUseHashRouter } from "@/lib/routing";
 import { resolveBookingSlugFromHost } from "@/lib/bookingSubdomain";
 import { hasCachedAuthSession } from "@/lib/sessionPeek";
+import { rememberReturnTo } from "@/lib/returnTo";
 
 /** Marketing home — keep in main graph for fast FCP (no framer-motion / radix). */
 import Landing from "@/pages/Landing";
@@ -146,6 +147,7 @@ function AppShellGate() {
   }
 
   if (!isAuthenticated) {
+    rememberReturnTo(location);
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

@@ -177,7 +177,7 @@ export default function AIAssistant() {
     if (msg.role === "user") {
       return (
         <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-          <div className="bg-titan-cyan text-black rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
+          <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
             <p className="text-sm font-medium">{msg.content}</p>
           </div>
         </motion.div>
@@ -286,7 +286,7 @@ export default function AIAssistant() {
                 <>
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-xs text-muted-foreground">
-                    Live · {businessSummary?.counts?.customers || 0} customers ·{" "}
+                    Your data · {businessSummary?.counts?.customers || 0} customers ·{" "}
                     {businessSummary?.counts?.jobs || 0} jobs
                   </span>
                 </>
@@ -317,7 +317,8 @@ export default function AIAssistant() {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">What can I do for you?</h2>
             <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
-              Ask about today&apos;s jobs, who owes money, revenue, or profit — answers use your live TitanOS data.
+              Ask about today&apos;s jobs, who owes money, revenue, or profit — answers use your TitanOS
+              records (and fall back to on-device summaries when cloud AI is unavailable).
             </p>
             <div className="grid grid-cols-2 gap-2 w-full max-w-md">
               {SUGGESTIONS.map((s) => (

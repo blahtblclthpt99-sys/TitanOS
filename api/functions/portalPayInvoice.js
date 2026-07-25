@@ -1,5 +1,8 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
-import { applyCors, handleOptions } from "../_lib/cors.js";
+import { applyCors, handleOptions, resolveAppOrigin, allowedOrigins } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
 
 async function requirePortalSession(admin, token) {
   if (!token || typeof token !== "string") return { error: "Missing session token", status: 400 };
@@ -16,6 +19,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 15, windowMs: 60_000, key: "portalPayInvoice" })) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -35,7 +39,10 @@ export default async function handler(req, res) {
 
     const amount = Number(invoice.balance_due || invoice.total || 0);
     const stripeKey = process.env.STRIPE_SECRET_KEY;
-    const origin = process.env.APP_ORIGIN || "https://titanos-web.vercel.app";
+    const configuredOrigin = String(process.env.APP_ORIGIN || "").replace(/\/$/, "");
+    const origin =
+      (configuredOrigin && allowedOrigins().includes(configuredOrigin) && configuredOrigin) ||
+      resolveAppOrigin(req);
 
     if (!stripeKey) {
       return res.status(503).json({
@@ -43,7 +50,7 @@ export default async function handler(req, res) {
         setupRequired: true,
       });
     }
-    if (!(amount > 0)) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: "Invoice has no balance due" });
     }
 
@@ -70,7 +77,9 @@ export default async function handler(req, res) {
     });
     const session = await response.json();
     if (!response.ok) {
-      console.error("Stripe portal pay error:", session);
+      logError("portalPayInvoice:stripe_checkout_failed", {
+        message: session?.error?.message || "checkout failed",
+      });
       return res.status(502).json({ error: "Could not create checkout session" });
     }
 
@@ -85,7 +94,8 @@ export default async function handler(req, res) {
     // Never mark paid here — only Stripe webhook / verified payment may close the invoice.
     return res.status(200).json({ url: session.url, checkout: true });
   } catch (error) {
-    console.error("portalPayInvoice error:", error);
+    logError("portalPayInvoice", { message: error?.message || String(error) });
+    captureApiException(error, { tags: { route: "portalPayInvoice" } });
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

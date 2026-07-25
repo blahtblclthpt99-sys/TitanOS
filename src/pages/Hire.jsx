@@ -16,10 +16,12 @@ import { useAuth } from "@/lib/AuthContext";
 import { SERVICE_CATEGORIES, US_STATES, timeAgo } from "@/lib/platformConstants";
 import { betaBadgeLabel } from "@/lib/plan";
 import {
-  applyToHireJob, createHireJob, formatBudget, hireApplicant, listApplicationsForJob,
-  listHireJobs, listHireMessages, listMyApplications, listSavedJobIds, listSavedJobs,
-  locationLabel, sendHireMessage, toggleSaveJob,
+  applyToHireJob, createHireJob, formatBudget, hireApplicant, listApplicationsForJobs,
+  listHireJobs, listHireJobsByIds, listHireMessages, listMyApplications, listSavedJobIds, listSavedJobs,
+  locationLabel, sendHireMessage, toggleSaveJob, getSource, DATA_SOURCE,
 } from "@/lib/hireApi";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
+import { isLocalOrStub } from "@/lib/dataSource";
 
 const BLANK_JOB = { title: "", description: "", category: "General", city: "", state: "", budget_min: "", budget_max: "", deadline: "", imageUrl: "", is_same_day: false, is_urgent: false };
 const fieldClass = "bg-muted border-border text-foreground rounded-md";
@@ -84,7 +86,12 @@ function JobCard({ job, saved, onSave, onApply }) {
 export default function Hire() {
   const { user, isLoadingAuth, authChecked } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (searchParams.get("new") === "1" ? "post" : "browse"));
+  const [tab, setTab] = useState(() => {
+    if (searchParams.get("new") === "1" || searchParams.get("tab") === "post") return "post";
+    const t = searchParams.get("tab");
+    if (["browse", "saved", "post", "posts", "applications"].includes(t)) return t;
+    return "browse";
+  });
   const [filters, setFilters] = useState({ search: "", category: "All", state: "" });
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -100,15 +107,22 @@ export default function Hire() {
   const [messages, setMessages] = useState([]);
   const [messageBody, setMessageBody] = useState("");
 
+  // Deep-link: /hire?new=1 (and ?tab=post) always opens the Post form.
+  // Keep tab=post in the URL so clearing `new` cannot remount back to Browse.
   useEffect(() => {
-    if (searchParams.get("new") === "1") {
-      setTab("post");
-      const next = new URLSearchParams(searchParams);
-      next.delete("new");
-      setSearchParams(next, { replace: true });
+    const wantsPost = searchParams.get("new") === "1" || searchParams.get("tab") === "post";
+    if (!wantsPost) return;
+    setTab("post");
+    if (searchParams.get("new") === "1" || searchParams.get("tab") !== "post") {
+      setSearchParams({ tab: "post" }, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
+  const selectTab = (id) => {
+    setTab(id);
+    if (id === "browse") setSearchParams({}, { replace: true });
+    else setSearchParams({ tab: id }, { replace: true });
+  };
   const load = async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -120,12 +134,13 @@ export default function Hire() {
       else if (tab === "posts") {
         const mine = (await listHireJobs({ status: "all" })).filter((job) => job.customer_id === user.id);
         setJobs(mine);
-        setApplicants(Object.fromEntries(await Promise.all(mine.map(async (job) => [job.id, await listApplicationsForJob(job.id)]))));
+        setApplicants(await listApplicationsForJobs(mine.map((job) => job.id)));
       } else if (tab === "applications") {
         const rows = await listMyApplications(user.id);
         setApplications(rows);
-        const allJobs = await listHireJobs({ status: "all" });
-        setJobById(Object.fromEntries(allJobs.map((job) => [job.id, job])));
+        const jobIds = [...new Set(rows.map((row) => row.hire_job_id).filter(Boolean))];
+        const jobsForApps = await listHireJobsByIds(jobIds);
+        setJobById(Object.fromEntries(jobsForApps.map((job) => [job.id, job])));
       }
     } catch {
       toast({ variant: "destructive", title: "Couldn't load Hire", description: "Please try again." });
@@ -149,21 +164,62 @@ export default function Hire() {
     event.preventDefault();
     if (saving) return;
     setSaving(true);
-    try { await createHireJob(user, { ...jobForm, images: jobForm.imageUrl ? [jobForm.imageUrl] : [] }); toast({ title: "Job posted", description: "Local professionals can now apply." }); setJobForm(BLANK_JOB); setTab("posts"); }
+    try {
+      const job = await createHireJob(user, { ...jobForm, images: jobForm.imageUrl ? [jobForm.imageUrl] : [] });
+      if (getSource(job) === DATA_SOURCE.local) {
+        toast({
+          title: "Job saved on this device",
+          description: "Hire board sync isn’t available — this post won’t reach other users until the server is connected.",
+        });
+      } else {
+        toast({ title: "Job posted", description: "Local professionals can now apply." });
+      }
+      setJobForm(BLANK_JOB);
+      setTab("posts");
+      setSearchParams({ tab: "posts" }, { replace: true });
+    }
     catch (error) { toast({ variant: "destructive", title: "Couldn't post job", description: error.message || "Please try again." }); } finally { setSaving(false); }
   };
   const submitApplication = async (event) => {
     event.preventDefault();
     if (saving || !selectedJob) return;
     setSaving(true);
-    try { await applyToHireJob(user, selectedJob.id, applyForm); toast({ title: "Application sent", description: "The job poster will be notified." }); setSelectedJob(null); }
+    try {
+      const app = await applyToHireJob(user, selectedJob.id, applyForm);
+      if (getSource(app) === DATA_SOURCE.local) {
+        toast({
+          title: "Application saved on this device",
+          description: "The poster was not notified — server hire applications aren’t reachable right now.",
+        });
+      } else {
+        toast({ title: "Application sent", description: "The job poster will be notified." });
+      }
+      setSelectedJob(null);
+    }
     catch { toast({ variant: "destructive", title: "Couldn't send application" }); } finally { setSaving(false); }
   };
   const hire = async (job, application) => {
     if (saving || !window.confirm(`Hire ${application.worker_name || "this applicant"}?`)) return;
     setSaving(true);
-    try { await hireApplicant(job, application); toast({ title: "Applicant hired", description: "They've been notified." }); load(); }
-    catch { toast({ variant: "destructive", title: "Couldn't hire applicant" }); } finally { setSaving(false); }
+    try {
+      const result = await hireApplicant(job, application);
+      if (isLocalOrStub(result) || getSource(result) === DATA_SOURCE.local) {
+        toast({
+          title: "Hired on this device only",
+          description: "Status updated locally — the worker was not notified via the server.",
+        });
+      } else {
+        toast({ title: "Applicant hired", description: "They've been notified." });
+      }
+      load();
+    }
+    catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't hire applicant",
+        description: error.message || "Please try again.",
+      });
+    } finally { setSaving(false); }
   };
   const openMessages = async (job, recipientId, recipientName) => {
     setMessageTarget({ job, recipientId, recipientName });
@@ -194,10 +250,14 @@ export default function Hire() {
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Grow"
+        eyebrow="Grow · Demo-aware"
         title="Hire workers"
-        subtitle="Post hauls and gigs, or apply to work — find local help for your service business."
+        subtitle="Post hauls and gigs, or apply to work. Device-only saves are labeled — they don’t notify other users."
       />
+      <FeatureHonestyBanner>
+        When the hire board can’t reach Supabase, posts and applications stay on this device and are labeled
+        in toasts. Applications are private to the job owner and applicant once RLS migration 016 is applied.
+      </FeatureHonestyBanner>
       {betaBadgeLabel() && (
         <div className="titan-surface mb-5 p-4 flex justify-between gap-3">
           <div>
@@ -214,7 +274,7 @@ export default function Hire() {
             type="button"
             role="tab"
             aria-selected={tab === id}
-            onClick={() => setTab(id)}
+            onClick={() => selectTab(id)}
             className={`px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors focus-ring ${
               tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
@@ -249,7 +309,7 @@ export default function Hire() {
       {tab === "saved" && (loading ? <PageLoader variant="list" label="Loading saved jobs" /> : jobs.length ? (
         <div className="grid md:grid-cols-2 gap-4">{jobs.map((job) => <JobCard key={job.id} job={job} saved onSave={saveToggle} onApply={openApply} />)}</div>
       ) : (
-        <EmptyState icon={BriefcaseBusiness} title="No saved jobs" description="Save jobs from Browse to revisit them here." onAction={() => setTab("browse")} actionLabel="Browse jobs" />
+        <EmptyState icon={BriefcaseBusiness} title="No saved jobs" description="Save jobs from Browse to revisit them here." onAction={() => selectTab("browse")} actionLabel="Browse jobs" />
       ))}
       {tab === "post" && (
         <form onSubmit={saveJob} className="titan-surface p-5 md:p-7 max-w-3xl">
@@ -299,7 +359,7 @@ export default function Hire() {
           </section>
         ))}</div>
       ) : (
-        <EmptyState icon={BriefcaseBusiness} title="No jobs posted" description="Post a job to find the right local professional." onAction={() => setTab("post")} actionLabel="Post a job" />
+        <EmptyState icon={BriefcaseBusiness} title="No jobs posted" description="Post a job to find the right local professional." onAction={() => selectTab("post")} actionLabel="Post a job" />
       ))}
       {tab === "applications" && (loading ? <PageLoader variant="list" label="Loading applications" /> : applications.length ? (
         <div className="space-y-3">{applications.map((app) => {
@@ -323,7 +383,7 @@ export default function Hire() {
           );
         })}</div>
       ) : (
-        <EmptyState icon={BriefcaseBusiness} title="No applications yet" description="Browse open jobs to find your next opportunity." onAction={() => setTab("browse")} actionLabel="Browse jobs" />
+        <EmptyState icon={BriefcaseBusiness} title="No applications yet" description="Browse open jobs to find your next opportunity." onAction={() => selectTab("browse")} actionLabel="Browse jobs" />
       ))}
 
       <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>

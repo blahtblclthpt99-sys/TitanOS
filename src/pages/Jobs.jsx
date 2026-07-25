@@ -30,6 +30,8 @@ import { enqueueFollowUpsForJob } from "@/lib/followUpApi";
 import { toast } from "@/components/ui/use-toast";
 import { googleMapsLink, jobSiteCoords, openStreetMapEmbed } from "@/lib/geofence";
 import { generateJobSummary } from "@/lib/jobSummary";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { listItemMotion } from "@/lib/listMotion";
 
 const PRIORITY_COLORS = {
   low: "text-muted-foreground", medium: "text-primary",
@@ -46,6 +48,7 @@ const BLANK_FORM = {
 const JOB_STATUSES = ["scheduled", "in_progress", "completed", "cancelled"];
 
 export default function Jobs({ isActive = true }) {
+  const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -183,8 +186,11 @@ export default function Jobs({ isActive = true }) {
         )
       );
       toast({
-        title: "Job completed + AI summary ready",
-        description: summary.follow_up_message?.slice(0, 100) || summary.completion_report?.slice(0, 100),
+        title: "Job completed",
+        description:
+          summary.source === "local"
+            ? "Template summary generated on-device (not a live AI model)."
+            : summary.follow_up_message?.slice(0, 100) || summary.completion_report?.slice(0, 100),
       });
     } catch (err) {
       toast({
@@ -354,7 +360,7 @@ export default function Jobs({ isActive = true }) {
         <div className="mt-4 pt-4 border-t border-border space-y-3">
           {(job.completion_summary || job.follow_up_draft) && (
             <div className="rounded-xl bg-muted/50 p-3 text-xs text-foreground/90 space-y-2">
-              <p className="font-semibold text-primary">AI job summary</p>
+              <p className="font-semibold text-primary">Job summary</p>
               {job.completion_summary && <p>{job.completion_summary}</p>}
               {job.follow_up_draft && (
                 <button
@@ -451,7 +457,7 @@ export default function Jobs({ isActive = true }) {
       ) : (
         <div className="space-y-2 pb-28">
           {filtered.map((job, i) => (
-            <motion.div key={job.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+            <motion.div key={job.id} {...listItemMotion(reduceMotion, i)}>
               {renderJobRow(job)}
             </motion.div>
           ))}
@@ -462,9 +468,10 @@ export default function Jobs({ isActive = true }) {
       <AnimatePresence>
         {bulkMode && selected.size > 0 && (
           <motion.div
-            initial={{ y: 80, opacity: 0 }}
+            initial={reduceMotion ? false : { y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { y: 80, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-2xl shadow-2xl px-4 py-3"
           >
             <span className="text-xs text-muted-foreground mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>

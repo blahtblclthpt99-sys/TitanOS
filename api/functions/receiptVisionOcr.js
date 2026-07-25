@@ -1,6 +1,7 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { logError } from "../_lib/safeLog.js";
 
 /**
  * Vision OCR for receipts. Uses OpenAI when OPENAI_API_KEY is set;
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
       });
       const json = await response.json();
       if (!response.ok) {
-        console.error("OpenAI vision error:", json);
+        logError("receiptVisionOcr:openai", json);
         return res.status(502).json({ error: "Vision OCR failed" });
       }
       const text = json.choices?.[0]?.message?.content || "";
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
       message: "Add OPENAI_API_KEY for live receipt vision. Paste receipt text for now.",
     });
   } catch (error) {
-    console.error("receiptVisionOcr error:", error);
+    logError("receiptVisionOcr", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

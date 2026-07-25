@@ -1,6 +1,7 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { logError } from "../_lib/safeLog.js";
 
 /** Resolve orphan referral rows that still have pending_lookup referrer. */
 export default async function handler(req, res) {
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, matched: true, referrerId: referrer.id });
   } catch (error) {
-    console.error("[attachReferral]", error);
+    logError("attachReferral", error);
     return res.status(500).json({ error: error.message || "Failed" });
   }
 }

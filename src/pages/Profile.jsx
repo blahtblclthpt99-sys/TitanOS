@@ -148,7 +148,7 @@ export default function Profile() {
             <Button
               onClick={save}
               disabled={saving}
-              className="rounded-xl bg-titan-cyan text-black hover:bg-titan-cyan/90"
+              className="rounded-xl"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save profile"}
             </Button>
@@ -634,7 +634,7 @@ export default function Profile() {
           <Button
             onClick={save}
             disabled={saving}
-            className="rounded-xl bg-titan-cyan text-black hover:bg-titan-cyan/90"
+            className="rounded-xl"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save profile"}
           </Button>

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Award, BadgeCheck, ChevronRight, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "@/components/shared/PageHeader";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
 import { useEntityData } from "@/hooks/useEntityData";
 import { useAuth } from "@/lib/AuthContext";
@@ -45,8 +46,13 @@ export default function TitanScore() {
     <div className="page-pad mx-auto max-w-5xl pb-28">
       <PageHeader
         title="Titan Score"
-        subtitle="Trust score from reliability, reviews, response, completed work, verification, and experience"
+        subtitle="Activity score from your jobs, invoices, customers, estimates, and reviews"
       />
+
+      <FeatureHonestyBanner tone="info">
+        This score is calculated from your TitanOS records — not a third-party credit or background check.
+        “Verified” level stays limited until Trust & Safety identity providers go live.
+      </FeatureHonestyBanner>
 
       <div className="titan-surface mb-5 flex flex-col items-center gap-6 border border-primary/20 p-6 sm:flex-row md:p-8">
         <div className="flex h-36 w-36 flex-col items-center justify-center rounded-full border-4 border-primary bg-primary/10 shadow-lift">
@@ -60,20 +66,21 @@ export default function TitanScore() {
             {titanVerified ? <TitanVerifiedBadge size="sm" /> : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Calculated from six trust factors. Higher scores win more jobs and build customer confidence.
+            Six factors from your account activity. Improve it by completing jobs, collecting reviews, and
+            keeping invoices current.
           </p>
           <p className="mt-3 text-sm text-foreground">
             {result.stats.completedJobs} jobs done · {result.stats.reviewAvg}★ avg
             {result.stats.reviewCount ? ` (${result.stats.reviewCount})` : ""} ·{" "}
-            {Math.round(verificationLevel * 100)}% verified
+            {Math.round(verificationLevel * 100)}% profile completeness
           </p>
           {!titanVerified && (
             <Link
-              to="/trust-safety"
+              to="/settings"
               className="mt-3 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-primary hover:underline"
             >
               <Shield className="h-4 w-4" aria-hidden="true" />
-              Complete verification for Titan Verified
+              Complete your profile in Settings
             </Link>
           )}
         </div>

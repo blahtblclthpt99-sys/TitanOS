@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import PageLoader from "@/components/shared/PageLoader";
 import EmptyState from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/AuthContext";
@@ -63,7 +64,7 @@ function Bubble({ message, isMine }) {
       <div
         className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
           isMine
-            ? "bg-titan-cyan text-black rounded-br-md"
+            ? "bg-primary text-primary-foreground rounded-br-md"
             : "bg-muted text-foreground rounded-bl-md border border-border"
         }`}
       >
@@ -372,18 +373,26 @@ export default function Messages() {
 
       <div className="relative">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-          <PageHeader title="Messages" subtitle="Chats with read receipts, media, voice, and search" />
+          <PageHeader
+            title="Messages"
+            subtitle="Real chats when contacts exist — a sample inbox may appear for preview"
+          />
           <div className="flex flex-wrap gap-2 shrink-0">
             {pushPerm !== "granted" && pushPerm !== "unsupported" && (
               <Button type="button" variant="outline" className="rounded-md" onClick={enablePush}>
                 Enable push
               </Button>
             )}
-            <Button type="button" className="rounded-md bg-titan-cyan text-black hover:bg-titan-cyan/90" onClick={startNewChat}>
+            <Button type="button" className="rounded-md" onClick={startNewChat}>
               New chat
             </Button>
           </div>
         </div>
+
+        <FeatureHonestyBanner tone="info">
+          If you see Titan Support or other starter threads, those are demo conversations seeded for
+          preview. New chats you start with real users are stored for your account.
+        </FeatureHonestyBanner>
 
         {composerSearch && (
           <div className="mb-4 titan-surface border border-border p-4">
@@ -452,7 +461,7 @@ export default function Messages() {
                     <div className="flex items-center justify-between gap-2 mt-0.5">
                       <p className="text-xs text-muted-foreground truncate">{c.last_preview || "No messages yet"}</p>
                       {c.unread > 0 && (
-                        <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-titan-cyan text-black text-[10px] font-bold flex items-center justify-center">
+                        <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
                           {c.unread}
                         </span>
                       )}
@@ -600,7 +609,7 @@ export default function Messages() {
                     <Button
                       type="submit"
                       size="icon"
-                      className="rounded-md shrink-0 bg-titan-cyan text-black hover:bg-titan-cyan/90"
+                      className="rounded-md shrink-0"
                       aria-label="Send message"
                       disabled={sending || !draft.trim()}
                     >

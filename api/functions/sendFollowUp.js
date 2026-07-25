@@ -1,6 +1,7 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -56,19 +57,21 @@ export default async function handler(req, res) {
         });
         if (!response.ok) {
           const err = await response.text();
-          console.error("sendFollowUp Resend error:", err);
+          logError("sendFollowUp:resend", err);
           return res.status(502).json({ error: "Failed to send email" });
         }
         emailed = true;
       } else {
-        console.log("[sendFollowUp stub]", {
+        logError("sendFollowUp:stub", {
+          message: "Email delivery not configured",
           user: auth.user.id,
-          to: emailTo,
-          subject: emailSubject,
-          body: message.slice(0, 120),
+          hasRecipient: Boolean(emailTo),
+          subjectLength: String(emailSubject || "").length,
         });
-        stub = true;
-        emailed = true;
+        return res.status(503).json({
+          error: "Email delivery is not configured",
+          stub: true,
+        });
       }
     }
 
@@ -96,7 +99,7 @@ export default async function handler(req, res) {
         : "Marked sent (no customer email on file)",
     });
   } catch (error) {
-    console.error("sendFollowUp error:", error);
+    logError("sendFollowUp", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

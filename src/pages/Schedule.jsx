@@ -17,9 +17,10 @@ import {
   getWeekDays,
   isToday,
 } from "@/lib/date-utils";
-import { fetchOpenMeteo } from "@/lib/weatherApi";
+import { loadLocalWeather } from "@/lib/weatherApi";
 import { buildSmartScheduleTips } from "@/lib/smartSchedule";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 
 const STATUS_BORDER = {
   scheduled:   "border-l-titan-cyan",
@@ -30,6 +31,7 @@ const STATUS_BORDER = {
 
 export default function Schedule() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: [jobs], loading, error, reload } = useEntityData([
     { entity: "Job", method: "list", args: ["-scheduled_date", 100] },
   ]);
@@ -38,23 +40,15 @@ export default function Schedule() {
   const [weather, setWeather] = useState(null);
   useEffect(() => {
     let alive = true;
-    const loadWeather = (lat = 41.88, lon = -87.63) =>
-      fetchOpenMeteo(lat, lon)
-        .then((w) => {
-          if (alive) setWeather(w);
-        })
-        .catch(() => {});
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => loadWeather(position.coords.latitude, position.coords.longitude),
-        () => loadWeather(),
-        { timeout: 5000 }
-      );
-    } else loadWeather();
+    loadLocalWeather(user)
+      .then((w) => {
+        if (alive) setWeather(w);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
-  }, []);
+  }, [user?.id, user?.city, user?.state, user?.company_city, user?.company_state]);
 
   const weekDays = getWeekDays(currentDate);
   const navigateWeek = (dir) => setCurrentDate((prev) => addWeeks(prev, dir));
@@ -95,7 +89,22 @@ export default function Schedule() {
           </button>
         </div>
       </div>
-      {weather && <div className="titan-surface px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="font-semibold text-primary">{weather.temp}° · {weather.label}</span><span className="text-muted-foreground">Wind {weather.wind} mph</span>{weather.warning && <span className="text-titan-amber">{weather.warning}</span>}</div>}
+      {weather && (
+        <div className="titan-surface px-4 py-3 mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          {weather.unavailable ? (
+            <span className="text-muted-foreground">{weather.locationError || weather.label}</span>
+          ) : (
+            <>
+              <span className="font-semibold text-primary">
+                {weather.temp}° · {weather.label}
+              </span>
+              {weather.place ? <span className="text-muted-foreground">{weather.place}</span> : null}
+              <span className="text-muted-foreground">Wind {weather.wind} mph</span>
+              {weather.warning && <span className="text-titan-amber">{weather.warning}</span>}
+            </>
+          )}
+        </div>
+      )}
       {!loading && (
         <div className="grid sm:grid-cols-2 gap-2 mb-5">
           {buildSmartScheduleTips(jobs, weather).map((tip) => (

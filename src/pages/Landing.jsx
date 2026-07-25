@@ -96,7 +96,7 @@ const WHY = [
 ];
 
 const TRUST = [
-  { label: "Public beta", detail: "Full product access" },
+  { label: "Public beta", detail: "Core product access" },
   { label: "No credit card", detail: "Start in minutes" },
   { label: "Android app", detail: "Install the APK" },
   { label: "Field-ready", detail: "Mobile-first design" },
@@ -129,7 +129,7 @@ const INCLUDED = [
   "Schedule & dispatch",
   "Fleet management",
   "Reports & analytics",
-  "Driver marketplace",
+  "Driver Hub (shift miles)",
   "Mobile-first app",
 ];
 
@@ -414,7 +414,7 @@ export default function Landing() {
                 </button>
               </div>
               <p className="mt-5 text-caption text-muted-foreground">
-                No credit card · Full product during public beta
+                No credit card · Core product during public beta
               </p>
             </div>
 
@@ -565,14 +565,14 @@ export default function Landing() {
               Start free. Run your next job on TitanOS.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Create an account in minutes. Full product during public beta — no card required.
+              Create an account in minutes. Core product free during public beta — Labs tools are labeled Beta/Soon. No card required.
             </p>
           </div>
           <div className="titan-surface mx-auto mt-10 max-w-lg p-6 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div className="text-left">
-                <h3 className="text-xl font-bold text-foreground">Everything included</h3>
-                <p className="text-xs text-muted-foreground">All features · no restrictions</p>
+                <h3 className="text-xl font-bold text-foreground">Core product included</h3>
+                <p className="text-xs text-muted-foreground">Jobs, money, schedule · Labs labeled separately</p>
               </div>
               <div className="text-right">
                 <div className="text-4xl font-bold tabular-nums text-primary">$0</div>

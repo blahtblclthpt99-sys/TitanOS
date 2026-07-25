@@ -13,9 +13,10 @@ function getTabRoot(pathname) {
   if (pathname.startsWith("/marketplace")) return "/marketplace";
   if (pathname.startsWith("/messages")) return "/messages";
   if (pathname.startsWith("/community")) return "/community";
-  if (pathname.startsWith("/settings")) return "/settings";
+  if (pathname.startsWith("/settings")) return "/more";
+  if (pathname.startsWith("/profile")) return "/profile";
   if (pathname.startsWith("/titan-score")) return "/";
-  if (pathname.startsWith("/trust-safety")) return "/settings";
+  if (pathname.startsWith("/trust-safety")) return "/more";
   return "/";
 }
 

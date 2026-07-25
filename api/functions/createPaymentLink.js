@@ -1,16 +1,8 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
-import { applyCors, handleOptions } from "../_lib/cors.js";
-
-const PLAN_FEES = {
-  customer: { rate: 0, label: "0%" },
-  worker_free: { rate: 0.08, label: "8%" },
-  worker_premium: { rate: 0.025, label: "2.5%" },
-  business: { rate: 0.015, label: "1.5%" },
-  // aliases
-  free: { rate: 0.08, label: "8%" },
-  premium: { rate: 0.025, label: "2.5%" },
-  pro: { rate: 0.015, label: "1.5%" },
-};
+import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
+import { calculateCategoryFees } from "../_lib/feeConfig.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
 
 function resolvePlanFromProfile(profile, authUser) {
   if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
@@ -30,22 +22,15 @@ function resolvePlanFromProfile(profile, authUser) {
   return "worker_free";
 }
 
-function calcPlatformFee(amount, planId) {
-  const { rate, label } = PLAN_FEES[planId] || PLAN_FEES.free;
-  const base = Math.round((Number(amount) || 0) * 100) / 100;
-  const fee = Math.round(base * rate * 100) / 100;
-  const total = Math.round((base + fee) * 100) / 100;
-  return { base, fee, total, rate, label, planId };
-}
-
 /**
  * Creates a Stripe Checkout session when STRIPE_SECRET_KEY is configured.
- * Charges base amount + plan-based TitanOS platform fee.
+ * Platform fee ALWAYS computed server-side via Fee Engine (never trusts client fee fields).
  */
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 20, windowMs: 60_000, key: "createPaymentLink" })) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -65,18 +50,65 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const planId = resolvePlanFromProfile(profile, user);
-    const amount = Number(body.amount);
-    if (!amount || amount <= 0) return res.status(400).json({ error: "Valid amount required" });
-
-    const { base, fee, total, rate, label } = calcPlatformFee(amount, planId);
     const provider = body.provider || "stripe";
     const currency = (body.currency || "usd").toLowerCase();
-    const origin = req.headers.origin || process.env.VITE_APP_URL || "https://titanos-web.vercel.app";
+    const origin = resolveAppOrigin(req);
+
+    // Never attach an invoice the caller does not own (webhook would mark it paid).
+    // When charging an invoice, ALWAYS use server balance_due — ignore client amount.
+    let invoiceId = body.invoice_id || null;
+    let amount = Number(body.amount);
+    if (invoiceId) {
+      const { data: invoice, error: invErr } = await admin
+        .from("invoices")
+        .select("id, created_by_id, status, balance_due, total")
+        .eq("id", invoiceId)
+        .maybeSingle();
+      if (invErr || !invoice) {
+        return res.status(400).json({ error: "Invoice not found" });
+      }
+      if (invoice.created_by_id !== user.id && profile?.role !== "admin" && user.app_metadata?.role !== "admin") {
+        return res.status(403).json({ error: "Not allowed to charge this invoice" });
+      }
+      if (invoice.status === "paid") {
+        return res.status(400).json({ error: "Invoice is already paid" });
+      }
+      const due = Number(invoice.balance_due ?? invoice.total ?? 0);
+      if (!Number.isFinite(due) || due <= 0) {
+        return res.status(400).json({ error: "Invoice has no balance due" });
+      }
+      amount = due;
+      invoiceId = invoice.id;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Valid amount required" });
+    }
+    if (amount > 1_000_000) {
+      return res.status(400).json({ error: "Amount exceeds maximum" });
+    }
+
+    // Ignore any client-supplied fee / total — recalculate from Fee Engine
+    const feeResult = await calculateCategoryFees(admin, {
+      categoryId: "service_requests",
+      contextKey: planId,
+      grossAmount: amount,
+      userId: user.id,
+      currency,
+      context: { planId, endpoint: "createPaymentLink" },
+      persistLog: false,
+    });
+
+    const base = feeResult.gross;
+    const fee = feeResult.platformFee;
+    const total = feeResult.finalTotal;
+    const rate = feeResult.rate;
+    const label = feeResult.label;
 
     const feeNote = `TitanOS ${planId} fee ${label} ($${fee.toFixed(2)}). Total charged $${total.toFixed(2)}.`;
     const insertPayload = {
       user_id: user.id,
-      invoice_id: body.invoice_id || null,
+      invoice_id: invoiceId,
       customer_name: body.customer_name || "",
       amount: total,
       base_amount: base,
@@ -92,7 +124,6 @@ export default async function handler(req, res) {
       created_by_id: user.id,
     };
 
-    // Insert payment first so Stripe metadata can carry payment_id for reliable webhook settlement.
     let { data: payment, error } = await admin
       .from("payments")
       .insert(insertPayload)
@@ -129,6 +160,32 @@ export default async function handler(req, res) {
 
     if (error) return res.status(400).json({ error: error.message });
 
+    try {
+      await admin.from("fee_calculation_logs").insert({
+        transaction_id: payment.id,
+        payment_id: payment.id,
+        category_id: "service_requests",
+        fee_rule_id:
+          typeof feeResult.rule?.id === "string" && feeResult.rule.id.startsWith("seed-")
+            ? null
+            : feeResult.rule?.id || null,
+        fee_version: feeResult.feeVersion,
+        context_key: planId,
+        applied_rules: feeResult.appliedRules,
+        gross_amount: base,
+        platform_fee: fee,
+        processing_fee: feeResult.processingFee,
+        tax_amount: feeResult.taxAmount,
+        net_amount: feeResult.netAmount,
+        final_total: total,
+        currency,
+        context: { planId, endpoint: "createPaymentLink", source: feeResult.configSource },
+        created_by_id: user.id,
+      });
+    } catch {
+      /* audit optional until migration 017 */
+    }
+
     let checkoutUrl = "";
     let externalId = null;
 
@@ -156,15 +213,17 @@ export default async function handler(req, res) {
         params.set("line_items[1][quantity]", "1");
       }
 
-      if (body.invoice_id) {
-        params.set("client_reference_id", body.invoice_id);
-        params.set("metadata[invoice_id]", body.invoice_id);
+      if (invoiceId) {
+        params.set("client_reference_id", invoiceId);
+        params.set("metadata[invoice_id]", invoiceId);
       }
       if (payment?.id) params.set("metadata[payment_id]", payment.id);
       params.set("metadata[platform_fee_rate]", String(rate));
       params.set("metadata[plan]", planId);
       params.set("metadata[base_amount]", String(base));
       params.set("metadata[platform_fee]", String(fee));
+      params.set("metadata[fee_version]", String(feeResult.feeVersion ?? ""));
+      params.set("metadata[fee_config_source]", feeResult.configSource || "seed");
       params.set("metadata[user_id]", user.id);
 
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -208,14 +267,26 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       payment: { ...payment, plan: planId },
-      fee: { rate, label, base, platform_fee: fee, amount_total: total, plan: planId },
+      fee: {
+        rate,
+        label,
+        base,
+        platform_fee: fee,
+        amount_total: total,
+        plan: planId,
+        fee_version: feeResult.feeVersion,
+        config_source: feeResult.configSource,
+        applied_rules: feeResult.appliedRules,
+      },
       setupRequired: !checkoutUrl,
       message: checkoutUrl
         ? `Checkout created with ${label} ${planId} fee`
         : "Payment recorded as pending.",
     });
   } catch (error) {
-    console.error("[createPaymentLink]", error);
-    return res.status(500).json({ error: error.message || "Failed" });
+    const { logError } = await import("../_lib/safeLog.js");
+    logError("createPaymentLink", error);
+    captureApiException(error, { tags: { route: "createPaymentLink" } });
+    return res.status(500).json({ error: "Payment link failed" });
   }
 }

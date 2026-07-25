@@ -232,8 +232,10 @@ android/app/src/main/assets/capacitor.plugins.json
 
 .vercel
 .env*
+!.env.example
+!.env.production.example
 
-# Signup email log (PII — keep local / export via API)
+# Signup email log (PII ï¿½ keep local / export via API)
 data/signup-emails.txt
 
 # Lighthouse / local audit artifacts

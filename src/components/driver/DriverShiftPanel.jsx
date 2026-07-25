@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Car,
-  Clock,
   Fuel,
   MapPin,
   Navigation,
@@ -19,33 +18,37 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import HotspotMap from "@/components/driver/HotspotMap";
+import StatHint from "@/components/shared/StatHint";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
 import {
   addStop,
   buildHotspots,
   calcFuelCost,
   coachTip,
+  computeShiftDashboard,
   convertFromUsd,
   currencySymbol,
   dayPartLabel,
   endStop,
   estimateGasPriceUsd,
   estimateMpg,
-  estimateShiftEarnings,
   formatDuration,
   getDayPart,
   listDriverVehicles,
+  parseMilesInput,
   readPrefs,
   readSession,
   readShiftHistory,
   readStops,
   savePrefs,
-  sessionStats,
   startDrivingSession,
   stopDrivingSession,
   syncSessionToTax,
   topHotspotsNow,
   updateSessionMiles,
+  IRS_MILEAGE_RATE_USD,
+  summarizeRecordedShifts,
 } from "@/lib/driverHubApi";
 import { vehicleLabel } from "@/lib/vehicleCatalog";
 
@@ -64,6 +67,9 @@ export default function DriverShiftPanel() {
   const [now, setNow] = useState(() => new Date());
   const [previewPart, setPreviewPart] = useState(null);
   const [focusId, setFocusId] = useState(null);
+
+  const [milesError, setMilesError] = useState("");
+  const [toggleError, setToggleError] = useState("");
 
   const mode = prefs.mode === "riding" ? "riding" : "driving";
   const requestingRide = Boolean(prefs.requestingRide);
@@ -89,6 +95,7 @@ export default function DriverShiftPanel() {
   useEffect(() => {
     if (!session?.active) return undefined;
     setMilesDraft(String(session.miles ?? 0));
+    setMilesError("");
     const id = window.setInterval(() => setTick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
     // Only re-seed draft when a session becomes active (not on every miles save)
@@ -108,8 +115,16 @@ export default function DriverShiftPanel() {
   const mpg = Number(prefs.mpg) || estimateMpg(selectedVehicle);
   const gasUsd = estimateGasPriceUsd(prefs.zip);
   const gasLocal = convertFromUsd(gasUsd, prefs.currency || "USD");
+
+  /** Live miles: prefer draft while editing so totals update instantly */
+  const displayMiles = useMemo(() => {
+    if (!drivingActive) return Number(session?.miles || 0);
+    const parsed = parseMilesInput(milesDraft === "" ? session?.miles ?? 0 : milesDraft);
+    return parsed.ok ? parsed.miles : Number(session?.miles || 0);
+  }, [drivingActive, milesDraft, session?.miles]);
+
   const fuel = calcFuelCost({
-    miles: Number(session?.miles || milesDraft || 0),
+    miles: displayMiles,
     mpg,
     gasPriceLocal: gasLocal,
     currency: prefs.currency || "USD",
@@ -134,13 +149,70 @@ export default function DriverShiftPanel() {
 
   const mapLat = Number(prefs.lat) || hotspots[0]?.lat || 32.7767;
   const mapLng = Number(prefs.lng) || hotspots[0]?.lng || -96.797;
-  const stats = sessionStats(session, stops);
-  const earnings = estimateShiftEarnings({
-    miles: stats?.miles || 0,
-    elapsedSec: stats?.elapsedSec || 0,
-    stops: stats?.stops || 0,
-  });
-  void tick;
+
+  const liveSession = useMemo(() => {
+    if (!session) return null;
+    return { ...session, miles: displayMiles };
+  }, [session, displayMiles]);
+
+  const dash = useMemo(
+    () =>
+      computeShiftDashboard(liveSession, stops, {
+        mpg,
+        gasPriceLocal: gasLocal,
+        currency: prefs.currency || "USD",
+      }),
+    // `tick` refreshes elapsed time / earnings every second while driving
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveSession, stops, mpg, gasLocal, prefs.currency, tick]
+  );
+
+  const recorded = useMemo(() => summarizeRecordedShifts(history), [history]);
+
+  /** Persist miles on every valid edit — no silent drops */
+  const persistMilesNow = useCallback(
+    (raw) => {
+      if (!user?.id || !session?.active) return null;
+      const parsed = parseMilesInput(raw === "" || raw == null ? 0 : raw);
+      if (!parsed.ok) {
+        setMilesError(parsed.error);
+        return null;
+      }
+      setMilesError("");
+      const next = updateSessionMiles(user.id, parsed.miles);
+      if (next?.error) {
+        setMilesError(next.error);
+        return null;
+      }
+      setSession(next);
+      return next;
+    },
+    [user?.id, session?.active]
+  );
+
+  // Auto-save miles while driving (debounce). Depends only on draft text to avoid save loops.
+  useEffect(() => {
+    if (!drivingActive || !user?.id) return undefined;
+    const handle = window.setTimeout(() => {
+      const parsed = parseMilesInput(milesDraft === "" || milesDraft == null ? 0 : milesDraft);
+      if (!parsed.ok) {
+        setMilesError(parsed.error);
+        return;
+      }
+      setMilesError("");
+      const next = updateSessionMiles(user.id, parsed.miles);
+      if (next?.error) {
+        setMilesError(next.error);
+        return;
+      }
+      setSession((prev) => {
+        if (!prev?.active) return prev;
+        if (Number(prev.miles) === parsed.miles) return prev;
+        return next;
+      });
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [milesDraft, drivingActive, user?.id]);
 
   const mapLit = (mode === "driving" && drivingActive) || (mode === "riding" && requestingRide);
 
@@ -150,10 +222,74 @@ export default function DriverShiftPanel() {
     setPrefs(savePrefs(user.id, next));
   };
 
-  const setMode = (nextMode) => {
+  const endShiftWithMiles = async () => {
+    if (!user?.id) return { ended: null, synced: { ok: false } };
+    const open = (readStops(user.id) || []).find((s) => !s.ended_at);
+    if (open) endStop(user.id, open.id);
+    const parsed = parseMilesInput(milesDraft === "" || milesDraft == null ? session?.miles ?? 0 : milesDraft);
+    if (!parsed.ok) {
+      setMilesError(parsed.error);
+      throw new Error(parsed.error || "Fix miles before ending");
+    }
+    updateSessionMiles(user.id, parsed.miles);
+    const liveStops = readStops(user.id);
+    const snapDash = computeShiftDashboard(
+      { ...session, miles: parsed.miles, active: true },
+      liveStops,
+      { mpg, gasPriceLocal: gasLocal, currency: prefs.currency || "USD" }
+    );
+    const ended = await stopDrivingSession(user.id, {
+      miles: parsed.miles,
+      elapsedSec: snapDash?.elapsedSec || 0,
+      hours: snapDash?.earnings?.hours || 0,
+      jobsCompleted: snapDash?.jobsCompleted || 0,
+      earningsGross: snapDash?.earnings?.gross || 0,
+      earningsPerHour: snapDash?.earnings?.perHourEst || 0,
+      fuelCost: snapDash?.fuel?.cost || 0,
+      fuelGallons: snapDash?.fuel?.gallons || 0,
+      profit: snapDash?.profit || 0,
+      taxEstimate: snapDash?.taxEstimate || 0,
+      mpg: snapDash?.mpg || mpg,
+      currency: prefs.currency || "USD",
+    });
+    const synced = await syncSessionToTax(
+      user,
+      { ...ended, miles: parsed.miles },
+      {
+        mpg,
+        gasPriceLocal: gasLocal,
+        currency: prefs.currency || "USD",
+        vehicleName: vehicleLabel(selectedVehicle),
+      }
+    );
+    return { ended, synced, miles: parsed.miles };
+  };
+
+  const setMode = async (nextMode) => {
+    if (!user?.id || busy) return;
+    setToggleError("");
+    // Prevent desync: ending an active drive when switching to passenger mode
+    if (nextMode === "riding" && session?.active) {
+      setBusy(true);
+      try {
+        await endShiftWithMiles();
+        refresh();
+        setMilesDraft("");
+        toast({
+          title: "Driving ended",
+          description: "Switched to Requesting a ride — your miles and totals were saved.",
+        });
+      } catch (err) {
+        setToggleError(err?.message || "Couldn't end driving before switching modes.");
+        toast({ variant: "destructive", title: "Couldn't switch modes", description: err?.message });
+        setBusy(false);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
     updatePref({
       mode: nextMode,
-      // turning off the other mode's "active" request flag when switching
       requestingRide: nextMode === "riding" ? prefs.requestingRide : false,
     });
   };
@@ -179,39 +315,33 @@ export default function DriverShiftPanel() {
   };
 
   const toggleRequestingRide = () => {
-    if (!user?.id) return;
-    const next = !requestingRide;
-    updatePref({ requestingRide: next, mode: "riding" });
-    toast({
-      title: next ? "Requesting a ride · ON" : "Requesting a ride · OFF",
-      description: next ? "Pickup hotspots are lit on the map." : "Ride request mode ended.",
-    });
+    if (!user?.id || busy) return;
+    setToggleError("");
+    try {
+      const next = !requestingRide;
+      updatePref({ requestingRide: next, mode: "riding" });
+      toast({
+        title: next ? "Requesting a ride · ON" : "Requesting a ride · OFF",
+        description: next ? "Pickup hotspots are lit on the map." : "Ride request mode ended.",
+      });
+    } catch (err) {
+      setToggleError(err?.message || "Couldn't update ride request.");
+      toast({ variant: "destructive", title: "Toggle failed", description: err?.message });
+    }
   };
 
   const toggleDriving = async () => {
     if (!user?.id || busy) return;
     setBusy(true);
+    setToggleError("");
     try {
       if (session?.active) {
-        // Close any in-progress stop before ending the shift
-        const open = (readStops(user.id) || []).find((s) => !s.ended_at);
-        if (open) endStop(user.id, open.id);
-        const miles = Number(milesDraft || session.miles || 0);
-        updateSessionMiles(user.id, miles);
-        const ended = await stopDrivingSession(user.id);
-        const synced = await syncSessionToTax(
-          user,
-          { ...ended, miles },
-          {
-            mpg,
-            gasPriceLocal: gasLocal,
-            currency: prefs.currency || "USD",
-            vehicleName: vehicleLabel(selectedVehicle),
-          }
-        );
-        refresh();
-        setMilesDraft("");
+        const { synced, miles } = await endShiftWithMiles();
+        setSession(readSession(user.id));
+        setStops(readStops(user.id));
         setHistory(readShiftHistory(user.id));
+        setMilesDraft("");
+        setMilesError("");
         if (synced.ok) {
           toast({
             title: "Driving ended · tax synced",
@@ -220,7 +350,12 @@ export default function DriverShiftPanel() {
             }.`,
           });
         } else {
-          toast({ title: "Driving ended", description: "Add miles next time to auto-fill tax." });
+          toast({
+            title: "Driving ended · totals saved",
+            description: `${miles} mi recorded on this device${
+              miles <= 0 ? " (add miles next shift for tax sync)" : ""
+            }.`,
+          });
         }
       } else {
         updatePref({ mode: "driving", requestingRide: false });
@@ -233,13 +368,22 @@ export default function DriverShiftPanel() {
         setSession(next);
         setStops([]);
         setMilesDraft("0");
+        setMilesError("");
         toast({
           title: "Driving · ON",
           description: bestNow[0]
             ? `Hotspots lit. Head toward ${bestNow[0].short || bestNow[0].name} first.`
-            : "Hotspots lit. Log miles and stops as you go.",
+            : "Hotspots lit. Miles auto-save as you enter them.",
         });
       }
+    } catch (err) {
+      setToggleError(err?.message || "Couldn't update driving status.");
+      refresh();
+      toast({
+        variant: "destructive",
+        title: "Driving toggle failed",
+        description: err?.message || "Try again. Your last saved state was reloaded.",
+      });
     } finally {
       setBusy(false);
     }
@@ -267,27 +411,56 @@ export default function DriverShiftPanel() {
     setStops(readStops(user.id));
   };
 
+  const onMilesChange = (value) => {
+    setMilesDraft(value);
+    const parsed = parseMilesInput(value === "" ? 0 : value);
+    setMilesError(parsed.ok ? "" : parsed.error);
+  };
+
   const saveMiles = async () => {
     if (!user?.id || !session?.active) return;
-    const next = updateSessionMiles(user.id, milesDraft);
-    setSession(next);
-    const synced = await syncSessionToTax(user, next, {
-      mpg,
-      gasPriceLocal: gasLocal,
-      currency: prefs.currency || "USD",
-      vehicleName: vehicleLabel(selectedVehicle),
-    });
-    if (synced.session) setSession(synced.session);
-    toast({
-      title: synced.ok ? "Miles saved · tax updated" : "Miles updated",
-      description: synced.ok ? "Tax Center mileage refreshed while driving." : undefined,
-    });
+    const next = persistMilesNow(milesDraft === "" ? 0 : milesDraft);
+    if (!next) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't save miles",
+        description: milesError || "Enter a valid mileage.",
+      });
+      return;
+    }
+    setMilesDraft(String(next.miles));
+    try {
+      const synced = await syncSessionToTax(user, next, {
+        mpg,
+        gasPriceLocal: gasLocal,
+        currency: prefs.currency || "USD",
+        vehicleName: vehicleLabel(selectedVehicle),
+      });
+      if (synced.session) setSession(synced.session);
+      toast({
+        title: synced.ok ? "Miles saved · tax updated" : "Miles recorded",
+        description: synced.ok
+          ? "Tax Center mileage refreshed while driving."
+          : `${next.miles} mi saved on this device.`,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Miles saved locally",
+        description: err?.message || "Tax sync failed — miles are still on this shift.",
+      });
+    }
   };
 
   const sym = currencySymbol(prefs.currency || "USD");
 
   return (
     <div className="space-y-5">
+      <FeatureHonestyBanner>
+        Hotspot pins are suggested zones near your location for planning — not live third-party demand
+        feeds. Miles, stops, and tax sync are live.
+      </FeatureHonestyBanner>
+
       {/* Coach tip */}
       <div className="rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-card to-card px-4 py-3 flex gap-3 items-start">
         <div className="w-9 h-9 rounded-md bg-primary/15 flex items-center justify-center flex-shrink-0">
@@ -300,6 +473,12 @@ export default function DriverShiftPanel() {
           <p className="text-sm text-foreground mt-0.5 leading-snug">{tip}</p>
         </div>
       </div>
+
+      {toggleError ? (
+        <p className="text-sm text-red-400" role="alert">
+          {toggleError}
+        </p>
+      ) : null}
 
       {/* Mode: Requesting a ride vs Driving */}
       <section className="glass rounded-2xl p-4 border border-border">
@@ -349,14 +528,16 @@ export default function DriverShiftPanel() {
             </div>
             <button
               type="button"
-              disabled={!user?.id}
+              disabled={!user?.id || busy}
               onClick={toggleRequestingRide}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold min-h-[44px] transition-colors ${
+              aria-busy={busy}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold min-h-[44px] transition-colors disabled:opacity-60 ${
                 requestingRide
                   ? "bg-amber-500/15 text-amber-300 border border-amber-500/40"
                   : "bg-muted text-foreground border border-border hover:bg-secondary"
               }`}
               aria-pressed={requestingRide}
+              aria-label={requestingRide ? "Turn off requesting a ride" : "Turn on requesting a ride"}
             >
               {requestingRide ? (
                 <>
@@ -387,14 +568,18 @@ export default function DriverShiftPanel() {
                 type="button"
                 disabled={busy || !user?.id}
                 onClick={toggleDriving}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold min-h-[44px] transition-colors ${
+                aria-busy={busy}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold min-h-[44px] transition-colors disabled:opacity-60 ${
                   drivingActive
                     ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                     : "bg-muted text-foreground border border-border hover:bg-secondary"
                 }`}
                 aria-pressed={drivingActive}
+                aria-label={drivingActive ? "End driving session" : "Start driving session"}
               >
-                {drivingActive ? (
+                {busy ? (
+                  <>Saving…</>
+                ) : drivingActive ? (
                   <>
                     <ToggleRight className="w-6 h-6" /> Driving · ON
                   </>
@@ -406,55 +591,124 @@ export default function DriverShiftPanel() {
               </button>
             </div>
 
-            {drivingActive && (
+            {drivingActive && dash && (
               <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Live shift</p>
-                  <p className="text-sm font-semibold text-foreground tabular-nums">
-                    {formatDuration(stats?.elapsedSec || 0)}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-sm font-semibold text-foreground tabular-nums">
+                      {formatDuration(dash.elapsedSec || 0)}
+                    </p>
+                    <StatHint label="Time on shift">
+                      <p>How long Driving has been ON this session.</p>
+                      <p>Updates every second while you&apos;re on the road.</p>
+                    </StatHint>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase">Miles</p>
-                    <p className="text-lg font-bold text-foreground tabular-nums">{stats?.miles || 0}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Miles
+                      <StatHint label="Total miles">
+                        <p>Miles you entered for this shift (odometer or trip app).</p>
+                        <p>Totals update as you type; tap Save to store and sync tax.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-lg font-bold text-foreground tabular-nums">{dash.miles}</p>
                   </div>
                   <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase">Stops</p>
-                    <p className="text-lg font-bold text-foreground tabular-nums">{stats?.stops || 0}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Stops
+                      <StatHint label="Stops / trips">
+                        <p>Pickup or dropoff events you logged with Log stop.</p>
+                        <p>Completed stops count as jobs finished.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-lg font-bold text-foreground tabular-nums">{dash.stops}</p>
                   </div>
                   <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase">Est. earn</p>
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Est. earn
+                      <StatHint label="Estimated earnings">
+                        <p>Rough gross before platform fees: time + miles + stops.</p>
+                        <p>Not your real payout — use your gig app for exact pay.</p>
+                      </StatHint>
+                    </p>
                     <p className="text-lg font-bold text-emerald-400 tabular-nums">
                       {sym}
-                      {earnings.gross.toFixed(0)}
+                      {dash.earnings.gross.toFixed(0)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Fuel
+                      <StatHint label="Fuel cost">
+                        <p>Miles ÷ MPG × local gas estimate from your ZIP.</p>
+                        <p>Updates when miles or MPG change.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-lg font-bold text-titan-amber tabular-nums">
+                      {sym}
+                      {dash.fuel.cost.toFixed(0)}
                     </p>
                   </div>
                 </div>
-                {(stats?.avgStopSec > 0 || stats?.avgBetweenSec != null) && (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                      <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                        <Timer className="w-3 h-3" /> Avg stop
-                      </p>
-                      <p className="text-sm font-semibold text-foreground tabular-nums">
-                        {formatDuration(stats.avgStopSec)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                      <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Between
-                      </p>
-                      <p className="text-sm font-semibold text-foreground tabular-nums">
-                        {formatDuration(stats.avgBetweenSec)}
-                      </p>
-                    </div>
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Profit
+                      <StatHint label="Est. profit">
+                        <p>Estimated earnings minus estimated fuel.</p>
+                        <p>Does not include fees, tips, or maintenance.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-sm font-semibold text-foreground tabular-nums">
+                      {sym}
+                      {dash.profit.toFixed(0)}
+                    </p>
                   </div>
-                )}
+                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      MPG
+                      <StatHint label="Miles per gallon">
+                        <p>From your vehicle setting or Fleet estimate.</p>
+                        <p>Used only for fuel cost math.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-sm font-semibold text-foreground tabular-nums">{dash.mpg}</p>
+                  </div>
+                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      <Timer className="w-3 h-3" /> Avg stop
+                      <StatHint label="Average stop time">
+                        <p>Average time from Log stop to End stop.</p>
+                        <p>Updates when you finish a stop.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-sm font-semibold text-foreground tabular-nums">
+                      {formatDuration(dash.avgStopSec)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                      Tax est.
+                      <StatHint label="Mileage tax estimate">
+                        <p>
+                          {`Miles × IRS standard rate ($${IRS_MILEAGE_RATE_USD}/mi) — estimate only.`}
+                        </p>
+                        <p>Official logs live in Tax Center after sync.</p>
+                      </StatHint>
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-400 tabular-nums">
+                      ${dash.taxEstimate.toFixed(0)}
+                    </p>
+                  </div>
+                </div>
                 <p className="text-[11px] text-muted-foreground mt-2">
                   Rough gross before platform fees
-                  {earnings.perHourEst > 0 ? ` · ~${sym}${earnings.perHourEst}/hr` : ""}
+                  {dash.earnings.perHourEst > 0 ? ` · ~${sym}${dash.earnings.perHourEst}/hr` : ""}
                   {selectedVehicle ? ` · ${vehicleLabel(selectedVehicle)}` : ""}
+                  {dash.jobsCompleted > 0 ? ` · ${dash.jobsCompleted} completed stops` : ""}
                 </p>
               </div>
             )}
@@ -462,20 +716,45 @@ export default function DriverShiftPanel() {
             {drivingActive && (
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Miles this session</label>
+                  <label htmlFor="driver-hub-miles" className="text-xs text-muted-foreground">
+                    Miles this session
+                  </label>
                   <div className="flex gap-2 mt-1">
                     <Input
+                      id="driver-hub-miles"
                       type="number"
                       min="0"
+                      max="9999.9"
                       step="0.1"
+                      inputMode="decimal"
+                      aria-invalid={Boolean(milesError)}
+                      aria-describedby={milesError ? "driver-hub-miles-error" : undefined}
                       value={milesDraft !== "" ? milesDraft : String(session.miles || 0)}
-                      onChange={(e) => setMilesDraft(e.target.value)}
+                      onChange={(e) => onMilesChange(e.target.value)}
+                      onBlur={() => {
+                        if (milesDraft !== "" && !milesError) saveMiles();
+                      }}
                       className="bg-muted border-border text-foreground rounded-xl"
                     />
-                    <Button type="button" onClick={saveMiles} variant="outline" className="border-border">
+                    <Button
+                      type="button"
+                      onClick={saveMiles}
+                      variant="outline"
+                      className="border-border"
+                      disabled={Boolean(milesError)}
+                    >
                       Save
                     </Button>
                   </div>
+                  {milesError ? (
+                    <p id="driver-hub-miles-error" className="text-xs text-red-400 mt-1" role="alert">
+                      {milesError}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Miles auto-save as you type · Save also syncs Tax Center
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2 items-end">
                   <Button
@@ -552,21 +831,24 @@ export default function DriverShiftPanel() {
 
         <div className="grid sm:grid-cols-3 gap-2 mb-3">
           <Input
-            placeholder="City"
+            placeholder="City (Driver Location)"
             value={prefs.city || ""}
             onChange={(e) => updatePref({ city: e.target.value })}
             className="bg-muted border-border text-foreground rounded-xl"
+            aria-label="Driver city"
           />
           <Input
-            placeholder="ZIP / postal"
+            placeholder="ZIP (Driver Location)"
             value={prefs.zip || ""}
             onChange={(e) => updatePref({ zip: e.target.value })}
             className="bg-muted border-border text-foreground rounded-xl"
+            aria-label="Driver ZIP"
           />
           <select
             value={prefs.currency || "USD"}
             onChange={(e) => updatePref({ currency: e.target.value })}
             className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground text-sm"
+            aria-label="Display currency"
           >
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
@@ -575,6 +857,10 @@ export default function DriverShiftPanel() {
             ))}
           </select>
         </div>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          These fields are your Driver Location (maps & weather). They do not set sales tax — Job
+          Location on estimates does.
+        </p>
 
         <HotspotMap
           centerLat={mapLat}
@@ -686,7 +972,7 @@ export default function DriverShiftPanel() {
               </p>
               <p className="text-muted-foreground mt-1">
                 Using ZIP {prefs.zip || "—"} regional average (~${gasUsd.toFixed(2)} USD). At {mpg} mpg,{" "}
-                {Number(session?.miles || milesDraft || 0) || "—"} mi ≈ {fuel.gallons} gal · {sym}
+                {displayMiles || "—"} mi ≈ {fuel.gallons} gal · {sym}
                 {fuel.cost} ({sym}
                 {fuel.perMile}/mi).
               </p>
@@ -747,34 +1033,165 @@ export default function DriverShiftPanel() {
         </section>
       )}
 
-      {mode === "driving" && history.length > 0 && (
-        <section className="glass rounded-2xl p-5 border border-border">
-          <h2 className="text-base font-semibold text-foreground mb-3">Recent shifts</h2>
-          <ul className="space-y-2">
-            {history.slice(0, 5).map((s) => {
-              const mins = s.started_at && s.ended_at
-                ? Math.round((new Date(s.ended_at) - new Date(s.started_at)) / 60000)
-                : 0;
-              return (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm"
-                >
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {s.started_at ? new Date(s.started_at).toLocaleDateString() : "Shift"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.miles || 0} mi · {s.stops || 0} stops · {mins} min
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {s.ended_at ? new Date(s.ended_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+      {mode === "driving" && (
+        <section className="glass rounded-2xl p-5 border border-border" aria-label="Recorded driver totals">
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Recorded totals</h2>
+              <p className="text-sm text-muted-foreground">
+                {drivingActive
+                  ? "Live shift numbers update as you drive. Past shifts stay listed below."
+                  : recorded.shifts > 0
+                    ? `${recorded.shifts} saved shift${recorded.shifts === 1 ? "" : "s"} on this device`
+                    : "Turn Driving ON and enter miles — every number is saved when you end."}
+              </p>
+            </div>
+          </div>
+
+          {drivingActive && dash ? (
+            <p className="text-sm text-muted-foreground mb-4">
+              Live numbers are in the shift card above. Saved shifts with full totals are listed here when
+              you end Driving.
+            </p>
+          ) : null}
+
+          {!drivingActive && recorded.shifts > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Total miles</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.miles}</p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Stops</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.stops}</p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Hours</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.hours}</p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Jobs done</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.jobsCompleted}</p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Est. earn</p>
+                <p className="text-lg font-bold text-emerald-400 tabular-nums">
+                  {sym}
+                  {recorded.earnings.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Fuel</p>
+                <p className="text-lg font-bold text-titan-amber tabular-nums">
+                  {sym}
+                  {recorded.fuel.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Profit</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">
+                  {sym}
+                  {recorded.profit.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Tax est.</p>
+                <p className="text-lg font-bold text-emerald-400 tabular-nums">
+                  ${recorded.taxEstimate.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {history.length > 0 ? (
+            <>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                Recent shifts
+              </p>
+              <ul className="space-y-2">
+                {history.slice(0, 8).map((s) => {
+                  const mins =
+                    s.elapsed_sec != null
+                      ? Math.round(Number(s.elapsed_sec) / 60)
+                      : s.started_at && s.ended_at
+                        ? Math.round((new Date(s.ended_at) - new Date(s.started_at)) / 60000)
+                        : 0;
+                  const shiftSym = currencySymbol(s.currency || prefs.currency || "USD");
+                  return (
+                    <li
+                      key={s.id}
+                      className="rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm"
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <p className="font-medium text-foreground">
+                          {s.started_at ? new Date(s.started_at).toLocaleDateString() : "Shift"}
+                        </p>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {s.ended_at
+                            ? new Date(s.ended_at).toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>
+                          Miles:{" "}
+                          <strong className="text-foreground tabular-nums">{Number(s.miles) || 0}</strong>
+                        </span>
+                        <span>
+                          Stops:{" "}
+                          <strong className="text-foreground tabular-nums">{Number(s.stops) || 0}</strong>
+                        </span>
+                        <span>
+                          Time:{" "}
+                          <strong className="text-foreground tabular-nums">{mins} min</strong>
+                        </span>
+                        <span>
+                          Jobs:{" "}
+                          <strong className="text-foreground tabular-nums">
+                            {Number(s.jobs_completed) || 0}
+                          </strong>
+                        </span>
+                        <span>
+                          Earn:{" "}
+                          <strong className="text-emerald-400 tabular-nums">
+                            {shiftSym}
+                            {Number(s.earnings_gross || 0).toFixed(2)}
+                          </strong>
+                        </span>
+                        <span>
+                          Fuel:{" "}
+                          <strong className="text-titan-amber tabular-nums">
+                            {shiftSym}
+                            {Number(s.fuel_cost || 0).toFixed(2)}
+                          </strong>
+                        </span>
+                        <span>
+                          Profit:{" "}
+                          <strong className="text-foreground tabular-nums">
+                            {shiftSym}
+                            {Number(s.profit || 0).toFixed(2)}
+                          </strong>
+                        </span>
+                        <span>
+                          Tax:{" "}
+                          <strong className="text-emerald-400 tabular-nums">
+                            ${Number(s.tax_estimate || 0).toFixed(2)}
+                          </strong>
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : !drivingActive ? (
+            <p className="text-sm text-muted-foreground">
+              No shifts recorded yet. Start Driving, enter miles, then End — totals stay here.
+            </p>
+          ) : null}
         </section>
       )}
 

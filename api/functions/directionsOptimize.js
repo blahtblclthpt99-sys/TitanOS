@@ -1,6 +1,7 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { logError } from "../_lib/safeLog.js";
 
 function haversineMiles(a, b) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -92,12 +93,12 @@ export default async function handler(req, res) {
           method: "mapbox_optimized_trips",
         });
       }
-      console.error("Mapbox optimize fallback:", json);
+      logError("directionsOptimize:mapbox_fallback", json);
     }
 
     return res.status(200).json(nearestNeighbor(normalized));
   } catch (error) {
-    console.error("directionsOptimize error:", error);
+    logError("directionsOptimize", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

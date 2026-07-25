@@ -27,7 +27,7 @@ export default function SessionExpiryBanner() {
         <Button
           size="sm"
           onClick={extendSession}
-          className="bg-titan-amber hover:bg-titan-amber/90 text-black font-semibold h-8 gap-1"
+          className="bg-titan-amber hover:bg-titan-amber/90 text-black font-semibold min-h-[44px] gap-1"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Stay signed in
@@ -36,7 +36,7 @@ export default function SessionExpiryBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss session warning"
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
+          className="text-muted-foreground hover:text-foreground transition-colors inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md focus-ring"
         >
           <X className="w-4 h-4" />
         </button>

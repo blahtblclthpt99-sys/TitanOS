@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import PageLoader from "@/components/shared/PageLoader";
 import EmptyState from "@/components/shared/EmptyState";
 import DeleteButton from "@/components/shared/DeleteButton";
@@ -148,7 +149,7 @@ export default function Notifications() {
             <Button
               type="button"
               variant={unreadOnly ? "default" : "outline"}
-              className={`rounded-xl ${unreadOnly ? "bg-titan-cyan text-black hover:bg-titan-cyan/90" : ""}`}
+              className={`rounded-xl ${unreadOnly ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}`}
               onClick={() => setUnreadOnly((v) => !v)}
             >
               Unread only
@@ -170,6 +171,11 @@ export default function Notifications() {
             </Button>
           </div>
         </div>
+
+        <FeatureHonestyBanner tone="info">
+          Notifications appear here when real account events happen (jobs, messages, payments). Older
+          sample preview items were removed.
+        </FeatureHonestyBanner>
 
         {betaBadgeLabel() && (
           <div className="glass rounded-2xl mb-4 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">
@@ -198,7 +204,7 @@ export default function Notifications() {
                 onClick={() => setCategory(f.id)}
                 className={`inline-flex items-center gap-1.5 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold border transition-colors ${
                   active
-                    ? "bg-titan-cyan text-black border-titan-cyan"
+                    ? "bg-primary text-primary-foreground border-titan-cyan"
                     : "bg-card border-border text-foreground/80 hover:bg-muted"
                 }`}
               >

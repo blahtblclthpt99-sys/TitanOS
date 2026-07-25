@@ -1,9 +1,17 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
+import { applyCors, handleOptions } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { portalOtpMatches } from "../_lib/portalOtp.js";
+import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
+  applyCors(res, req);
+  if (handleOptions(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!assertRateLimit(req, res, { limit: 20, windowMs: 60_000, key: "portalVerifyOtp" })) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -15,6 +23,19 @@ export default async function handler(req, res) {
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const submittedCode = String(otpCode).trim();
+    if (!/^\d{6}$/.test(submittedCode)) {
+      return res.status(401).json({ error: "Invalid verification code" });
+    }
+
+    if (
+      !assertRateLimit(req, res, {
+        limit: 8,
+        windowMs: 10 * 60_000,
+        key: `portalVerify:${normalizedEmail}`,
+      })
+    ) {
+      return;
+    }
 
     const { data: sessions } = await admin
       .from("portal_sessions")
@@ -22,7 +43,7 @@ export default async function handler(req, res) {
       .eq("email", normalizedEmail);
 
     const session = (sessions || []).find(
-      (item) => !item.verified && item.otp_code === submittedCode
+      (item) => !item.verified && portalOtpMatches(item.otp_code, normalizedEmail, submittedCode)
     );
 
     if (!session) {
@@ -65,7 +86,8 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
-    console.error("portalVerifyOtp error:", error);
+    logError("portalVerifyOtp", error);
+    captureApiException(error, { tags: { route: "portalVerifyOtp" } });
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

@@ -1,9 +1,30 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { MARKETPLACE_MODULES } from "../../src/lib/marketplaceCatalog.js";
+import { applyCors, handleOptions } from "../_lib/cors.js";
+import { requireAdmin } from "../_lib/auth.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
 
+/**
+ * Admin-only marketplace catalog seed. Disabled unless caller is admin
+ * (or SEED_MARKETPLACE_SECRET matches header x-seed-secret).
+ */
 export default async function handler(req, res) {
+  applyCors(res, req);
+  if (handleOptions(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+  if (!assertRateLimit(req, res, { limit: 5, windowMs: 60_000, key: "seedMarketplace" })) return;
+
+  const seedSecret = process.env.SEED_MARKETPLACE_SECRET;
+  const headerSecret = req.headers["x-seed-secret"];
+  const secretOk = seedSecret && headerSecret && headerSecret === seedSecret;
+
+  if (!secretOk) {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
   }
 
   try {
@@ -40,7 +61,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ seeded: true, count: rows.length });
   } catch (error) {
-    console.error("seedMarketplace error:", error);
-    return res.status(500).json({ error: error.message || "Seed failed" });
+    logError("seedMarketplace", error);
+    captureApiException(error, { tags: { route: "seedMarketplace" } });
+    return res.status(500).json({ error: "Seed failed" });
   }
 }

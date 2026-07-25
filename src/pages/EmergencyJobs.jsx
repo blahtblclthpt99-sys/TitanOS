@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/shared/PageHeader";
+import PageShell from "@/components/shared/PageShell";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import {
   createEmergencyJob,
   deleteEmergencyJob,
@@ -47,34 +49,67 @@ export default function EmergencyJobs() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-28">
-      <PageHeader title="Emergency Jobs" subtitle="Same-day / ASAP work alerts for busy crews" />
-      <form onSubmit={add} className="glass rounded-2xl p-5 mb-5 space-y-3">
-        <div className="flex items-center gap-2 text-primary font-semibold">
-          <Siren className="w-5 h-5" /> Post an urgent need
+    <PageShell maxWidth="lg">
+      <PageHeader
+        eyebrow="Labs · Coming soon"
+        title="Emergency board"
+        subtitle="Your personal same-day list — not a live network alerting nearby crews."
+      />
+      <FeatureHonestyBanner>
+        Posts stay on your account (or this device if sync fails). TitanOS does not broadcast urgent jobs
+        to other users or dispatch responders. Treat this as a personal checklist until a dispatch network
+        ships.
+      </FeatureHonestyBanner>
+      <form onSubmit={add} className="titan-surface mb-5 space-y-3 p-5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+          <Siren className="h-5 w-5" aria-hidden="true" /> Post an urgent need
         </div>
-        <Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="What needs done today?" className="bg-muted border-border text-foreground" />
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="City" className="bg-muted border-border text-foreground" />
-          <Input type="number" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="Budget ($)" className="bg-muted border-border text-foreground" />
+        <Input
+          required
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          placeholder="What needs done today?"
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+            placeholder="City"
+          />
+          <Input
+            type="number"
+            value={form.budget}
+            onChange={(e) => setForm({ ...form, budget: e.target.value })}
+            placeholder="Budget ($)"
+          />
         </div>
-        <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Details" rows={2} className="bg-muted border-border text-foreground" />
-        <Button type="submit"><Plus className="w-4 h-4" /> Post same-day job</Button>
+        <Textarea
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          placeholder="Details"
+          rows={2}
+        />
+        <Button type="submit">
+          <Plus className="h-4 w-4" aria-hidden="true" /> Post same-day job
+        </Button>
       </form>
       <div className="space-y-3">
         {rows.map((row) => (
-          <article key={row.id} className="glass rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <article key={row.id} className="titan-surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
             <div className="flex-1">
               <p className="font-semibold text-foreground">{row.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {row.urgency?.replace("_", " ")} · {row.city || "Local"} · ${Number(row.budget || 0).toLocaleString()}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {row.urgency?.replace("_", " ")} · {row.city || "Local"} · $
+                {Number(row.budget || 0).toLocaleString()}
               </p>
-              {row.notes && <p className="text-sm text-muted-foreground mt-2">{row.notes}</p>}
+              {row.notes && <p className="mt-2 text-sm text-muted-foreground">{row.notes}</p>}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs capitalize text-primary">{row.status}</span>
               {row.status === "open" && (
-                <Button size="sm" onClick={() => claim(row)}>Mark claimed</Button>
+                <Button size="sm" onClick={() => claim(row)}>
+                  Mark claimed
+                </Button>
               )}
               <DeleteButton
                 label={row.title}
@@ -88,6 +123,6 @@ export default function EmergencyJobs() {
         ))}
         {!rows.length && <p className="text-sm text-muted-foreground">No emergency posts yet.</p>}
       </div>
-    </div>
+    </PageShell>
   );
 }

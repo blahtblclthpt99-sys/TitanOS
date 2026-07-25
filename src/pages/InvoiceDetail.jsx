@@ -13,7 +13,8 @@ import DeleteButton from "@/components/shared/DeleteButton";
 import { formatMonthDayYear } from "@/lib/date-utils";
 import { toast } from "@/components/ui/use-toast";
 
-const STATUS_OPTIONS = ["draft", "sent", "viewed", "paid", "partial", "overdue", "cancelled"];
+const STATUS_OPTIONS = ["draft", "sent", "viewed", "partial", "overdue", "cancelled"];
+// "paid" is webhook/admin only — never set from the browser
 
 export default function InvoiceDetail() {
   const { id } = useParams();
@@ -22,11 +23,21 @@ export default function InvoiceDetail() {
   const [saving, setSaving] = useState(false);
 
   const updateStatus = async (status) => {
+    if (status === "paid") {
+      toast({
+        variant: "destructive",
+        title: "Webhook only",
+        description: "Collect payment to mark this invoice paid — status comes from Stripe.",
+      });
+      return;
+    }
     setSaving(true);
     try {
       await api.entities.Invoice.update(id, { status });
       reload();
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <PageLoader variant="detail" label="Loading invoice" />;
@@ -104,10 +115,27 @@ export default function InvoiceDetail() {
           </div>
           {invoice.tax_amount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tax ({invoice.tax_rate}%)</span>
+              <span className="text-muted-foreground">
+                Tax ({invoice.tax_rate}%)
+                {invoice.tax_snapshot?.jurisdictionLabel
+                  ? ` · ${invoice.tax_snapshot.jurisdictionLabel}`
+                  : ""}
+              </span>
               <span className="text-foreground tabular-nums">${invoice.tax_amount.toFixed(2)}</span>
             </div>
           )}
+          {invoice.job_location?.city || invoice.job_city ? (
+            <p className="text-[11px] text-muted-foreground">
+              Job Location:{" "}
+              {[
+                invoice.job_location?.city || invoice.job_city,
+                invoice.job_location?.state || invoice.job_state,
+                invoice.job_location?.zip || invoice.job_zip,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+          ) : null}
           <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
             <span className="text-foreground">Total</span>
             <span className="text-titan-cyan tabular-nums">${(invoice.total || 0).toFixed(2)}</span>
@@ -124,7 +152,7 @@ export default function InvoiceDetail() {
           <div className="mb-4">
             <Button
               type="button"
-              className="w-full bg-titan-cyan text-black font-semibold h-11"
+              className="w-full font-semibold h-11"
               onClick={() => navigate("/payments", {
                 state: {
                   amount: invoice.balance_due > 0 ? invoice.balance_due : invoice.total,

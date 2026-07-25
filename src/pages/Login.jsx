@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
@@ -7,25 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
-import { normalizeAppPath } from "@/lib/routing";
 import { useAuth } from "@/lib/AuthContext";
+import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { checkUserAuth } = useAuth();
+  const { checkUserAuth, isAuthenticated, authChecked } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const returnTo = (() => {
-    const from = location.state?.from;
-    if (!from) return "/";
-    if (typeof from === "string") return normalizeAppPath(from) || "/";
-    const path = `${from.pathname || ""}${from.search || ""}${from.hash || ""}`;
-    return normalizeAppPath(path) || "/";
-  })();
+  const returnTo = resolveReturnTo(location);
+
+  useEffect(() => {
+    if (authChecked && isAuthenticated) {
+      navigate(consumeReturnTo(returnTo), { replace: true });
+    }
+  }, [authChecked, isAuthenticated, navigate, returnTo]);
+
+  const goAfterAuth = () => {
+    navigate(consumeReturnTo(returnTo), { replace: true });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +38,7 @@ export default function Login() {
     try {
       await api.auth.loginViaEmailPassword(email, password);
       await checkUserAuth();
-      navigate(returnTo === "/login" ? "/" : returnTo, { replace: true });
+      goAfterAuth();
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -50,7 +54,7 @@ export default function Login() {
         </div>
       )}
 
-      <SocialAuthButtons onError={setError} />
+      <SocialAuthButtons onError={setError} returnTo={returnTo} />
 
       <div className="relative my-5">
         <div className="absolute inset-0 flex items-center">
@@ -115,7 +119,11 @@ export default function Login() {
         <Link to="/forgot-password" className="transition-colors hover:text-foreground focus-ring rounded-md">
           Forgot password?
         </Link>
-        <Link to="/register" className="transition-colors hover:text-foreground focus-ring rounded-md">
+        <Link
+          to="/register"
+          state={location.state}
+          className="transition-colors hover:text-foreground focus-ring rounded-md"
+        >
           Need an account? <span className="font-semibold text-foreground">Sign up</span>
         </Link>
       </div>

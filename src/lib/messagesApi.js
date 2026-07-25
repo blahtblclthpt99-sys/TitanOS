@@ -55,60 +55,13 @@ function upsertThread(threadPatch) {
   return threads.find((t) => t.id === threadPatch.id);
 }
 
-function seedIfEmpty(user) {
-  if (!user?.id) return;
-  const mine = allThreads().filter((t) => (t.participant_ids || []).includes(user.id));
-  if (mine.length) return;
-
-  const supportId = "titan_support";
-  const tid = threadIdFor(user.id, supportId, "dm");
-  const now = Date.now();
-  const welcome = {
-    id: uid(),
-    thread_id: tid,
-    sender_id: supportId,
-    recipient_id: user.id,
-    body: "Welcome to Titan Messages. Send texts, photos, files, or voice notes — and search any conversation anytime.",
-    type: "text",
-    attachment: null,
-    read_at: null,
-    created_at: new Date(now - 60000).toISOString(),
-    created_by_id: supportId,
-  };
-  const tip = {
-    id: uid(),
-    thread_id: tid,
-    sender_id: supportId,
-    recipient_id: user.id,
-    body: "Tip: Use the paperclip for files, the camera for images, and the mic for voice. Read receipts appear under your messages.",
-    type: "text",
-    attachment: null,
-    read_at: null,
-    created_at: new Date(now - 30000).toISOString(),
-    created_by_id: supportId,
-  };
-  saveMessages([...allMessages(), welcome, tip]);
-  upsertThread({
-    id: tid,
-    participant_ids: [user.id, supportId],
-    participant_names: {
-      [user.id]: user.full_name || user.username || "You",
-      [supportId]: "Titan Support",
-    },
-    title: "Titan Support",
-    last_message_at: tip.created_at,
-    last_preview: previewFor(tip),
-    context: "dm",
-  });
-}
-
-export async function ensureDemoInbox(user) {
-  seedIfEmpty(user);
+/** No synthetic welcome threads — empty inbox until the user has real conversations. */
+export async function ensureDemoInbox() {
+  /* intentionally empty */
 }
 
 export async function listConversations(userId) {
   if (!userId) return [];
-  seedIfEmpty({ id: userId });
 
   // Merge marketplace_messages when remote works
   try {
@@ -199,11 +152,12 @@ export async function markThreadRead(userId, threadId) {
 
   try {
     const remote = await api.entities.MarketplaceMessage.filter({ thread_id: threadId });
-    await Promise.all(
-      (remote || [])
-        .filter((m) => m.recipient_id === userId && !m.read_at)
-        .map((m) => api.entities.MarketplaceMessage.update(m.id, { read_at: now }))
-    );
+    const ids = (remote || [])
+      .filter((m) => m.recipient_id === userId && !m.read_at)
+      .map((m) => m.id);
+    if (ids.length) {
+      await api.entities.MarketplaceMessage.updateMany(ids, { read_at: now });
+    }
   } catch {
     /* ignore */
   }

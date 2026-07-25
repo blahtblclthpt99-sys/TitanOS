@@ -17,9 +17,11 @@ const service = env.SUPABASE_SERVICE_ROLE_KEY;
 const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
 const client = createClient(url, anon, { auth: { autoRefreshToken: false, persistSession: false } });
 
-const email = `playtest+${Date.now()}@titanos.app`;
-const password = "TitanOS-Test-2026!";
-
+const email = process.env.SMOKE_AUTH_EMAIL || `playtest+${Date.now()}@titanos.app`;
+const password = process.env.SMOKE_AUTH_PASSWORD || `TitanOS-Test-${Date.now()}!`;
+if (!process.env.SMOKE_AUTH_PASSWORD) {
+  console.warn("SMOKE_AUTH_PASSWORD unset — using ephemeral password for this run only");
+}
 const tables = ["profiles", "customers", "jobs", "invoices", "estimates", "expenses"];
 for (const t of tables) {
   const { error } = await admin.from(t).select("id").limit(1);

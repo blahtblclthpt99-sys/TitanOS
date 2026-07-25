@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import FormField from "@/components/shared/FormField";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
-import { createHireJob } from "@/lib/hireApi";
+import { createHireJob, getSource, DATA_SOURCE } from "@/lib/hireApi";
 import { formatDriverRate } from "@/lib/driverDirectoryApi";
 
 /**
@@ -45,7 +45,7 @@ export default function HireRequestDialog({ driver, open, onOpenChange }) {
     setSaving(true);
     try {
       const cityParts = String(driver.city || "").split(",").map((s) => s.trim());
-      await createHireJob(user, {
+      const job = await createHireJob(user, {
         title: form.title,
         description: form.description,
         category: "Driving / Hauling",
@@ -56,7 +56,17 @@ export default function HireRequestDialog({ driver, open, onOpenChange }) {
         is_same_day: form.sameDay,
         is_urgent: form.sameDay,
       });
-      toast.success(`Request posted for ${driver.name}`, "Open Hire → My posts to track applications.");
+      if (getSource(job) === DATA_SOURCE.local) {
+        toast({
+          title: "Request saved on this device",
+          description: `${driver.name} was not notified — hire board is offline. Open Hire → My posts to review.`,
+        });
+      } else {
+        toast({
+          title: `Request posted for ${driver.name}`,
+          description: "Open Hire → My posts to track applications.",
+        });
+      }
       onOpenChange(false);
       navigate("/hire");
     } catch (err) {

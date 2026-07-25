@@ -31,7 +31,7 @@ import {
   formatDriverRate,
   formatVehicleSpecs,
   formatVehicleSummary,
-  getDriverById,
+  getDriverByIdAsync,
   verificationStatusClass,
   verificationStatusLabel,
 } from "@/lib/driverDirectoryApi";
@@ -44,6 +44,7 @@ import {
 import { computeDriverTitanScore, isTitanVerified, TITAN_SCORE_FACTORS } from "@/lib/titanScore";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
 import TitanScoreBadge from "@/components/shared/TitanScoreBadge";
+import VehicleCapacityCard from "@/components/driver/VehicleCapacityCard";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value, icon: Icon }) {
@@ -85,7 +86,8 @@ export default function DriverProfile() {
     return parts[0] === "driver" && parts[1] ? parts[1] : null;
   }, [paramId, location.pathname]);
 
-  const driver = useMemo(() => getDriverById(id), [id]);
+  const [driver, setDriver] = useState(null);
+  const [loadingDriver, setLoadingDriver] = useState(true);
   const titanScore = useMemo(() => (driver ? computeDriverTitanScore(driver) : null), [driver]);
   const titanVerified = driver ? isTitanVerified({ driver }) : false;
   const vehicleSpecs = useMemo(() => (driver ? formatVehicleSpecs(driver) : []), [driver]);
@@ -95,10 +97,33 @@ export default function DriverProfile() {
   const [hireOpen, setHireOpen] = useState(false);
 
   useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoadingDriver(true);
+      const row = await getDriverByIdAsync(id);
+      if (alive) {
+        setDriver(row);
+        setLoadingDriver(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
     if (!driver) return;
     setFavorite(isFavoriteDriver(userId, driver.id));
     setSaved(isSavedDriver(userId, driver.id));
   }, [driver, userId]);
+
+  if (loadingDriver) {
+    return (
+      <PageShell maxWidth="md" className="space-y-4">
+        <PageHeader title="Loading driver…" eyebrow="Driver Hub" />
+      </PageShell>
+    );
+  }
 
   if (!driver) {
     return (
@@ -351,6 +376,8 @@ export default function DriverProfile() {
           </dl>
         ) : null}
       </section>
+
+      <VehicleCapacityCard driver={driver} />
 
       <section className="titan-surface space-y-3 p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-foreground">Skills</h2>

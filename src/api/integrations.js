@@ -34,7 +34,7 @@ function apiCandidates(path) {
   return [...new Set(urls)];
 }
 
-async function uploadFile({ file }) {
+async function uploadFile({ file, visibility = "private" }) {
   if (!file) throw apiError("No file provided");
   const allowed = new Set([
     "image/jpeg",
@@ -61,15 +61,36 @@ async function uploadFile({ file }) {
   if (!user?.id) throw apiError("Sign in required to upload", 401);
 
   const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
-  const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+  const isPublic = visibility === "public";
+  // private: {uid}/…  |  public: public/{uid}/… (readable after migration 020)
+  const path = isPublic
+    ? `public/${user.id}/${crypto.randomUUID()}.${ext}`
+    : `${user.id}/${crypto.randomUUID()}.${ext}`;
+
   const { error } = await supabase.storage.from("titanos-uploads").upload(path, file, {
-    cacheControl: "3600",
+    cacheControl: isPublic ? "86400" : "3600",
     upsert: false,
     contentType: type || undefined,
   });
   throwIfError(error);
-  const { data } = supabase.storage.from("titanos-uploads").getPublicUrl(path);
-  return { file_url: data.publicUrl };
+
+  if (isPublic) {
+    const { data } = supabase.storage.from("titanos-uploads").getPublicUrl(path);
+    // Until migration 020 makes the bucket private, publicUrl still works;
+    // after 020, public/ prefix remains readable via RLS.
+    return { file_url: data.publicUrl, file_path: path, visibility: "public" };
+  }
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from("titanos-uploads")
+    .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 year
+  throwIfError(signErr);
+  return {
+    file_url: signed?.signedUrl || "",
+    file_path: path,
+    visibility: "private",
+    expires_in: 60 * 60 * 24 * 365,
+  };
 }
 
 async function sendEmail(payload) {
@@ -91,12 +112,14 @@ async function sendEmail(payload) {
       if (!response.ok) {
         throw apiError(body.error || "Failed to send email", response.status);
       }
-      return body;
+      // Preserve stub flag so callers never toast “email sent” on provider-less hosts
+      return body?.stub ? { ...body, success: true, stub: true } : body;
     } catch (err) {
       lastError = err;
     }
   }
 
+  // Fail closed for delivery — do not invent a silent success
   throw lastError || apiError("Failed to send email", 503);
 }
 

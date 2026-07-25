@@ -70,7 +70,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     navigate(s.action);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[40px]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
                 >
                   <s.icon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   {s.label}
@@ -83,7 +83,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     onOpenFeedback();
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[40px]"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   Send feedback
@@ -111,7 +111,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
         whileTap={reduceMotion ? undefined : { scale: 0.92 }}
         whileHover={reduceMotion ? undefined : { scale: 1.04 }}
         onClick={() => setOpen((p) => !p)}
-        className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lift bg-gradient-to-br from-titan-navy to-titan-electric ${reduceMotion ? "" : "ai-pulse"}`}
+        className={`w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center shadow-lift bg-gradient-to-br from-titan-navy to-titan-electric ${reduceMotion ? "" : "ai-pulse"}`}
         aria-label={open ? "Close Titan menu" : "Open Titan AI"}
         aria-expanded={open}
         aria-haspopup="menu"

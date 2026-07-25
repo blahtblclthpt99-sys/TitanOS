@@ -3,10 +3,9 @@ import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import MobileHeader from "./MobileHeader";
 import DesktopTopBar from "./DesktopTopBar";
-import QuickCreateFAB from "./QuickCreateFAB";
+import MobileActionDock from "./MobileActionDock";
 import TabStack from "./TabStack";
 import FloatingAIButton from "@/components/shared/FloatingAIButton";
-import FloatingVoiceButton from "@/components/shared/FloatingVoiceButton";
 import AppDownloadBanner from "@/components/shared/AppDownloadBanner";
 import FeedbackButton from "@/components/shared/FeedbackButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
@@ -48,9 +47,8 @@ export default function AppLayout() {
         id="main-content"
         tabIndex={-1}
         aria-label="Main content"
-        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none"
+        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+8.5rem)] md:pb-8"
         style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 4.5rem)",
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",
           minHeight: "100svh",
@@ -60,10 +58,12 @@ export default function AppLayout() {
           <TabStack />
         </div>
       </main>
-      <QuickCreateFAB />
-      <FloatingVoiceButton />
-      <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      <FeedbackButton ref={feedbackRef} hideTrigger />
+
+      <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />
+      <div className="hidden md:contents">
+        <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
+      </div>
+      <FeedbackButton ref={feedbackRef} />
       <AppDownloadBanner />
     </div>
   );

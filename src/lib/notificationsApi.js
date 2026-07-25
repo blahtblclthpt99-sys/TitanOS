@@ -1,18 +1,46 @@
 /**
- * Notification center — inbox with category taxonomy, seed, filters.
- *
- * Categories:
- * - jobs      Job updates
- * - messages  Messages
- * - reviews   Reviews
- * - account   Account alerts
- * - system    System updates
+ * Notification center — inbox with category taxonomy and filters.
+ * Real notifications only — no sample/demo seeding.
  */
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 
 const PREFIX = "titanos_notif";
 const SEEDED_KEY = "titanos_notif_seeded_v2";
+const PURGED_SAMPLES_KEY = "titanos_notif_purged_samples_v1";
+
+/** Drop historically seeded [Sample] rows so the inbox stays real. */
+function purgeSampleNotifications(userId) {
+  if (!userId) return;
+  try {
+    if (localStorage.getItem(`${PURGED_SAMPLES_KEY}_${userId}`) === "1") return;
+  } catch {
+    /* ignore */
+  }
+  const cleaned = readInbox(userId).filter(
+    (n) =>
+      !(
+        n?.meta?.sample ||
+        String(n?.title || "").startsWith("[Sample]") ||
+        String(n?.body || "").startsWith("Sample only")
+      )
+  );
+  writeInbox(userId, cleaned);
+  try {
+    localStorage.setItem(`${PURGED_SAMPLES_KEY}_${userId}`, "1");
+    localStorage.removeItem(`${SEEDED_KEY}_${userId}`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function isSampleNotification(n) {
+  return Boolean(
+    n?.meta?.sample ||
+      String(n?.title || "").startsWith("[Sample]") ||
+      String(n?.body || "").startsWith("Sample only")
+  );
+}
 
 /** Canonical center categories shown in the UI. */
 export const NOTIFICATION_CATEGORIES = [
@@ -91,162 +119,24 @@ function writeInbox(userId, rows) {
   writeLocal(PREFIX, userId, "inbox", rows.slice(0, 150));
 }
 
-function seedDemoNotifications(userId) {
-  if (!userId) return;
-  try {
-    if (localStorage.getItem(`${SEEDED_KEY}_${userId}`) === "1") return;
-  } catch {
-    /* ignore */
-  }
-  const existing = readInbox(userId);
-  if (existing.length > 0) {
-    try {
-      localStorage.setItem(`${SEEDED_KEY}_${userId}`, "1");
-    } catch {
-      /* ignore */
-    }
-    return;
-  }
-
-  const now = Date.now();
-  const demo = [
-    {
-      id: uid(),
-      user_id: userId,
-      type: "jobs",
-      category: "jobs",
-      title: "Job status updated",
-      body: "HVAC tune-up for Rivera Residence moved to In progress.",
-      link: "/jobs",
-      read_at: null,
-      created_at: new Date(now - 12 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "jobs",
-      category: "jobs",
-      title: "New hire application",
-      body: "A worker applied to your open help request.",
-      link: "/hire",
-      read_at: null,
-      created_at: new Date(now - 55 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "messages",
-      category: "messages",
-      title: "New message",
-      body: "Titan Support sent you a welcome message.",
-      link: "/messages",
-      read_at: null,
-      created_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "activity",
-      category: "account",
-      title: "Activity update",
-      body: "Marcus Rivera updated availability to Available in Driver Hub.",
-      link: "/driver",
-      read_at: null,
-      created_at: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
-      meta: { activity: true },
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "reviews",
-      category: "reviews",
-      title: "New 5-star review",
-      body: "A customer rated your last completed job.",
-      link: "/reputation",
-      read_at: null,
-      created_at: new Date(now - 5 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "account",
-      category: "account",
-      title: "Payment received",
-      body: "Invoice #1042 was paid in full.",
-      link: "/payments",
-      read_at: null,
-      created_at: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "account",
-      category: "account",
-      title: "Security reminder",
-      body: "Review your notification and privacy preferences in Settings.",
-      link: "/settings",
-      read_at: new Date(now - 30 * 60 * 60 * 1000).toISOString(),
-      created_at: new Date(now - 30 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "system",
-      category: "system",
-      title: "TitanOS update",
-      body: "Messages now support photos, files, voice notes, and read receipts.",
-      link: "/messages",
-      read_at: null,
-      created_at: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-    {
-      id: uid(),
-      user_id: userId,
-      type: "system",
-      category: "system",
-      title: "Scheduled maintenance",
-      body: "Brief platform maintenance Sunday 2–3 AM CT. No action needed.",
-      link: "/notifications",
-      read_at: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      created_at: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      meta: {},
-    },
-  ];
-
-  writeInbox(userId, demo);
-  try {
-    localStorage.setItem(`${SEEDED_KEY}_${userId}`, "1");
-  } catch {
-    /* ignore */
-  }
-}
-
 export async function ensureNotificationCenter(userId) {
-  seedDemoNotifications(userId);
+  purgeSampleNotifications(userId);
 }
 
 export async function listNotifications(userId, limit = 50, { category = "all", unreadOnly = false } = {}) {
   if (!userId) return [];
-  seedDemoNotifications(userId);
+  purgeSampleNotifications(userId);
 
   let rows = [];
   try {
     const remote = await api.entities.Notification.filter({ user_id: userId });
-    rows = (remote || []).map(normalize);
-    // Merge any local-only rows (e.g. demo / offline) by id
+    rows = (remote || []).map(normalize).filter((n) => !isSampleNotification(n));
     const remoteIds = new Set(rows.map((r) => r.id));
     for (const local of readInbox(userId)) {
-      if (!remoteIds.has(local.id)) rows.push(local);
+      if (!remoteIds.has(local.id) && !isSampleNotification(local)) rows.push(local);
     }
   } catch {
-    rows = readInbox(userId);
+    rows = readInbox(userId).filter((n) => !isSampleNotification(n));
   }
 
   rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -299,7 +189,20 @@ export async function markRead(userId, notificationId) {
 
 export async function markAllRead(userId, category = "all") {
   const rows = await listNotifications(userId, 200, { category });
-  await Promise.all(rows.filter((n) => !n.read_at).map((n) => markRead(userId, n.id)));
+  const unread = rows.filter((n) => !n.read_at);
+  if (!unread.length) return;
+  const now = new Date().toISOString();
+  const ids = unread.map((n) => n.id);
+  try {
+    await api.entities.Notification.updateMany(ids, { read_at: now });
+  } catch {
+    /* local fallback below */
+  }
+  const idSet = new Set(ids);
+  writeInbox(
+    userId,
+    readInbox(userId).map((n) => (idSet.has(n.id) ? { ...n, read_at: now } : n))
+  );
 }
 
 export async function deleteNotification(userId, notificationId) {

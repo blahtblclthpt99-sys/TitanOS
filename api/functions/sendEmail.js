@@ -1,6 +1,11 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -8,6 +13,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!assertRateLimit(req, res, { limit: 10, windowMs: 60_000, key: "sendEmail" })) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;
@@ -18,13 +24,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "to, subject, and body are required" });
     }
 
-    // Basic abuse controls
-    const recipients = Array.isArray(to) ? to : [to];
-    if (recipients.length > 5) {
-      return res.status(400).json({ error: "Too many recipients" });
+    const recipients = (Array.isArray(to) ? to : [to])
+      .map((r) => String(r || "").trim().toLowerCase())
+      .filter(Boolean);
+
+    if (recipients.length === 0 || recipients.length > 5) {
+      return res.status(400).json({ error: "Invalid recipients" });
+    }
+    if (recipients.some((r) => !EMAIL_RE.test(r))) {
+      return res.status(400).json({ error: "Invalid email address" });
     }
     if (String(body).length > 20000 || String(subject).length > 200) {
       return res.status(400).json({ error: "Message too large" });
+    }
+
+    // Restrict destinations to the caller's own email or customers they own.
+    const { admin, user } = auth;
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("email, role")
+      .eq("id", user.id)
+      .maybeSingle();
+    const ownEmail = String(profile?.email || user.email || "").toLowerCase();
+    const isAdmin = profile?.role === "admin" || user.app_metadata?.role === "admin";
+
+    if (!isAdmin) {
+      const { data: customers } = await admin
+        .from("customers")
+        .select("email")
+        .eq("created_by_id", user.id)
+        .limit(500);
+      const allowed = new Set(
+        [ownEmail, ...(customers || []).map((c) => String(c.email || "").toLowerCase())].filter(Boolean)
+      );
+      const blocked = recipients.filter((r) => !allowed.has(r));
+      if (blocked.length) {
+        return res.status(403).json({
+          error: "You can only email yourself or customers you own.",
+        });
+      }
     }
 
     const resendKey = process.env.RESEND_API_KEY;
@@ -45,22 +83,25 @@ export default async function handler(req, res) {
       });
       if (!response.ok) {
         const err = await response.text();
-        console.error("Resend error:", err);
+        logError("sendEmail:resend", err);
         return res.status(502).json({ error: "Failed to send email" });
       }
       return res.status(200).json({ success: true });
     }
 
-    console.log("[sendEmail stub]", {
+    logError("sendEmail:stub", {
+      message: "Email delivery not configured",
       user: auth.user.id,
-      to,
-      subject,
-      fromName,
-      body: String(body).slice(0, 120),
+      recipientCount: recipients.length,
+      subjectLength: String(subject).length,
     });
-    return res.status(200).json({ success: true, stub: true });
+    return res.status(503).json({
+      error: "Email delivery is not configured",
+      stub: true,
+    });
   } catch (error) {
-    console.error("sendEmail error:", error);
+    logError("sendEmail", error);
+    captureApiException(error, { tags: { route: "sendEmail" } });
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

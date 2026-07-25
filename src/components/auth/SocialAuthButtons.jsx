@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { api } from "@/api/apiClient";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { rememberReturnTo } from "@/lib/returnTo";
 
 function GoogleIcon({ className }) {
   return (
@@ -16,12 +17,13 @@ function GoogleIcon({ className }) {
 
 const PROVIDERS = [{ id: "google", label: "Continue with Google", Icon: GoogleIcon }];
 
-export default function SocialAuthButtons({ onError }) {
+export default function SocialAuthButtons({ onError, returnTo }) {
   const [loadingProvider, setLoadingProvider] = useState("");
 
   const start = async (provider) => {
     setLoadingProvider(provider);
     try {
+      if (returnTo) rememberReturnTo(returnTo);
       await api.auth.loginWithProvider(provider);
     } catch (err) {
       setLoadingProvider("");

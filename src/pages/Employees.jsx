@@ -80,7 +80,7 @@ export default function Employees() {
             <option>manager</option>
             <option>owner</option>
           </select>
-          <Button disabled={adding} className="w-full bg-titan-cyan text-black">
+          <Button disabled={adding} className="w-full">
             {adding ? "Saving…" : "Add employee"}
           </Button>
         </form>

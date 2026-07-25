@@ -17,12 +17,29 @@ const DEFAULT_ALLOWED = [
   "http://localhost",
 ];
 
-function allowedOrigins() {
+export function allowedOrigins() {
   const extra = String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   return [...new Set([...DEFAULT_ALLOWED, ...extra])];
+}
+
+/** Resolve a safe app origin for redirects (never trust raw Origin alone). */
+export function resolveAppOrigin(req) {
+  const origin = req?.headers?.origin || "";
+  const allowed = allowedOrigins();
+  if (origin && allowed.includes(origin)) return origin;
+  const configured =
+    process.env.VITE_TITANOS_PUBLIC_ORIGIN ||
+    process.env.VITE_APP_URL ||
+    process.env.PUBLIC_APP_URL ||
+    "";
+  if (configured && allowed.includes(configured.replace(/\/$/, ""))) {
+    return configured.replace(/\/$/, "");
+  }
+  // Do not accept arbitrary configured HTTPS URLs outside the allowlist.
+  return "https://titanos-web.vercel.app";
 }
 
 export function applyCors(res, req) {

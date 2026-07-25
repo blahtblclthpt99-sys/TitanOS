@@ -5,6 +5,7 @@ import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
 import { supabase } from "@/api/supabaseClient";
+import { consumeReturnTo } from "@/lib/returnTo";
 
 function friendlyAuthError(message) {
   if (/code verifier|pkce|flow state|invalid.*code/i.test(message || "")) {
@@ -39,7 +40,7 @@ export default function AuthCallback() {
 
         // Drop oauth query params from the address bar after a successful exchange
         if (typeof window !== "undefined" && window.history?.replaceState) {
-          window.history.replaceState({}, document.title, "/");
+          window.history.replaceState({}, document.title, "/auth/callback");
         }
 
         // Log new OAuth signups (created in the last 10 minutes)
@@ -66,7 +67,8 @@ export default function AuthCallback() {
         }
 
         await checkUserAuth();
-        if (!cancelled) navigate("/", { replace: true });
+        const dest = consumeReturnTo("/");
+        if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));
       }

@@ -93,26 +93,62 @@ function PortalLogin({ onLogin }) {
           {step === "email" ? (
             <form onSubmit={handleSendCode} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Email Address</label>
-                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600" autoFocus />
+                <label htmlFor="portal-email" className="block text-sm text-gray-400 mb-1">
+                  Email Address
+                </label>
+                <Input
+                  id="portal-email"
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600"
+                  autoFocus
+                />
               </div>
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-              <Button type="submit" disabled={loading} className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90">
+              {error && <p className="text-red-400 text-xs" role="alert">{error}</p>}
+              <Button type="submit" disabled={loading} className="w-full font-semibold hover:bg-titan-cyan/90">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Verification Code"}
               </Button>
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Verification Code</label>
-                <Input type="text" inputMode="numeric" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600 tracking-widest text-center" autoFocus maxLength={6} />
-                <p className="text-gray-600 text-xs mt-2">If an account exists for {email}, a 6-digit code was sent. It expires in 10 minutes.</p>
+                <label htmlFor="portal-otp" className="block text-sm text-gray-400 mb-1">
+                  Verification Code
+                </label>
+                <Input
+                  id="portal-otp"
+                  type="text"
+                  name="one-time-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="bg-[#0A0A0B] border-white/10 text-white placeholder:text-gray-600 tracking-widest text-center"
+                  autoFocus
+                  maxLength={6}
+                />
+                <p className="text-gray-600 text-xs mt-2">
+                  If an account exists for {email}, a 6-digit code was sent. It expires in 10 minutes.
+                </p>
               </div>
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-              <Button type="submit" disabled={loading} className="w-full bg-titan-cyan text-black font-semibold hover:bg-titan-cyan/90">
+              {error && <p className="text-red-400 text-xs" role="alert">{error}</p>}
+              <Button type="submit" disabled={loading} className="w-full font-semibold hover:bg-titan-cyan/90">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify & Continue"}
               </Button>
-              <button type="button" onClick={() => { setStep("email"); setCode(""); setError(""); }} className="w-full flex items-center justify-center gap-1 text-gray-400 hover:text-white text-xs transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setCode("");
+                  setError("");
+                }}
+                className="w-full flex items-center justify-center gap-1 text-gray-400 hover:text-white text-xs transition-colors min-h-[44px]"
+              >
                 <ArrowLeft className="w-3 h-3" /> Use a different email
               </button>
             </form>
@@ -237,7 +273,7 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === tab.id ? "bg-titan-cyan text-black" : "text-gray-400 hover:text-white"}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-gray-400 hover:text-white"}`}>
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {tab.count > 0 && <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab.id ? "bg-black/20" : "bg-white/10"}`}>{tab.count}</span>}
@@ -282,7 +318,7 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                           ))}
                         </div>
                         <Textarea rows={2} placeholder="How did we do?" value={reviewDraft[job.id]?.comment || ""} onChange={(e) => setReviewDraft((d) => ({ ...d, [job.id]: { rating: d[job.id]?.rating || 5, comment: e.target.value } }))} className="bg-[#0A0A0B] border-white/10 text-white text-sm" />
-                        <Button size="sm" disabled={busyId === job.id} onClick={() => leaveReview(job)} className="bg-titan-cyan text-black">
+                        <Button size="sm" disabled={busyId === job.id} onClick={() => leaveReview(job)} className="bg-primary text-primary-foreground">
                           {busyId === job.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Submit review"}
                         </Button>
                       </div>
@@ -359,7 +395,7 @@ function PortalDashboard({ token, initialCustomer, onLogout }) {
                             <span className="font-bold text-red-400">${Number(inv.balance_due).toFixed(2)}</span>
                           </div>
                         )}
-                        <Button size="sm" disabled={busyId === inv.id} onClick={() => payInvoice(inv)} className="w-full bg-titan-cyan text-black mt-1">
+                        <Button size="sm" disabled={busyId === inv.id} onClick={() => payInvoice(inv)} className="w-full bg-primary text-primary-foreground mt-1">
                           {busyId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CreditCard className="w-3.5 h-3.5 mr-1" /> Pay now</>}
                         </Button>
                       </>

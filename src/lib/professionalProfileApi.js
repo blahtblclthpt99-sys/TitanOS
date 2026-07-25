@@ -123,48 +123,16 @@ function seedDemoIfNeeded(user) {
   if (!user?.id) return;
   if (readOwned(user.id)) return;
 
+  // Empty starter only — never invent portfolio, work history, or badges.
   const profile = normalizeProfile(
     {
-      headline: "Trusted field professional on TitanOS",
-      bio:
-        user.bio ||
-        "I help customers get quality work done on time — from estimates to completed jobs. View my portfolio, skills, and reviews below.",
-      skills: ["Customer service", "Estimating", "Safety compliance"],
-      portfolio: [
-        {
-          id: uid(),
-          title: "Residential HVAC upgrade",
-          description: "Full system replacement with efficiency improvements.",
-          image_url: "https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=800&h=600&fit=crop",
-          year: "2025",
-        },
-        {
-          id: uid(),
-          title: "Commercial maintenance contract",
-          description: "Ongoing service for a multi-unit property.",
-          image_url: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&h=600&fit=crop",
-          year: "2024",
-        },
-      ],
-      work_history: [
-        {
-          id: uid(),
-          role: user.company_name ? "Owner / Operator" : "Field technician",
-          company: user.company_name || "Independent",
-          start: "2020",
-          end: "Present",
-          summary: "Leading jobs, customer communication, and quality control.",
-        },
-      ],
-      achievements: [
-        {
-          id: uid(),
-          title: "Customer satisfaction focus",
-          year: "2025",
-          description: "Maintained strong review averages across completed jobs.",
-        },
-      ],
-      badges: user.verified_worker ? ["verified", "reliable", "rising_star"] : ["reliable", "rising_star"],
+      headline: "",
+      bio: user.bio || "",
+      skills: [],
+      portfolio: [],
+      work_history: [],
+      achievements: [],
+      badges: [],
       social: {
         website: "",
         linkedin: "",
@@ -173,7 +141,7 @@ function seedDemoIfNeeded(user) {
         youtube: "",
         x: "",
       },
-      public: true,
+      public: false,
     },
     user
   );

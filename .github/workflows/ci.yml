@@ -1,0 +1,59 @@
+# TitanOS CI — build gate for GitHub → Vercel continuous deployment
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Fee engine tests
+        run: npm run test:fees
+
+      - name: Hire security tests
+        run: npm run test:hire
+
+      - name: Payment security tests
+        run: npm run test:payments
+
+      - name: Driver Hub tests
+        run: npm run test:driver
+
+      - name: Money & portal OTP tests
+        run: npm run test:money
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Public placeholders so Vite can compile without real secrets
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
+          VITE_API_BASE_URL: https://titanos-web.vercel.app

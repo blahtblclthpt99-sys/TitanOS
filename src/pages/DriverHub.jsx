@@ -6,6 +6,7 @@ import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
 import DriverDirectory from "@/components/driver/DriverDirectory";
 import DriverShiftPanel from "@/components/driver/DriverShiftPanel";
+import DriverLocationPanel from "@/components/driver/DriverLocationPanel";
 
 const TABS = [
   { id: "directory", label: "Find drivers", icon: Users },
@@ -16,11 +17,12 @@ export default function DriverHub() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const qParam = params.get("q") || "";
-  const initialTab = tabParam === "shift" ? "shift" : "directory";
+  const initialTab = tabParam === "directory" ? "directory" : "shift";
   const [tab, setTab] = useState(initialTab);
 
   useEffect(() => {
     if (tabParam === "shift" || tabParam === "directory") setTab(tabParam);
+    else if (!tabParam) setTab("shift");
   }, [tabParam]);
 
   useEffect(() => {
@@ -38,15 +40,15 @@ export default function DriverHub() {
   const subtitle = useMemo(
     () =>
       tab === "directory"
-        ? "Browse verified drivers by rating, vehicle, availability, and trust — then request or message in one tap."
-        : "Hotspots, miles, stops & tax sync for your active shift.",
+        ? "Browse published drivers nearby — or publish yourself to get hired."
+        : "Track miles, stops, fuel, and sync to Tax Center.",
     [tab]
   );
 
   return (
     <PageShell maxWidth="xl" className="space-y-5">
       <PageHeader
-        eyebrow="Marketplace"
+        eyebrow="Field"
         title="Driver Hub"
         subtitle={subtitle}
         className="mb-0"
@@ -73,7 +75,10 @@ export default function DriverHub() {
               key={id}
               type="button"
               role="tab"
+              id={`driver-hub-tab-${id}`}
+              aria-controls={`driver-hub-panel-${id}`}
               aria-selected={active}
+              tabIndex={active ? 0 : -1}
               onClick={() => selectTab(id)}
               className={`flex min-h-[48px] items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors duration-fast focus-ring ${
                 active
@@ -88,7 +93,18 @@ export default function DriverHub() {
         })}
       </div>
 
-      {tab === "directory" ? <DriverDirectory initialQuery={qParam} /> : <DriverShiftPanel />}
+      <div
+        role="tabpanel"
+        id={`driver-hub-panel-${tab}`}
+        aria-labelledby={`driver-hub-tab-${tab}`}
+      >
+        {tab === "directory" ? <DriverDirectory initialQuery={qParam} /> : (
+          <div className="space-y-4">
+            <DriverLocationPanel />
+            <DriverShiftPanel />
+          </div>
+        )}
+      </div>
     </PageShell>
   );
 }

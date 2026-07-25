@@ -70,6 +70,37 @@ async function localFallback(functionName, payload) {
     };
   }
 
+  if (functionName === "calculateFee") {
+    const { calculateFees, pickSeedRule } = await import("@/lib/feeEngine");
+    const categoryId = payload.categoryId || payload.category_id || "service_requests";
+    const contextKey = payload.contextKey || payload.context_key || payload.planId || "*";
+    const rule = pickSeedRule(categoryId, contextKey);
+    const result = calculateFees({
+      grossAmount: Number(payload.grossAmount ?? payload.amount) || 0,
+      rule,
+    });
+    return {
+      fee: {
+        categoryId,
+        contextKey,
+        gross: result.gross,
+        platform_fee: result.platformFee,
+        processing_fee: result.processingFee,
+        tax_amount: result.taxAmount,
+        net_amount: result.netAmount,
+        final_total: result.finalTotal,
+        rate: result.rate,
+        label: result.label,
+        config_source: "seed",
+        stub: true,
+      },
+    };
+  }
+
+  if (functionName === "adminFees") {
+    throw apiError("Fee admin API requires a signed-in admin on the live host.", 503);
+  }
+
   if (functionName === "attachReferral") {
     return { ok: true, matched: false, stub: true };
   }

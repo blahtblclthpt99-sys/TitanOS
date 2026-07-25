@@ -5,19 +5,20 @@ import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import { MORE_MENU_GROUPS, filterNavItems, navItemsByPaths } from "@/lib/nav-items";
 import { useAuth } from "@/lib/AuthContext";
+import { isUserAdmin } from "@/lib/isAdmin";
 import { betaBadgeLabel } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 
 export default function MoreMenu() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isUserAdmin(user);
 
   return (
     <PageShell maxWidth="md">
       <PageHeader
         eyebrow="Navigate"
-        title="More tools"
-        subtitle="Everything beyond the bottom tabs — organized by what you’re trying to do."
+        title="More"
+        subtitle="Daily tools first — Labs holds demos and early experiments."
       />
 
       {betaBadgeLabel() && (
@@ -29,7 +30,8 @@ export default function MoreMenu() {
       <div className="space-y-8">
         {MORE_MENU_GROUPS.map((group) => {
           const paths = group.paths.filter(
-            (path) => path !== "/admin/moderation" || isAdmin
+            (path) =>
+              (path !== "/admin/moderation" && path !== "/admin/fees" && path !== "/admin/tax-rules") || isAdmin
           );
           const items = filterNavItems(navItemsByPaths(paths), { isAdmin });
           if (!items.length) return null;

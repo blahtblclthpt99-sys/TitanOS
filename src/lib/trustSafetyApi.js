@@ -175,15 +175,22 @@ export async function markEmailVerified(userId) {
 
 export async function sendEmailVerification(user) {
   if (!user?.email) throw new Error("No email on account");
+  let emailed = false;
+  let stub = true;
   try {
-    await api.auth.resendOtp?.(user.email);
+    if (typeof api.auth.resendOtp === "function") {
+      await api.auth.resendOtp(user.email);
+      emailed = true;
+      stub = false;
+    }
   } catch {
-    /* local-only fallback */
+    emailed = false;
+    stub = true;
   }
   const state = readTrust(user.id);
   state.email = { ...state.email, status: "pending" };
   writeTrust(user.id, state);
-  return state;
+  return { state, emailed, stub, demo: true };
 }
 
 export async function startPhoneVerification(user, phone) {

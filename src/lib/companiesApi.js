@@ -5,19 +5,42 @@ const PREFIX = "titanos_companies";
 
 export async function listMyCompanies(userId) {
   try {
-    const owned = await api.entities.Company.filter({ owner_id: userId });
-    const memberships = await api.entities.CompanyMember.filter({ user_id: userId, status: "active" });
-    const memberCompanies = [];
-    for (const m of memberships) {
+    const [owned, memberships] = await Promise.all([
+      api.entities.Company.filter({ owner_id: userId }),
+      api.entities.CompanyMember.filter({ user_id: userId, status: "active" }),
+    ]);
+
+    const memberIds = [...new Set((memberships || []).map((m) => m.company_id).filter(Boolean))];
+    let memberCompanies = [];
+    if (memberIds.length) {
       try {
-        const c = await api.entities.Company.get(m.company_id);
-        if (c) memberCompanies.push({ ...c, member_role: m.role });
+        memberCompanies = await api.entities.Company.filter({ id: { in: memberIds } });
       } catch {
-        /* skip */
+        // Fallback if .in unsupported on host — parallel get (still better than sequential)
+        memberCompanies = (
+          await Promise.all(
+            memberIds.map(async (id) => {
+              try {
+                return await api.entities.Company.get(id);
+              } catch {
+                return null;
+              }
+            })
+          )
+        ).filter(Boolean);
       }
     }
+
+    const roleByCompany = new Map((memberships || []).map((m) => [m.company_id, m.role]));
     const map = new Map();
-    [...owned.map((c) => ({ ...c, member_role: "owner" })), ...memberCompanies].forEach((c) => map.set(c.id, c));
+    for (const c of owned || []) {
+      map.set(c.id, { ...c, member_role: "owner" });
+    }
+    for (const c of memberCompanies) {
+      if (!map.has(c.id)) {
+        map.set(c.id, { ...c, member_role: roleByCompany.get(c.id) || "member" });
+      }
+    }
     return [...map.values()];
   } catch {
     return readLocal(PREFIX, userId, "all", []);

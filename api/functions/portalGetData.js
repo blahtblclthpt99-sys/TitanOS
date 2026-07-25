@@ -1,9 +1,16 @@
 import { getSupabaseAdmin, readJson, toEntityRow } from "../_lib/supabase.js";
+import { applyCors, handleOptions } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
+  applyCors(res, req);
+  if (handleOptions(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!assertRateLimit(req, res, { limit: 60, windowMs: 60_000, key: "portalGetData" })) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -70,7 +77,8 @@ export default async function handler(req, res) {
       invoices: (invoicesRes.data || []).map(toEntityRow),
     });
   } catch (error) {
-    console.error("portalGetData error:", error);
+    logError("portalGetData", error);
+    captureApiException(error, { tags: { route: "portalGetData" } });
     return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }

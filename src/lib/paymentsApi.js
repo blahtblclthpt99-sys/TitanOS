@@ -1,14 +1,15 @@
 import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { calcPlatformFee } from "@/lib/platformFee";
+import { DATA_SOURCE, PersistenceError, withSource, getSource } from "@/lib/dataSource";
 
 const PREFIX = "titanos_pay";
 
 export async function listPaymentAccounts(userId) {
   try {
-    return await api.entities.PaymentAccount.filter({ user_id: userId });
+    return withSource(await api.entities.PaymentAccount.filter({ user_id: userId }), DATA_SOURCE.remote);
   } catch {
-    return readLocal(PREFIX, userId, "accounts", []);
+    return withSource(readLocal(PREFIX, userId, "accounts", []), DATA_SOURCE.local);
   }
 }
 
@@ -23,8 +24,10 @@ export async function upsertPaymentAccount(user, { provider, account_label, exte
   };
   try {
     const existing = await api.entities.PaymentAccount.filter({ user_id: user.id, provider });
-    if (existing[0]) return api.entities.PaymentAccount.update(existing[0].id, payload);
-    return api.entities.PaymentAccount.create(payload);
+    const row = existing[0]
+      ? await api.entities.PaymentAccount.update(existing[0].id, payload)
+      : await api.entities.PaymentAccount.create(payload);
+    return withSource(row, DATA_SOURCE.remote);
   } catch {
     const rows = readLocal(PREFIX, user.id, "accounts", []);
     const idx = rows.findIndex((r) => r.provider === provider);
@@ -32,21 +35,26 @@ export async function upsertPaymentAccount(user, { provider, account_label, exte
     if (idx >= 0) rows[idx] = row;
     else rows.push(row);
     writeLocal(PREFIX, user.id, "accounts", rows);
-    return row;
+    return withSource(row, DATA_SOURCE.local);
   }
 }
 
 export async function listPayments(userId) {
   try {
-    return await api.entities.Payment.filter({ user_id: userId });
+    return withSource(await api.entities.Payment.filter({ user_id: userId }), DATA_SOURCE.remote);
   } catch {
-    return readLocal(PREFIX, userId, "payments", []);
+    return withSource(readLocal(PREFIX, userId, "payments", []), DATA_SOURCE.local);
   }
 }
 
+/**
+ * Fail closed: only succeed when a live checkout URL exists.
+ * Never invent a local “payment link created” success for money.
+ */
 export async function createPaymentLink(user, { amount, customer_name, invoice_id, provider = "stripe", note }) {
   const { base, fee, total, rate, percentLabel, planId } = calcPlatformFee(amount, user);
 
+  let invokeError = null;
   try {
     const result = await api.functions.invoke("createPaymentLink", {
       amount: base,
@@ -56,64 +64,100 @@ export async function createPaymentLink(user, { amount, customer_name, invoice_i
       note,
     });
     const data = result?.data || result;
-    if (data?.payment) {
-      return {
-        ...data.payment,
-        base_amount: data.payment.base_amount ?? base,
-        platform_fee: data.payment.platform_fee ?? fee,
-        platform_fee_rate: data.payment.platform_fee_rate ?? rate,
-        amount_total: data.payment.amount_total ?? data.payment.amount ?? total,
-        plan: data.payment.plan ?? planId,
-        fee_label: data.fee?.label ?? percentLabel,
-      };
+
+    if (data?.stub || data?.setupRequired) {
+      throw new PersistenceError(
+        data?.message ||
+          "Live checkout is not configured. Add STRIPE_SECRET_KEY on the server — no payment link was created.",
+        { source: DATA_SOURCE.stub, code: "PAYMENT_STUB" }
+      );
     }
-  } catch {
-    /* fall through to local pending payment */
-  }
 
-  const payload = {
-    user_id: user.id,
-    invoice_id: invoice_id || null,
-    customer_name: customer_name || "",
-    amount: total,
-    base_amount: base,
-    platform_fee: fee,
-    platform_fee_rate: rate,
-    amount_total: total,
-    provider,
-    status: "pending",
-    checkout_url: "",
-    note:
-      note ||
-      `TitanOS ${planId} fee ${percentLabel} ($${fee.toFixed(2)}). Total $${total.toFixed(2)}.`,
-    created_by_id: user.id,
-  };
+    if (data?.payment?.checkout_url) {
+      return withSource(
+        {
+          ...data.payment,
+          base_amount: data.payment.base_amount ?? base,
+          platform_fee: data.payment.platform_fee ?? fee,
+          platform_fee_rate: data.payment.platform_fee_rate ?? rate,
+          amount_total: data.payment.amount_total ?? data.payment.amount ?? total,
+          plan: data.payment.plan ?? planId,
+          fee_label: data.fee?.label ?? percentLabel,
+        },
+        DATA_SOURCE.remote
+      );
+    }
 
-  try {
-    return await api.entities.Payment.create(payload);
-  } catch {
-    try {
-      const { base_amount, platform_fee, platform_fee_rate, amount_total, ...legacy } = payload;
-      const row = await api.entities.Payment.create({
-        ...legacy,
-        note: `${legacy.note} base=$${base_amount} fee=$${platform_fee}`,
+    if (data?.payment && !data.payment.checkout_url) {
+      throw new PersistenceError("Payment provider did not return a checkout URL. No live link was created.", {
+        source: DATA_SOURCE.stub,
+        code: "PAYMENT_NO_CHECKOUT",
       });
-      return { ...row, base_amount, platform_fee, platform_fee_rate, amount_total, plan: planId, fee_label: percentLabel };
-    } catch {
-      const row = { id: uid(), created_at: new Date().toISOString(), ...payload, plan: planId, fee_label: percentLabel };
-      const all = readLocal(PREFIX, user.id, "payments", []);
-      all.unshift(row);
-      writeLocal(PREFIX, user.id, "payments", all);
-      return row;
     }
+  } catch (err) {
+    if (err instanceof PersistenceError) throw err;
+    invokeError = err;
   }
+
+  throw new PersistenceError(
+    invokeError?.message ||
+      "Could not create a live payment link. TitanOS will not save a fake checkout or toast success.",
+    { source: DATA_SOURCE.stub, code: "PAYMENT_FAIL_CLOSED", cause: invokeError }
+  );
 }
 
+/** Fail closed: remote money statuses are webhook-only. Local device rows may still update. */
+const CLIENT_ALLOWED_STATUSES = new Set(["pending", "canceled", "failed", "cancelled"]);
+const WEBHOOK_ONLY_STATUSES = new Set(["succeeded", "refunded", "paid"]);
+
 export async function markPaymentStatus(id, status) {
+  const normalized = String(status || "").toLowerCase();
+  if (WEBHOOK_ONLY_STATUSES.has(normalized)) {
+    throw new PersistenceError(
+      "Paid / refunded status is set only by the payment provider webhook. TitanOS will not mark this paid from the browser.",
+      { source: DATA_SOURCE.remote, code: "PAYMENT_STATUS_WEBHOOK_ONLY" }
+    );
+  }
+  if (!CLIENT_ALLOWED_STATUSES.has(normalized)) {
+    throw new PersistenceError("Unsupported payment status.", {
+      source: DATA_SOURCE.remote,
+      code: "PAYMENT_STATUS_INVALID",
+    });
+  }
+
   try {
-    return await api.entities.Payment.update(id, { status });
-  } catch {
-    return { id, status };
+    return withSource(await api.entities.Payment.update(id, { status: normalized === "cancelled" ? "canceled" : normalized }), DATA_SOURCE.remote);
+  } catch (err) {
+    const localId = String(id || "");
+    const looksLocal = localId.startsWith("local_") || !/^[0-9a-f-]{36}$/i.test(localId);
+    if (!looksLocal) {
+      throw new PersistenceError("Could not update payment status on the server. No status change was saved.", {
+        source: DATA_SOURCE.remote,
+        code: "PAYMENT_STATUS_FAIL",
+        cause: err,
+      });
+    }
+
+    // Device-only rows from older builds — surface, don't pretend remote.
+    const userKeys = Object.keys(localStorage || {}).filter((k) => k.startsWith(`${PREFIX}_payments_`));
+    for (const key of userKeys) {
+      try {
+        const rows = JSON.parse(localStorage.getItem(key) || "[]");
+        const idx = rows.findIndex((r) => r.id === id);
+        if (idx >= 0) {
+          rows[idx] = { ...rows[idx], status: normalized };
+          localStorage.setItem(key, JSON.stringify(rows));
+          return withSource({ ...rows[idx] }, DATA_SOURCE.local);
+        }
+      } catch {
+        /* continue */
+      }
+    }
+    throw new PersistenceError("Could not update payment status.", {
+      source: DATA_SOURCE.local,
+      code: "PAYMENT_STATUS_MISSING",
+      cause: err,
+    });
   }
 }
 
@@ -129,3 +173,5 @@ export async function deletePayment(userId, id) {
     );
   }
 }
+
+export { getSource, DATA_SOURCE };

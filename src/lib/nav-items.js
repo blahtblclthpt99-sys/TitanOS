@@ -42,10 +42,12 @@ import {
   PhoneCall,
   Car,
   Palette,
+  Percent,
+  Landmark,
 } from "lucide-react";
 
 /**
- * Sidebar IA — daily work first; secondary groups collapsed by default.
+ * Sidebar IA — daily work first; Labs holds demos / early tools (collapsed).
  * Items with adminOnly are filtered in Sidebar / MoreMenu.
  */
 export const APP_NAV_ITEMS = [
@@ -56,12 +58,11 @@ export const APP_NAV_ITEMS = [
   { icon: Users, label: "Customers", path: "/customers", group: "daily" },
   { icon: FileText, label: "Estimates", path: "/estimates", group: "daily" },
   { icon: Receipt, label: "Invoices", path: "/invoices", group: "daily" },
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "daily" },
+  { icon: MessageSquare, label: "Messages", path: "/messages", group: "daily" },
 
   // Money
   { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
   { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
-  { icon: ShieldCheck, label: "Job Holds · Beta", path: "/escrow", group: "money", beta: true },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "money" },
   { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "money" },
   { icon: LineChart, label: "Analytics", path: "/analytics", group: "money" },
@@ -76,35 +77,40 @@ export const APP_NAV_ITEMS = [
   { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "field" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "field" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "field" },
+  { icon: Car, label: "Driver Hub", path: "/driver", group: "field" },
 
-  // Growth
+  // Growth — live customer / revenue tools
   { icon: Store, label: "Marketplace", path: "/marketplace", group: "growth" },
   { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "growth" },
   { icon: ContactRound, label: "Leads", path: "/leads", group: "growth" },
   { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "growth" },
   { icon: Star, label: "Reputation", path: "/reputation", group: "growth" },
-  { icon: Sparkles, label: "Growth Coach · Beta", path: "/growth-coach", group: "growth", beta: true },
   { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "growth" },
   { icon: Award, label: "Titan Score", path: "/titan-score", group: "growth" },
-  { icon: Tag, label: "Local Deals · Beta", path: "/deals", group: "growth", beta: true },
-  { icon: Siren, label: "Emergency Jobs", path: "/emergency", group: "growth" },
-  { icon: Shield, label: "Insurance", path: "/insurance", group: "growth" },
   { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
 
   // Connect
   { icon: Bot, label: "AI Assistant", path: "/assistant", group: "connect" },
-  { icon: PhoneCall, label: "Phone Script · Beta", path: "/phone", group: "connect", beta: true },
-  { icon: MessageSquare, label: "Messages", path: "/messages", group: "connect" },
   { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
   { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
 
   // Account
   { icon: User, label: "Professional Profile", path: "/profile", group: "account" },
-  { icon: Shield, label: "Trust & Safety · Beta", path: "/trust-safety", group: "account", beta: true },
   { icon: Building2, label: "Companies", path: "/companies", group: "account" },
   { icon: Settings, label: "Settings", path: "/settings", group: "account" },
-  { icon: Palette, label: "Design System", path: "/design-system", group: "account" },
+  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "account" },
   { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "account", adminOnly: true },
+  { icon: Percent, label: "Fee management", path: "/admin/fees", group: "account", adminOnly: true },
+  { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "account", adminOnly: true },
+
+  // Labs — needs external providers (Stripe Connect, Twilio, partner feeds)
+  { icon: ShieldCheck, label: "Job Holds · Soon", path: "/escrow", group: "labs", beta: true },
+  { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "labs" },
+  { icon: Tag, label: "Local Deals · Soon", path: "/deals", group: "labs", beta: true },
+  { icon: Siren, label: "Emergency Board", path: "/emergency", group: "labs" },
+  { icon: PhoneCall, label: "Phone Scripts", path: "/phone", group: "labs" },
+  { icon: Shield, label: "Insurance", path: "/insurance", group: "labs" },
+  { icon: Palette, label: "Design System", path: "/design-system", group: "labs" },
 ];
 
 export const NAV_GROUP_META = {
@@ -114,41 +120,51 @@ export const NAV_GROUP_META = {
   growth: { label: "Grow business", collapsible: true, defaultOpen: false },
   connect: { label: "Connect", collapsible: true, defaultOpen: false },
   account: { label: "Account", collapsible: true, defaultOpen: false },
+  labs: { label: "Labs", collapsible: true, defaultOpen: false },
 };
 
-export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", "account"];
+export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", "account", "labs"];
 
-/** Mobile bottom tabs — Settings (not “Profile”) to match destination */
+/** Mobile bottom tabs — Profile opens /profile (settings live under More). */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
   { icon: Store, label: "Market", path: "/marketplace" },
   { icon: MessageSquare, label: "Messages", path: "/messages" },
-  { icon: Settings, label: "Settings", path: "/settings" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
 /** Paths that keep the bottom tab bar “selected root” chrome (no Back). */
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/settings", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
 
 /**
- * More menu — essentials first; beta tools labeled in APP_NAV_ITEMS.
- * Driver Hub lives in Daily work (no duplicate hero).
+ * More menu — essentials first; Labs holds partner-dependent tools.
  */
 export const MORE_MENU_GROUPS = [
   {
     title: "Daily work",
     description: "Run today’s jobs",
-    paths: ["/driver", "/schedule", "/customers", "/estimates", "/invoices"],
+    paths: ["/schedule", "/customers", "/estimates", "/invoices", "/messages"],
   },
   {
     title: "Money",
     description: "Get paid and stay organized",
-    paths: ["/finances", "/payments", "/tax-center", "/receipts", "/invoices", "/analytics", "/reports", "/escrow"],
+    paths: ["/finances", "/payments", "/tax-center", "/receipts", "/analytics", "/reports"],
   },
   {
     title: "Field & team",
-    description: "Crew, trucks, and ops",
-    paths: ["/job-estimator", "/routes", "/fleet", "/employees", "/inventory", "/credentials", "/booking", "/contracts"],
+    description: "Crew, routes, fleet, drivers",
+    paths: [
+      "/job-estimator",
+      "/routes",
+      "/fleet",
+      "/employees",
+      "/inventory",
+      "/credentials",
+      "/booking",
+      "/contracts",
+      "/driver",
+    ],
   },
   {
     title: "Grow",
@@ -158,17 +174,25 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Connect",
     description: "Talk to customers and your team",
-    paths: ["/assistant", "/messages", "/community", "/notifications"],
+    paths: ["/assistant", "/community", "/notifications"],
   },
   {
     title: "Account",
     description: "You and your business",
-    paths: ["/profile", "/companies", "/settings", "/design-system", "/trust-safety", "/admin/moderation"],
+    paths: ["/profile", "/companies", "/settings", "/trust-safety", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
   },
   {
     title: "Labs",
-    description: "Early / experimental tools",
-    paths: ["/growth-coach", "/deals", "/emergency", "/phone", "/insurance"],
+    description: "Tools that need partner APIs (Stripe Connect, telephony, deals)",
+    paths: [
+      "/escrow",
+      "/growth-coach",
+      "/deals",
+      "/emergency",
+      "/phone",
+      "/insurance",
+      "/design-system",
+    ],
   },
 ];
 

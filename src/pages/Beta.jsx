@@ -66,13 +66,16 @@ export default function Beta() {
         localStorage.setItem("titanos_beta_signups", JSON.stringify(pending));
       }
       try {
-        await api.integrations.Core.SendEmail({
+        const mail = await api.integrations.Core.SendEmail({
           to: "hello@titanos.app",
           subject: `New Beta Tester Application — ${form.full_name}`,
           body: `New beta tester application:\n\nName: ${form.full_name}\nEmail: ${form.email}\nBusiness Type: ${form.business_type || "N/A"}\nTeam Size: ${form.business_size || "N/A"}\nTech Level: ${form.experience || "N/A"}\n\nWhy they want to join:\n${form.why_join || "Not provided"}`,
         });
+        if (mail?.stub) {
+          /* application saved; email not delivered */
+        }
       } catch {
-        /* sendEmail may be stubbed on IONOS — application still counted locally */
+        /* sendEmail may be unavailable — application still counted locally */
       }
       setApplied(true);
     } catch {
@@ -163,8 +166,17 @@ export default function Beta() {
               <div className="w-16 h-16 rounded-2xl bg-titan-cyan/10 flex items-center justify-center mx-auto mb-4">
                 <Check className="w-8 h-8 text-titan-cyan" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Application received!</h3>
-              <p className="text-sm text-white/50 mb-2">We'll review your application and reach out to <span className="text-white/70">{form.email}</span> soon.</p>
+              <h3 className="text-xl font-bold text-white mb-2">Application saved</h3>
+              <p className="text-sm text-white/50 mb-2">
+                We recorded your application
+                {form.email ? (
+                  <>
+                    {" "}
+                    for <span className="text-white/70">{form.email}</span>
+                  </>
+                ) : null}
+                . If email delivery isn’t configured on this host, we may not auto-reply — create an account to stay in the loop.
+              </p>
               <p className="text-xs text-white/30 mb-6">In the meantime, feel free to explore the app.</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button asChild className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 text-sm gap-2">

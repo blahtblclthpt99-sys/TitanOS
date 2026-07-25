@@ -128,6 +128,7 @@ async function registerViaServer({ email, password, fullName }) {
         session: body.session || null,
         user: body.user || null,
         needsEmailVerification: Boolean(body.needsEmailVerification),
+        verificationMode: body.verificationMode || null,
       };
     } catch (err) {
       lastError = err;
@@ -311,11 +312,9 @@ export function createAuthModule() {
         "community_opt_in",
         "referral_code",
         "referred_by_code",
-        "verified_worker",
-        "verification_notes",
         "active_company_id",
-        "plan_tier",
-        "account_type",
+        // Intentionally excluded (server/admin only): role, is_pro, lifetime_premium,
+        // paying_subscriber, plan_tier, account_type, verified_worker, verification_notes
       ];
 
       const payload = {};
@@ -372,6 +371,19 @@ export function createAuthModule() {
     },
 
     redirectToLogin(fromUrl = window.location.href) {
+      const path = (() => {
+        try {
+          const url = new URL(fromUrl, window.location.origin);
+          return `${url.pathname}${url.search}${url.hash}`;
+        } catch {
+          return "/";
+        }
+      })();
+      try {
+        sessionStorage.setItem("titanos_auth_return_to", path.startsWith("/") ? path : "/");
+      } catch {
+        /* ignore */
+      }
       const loginUrl = `/login?from_url=${encodeURIComponent(fromUrl)}`;
       window.location.href = loginUrl;
     },

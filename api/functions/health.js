@@ -31,10 +31,10 @@ export default async function handler(req, res) {
       const admin = getSupabaseAdmin();
       const { error } = await admin.from("profiles").select("id").limit(1);
       checks.supabase = error ? "degraded" : "ok";
-      if (error) checks.supabaseError = error.message;
-    } catch (err) {
+      if (error) checks.supabaseError = "query_failed";
+    } catch {
       checks.supabase = "down";
-      checks.supabaseError = err.message || "unreachable";
+      checks.supabaseError = "unreachable";
     }
   }
 

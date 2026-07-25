@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,15 @@ import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { toast } from "@/components/ui/use-toast";
 import { attachReferralOnSignup } from "@/lib/referralApi";
 import { useAuth } from "@/lib/AuthContext";
+import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { checkUserAuth } = useAuth();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref") || "";
+  const returnTo = resolveReturnTo(location);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +39,7 @@ export default function Register() {
       await attachReferralOnSignup({ userId, email, refCode });
     }
     await checkUserAuth();
-    navigate("/", { replace: true });
+    navigate(consumeReturnTo(returnTo), { replace: true });
   };
 
   const handleSubmit = async (e) => {
@@ -56,6 +59,15 @@ export default function Register() {
       if (result?.session) {
         const me = await api.auth.me().catch(() => null);
         await finishSignup(me?.id || result?.user?.id);
+        return;
+      }
+      if (result?.verificationMode === "email_link" || result?.needsEmailVerification) {
+        setError("");
+        toast({
+          title: "Check your email",
+          description: "Confirm your address from the link we sent, then sign in.",
+        });
+        navigate("/login", { replace: true });
         return;
       }
       setShowOtp(true);
@@ -148,7 +160,7 @@ export default function Register() {
         </div>
       )}
 
-      <SocialAuthButtons onError={setError} />
+      <SocialAuthButtons onError={setError} returnTo={returnTo} />
 
       <div className="relative my-5">
         <div className="absolute inset-0 flex items-center">
@@ -247,7 +259,7 @@ export default function Register() {
 
       <p className="mt-5 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-foreground hover:underline">
+        <Link to="/login" state={location.state} className="font-semibold text-foreground hover:underline">
           Sign in
         </Link>
       </p>

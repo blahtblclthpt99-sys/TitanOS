@@ -3,43 +3,54 @@ import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
 import { notifyUser } from "@/lib/notify";
 import { assertWithinFreeLimit } from "@/lib/plan";
+import { DATA_SOURCE, PersistenceError, withSource, getSource } from "@/lib/dataSource";
 
 const PREFIX = "titanos_hire";
 
-/**
- * Hire board API — Supabase when available, otherwise localStorage.
- * Used by Hire page and Driver Hub “Request driver” flow.
- */
+function readGlobalApps() {
+  return readLocal(PREFIX, "global", "apps", []);
+}
+
+function writeGlobalApps(rows) {
+  writeLocal(PREFIX, "global", "apps", rows.slice(0, 500));
+}
 
 /**
- * @param {{ category?: string, state?: string, search?: string, status?: string }} [opts]
- * @returns {Promise<object[]>}
+ * Hire board API — Supabase when available.
+ * Local fallback is tagged `_source: local` so UI can surface device-only mode
+ * instead of looking production-ready.
  */
+
 export async function listHireJobs({ category = "All", state = "", search = "", status = "open" } = {}) {
   try {
-    let rows = await api.entities.HireJob.list("-created_date", 200);
-    return filterJobs(rows, { category, state, search, status });
+    const rows = await api.entities.HireJob.list("-created_date", 200);
+    return withSource(filterJobs(rows, { category, state, search, status }), DATA_SOURCE.remote);
   } catch {
-    return filterJobs(readLocal(PREFIX, "global", "jobs", []), { category, state, search, status });
+    return withSource(
+      filterJobs(readLocal(PREFIX, "global", "jobs", []), { category, state, search, status }),
+      DATA_SOURCE.local
+    );
   }
 }
 
 function filterJobs(rows, { category, state, search, status }) {
   const q = search.trim().toLowerCase();
-  return rows.filter((j) => {
-    if (status && status !== "all" && j.status !== status) return false;
-    if (category && category !== "All" && j.category !== category) return false;
-    if (state && j.state !== state) return false;
-    if (!q) return true;
-    return (
-      j.title?.toLowerCase().includes(q) ||
-      j.description?.toLowerCase().includes(q) ||
-      j.city?.toLowerCase().includes(q)
-    );
-  }).sort((a, b) => {
-    const priority = (job) => (job.is_same_day ? 2 : 0) + (job.is_urgent ? 1 : 0);
-    return priority(b) - priority(a);
-  });
+  return rows
+    .filter((j) => {
+      if (status && status !== "all" && j.status !== status) return false;
+      if (category && category !== "All" && j.category !== category) return false;
+      if (state && j.state !== state) return false;
+      if (!q) return true;
+      return (
+        j.title?.toLowerCase().includes(q) ||
+        j.description?.toLowerCase().includes(q) ||
+        j.city?.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const priority = (job) => (job.is_same_day ? 2 : 0) + (job.is_urgent ? 1 : 0);
+      return priority(b) - priority(a);
+    });
 }
 
 /** Create a hire post (enforces free-plan limits). Prefills from Driver Hub when used there. */
@@ -74,13 +85,13 @@ export async function createHireJob(user, data) {
     created_by_id: user.id,
   };
   try {
-    return await api.entities.HireJob.create(payload);
+    return withSource(await api.entities.HireJob.create(payload), DATA_SOURCE.remote);
   } catch {
     const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
     const all = readLocal(PREFIX, "global", "jobs", []);
     all.unshift(row);
     writeLocal(PREFIX, "global", "jobs", all);
-    return row;
+    return withSource(row, DATA_SOURCE.local);
   }
 }
 
@@ -109,31 +120,93 @@ export async function applyToHireJob(user, hireJobId, { message, bid_amount }) {
         link: "/hire",
       });
     } catch {
-      /* optional */
+      /* optional notify */
     }
-    return app;
+    return withSource(app, DATA_SOURCE.remote);
   } catch {
-    const apps = readLocal(PREFIX, user.id, "apps", []);
     const row = { id: uid(), created_at: new Date().toISOString(), ...payload };
-    apps.unshift(row);
-    writeLocal(PREFIX, user.id, "apps", apps);
-    return row;
+    writeGlobalApps([row, ...readGlobalApps()]);
+    // Keep per-user mirror for "my applications"
+    const mine = readLocal(PREFIX, user.id, "apps", []);
+    mine.unshift(row);
+    writeLocal(PREFIX, user.id, "apps", mine);
+
+    const jobs = readLocal(PREFIX, "global", "jobs", []);
+    const jIdx = jobs.findIndex((j) => j.id === hireJobId);
+    if (jIdx >= 0) {
+      jobs[jIdx] = {
+        ...jobs[jIdx],
+        application_count: (jobs[jIdx].application_count || 0) + 1,
+      };
+      writeLocal(PREFIX, "global", "jobs", jobs);
+    }
+    return withSource(row, DATA_SOURCE.local);
   }
 }
 
 export async function listApplicationsForJob(hireJobId) {
   try {
-    return await api.entities.HireApplication.filter({ hire_job_id: hireJobId });
+    return withSource(
+      await api.entities.HireApplication.filter({ hire_job_id: hireJobId }),
+      DATA_SOURCE.remote
+    );
   } catch {
-    return readLocal(PREFIX, "global", "apps", []).filter((a) => a.hire_job_id === hireJobId);
+    return withSource(
+      readGlobalApps().filter((a) => a.hire_job_id === hireJobId),
+      DATA_SOURCE.local
+    );
+  }
+}
+
+/** One query for all applicants across a set of posts (avoids N+1 on My Posts). */
+export async function listApplicationsForJobs(jobIds) {
+  const ids = [...new Set((jobIds || []).filter(Boolean))];
+  const empty = Object.fromEntries(ids.map((id) => [id, []]));
+  if (!ids.length) return empty;
+  try {
+    const rows = await api.entities.HireApplication.filter({ hire_job_id: { in: ids } });
+    const map = { ...empty };
+    for (const row of rows || []) {
+      if (!map[row.hire_job_id]) map[row.hire_job_id] = [];
+      map[row.hire_job_id].push(row);
+    }
+    return withSource(map, DATA_SOURCE.remote);
+  } catch {
+    const map = { ...empty };
+    for (const app of readGlobalApps()) {
+      if (!map[app.hire_job_id]) continue;
+      map[app.hire_job_id].push(app);
+    }
+    return withSource(map, DATA_SOURCE.local);
+  }
+}
+
+/** Fetch hire posts by id list — used for Applications tab titles without loading the whole board. */
+export async function listHireJobsByIds(ids) {
+  const unique = [...new Set((ids || []).filter(Boolean))];
+  if (!unique.length) return withSource([], DATA_SOURCE.remote);
+  try {
+    return withSource(
+      await api.entities.HireJob.filter({ id: { in: unique } }),
+      DATA_SOURCE.remote
+    );
+  } catch {
+    const local = readLocal(PREFIX, "global", "jobs", []).filter((job) => unique.includes(job.id));
+    return withSource(local, DATA_SOURCE.local);
   }
 }
 
 export async function listMyApplications(userId) {
   try {
-    return await api.entities.HireApplication.filter({ worker_id: userId });
+    return withSource(
+      await api.entities.HireApplication.filter({ worker_id: userId }),
+      DATA_SOURCE.remote
+    );
   } catch {
-    return readLocal(PREFIX, userId, "apps", []);
+    const global = readGlobalApps().filter((a) => a.worker_id === userId);
+    const mine = readLocal(PREFIX, userId, "apps", []);
+    const byId = new Map([...global, ...mine].map((a) => [a.id, a]));
+    return withSource([...byId.values()], DATA_SOURCE.local);
   }
 }
 
@@ -189,19 +262,39 @@ export async function sendHireMessage(user, { hireJobId, recipientId, body }) {
 }
 
 export async function listHireMessages(userId, hireJobId) {
+  if (!userId || !hireJobId) return [];
   try {
+    // RLS (messages_own) restricts rows to sender/recipient; still filter client-side as defense in depth.
     const rows = await api.entities.MarketplaceMessage.filter({ hire_job_id: hireJobId });
-    return rows
+    return (rows || [])
       .filter((message) => message.sender_id === userId || message.recipient_id === userId)
       .sort((a, b) => new Date(a.created_date || a.created_at) - new Date(b.created_date || b.created_at));
   } catch {
     return readLocal(PREFIX, "global", "messages", [])
-      .filter((message) => message.hire_job_id === hireJobId && (message.sender_id === userId || message.recipient_id === userId))
+      .filter(
+        (message) =>
+          message.hire_job_id === hireJobId &&
+          (message.sender_id === userId || message.recipient_id === userId)
+      )
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   }
 }
 
 export async function hireApplicant(job, application) {
+  // Client-side ownership gate — RLS (019) also blocks applicants from setting accepted.
+  try {
+    const me = await api.auth.me();
+    const ownerId = job?.customer_id || job?.created_by_id;
+    if (me?.id && ownerId && me.id !== ownerId && me.role !== "admin") {
+      throw new PersistenceError("Only the job owner can hire an applicant.", {
+        source: DATA_SOURCE.remote,
+        code: "HIRE_FORBIDDEN",
+      });
+    }
+  } catch (err) {
+    if (err instanceof PersistenceError) throw err;
+  }
+
   try {
     await api.entities.HireApplication.update(application.id, { status: "accepted" });
     await api.entities.HireJob.update(job.id, {
@@ -214,8 +307,26 @@ export async function hireApplicant(job, application) {
       body: `You were hired for "${job.title}"`,
       link: "/hire",
     });
-  } catch {
-    /* local mode */
+    return withSource({ ok: true, jobId: job.id, applicationId: application.id }, DATA_SOURCE.remote);
+  } catch (err) {
+    if (err instanceof PersistenceError) throw err;
+    const apps = readGlobalApps().map((a) =>
+      a.id === application.id ? { ...a, status: "accepted" } : a
+    );
+    writeGlobalApps(apps);
+    const jobs = readLocal(PREFIX, "global", "jobs", []);
+    const jIdx = jobs.findIndex((j) => j.id === job.id);
+    if (jIdx < 0 && getSource(job) !== DATA_SOURCE.local) {
+      throw new PersistenceError(
+        "Could not hire on the server, and this job is not in device storage.",
+        { source: DATA_SOURCE.remote, code: "HIRE_FAIL_CLOSED" }
+      );
+    }
+    if (jIdx >= 0) {
+      jobs[jIdx] = { ...jobs[jIdx], status: "hired", hired_worker_id: application.worker_id };
+      writeLocal(PREFIX, "global", "jobs", jobs);
+    }
+    return withSource({ ok: true, jobId: job.id, applicationId: application.id }, DATA_SOURCE.local);
   }
 }
 
@@ -226,4 +337,4 @@ export function formatBudget(job) {
   return "Budget flexible";
 }
 
-export { locationLabel };
+export { locationLabel, getSource, DATA_SOURCE };

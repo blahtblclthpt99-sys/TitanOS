@@ -45,7 +45,7 @@ function TrustPills({ driver, titanVerified }) {
           Background check
         </span>
       )}
-      {titanVerified && !driver.verified ? (
+      {titanVerified ? (
         <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
           Titan Verified
         </span>
@@ -125,7 +125,7 @@ export default memo(function DriverCard({
                   onToggleFavorite?.(driver);
                 }}
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-md transition-colors focus-ring",
+                  "flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors focus-ring",
                   favorite
                     ? "text-destructive bg-destructive/10"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -142,7 +142,7 @@ export default memo(function DriverCard({
                   onToggleSaved?.(driver);
                 }}
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-md transition-colors focus-ring",
+                  "flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors focus-ring",
                   saved
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"

@@ -1,22 +1,23 @@
 import { getSupabaseAdmin, readJson } from "./_lib/supabase.js";
 import { recordSignupEmail, formatSignupEmailFile, getLocalSignupEmailsPath } from "./_lib/recordSignupEmail.js";
+import { applyCors, handleOptions } from "./_lib/cors.js";
+import { assertRateLimit } from "./_lib/rateLimit.js";
+import { logError } from "./_lib/safeLog.js";
 import fs from "node:fs";
 
 /**
  * POST — log a signup email (used by client fallback path)
- * GET  — download all signup emails as a .txt file (admin service role)
+ * GET  — download signup emails (requires SIGNUP_EMAILS_EXPORT_KEY only — never service role)
  */
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") return res.status(204).end();
+  applyCors(res, req);
+  if (handleOptions(req, res)) return;
 
   try {
     const admin = getSupabaseAdmin();
 
     if (req.method === "POST") {
+      if (!assertRateLimit(req, res, { limit: 15, windowMs: 60_000, key: "signupEmailsPost" })) return;
       const body = readJson(req);
       const result = await recordSignupEmail(admin, {
         email: body.email,
@@ -27,15 +28,18 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET") {
-      const secret = process.env.SIGNUP_EMAILS_EXPORT_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const secret = process.env.SIGNUP_EMAILS_EXPORT_KEY;
+      if (!secret) {
+        return res.status(503).json({ error: "Export not configured" });
+      }
       const auth = String(req.headers.authorization || "");
       const key = String(req.query?.key || "");
       const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      if (!secret || (bearer !== secret && key !== secret)) {
+      // Never accept SUPABASE_SERVICE_ROLE_KEY as the export credential
+      if (bearer !== secret && key !== secret) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Prefer durable DB; fall back to local file
       let text = "";
       const { data, error } = await admin
         .from("signup_emails")
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (err) {
-    console.error("[api/signup-emails]", err);
-    return res.status(500).json({ error: err.message || "Failed" });
+    logError("api/signup-emails", err);
+    return res.status(500).json({ error: "Failed" });
   }
 }

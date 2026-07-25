@@ -55,7 +55,7 @@ export default function RoutePlanner() {
         </div>
         <div className="flex gap-2">
           <Button onClick={load} variant="outline" className="border-border text-foreground"><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
-          <Button onClick={openMaps} disabled={!route.ordered.length} className="bg-titan-cyan text-black font-semibold"><ExternalLink className="w-4 h-4 mr-2" />Open in Google Maps</Button>
+          <Button onClick={openMaps} disabled={!route.ordered.length} className="font-semibold"><ExternalLink className="w-4 h-4 mr-2" />Open in Google Maps</Button>
         </div>
       </div>
       {loading ? (

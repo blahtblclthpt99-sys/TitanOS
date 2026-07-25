@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Play, Volume2, VolumeX } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { listMarketplaceListings } from "@/lib/listingsApi";
 
 const TITAN_CLIPS = [
@@ -108,7 +108,6 @@ function ClipCard({ clip, onSelect }) {
         <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/90 text-slate-900">
           {clip.badge}
         </span>
-        <Play className="w-3.5 h-3.5 text-white drop-shadow" aria-hidden="true" />
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
@@ -123,12 +122,11 @@ function ClipCard({ clip, onSelect }) {
 }
 
 /**
- * Static tip reel — no auto-advance, no timers, no programmatic scroll.
- * Idle auto-advance was jumping Home back to the top on mobile.
+ * Static tip reel — honest shortcuts into real app areas (not ads or videos).
+ * Idle auto-advance was jumping Home back to the top on mobile — intentionally omitted.
  */
 export default function HomeAdClips({ isActive = true }) {
   const navigate = useNavigate();
-  const [muted, setMuted] = useState(true);
   const [marketClips, setMarketClips] = useState([]);
 
   useEffect(() => {
@@ -146,7 +144,7 @@ export default function HomeAdClips({ isActive = true }) {
             subtitle: r.location_label || r.category || "Nearby marketplace",
             cta: "View listing",
             path: "/marketplace",
-            badge: "Featured",
+            badge: "Listing",
             poster:
               r.images?.[0] ||
               "https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=600",
@@ -166,23 +164,14 @@ export default function HomeAdClips({ isActive = true }) {
   if (clips.length === 0) return null;
 
   return (
-    <section className="mb-6 -mx-1" aria-label="Short ads and tips" style={{ overflowAnchor: "none" }}>
+    <section className="mb-6 -mx-1" aria-label="Tips and shortcuts" style={{ overflowAnchor: "none" }}>
       <div className="flex items-center justify-between px-1 mb-2.5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">For you</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Tips</p>
           <p className="text-sm text-muted-foreground">
-            {clips.length} tips · swipe sideways (no auto-scroll)
+            Shortcuts into real tools{marketClips.length ? " · plus your marketplace listings" : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-muted border border-border text-foreground text-xs font-semibold hover:bg-secondary transition-colors"
-          aria-label={muted ? "Unmute clips" : "Mute clips"}
-        >
-          {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-          {muted ? "Muted" : "Sound"}
-        </button>
       </div>
 
       <div

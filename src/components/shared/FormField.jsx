@@ -26,7 +26,8 @@ export default function FormField({
     ? React.isValidElement(children)
       ? React.cloneElement(children, {
           id: children.props.id ?? fieldId,
-          "aria-invalid": error ? true : children.props["aria-invalid"],
+          "aria-invalid": Boolean(error) || children.props["aria-invalid"],
+          "aria-required": required || children.props["aria-required"],
           "aria-describedby":
             [children.props["aria-describedby"], describedBy].filter(Boolean).join(" ") ||
             undefined,
@@ -41,6 +42,7 @@ export default function FormField({
         {...inputProps}
         id={fieldId}
         aria-invalid={error ? true : undefined}
+        aria-required={required ? true : undefined}
         aria-describedby={describedBy}
         required={required ?? inputProps.required}
         className={cn(

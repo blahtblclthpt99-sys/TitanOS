@@ -180,7 +180,7 @@ export default function Settings() {
     }
     setUploading(field);
     try {
-      const { file_url } = await api.integrations.Core.UploadFile({ file });
+      const { file_url } = await api.integrations.Core.UploadFile({ file, visibility: "public" });
       if (field === "avatar_url") setProfile((form) => ({ ...form, avatar_url: file_url }));
       else setCompany((form) => ({ ...form, company_logo_url: file_url }));
       toast({ title: "Image uploaded", description: "Save this panel to keep the new image." });
@@ -230,7 +230,7 @@ export default function Settings() {
     { id: "company",       icon: Building2, title: "Company",       description: "Business name, address, branding" },
     { id: "notifications", icon: Bell,      title: "Notifications", description: "Job, message, review, account, and system alerts" },
     { id: "marketing",     icon: Megaphone, title: "Marketing preferences", description: "Email, SMS, push, frequency, and topics" },
-    { id: "trust",         icon: Shield,    title: "Trust & Safety", description: "Verification, 2FA, reports, and blocking" },
+    { id: "trust",         icon: Shield,    title: "Trust & Safety", description: "Report & block now · identity / 2FA coming soon" },
     { id: "privacy",       icon: Lock,      title: "Privacy",       description: "Community visibility and sharing" },
     { id: "security",      icon: Shield,    title: "Security",      description: "Password and login settings" },
     { id: "accounts",      icon: Lock,      title: "Connected accounts", description: "Google and email sign-in methods" },

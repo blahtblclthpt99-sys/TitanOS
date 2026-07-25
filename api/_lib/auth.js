@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabase.js";
+import { logError } from "./safeLog.js";
 
 /**
  * Require a valid Supabase JWT from Authorization: Bearer …
@@ -20,8 +21,26 @@ export async function requireUser(req, res) {
     }
     return { user: data.user, admin, token };
   } catch (error) {
-    console.error("requireUser error:", error);
+    logError("requireUser", error);
     res.status(401).json({ error: "Authentication failed" });
     return null;
   }
+}
+
+/**
+ * Require authenticated admin (JWT app_metadata.role or profiles.role).
+ */
+export async function requireAdmin(req, res) {
+  const auth = await requireUser(req, res);
+  if (!auth) return null;
+  const { user, admin } = auth;
+  if (user.app_metadata?.role === "admin") return auth;
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role === "admin") return auth;
+  res.status(403).json({ error: "Admin access required" });
+  return null;
 }

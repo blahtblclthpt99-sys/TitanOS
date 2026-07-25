@@ -21,7 +21,7 @@ export default function AppDownloadBanner() {
   };
 
   return (
-    <div className="fixed bottom-[4.5rem] md:bottom-0 left-0 right-0 z-40 px-3 pb-1 md:pb-3 pointer-events-none">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+8.75rem)] md:bottom-3 left-0 right-0 z-40 px-3 pointer-events-none">
       <div className="max-w-lg mx-auto pointer-events-auto">
         <div className="glass border border-white/8 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-2xl">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">
@@ -39,12 +39,17 @@ export default function AppDownloadBanner() {
           <button
             type="button"
             onClick={openPlayStore}
-            className="flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-xl bg-titan-cyan hover:bg-titan-cyan/90 text-black text-[11px] font-semibold transition-colors"
+            className="flex items-center gap-1.5 flex-shrink-0 min-h-[44px] px-3 rounded-xl bg-titan-cyan hover:bg-titan-cyan/90 text-black text-[11px] font-semibold transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
             Get on Play
           </button>
-          <button onClick={dismiss} className="text-white/20 hover:text-white/60 transition-colors p-1 flex-shrink-0" aria-label="Dismiss">
+          <button
+            type="button"
+            onClick={dismiss}
+            className="text-white/40 hover:text-white/80 transition-colors inline-flex min-h-[44px] min-w-[44px] items-center justify-center flex-shrink-0 rounded-md focus-ring"
+            aria-label="Dismiss"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>

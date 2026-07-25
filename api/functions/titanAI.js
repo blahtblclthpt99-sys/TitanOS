@@ -1,5 +1,8 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
+import { captureApiException } from "../_lib/sentry.js";
+import { logError } from "../_lib/safeLog.js";
 
 function money(n) {
   return (Number(n) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -216,6 +219,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!assertRateLimit(req, res, { limit: 30, windowMs: 60_000, key: "titanAI" })) return;
 
   try {
     const authHeader = req.headers.authorization || "";
@@ -318,7 +322,7 @@ export default async function handler(req, res) {
           });
         }
       } catch (execErr) {
-        console.error("AI action execute error:", execErr);
+        logError("titanAI:action_execute", execErr);
         return res.status(200).json({
           data: {
             type: "done",
@@ -400,7 +404,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("OpenAI error:", errText.slice(0, 500));
+      logError("titanAI:openai", errText.slice(0, 500));
       return res.status(200).json({
         data: {
           type: "response",
@@ -423,7 +427,8 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
-    console.error("titanAI error:", error);
+    logError("titanAI", error);
+    captureApiException(error, { tags: { route: "titanAI" } });
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

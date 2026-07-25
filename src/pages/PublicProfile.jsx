@@ -81,7 +81,7 @@ export default function PublicProfile() {
         <div className="glass rounded-3xl p-8 text-foreground max-w-md border border-border">
           <h1 className="text-xl font-semibold">Profile unavailable</h1>
           <p className="text-muted-foreground mt-2">This professional profile is private or doesn&apos;t exist.</p>
-          <Button asChild className="mt-5 rounded-xl bg-titan-cyan text-black hover:bg-titan-cyan/90">
+          <Button asChild className="mt-5 rounded-xl">
             <Link to="/">Go home</Link>
           </Button>
           <p className="text-xs text-muted-foreground mt-4">

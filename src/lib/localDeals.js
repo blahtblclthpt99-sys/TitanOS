@@ -1,4 +1,4 @@
-/** Static local partner deals — affiliate-ready placeholders. */
+/** Static partner-deal placeholders — search links / Marketplace, not negotiated rates. */
 export const LOCAL_DEALS = [
   {
     id: "fuel-fleet",

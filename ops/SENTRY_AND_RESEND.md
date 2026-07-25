@@ -1,47 +1,44 @@
 # Production observability & email (Sentry + Resend)
 
-Code is already wired. These are **ops configuration** steps — do not invent DSNs/keys.
+Code is wired for **Node.js API** (`api/instrument.mjs` + `api/_lib/sentry.js`) and **React** (`src/lib/sentry.js`). These are **ops configuration** steps — do not invent DSNs/keys.
 
-## Current Vercel Production (verified)
+## Current Vercel Production
 
-| Variable | Status |
-|----------|--------|
-| `VITE_SUPABASE_*` / `SUPABASE_*` | Set |
-| `STRIPE_SECRET_KEY` | Set |
-| `STRIPE_WEBHOOK_SECRET` | Set |
-| `VITE_SENTRY_DSN` / `SENTRY_DSN` | **Missing** |
-| `RESEND_API_KEY` / `RESEND_FROM` | **Missing** |
-| `PORTAL_OTP_PEPPER` | **Missing** (falls back to service role / weak default) |
+| Variable | Purpose |
+|----------|---------|
+| `SENTRY_DSN` | Node.js / Vercel serverless (`api/instrument.mjs`) |
+| `VITE_SENTRY_DSN` | Browser (`src/lib/sentry.js`); also fallback for API if `SENTRY_DSN` unset |
+| `SENTRY_ENVIRONMENT` | Optional override (`production` / `preview`) |
+| `SENTRY_DEBUG_ROUTE=1` | Enables `GET /api/functions/sentryDebug` for setup verification |
+| `RESEND_API_KEY` / `RESEND_FROM` | Portal OTP email |
+| `PORTAL_OTP_PEPPER` | Portal OTP hashing |
 
-## Sentry (optional but recommended)
+## Sentry Node.js setup (done in code)
 
-1. Create a Sentry project (React + Node).
+Per [Sentry Instrument](https://skills.sentry.dev/instrument) Node defaults:
+
+- Errors + tracing (`tracesSampleRate` 1.0 preview/dev, 0.1 production)
+- `includeLocalVariables`, `enableLogs`
+- Optional CPU profiling via `@sentry/profiling-node` when `SENTRY_PROFILING=1` and the native addon loads
+- Serverless flush after `captureApiException`
+
+## Ops checklist
+
+1. Create a Sentry project (Node.js and/or React).
 2. Vercel → Environment Variables (Production + Preview):
-   - `VITE_SENTRY_DSN` — browser (`src/lib/sentry.js`)
-   - `SENTRY_DSN` — API (`api/_lib/sentry.js`)
-3. Redeploy (client DSN is build-time).
-4. Confirm: throw a test error in Preview; event appears in Sentry.
+   - `SENTRY_DSN` — API
+   - `VITE_SENTRY_DSN` — browser (rebuild required)
+3. Redeploy.
+4. Temporarily set `SENTRY_DEBUG_ROUTE=1`, then open:
+   - `https://titanos-web.vercel.app/api/functions/sentryDebug`
+5. Confirm the issue in Sentry within ~30s, then unset `SENTRY_DEBUG_ROUTE`.
 
-Without DSNs, `initSentry` / `captureApiException` are safe no-ops.
+Without DSNs, init / capture are safe no-ops.
 
 ## Resend (required for portal OTP email)
 
 Portal OTP **fails closed** without Resend (`api/functions/portalRequestOtp.js`).
 
 1. Create Resend API key + verified sending domain.
-2. Vercel → add:
-   - `RESEND_API_KEY=re_...`
-   - `RESEND_FROM=TitanOS <noreply@yourdomain.com>`
-   - `PORTAL_OTP_PEPPER=` long random string (do not reuse service role)
-3. Redeploy (server env is runtime).
-4. Test `/portal` OTP request — email arrives; health unchanged.
-
-## Git / Production parity
-
-- GitHub: `https://github.com/blahtblclthpt99-sys/TitanOS.git`
-- Branch: `main` tracks `origin/main`
-- **Risk:** large local uncommitted hardening tree. Prefer commit → push → Vercel Git deploy so Production matches `main`, not only CLI uploads.
-
-## Preview vs Production build
-
-Same Vite build (`npm run build`). Ensure Preview also has Supabase + Stripe vars if Preview is used for payment QA.
+2. Vercel → add `RESEND_API_KEY`, `RESEND_FROM`, `PORTAL_OTP_PEPPER`.
+3. Redeploy and test `/portal` OTP.

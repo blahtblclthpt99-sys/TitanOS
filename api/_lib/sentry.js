@@ -1,40 +1,30 @@
 /**
- * Server-side Sentry for Vercel serverless functions.
- * Init when SENTRY_DSN or VITE_SENTRY_DSN is set.
+ * Server-side Sentry helpers for Vercel serverless functions.
+ * Init lives in api/instrument.mjs (errors + tracing + optional profiling).
  */
-import * as Sentry from "@sentry/node";
+import { Sentry, sentryEnabled, getSentryProfilingEnabled } from "../instrument.mjs";
 
-let initialized = false;
-
-function resolveDsn() {
-  const dsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN || "";
-  return typeof dsn === "string" ? dsn.trim() : "";
+/** @deprecated Prefer side-effect of importing this module; kept for call-site compat. */
+export function initApiSentry() {
+  return sentryEnabled;
 }
 
-export function initApiSentry() {
-  if (initialized) return;
-  const dsn = resolveDsn();
-  if (!dsn) return;
-  try {
-    Sentry.init({
-      dsn,
-      environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
-      tracesSampleRate: 0.05,
-    });
-    initialized = true;
-  } catch (err) {
-    console.error("[sentry:api] init failed", err?.message || err);
-  }
+export function isApiSentryEnabled() {
+  return sentryEnabled;
+}
+
+export function isApiSentryProfilingEnabled() {
+  return getSentryProfilingEnabled();
 }
 
 /**
  * Capture an API exception. No-ops when DSN is unset.
+ * Flushes the client so short-lived serverless invocations still deliver events.
  * @param {unknown} error
  * @param {{ tags?: Record<string, string>, extra?: Record<string, unknown> }} [context]
  */
 export function captureApiException(error, context) {
-  initApiSentry();
-  if (!initialized) return;
+  if (!sentryEnabled) return;
   try {
     if (context) {
       Sentry.withScope((scope) => {
@@ -47,7 +37,11 @@ export function captureApiException(error, context) {
     } else {
       Sentry.captureException(error);
     }
+    // Serverless: flush without blocking the response path excessively
+    void Sentry.flush(2000).catch(() => {});
   } catch {
     /* never fail the request for telemetry */
   }
 }
+
+export { Sentry };

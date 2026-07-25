@@ -9,7 +9,6 @@ import {
   Phone,
   Plus,
   Siren,
-  Timer,
   ToggleLeft,
   ToggleRight,
   UserRound,
@@ -18,7 +17,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import HotspotMap from "@/components/driver/HotspotMap";
-import StatHint from "@/components/shared/StatHint";
+import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
+import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
+import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
+import { useDriverActivityTracker } from "@/components/driver/activity/useDriverActivityTracker";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -37,17 +39,19 @@ import {
   getDayPart,
   listDriverVehicles,
   parseMilesInput,
+  pauseDrivingSession,
   readPrefs,
   readSession,
   readShiftHistory,
   readStops,
+  renameStop,
+  resumeDrivingSession,
   savePrefs,
   startDrivingSession,
   stopDrivingSession,
   syncSessionToTax,
   topHotspotsNow,
   updateSessionMiles,
-  IRS_MILEAGE_RATE_USD,
   summarizeRecordedShifts,
 } from "@/lib/driverHubApi";
 import { vehicleLabel } from "@/lib/vehicleCatalog";
@@ -70,10 +74,35 @@ export default function DriverShiftPanel() {
 
   const [milesError, setMilesError] = useState("");
   const [toggleError, setToggleError] = useState("");
+  const [gpsError, setGpsError] = useState("");
+  const [reviewSessionId, setReviewSessionId] = useState(null);
 
   const mode = prefs.mode === "riding" ? "riding" : "driving";
   const requestingRide = Boolean(prefs.requestingRide);
   const drivingActive = Boolean(session?.active);
+  const sessionPaused = Boolean(session?.paused);
+
+  useDriverActivityTracker({
+    userId: user?.id,
+    active: drivingActive,
+    paused: sessionPaused,
+    autoTrack: prefs.autoTrack !== false,
+    stopConfirmSec: Number(prefs.stopConfirmSec) || 90,
+    enabled: Boolean(prefs.locationPrivacyAck),
+    onUpdate: (nextSession, nextStops, err) => {
+      if (err) {
+        setGpsError(
+          err.code === 1
+            ? "Location permission denied. Enable location for TitanOS or enter miles manually."
+            : err.message || "GPS unavailable — enter miles manually."
+        );
+        return;
+      }
+      setGpsError("");
+      if (nextSession) setSession(nextSession);
+      if (nextStops) setStops(nextStops);
+    },
+  });
 
   const refresh = useCallback(() => {
     if (!user?.id) return;
@@ -243,14 +272,20 @@ export default function DriverShiftPanel() {
       elapsedSec: snapDash?.elapsedSec || 0,
       hours: snapDash?.earnings?.hours || 0,
       jobsCompleted: snapDash?.jobsCompleted || 0,
-      earningsGross: snapDash?.earnings?.gross || 0,
-      earningsPerHour: snapDash?.earnings?.perHourEst || 0,
+      earningsGross: 0,
+      earningsPerHour: 0,
       fuelCost: snapDash?.fuel?.cost || 0,
       fuelGallons: snapDash?.fuel?.gallons || 0,
-      profit: snapDash?.profit || 0,
+      profit: 0,
       taxEstimate: snapDash?.taxEstimate || 0,
       mpg: snapDash?.mpg || mpg,
       currency: prefs.currency || "USD",
+      driveSec: snapDash?.driveSec || session?.drive_sec || 0,
+      idleSec: snapDash?.idleSec || session?.idle_sec || 0,
+      maxSpeedMph: snapDash?.maxSpeedMph || session?.max_speed_mph || 0,
+      avgSpeedMph: snapDash?.avgSpeedMph || session?.avg_speed_mph || 0,
+      autoMiles: session?.auto_miles || 0,
+      milesSource: session?.miles_source || "manual",
     });
     const synced = await syncSessionToTax(
       user,
@@ -370,10 +405,12 @@ export default function DriverShiftPanel() {
         setMilesDraft("0");
         setMilesError("");
         toast({
-          title: "Driving · ON",
-          description: bestNow[0]
-            ? `Hotspots lit. Head toward ${bestNow[0].short || bestNow[0].name} first.`
-            : "Hotspots lit. Miles auto-save as you enter them.",
+          title: "Work session · ON",
+          description: prefs.autoTrack !== false && prefs.locationPrivacyAck
+            ? "GPS tracking started. Miles and stops update automatically — glance only while driving."
+            : bestNow[0]
+              ? `Hotspots lit. Head toward ${bestNow[0].short || bestNow[0].name} first.`
+              : "Session started. Enable Auto GPS below or enter miles manually.",
         });
       }
     } catch (err) {
@@ -387,6 +424,20 @@ export default function DriverShiftPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handlePauseSession = () => {
+    if (!user?.id) return;
+    const next = pauseDrivingSession(user.id);
+    setSession(next);
+    toast({ title: "Tracking paused", description: "Resume when you continue the work session." });
+  };
+
+  const handleResumeSession = () => {
+    if (!user?.id) return;
+    const next = resumeDrivingSession(user.id);
+    setSession(next);
+    toast({ title: "Tracking resumed" });
   };
 
   const openStop = useMemo(() => (stops || []).find((s) => !s.ended_at) || null, [stops]);
@@ -457,9 +508,37 @@ export default function DriverShiftPanel() {
   return (
     <div className="space-y-5">
       <FeatureHonestyBanner>
-        Hotspot pins are suggested zones near your location for planning — not live third-party demand
-        feeds. Miles, stops, and tax sync are live.
+        Work sessions auto-track GPS miles and stops while Driving is ON (after you allow
+        location). Hotspot pins are planning suggestions — not live third-party demand. Tax
+        mileage sync is for recordkeeping only, not tax advice.
       </FeatureHonestyBanner>
+
+      <div className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+        <p className="text-sm font-semibold text-foreground">Location & privacy</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          TitanOS collects GPS only during an active work session when Auto GPS is on. We do not
+          track in the background unless you explicitly enable a future background option. You can
+          pause or end the session anytime. Route points stay on this device (last ~400 samples).
+        </p>
+        <label className="flex items-start gap-3 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={Boolean(prefs.locationPrivacyAck)}
+            onChange={(e) => updatePref({ locationPrivacyAck: e.target.checked })}
+          />
+          <span>I understand location is used for mileage and stop detection during work sessions.</span>
+        </label>
+        <label className="flex items-start gap-3 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={prefs.autoTrack !== false}
+            onChange={(e) => updatePref({ autoTrack: e.target.checked })}
+          />
+          <span>Auto GPS miles & stop detection (recommended for hauling / delivery)</span>
+        </label>
+      </div>
 
       {/* Coach tip */}
       <div className="rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-card to-card px-4 py-3 flex gap-3 items-start">
@@ -592,125 +671,21 @@ export default function DriverShiftPanel() {
             </div>
 
             {drivingActive && dash && (
-              <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Live shift</p>
-                  <div className="flex items-center gap-1">
-                    <p className="text-sm font-semibold text-foreground tabular-nums">
-                      {formatDuration(dash.elapsedSec || 0)}
-                    </p>
-                    <StatHint label="Time on shift">
-                      <p>How long Driving has been ON this session.</p>
-                      <p>Updates every second while you&apos;re on the road.</p>
-                    </StatHint>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Miles
-                      <StatHint label="Total miles">
-                        <p>Miles you entered for this shift (odometer or trip app).</p>
-                        <p>Totals update as you type; tap Save to store and sync tax.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-lg font-bold text-foreground tabular-nums">{dash.miles}</p>
-                  </div>
-                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Stops
-                      <StatHint label="Stops / trips">
-                        <p>Pickup or dropoff events you logged with Log stop.</p>
-                        <p>Completed stops count as jobs finished.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-lg font-bold text-foreground tabular-nums">{dash.stops}</p>
-                  </div>
-                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Est. earn
-                      <StatHint label="Estimated earnings">
-                        <p>Rough gross before platform fees: time + miles + stops.</p>
-                        <p>Not your real payout — use your gig app for exact pay.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-lg font-bold text-emerald-400 tabular-nums">
-                      {sym}
-                      {dash.earnings.gross.toFixed(0)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Fuel
-                      <StatHint label="Fuel cost">
-                        <p>Miles ÷ MPG × local gas estimate from your ZIP.</p>
-                        <p>Updates when miles or MPG change.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-lg font-bold text-titan-amber tabular-nums">
-                      {sym}
-                      {dash.fuel.cost.toFixed(0)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Profit
-                      <StatHint label="Est. profit">
-                        <p>Estimated earnings minus estimated fuel.</p>
-                        <p>Does not include fees, tips, or maintenance.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-sm font-semibold text-foreground tabular-nums">
-                      {sym}
-                      {dash.profit.toFixed(0)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      MPG
-                      <StatHint label="Miles per gallon">
-                        <p>From your vehicle setting or Fleet estimate.</p>
-                        <p>Used only for fuel cost math.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-sm font-semibold text-foreground tabular-nums">{dash.mpg}</p>
-                  </div>
-                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      <Timer className="w-3 h-3" /> Avg stop
-                      <StatHint label="Average stop time">
-                        <p>Average time from Log stop to End stop.</p>
-                        <p>Updates when you finish a stop.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-sm font-semibold text-foreground tabular-nums">
-                      {formatDuration(dash.avgStopSec)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-1.5">
-                    <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                      Tax est.
-                      <StatHint label="Mileage tax estimate">
-                        <p>
-                          {`Miles × IRS standard rate ($${IRS_MILEAGE_RATE_USD}/mi) — estimate only.`}
-                        </p>
-                        <p>Official logs live in Tax Center after sync.</p>
-                      </StatHint>
-                    </p>
-                    <p className="text-sm font-semibold text-emerald-400 tabular-nums">
-                      ${dash.taxEstimate.toFixed(0)}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  Rough gross before platform fees
-                  {dash.earnings.perHourEst > 0 ? ` · ~${sym}${dash.earnings.perHourEst}/hr` : ""}
-                  {selectedVehicle ? ` · ${vehicleLabel(selectedVehicle)}` : ""}
-                  {dash.jobsCompleted > 0 ? ` · ${dash.jobsCompleted} completed stops` : ""}
-                </p>
-              </div>
+              <ActivityLiveDash
+                dash={dash}
+                stopPhase={session?.stop_phase || dash.stopPhase}
+                paused={sessionPaused}
+                milesSource={session?.miles_source || dash.milesSource}
+                onPause={handlePauseSession}
+                onResume={handleResumeSession}
+                busy={busy}
+              />
+            )}
+
+            {drivingActive && gpsError && (
+              <p className="mt-2 text-xs text-titan-amber" role="status">
+                {gpsError}
+              </p>
             )}
 
             {drivingActive && (
@@ -718,6 +693,7 @@ export default function DriverShiftPanel() {
                 <div>
                   <label htmlFor="driver-hub-miles" className="text-xs text-muted-foreground">
                     Miles this session
+                    {session?.miles_source === "gps" ? " (auto — correct if needed)" : " (manual)"}
                   </label>
                   <div className="flex gap-2 mt-1">
                     <Input
@@ -752,7 +728,7 @@ export default function DriverShiftPanel() {
                     </p>
                   ) : (
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Miles auto-save as you type · Save also syncs Tax Center
+                      GPS updates miles automatically when Auto GPS is on · Save syncs Tax Center
                     </p>
                   )}
                 </div>
@@ -981,56 +957,37 @@ export default function DriverShiftPanel() {
         </section>
       )}
 
-      {mode === "driving" && (
+      {mode === "driving" && session && (
         <section className="glass rounded-2xl p-5 border border-border">
-          <h2 className="text-base font-semibold text-foreground mb-3">Stops this session</h2>
-          {stops.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No stops yet. Turn Driving ON, then tap Log stop at each pickup/dropoff.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {stops.map((s, i) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">
-                      Stop {stops.length - i}
-                      {!s.ended_at && (
-                        <span className="ml-2 text-[10px] font-bold uppercase text-emerald-400">Live</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.ended_at
-                        ? `${formatDuration(s.duration_sec)} · gap ${formatDuration(s.between_orders_sec)}`
-                        : "In progress…"}
-                    </p>
-                  </div>
-                  {!s.ended_at && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-border"
-                      onClick={() => handleEndStop(s.id)}
-                    >
-                      End stop
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <BetweenStopsPanel
+            session={session}
+            stops={stops}
+            tick={tick}
+            onRenameStop={(id, label) => {
+              if (!user?.id) return;
+              renameStop(user.id, id, label);
+              setStops(readStops(user.id));
+            }}
+          />
+          {openStop ? (
+            <div className="mt-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => handleEndStop(openStop.id)}>
+                End current stop
+              </Button>
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground mt-4">
-            When you end Driving, mileage + estimated fuel go into{" "}
+            When you end the work session, mileage and estimated fuel go into{" "}
             <Link to="/tax-center" className="text-primary hover:underline">
               Tax Center
-            </Link>
-            .
+            </Link>{" "}
+            for recordkeeping.
           </p>
         </section>
+      )}
+
+      {mode === "driving" && (
+        <ActivityStatsPanel history={history} liveSession={drivingActive ? session : null} stops={stops} />
       )}
 
       {mode === "driving" && (
@@ -1066,37 +1023,23 @@ export default function DriverShiftPanel() {
                 <p className="text-lg font-bold text-foreground tabular-nums">{recorded.stops}</p>
               </div>
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Hours</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Drive hours</p>
                 <p className="text-lg font-bold text-foreground tabular-nums">{recorded.hours}</p>
               </div>
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Jobs done</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.jobsCompleted}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Trips</p>
+                <p className="text-lg font-bold text-foreground tabular-nums">{recorded.shifts}</p>
               </div>
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Est. earn</p>
-                <p className="text-lg font-bold text-emerald-400 tabular-nums">
-                  {sym}
-                  {recorded.earnings.toFixed(2)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Fuel</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Fuel est.</p>
                 <p className="text-lg font-bold text-titan-amber tabular-nums">
                   {sym}
                   {recorded.fuel.toFixed(2)}
                 </p>
               </div>
               <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Profit</p>
-                <p className="text-lg font-bold text-foreground tabular-nums">
-                  {sym}
-                  {recorded.profit.toFixed(2)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-background/50 border border-border px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase">Tax est.</p>
-                <p className="text-lg font-bold text-emerald-400 tabular-nums">
+                <p className="text-[10px] text-muted-foreground uppercase">Deductible est.</p>
+                <p className="text-lg font-bold text-emerald-500 tabular-nums">
                   ${recorded.taxEstimate.toFixed(2)}
                 </p>
               </div>
@@ -1155,10 +1098,15 @@ export default function DriverShiftPanel() {
                           </strong>
                         </span>
                         <span>
-                          Earn:{" "}
-                          <strong className="text-emerald-400 tabular-nums">
-                            {shiftSym}
-                            {Number(s.earnings_gross || 0).toFixed(2)}
+                          Drive:{" "}
+                          <strong className="text-foreground tabular-nums">
+                            {formatDuration(Number(s.drive_sec) || Number(s.elapsed_sec) || mins * 60)}
+                          </strong>
+                        </span>
+                        <span>
+                          Idle:{" "}
+                          <strong className="text-foreground tabular-nums">
+                            {formatDuration(Number(s.idle_sec) || 0)}
                           </strong>
                         </span>
                         <span>
@@ -1169,19 +1117,30 @@ export default function DriverShiftPanel() {
                           </strong>
                         </span>
                         <span>
-                          Profit:{" "}
-                          <strong className="text-foreground tabular-nums">
-                            {shiftSym}
-                            {Number(s.profit || 0).toFixed(2)}
-                          </strong>
-                        </span>
-                        <span>
-                          Tax:{" "}
-                          <strong className="text-emerald-400 tabular-nums">
+                          Deductible:{" "}
+                          <strong className="text-emerald-500 tabular-nums">
                             ${Number(s.tax_estimate || 0).toFixed(2)}
                           </strong>
                         </span>
                       </div>
+                      {Array.isArray(s.stops_detail) && s.stops_detail.length > 0 ? (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            className="text-xs text-primary underline-offset-2 hover:underline"
+                            onClick={() =>
+                              setReviewSessionId((id) => (id === s.id ? null : s.id))
+                            }
+                          >
+                            {reviewSessionId === s.id ? "Hide timeline" : "Review timeline & between stops"}
+                          </button>
+                          {reviewSessionId === s.id ? (
+                            <div className="mt-3 border-t border-border pt-3">
+                              <BetweenStopsPanel session={s} stops={s.stops_detail} />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}

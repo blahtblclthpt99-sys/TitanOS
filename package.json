@@ -32,7 +32,7 @@
     "test:fees": "node --test scripts/fee-engine.test.mjs",
     "test:hire": "node --test scripts/hire-security.test.mjs",
     "test:payments": "node --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs",
-    "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs",
+    "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs scripts/driver-activity.test.mjs",
     "test:money": "node --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
     "test:tax": "node --test scripts/tax-engine.test.mjs",
     "test:hardening": "node --test scripts/production-hardening.test.mjs",

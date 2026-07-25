@@ -60,6 +60,12 @@ export function readPrefs(userId) {
     equipmentId: null,
     mode: "driving", // "driving" | "riding"
     requestingRide: false,
+    /** Auto GPS miles/stops only while a work session is active */
+    autoTrack: true,
+    /** Stationary seconds before confirming a delivery/haul stop */
+    stopConfirmSec: 90,
+    /** Acknowledge location privacy notice */
+    locationPrivacyAck: false,
   });
 }
 
@@ -461,6 +467,9 @@ export async function startDrivingSession(user, prefs) {
     started_at: new Date().toISOString(),
     ended_at: null,
     active: true,
+    paused: false,
+    paused_at: null,
+    pause_accum_sec: 0,
     city: prefs.city || "",
     zip: prefs.zip || "",
     lat: prefs.lat,
@@ -468,12 +477,68 @@ export async function startDrivingSession(user, prefs) {
     equipment_id: prefs.equipmentId || null,
     currency: prefs.currency || "USD",
     miles: 0,
+    auto_miles: 0,
+    miles_source: prefs.autoTrack === false ? "manual" : "gps",
     stops: 0,
     apps: prefs.connectedApps || [],
+    drive_sec: 0,
+    idle_sec: 0,
+    max_speed_mph: 0,
+    avg_speed_mph: 0,
+    stop_phase: "moving",
+    auto_track: prefs.autoTrack !== false,
   };
   writeLocal(PREFIX, user.id, SESSION_KEY, session);
   writeLocal(PREFIX, user.id, STOPS_KEY, []);
   return session;
+}
+
+export function pauseDrivingSession(userId) {
+  const session = readSession(userId);
+  if (!session?.active || session.paused) return session;
+  const next = {
+    ...session,
+    paused: true,
+    paused_at: new Date().toISOString(),
+  };
+  writeLocal(PREFIX, userId, SESSION_KEY, next);
+  return next;
+}
+
+export function resumeDrivingSession(userId) {
+  const session = readSession(userId);
+  if (!session?.active || !session.paused) return session;
+  const pausedMs = session.paused_at
+    ? Math.max(0, Date.now() - new Date(session.paused_at).getTime())
+    : 0;
+  const next = {
+    ...session,
+    paused: false,
+    paused_at: null,
+    pause_accum_sec: Number(session.pause_accum_sec || 0) + Math.round(pausedMs / 1000),
+  };
+  writeLocal(PREFIX, userId, SESSION_KEY, next);
+  return next;
+}
+
+/** Patch live telemetry from the Activity Engine (GPS). */
+export function patchSessionTelemetry(userId, patch = {}) {
+  const session = readSession(userId);
+  if (!session?.active) return null;
+  const autoMiles = patch.auto_miles != null ? Number(patch.auto_miles) : Number(session.auto_miles || 0);
+  const manualOverride = session.miles_source === "manual";
+  const miles = manualOverride
+    ? Number(session.miles || 0)
+    : Math.max(Number(session.miles || 0), autoMiles);
+  const next = {
+    ...session,
+    ...patch,
+    auto_miles: autoMiles,
+    miles,
+    miles_source: manualOverride ? "manual" : patch.miles_source || session.miles_source || "gps",
+  };
+  writeLocal(PREFIX, userId, SESSION_KEY, next);
+  return next;
 }
 
 export async function stopDrivingSession(userId, snapshot = {}) {
@@ -499,13 +564,21 @@ export async function stopDrivingSession(userId, snapshot = {}) {
   const ended = {
     ...session,
     active: false,
+    paused: false,
     ended_at: new Date().toISOString(),
     stops: stops.length,
+    stops_detail: stops,
     miles,
-    // Persist every recorded number so Hub history can display them later
     elapsed_sec: elapsedSec,
     hours: snapshot.hours != null ? Number(snapshot.hours) : Math.round((elapsedSec / 3600) * 100) / 100,
     jobs_completed: jobsCompleted,
+    drive_sec: Number(snapshot.driveSec ?? session.drive_sec ?? 0),
+    idle_sec: Number(snapshot.idleSec ?? session.idle_sec ?? 0),
+    max_speed_mph: Number(snapshot.maxSpeedMph ?? session.max_speed_mph ?? 0),
+    avg_speed_mph: Number(snapshot.avgSpeedMph ?? session.avg_speed_mph ?? 0),
+    auto_miles: Number(snapshot.autoMiles ?? session.auto_miles ?? 0),
+    miles_source: snapshot.milesSource || session.miles_source || "manual",
+    // Legacy earnings fields kept for old history rows; UI no longer surfaces estimates
     earnings_gross: Number(snapshot.earningsGross ?? 0),
     earnings_per_hour: Number(snapshot.earningsPerHour ?? 0),
     fuel_cost: Number(snapshot.fuelCost ?? 0),
@@ -548,30 +621,97 @@ export function addStop(userId, partial = {}) {
   const session = readSession(userId);
   if (!session?.active) return null;
   const stops = readStops(userId);
+  // Chronological previous = oldest unfinished chain → last ended stop by time
+  const ordered = [...stops].sort(
+    (a, b) => new Date(a.started_at || 0) - new Date(b.started_at || 0)
+  );
+  const prevEnded = [...ordered].reverse().find((s) => s.ended_at) || null;
   const now = Date.now();
-  const last = stops[0];
-  const betweenMs = last?.ended_at ? now - new Date(last.ended_at).getTime() : null;
+  const betweenMs = prevEnded?.ended_at
+    ? now - new Date(prevEnded.ended_at).getTime()
+    : session.started_at
+      ? now - new Date(session.started_at).getTime()
+      : null;
+
+  const milesNow = Number(session.miles || 0);
+  const driveNow = Number(session.drive_sec || 0);
+  const prevMiles =
+    prevEnded?.miles_at_departure != null
+      ? Number(prevEnded.miles_at_departure)
+      : prevEnded
+        ? Number(prevEnded.miles_at_arrival || 0)
+        : 0;
+  const prevDrive =
+    prevEnded?.drive_sec_at_departure != null
+      ? Number(prevEnded.drive_sec_at_departure)
+      : prevEnded
+        ? Number(prevEnded.drive_sec_at_arrival || 0)
+        : 0;
+
   const stop = {
-    id: uid(),
-    started_at: new Date().toISOString(),
+    id: partial.id || uid(),
+    started_at: partial.started_at || new Date().toISOString(),
     ended_at: null,
     duration_sec: 0,
-    between_orders_sec: betweenMs != null ? Math.round(betweenMs / 1000) : null,
-    miles_delta: Number(partial.miles_delta || 0),
+    between_orders_sec:
+      partial.between_orders_sec != null
+        ? Number(partial.between_orders_sec)
+        : betweenMs != null
+          ? Math.round(betweenMs / 1000)
+          : null,
+    miles_delta:
+      partial.miles_delta != null
+        ? Number(partial.miles_delta)
+        : Math.max(0, Math.round((milesNow - prevMiles) * 10) / 10),
+    miles_at_arrival: partial.miles_at_arrival != null ? Number(partial.miles_at_arrival) : milesNow,
+    drive_sec_at_arrival:
+      partial.drive_sec_at_arrival != null ? Number(partial.drive_sec_at_arrival) : driveNow,
+    drive_since_prev_sec:
+      partial.drive_since_prev_sec != null
+        ? Number(partial.drive_since_prev_sec)
+        : Math.max(0, driveNow - prevDrive),
+    miles_since_prev:
+      partial.miles_since_prev != null
+        ? Number(partial.miles_since_prev)
+        : Math.max(0, Math.round((milesNow - prevMiles) * 10) / 10),
     note: partial.note || "",
+    label: partial.label || "",
     app: partial.app || "",
+    lat: partial.lat ?? null,
+    lng: partial.lng ?? null,
+    auto: Boolean(partial.auto),
   };
   writeLocal(PREFIX, userId, STOPS_KEY, [stop, ...stops]);
+  const patched = { ...session, stops: stops.length + 1 };
+  writeLocal(PREFIX, userId, SESSION_KEY, patched);
   return stop;
 }
 
-export function endStop(userId, stopId) {
+export function renameStop(userId, stopId, label) {
   const stops = readStops(userId);
+  const next = stops.map((s) =>
+    s.id === stopId ? { ...s, label: String(label || "").slice(0, 80), note: String(label || "").slice(0, 80) } : s
+  );
+  writeLocal(PREFIX, userId, STOPS_KEY, next);
+  return next.find((s) => s.id === stopId);
+}
+
+export function endStop(userId, stopId) {
+  const session = readSession(userId);
+  const stops = readStops(userId);
+  const milesNow = Number(session?.miles || 0);
+  const driveNow = Number(session?.drive_sec || 0);
   const next = stops.map((s) => {
     if (s.id !== stopId || s.ended_at) return s;
     const ended = new Date().toISOString();
     const duration_sec = Math.max(1, Math.round((Date.now() - new Date(s.started_at).getTime()) / 1000));
-    return { ...s, ended_at: ended, duration_sec };
+    return {
+      ...s,
+      ended_at: ended,
+      duration_sec,
+      miles_at_departure: milesNow,
+      drive_sec_at_departure: driveNow,
+    };
   });
   writeLocal(PREFIX, userId, STOPS_KEY, next);
   return next.find((s) => s.id === stopId);
@@ -582,7 +722,11 @@ export function updateSessionMiles(userId, miles) {
   if (!session) return null;
   const parsed = parseMilesInput(miles);
   if (!parsed.ok) return { error: parsed.error, session };
-  const next = { ...session, miles: parsed.miles };
+  const next = {
+    ...session,
+    miles: parsed.miles,
+    miles_source: "manual",
+  };
   writeLocal(PREFIX, userId, SESSION_KEY, next);
   return next;
 }
@@ -704,16 +848,32 @@ export function sessionStats(session, stops) {
     .filter((n) => typeof n === "number" && n >= 0);
   const avgBetween =
     between.length > 0 ? Math.round(between.reduce((a, b) => a + b, 0) / between.length) : null;
-  const elapsedSec = Math.round(
+  const pauseExtra =
+    session.paused && session.paused_at
+      ? Math.round((Date.now() - new Date(session.paused_at).getTime()) / 1000)
+      : 0;
+  const pauseAccum = Number(session.pause_accum_sec || 0) + pauseExtra;
+  const wallSec = Math.round(
     ((session.ended_at ? new Date(session.ended_at) : new Date()) - new Date(session.started_at)) /
       1000
   );
+  const elapsedSec = Math.max(0, wallSec - pauseAccum);
+  const driveSec = Number(session.drive_sec || 0);
+  const idleSec = Number(session.idle_sec || 0);
   return {
     miles: Number(session.miles || 0),
+    autoMiles: Number(session.auto_miles || 0),
     stops: (stops || []).length,
     avgStopSec: avgStop,
     avgBetweenSec: avgBetween,
     elapsedSec,
+    driveSec,
+    idleSec,
+    maxSpeedMph: Number(session.max_speed_mph || 0),
+    avgSpeedMph: Number(session.avg_speed_mph || 0),
+    stopPhase: session.stop_phase || "moving",
+    paused: Boolean(session.paused),
+    milesSource: session.miles_source || "manual",
     active: Boolean(session.active),
   };
 }

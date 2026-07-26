@@ -22,6 +22,7 @@ import FormField from "@/components/shared/FormField";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { uid } from "@/lib/localStore";
+import { isOwnerAccount } from "@/lib/ownerAccount";
 import {
   BADGE_CATALOG,
   SKILL_SUGGESTIONS,
@@ -137,7 +138,11 @@ export default function Profile() {
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <PageHeader
             title="Professional profile"
-            subtitle="Bio, portfolio, skills, verification, and public reviews"
+            subtitle={
+              isOwnerAccount(user)
+                ? "Founder account · ∞ authority · public reviews & portfolio"
+                : "Bio, portfolio, skills, verification, and public reviews"
+            }
           />
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" className="rounded-xl">
@@ -198,10 +203,12 @@ export default function Profile() {
               />
               <BadgeCheck className="w-4 h-4 text-titan-cyan" /> Show verified badge
             </label>
-            <span className="text-xs text-muted-foreground">
-              {reviewsMeta.count
-                ? `${reviewsMeta.average.toFixed(1)}★ · ${reviewsMeta.count} reviews`
-                : "No reviews yet"}
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {isOwnerAccount(user)
+                ? "∞★ · ∞ reviews · ∞ jobs"
+                : reviewsMeta.count
+                  ? `${reviewsMeta.average.toFixed(1)}★ · ${reviewsMeta.count} reviews`
+                  : "No reviews yet"}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">

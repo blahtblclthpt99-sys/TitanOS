@@ -132,7 +132,7 @@ export default function PhoneReceptionist() {
     return (
       <PageShell maxWidth="lg">
         <PageHeader
-          eyebrow="Labs · Coming soon"
+          eyebrow="Labs · Preview"
           title="Phone scripts"
           subtitle="Write a greeting and FAQ, then practice replies — not a live phone line."
         />
@@ -152,7 +152,7 @@ export default function PhoneReceptionist() {
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Labs · Coming soon"
+        eyebrow="Labs · Preview"
         title="Phone scripts"
         subtitle="Write a greeting and FAQ, then practice replies — not a live phone line."
       />

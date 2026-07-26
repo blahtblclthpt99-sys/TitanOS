@@ -124,10 +124,10 @@ export default function AdminTaxRules() {
         subtitle="Configure sales-tax jurisdictions by Job Location. Driver Location never sets tax."
       />
 
-      <FeatureHonestyBanner
-        title="Configurable rates — verify before charging"
-        description="Starter rules are illustrative. Keep historical estimate/invoice tax_snapshot unless you intentionally recalculate."
-      />
+      <FeatureHonestyBanner>
+        Configurable rates — verify before charging. Starter rules are illustrative. Keep historical
+        estimate/invoice tax snapshots unless you intentionally recalculate.
+      </FeatureHonestyBanner>
 
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Add / edit rule</p>

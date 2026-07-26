@@ -78,11 +78,12 @@ describe("PayPal membership path", () => {
 });
 
 describe("Marketplace free + payment fees", () => {
-  it("marketplace catalog modules are priced at $1.99", async () => {
-    const { MODULE_PRICE, MARKETPLACE_MODULES, formatModulePrice } = await import(
+  it("marketplace catalog modules are free beta perks at $0", async () => {
+    const { MODULE_PRICE, MODULE_PRICE_LABEL, MARKETPLACE_MODULES, formatModulePrice } = await import(
       "../src/lib/marketplaceCatalog.js"
     );
-    assert.equal(MODULE_PRICE, 1.99);
+    assert.equal(MODULE_PRICE, 0);
+    assert.equal(MODULE_PRICE_LABEL, "Free beta perk");
     assert.ok(MARKETPLACE_MODULES.length >= 25);
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "law-mastermind-ai"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "babysitting-pro"));
@@ -94,8 +95,8 @@ describe("Marketplace free + payment fees", () => {
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-car-wash"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-mechanic"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "christmas-light-installer"));
-    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 1.99));
-    assert.equal(formatModulePrice({ price: 1.99 }), "$1.99");
+    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0));
+    assert.equal(formatModulePrice({ price: 0 }), "Free beta perk");
   });
 
   it("createPaymentLink supports module purpose without service fee", () => {

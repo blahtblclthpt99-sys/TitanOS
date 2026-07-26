@@ -232,7 +232,7 @@ export default function Settings() {
     { id: "company",       icon: Building2, title: "Company",       description: "Business name, address, branding" },
     { id: "notifications", icon: Bell,      title: "Notifications", description: "Job, message, review, account, and system alerts" },
     { id: "marketing",     icon: Megaphone, title: "Marketing preferences", description: "Email, SMS, push, frequency, and topics" },
-    { id: "trust",         icon: Shield,    title: "Trust & Safety", description: "Report & block now · identity / 2FA coming soon" },
+    { id: "trust",         icon: Shield,    title: "Trust & Safety", description: "Report & block live · identity verification in Labs" },
     { id: "privacy",       icon: Lock,      title: "Privacy",       description: "Community visibility and sharing" },
     { id: "security",      icon: Shield,    title: "Security",      description: "Password and login settings" },
     { id: "accounts",      icon: Lock,      title: "Connected accounts", description: "Google and email sign-in methods" },
@@ -386,7 +386,7 @@ export default function Settings() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">{betaBadgeLabel() || "Public Beta"}</p>
-            <p className="text-xs text-muted-foreground">Free During Beta! All features included.</p>
+            <p className="text-xs text-muted-foreground">Free During Beta — core tools unlocked. Labs features stay labeled.</p>
           </div>
           <ChevronRight className="w-4 h-4 text-primary/50" />
         </motion.div>

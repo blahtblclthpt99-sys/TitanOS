@@ -81,7 +81,7 @@ export default function EmergencyJobs() {
     return (
       <PageShell maxWidth="lg">
         <PageHeader
-          eyebrow="Labs · Coming soon"
+          eyebrow="Labs · Preview"
           title="Emergency board"
           subtitle="Your personal same-day list — not a live network alerting nearby crews."
         />
@@ -98,7 +98,7 @@ export default function EmergencyJobs() {
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Labs · Coming soon"
+        eyebrow="Labs · Preview"
         title="Emergency board"
         subtitle="Your personal same-day list — not a live network alerting nearby crews."
       />

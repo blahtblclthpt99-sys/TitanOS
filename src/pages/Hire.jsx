@@ -263,7 +263,7 @@ export default function Hire() {
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Grow · Demo-aware"
+        eyebrow="Grow"
         title="Hire workers"
         subtitle="Post hauls and gigs, or apply to work. Device-only saves are labeled — they don’t notify other users."
       />

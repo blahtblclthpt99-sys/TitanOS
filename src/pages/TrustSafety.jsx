@@ -109,7 +109,7 @@ export default function TrustSafety() {
     <div className="relative page-pad max-w-3xl mx-auto pb-32 space-y-4">
       <div className="relative space-y-4">
         <PageHeader
-          eyebrow="Account · Coming soon"
+          eyebrow="Account"
           title="Trust & Safety"
           subtitle="Identity verification and 2FA providers are not live yet. Reporting and blocking work on this account."
         />

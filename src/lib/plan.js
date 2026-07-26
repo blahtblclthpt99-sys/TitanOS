@@ -6,6 +6,8 @@
  * During FREE_DURING_BETA: memberships show $0 / "Free beta perk" (no PayPal checkout).
  * Post-beta launch prices stay in `launchPriceMonthly` for when we flip the flag.
  */
+import { isOwnerAccount } from "@/lib/ownerAccount";
+
 export const FREE_DURING_BETA = true;
 
 /** @deprecated Use FREE_DURING_BETA */
@@ -205,6 +207,7 @@ export function isCustomerPlan(user) {
 export function canAccessFeature(user, featureKey) {
   if (!user) return false;
   if (FREE_DURING_BETA) return true;
+  if (isOwnerAccount(user)) return true;
   if (user.role === "admin") return true;
 
   const plan = resolvePlan(user);

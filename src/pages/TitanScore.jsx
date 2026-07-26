@@ -13,10 +13,12 @@ import {
   verificationLevelFromTrust,
 } from "@/lib/titanScore";
 import { getLocalTrustState } from "@/lib/trustSafetyApi";
+import { isOwnerAccount } from "@/lib/ownerAccount";
 
 export default function TitanScore() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const owner = isOwnerAccount(user);
   const { data: [invoices, jobs, customers, estimates, reviews] } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 200] },
     { entity: "Job", method: "list", args: ["-created_date", 200] },
@@ -27,7 +29,7 @@ export default function TitanScore() {
 
   const trustState = useMemo(() => (user?.id ? getLocalTrustState(user.id) : null), [user?.id]);
   const verificationLevel = verificationLevelFromTrust(trustState);
-  const titanVerified = isTitanVerified({
+  const titanVerified = owner || isTitanVerified({
     verifiedWorker: Boolean(user?.verified_worker),
     trustState,
   });
@@ -38,7 +40,7 @@ export default function TitanScore() {
     customers,
     estimates,
     reviews,
-    verificationLevel,
+    verificationLevel: owner ? 1 : verificationLevel,
     yearsExperience: user?.years_experience != null ? Number(user.years_experience) : null,
   });
 
@@ -51,13 +53,15 @@ export default function TitanScore() {
 
       <FeatureHonestyBanner tone="info">
         This score is calculated from your TitanOS records — not a third-party credit or background check.
-        “Verified” level stays limited until Trust & Safety identity providers go live.
+        {owner
+          ? " Founder account: authority stats display as ∞."
+          : " “Verified” level stays limited until Trust & Safety identity providers go live."}
       </FeatureHonestyBanner>
 
       <div className="titan-surface mb-5 flex flex-col items-center gap-6 border border-primary/20 p-6 sm:flex-row md:p-8">
         <div className="flex h-36 w-36 flex-col items-center justify-center rounded-full border-4 border-primary bg-primary/10 shadow-lift">
-          <p className="text-4xl font-bold text-foreground">{result.score}</p>
-          <p className="text-sm font-semibold text-primary">{result.grade}</p>
+          <p className="text-4xl font-bold text-foreground">{owner ? "∞" : result.score}</p>
+          <p className="text-sm font-semibold text-primary">{owner ? "Founder" : result.grade}</p>
         </div>
         <div className="flex-1 text-center sm:text-left">
           <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
@@ -66,13 +70,16 @@ export default function TitanScore() {
             {titanVerified ? <TitanVerifiedBadge size="sm" /> : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Six factors from your account activity. Improve it by completing jobs, collecting reviews, and
-            keeping invoices current.
+            {owner
+              ? "Platform founder authority — unlimited standing across TitanOS."
+              : "Six factors from your account activity. Improve it by completing jobs, collecting reviews, and keeping invoices current."}
           </p>
           <p className="mt-3 text-sm text-foreground">
-            {result.stats.completedJobs} jobs done · {result.stats.reviewAvg}★ avg
-            {result.stats.reviewCount ? ` (${result.stats.reviewCount})` : ""} ·{" "}
-            {Math.round(verificationLevel * 100)}% profile completeness
+            {owner
+              ? "∞ jobs done · ∞★ avg · ∞ profile authority"
+              : `${result.stats.completedJobs} jobs done · ${result.stats.reviewAvg}★ avg${
+                  result.stats.reviewCount ? ` (${result.stats.reviewCount})` : ""
+                } · ${Math.round(verificationLevel * 100)}% profile completeness`}
           </p>
           {!titanVerified && (
             <Link

@@ -33,7 +33,7 @@
     "test:fees": "node --test scripts/fee-engine.test.mjs",
     "test:hire": "node --test scripts/hire-security.test.mjs",
     "test:payments": "node --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs",
-    "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs scripts/driver-activity.test.mjs",
+    "test:driver": "node --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs scripts/driver-activity.test.mjs scripts/driver-intelligence.test.mjs scripts/driver-logbook.test.mjs scripts/driver-trip-journal.test.mjs scripts/driver-offer-analyzer.test.mjs",
     "icons:pwa": "node scripts/generate-pwa-icons.mjs",
     "test:money": "node --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
     "test:tax": "node --test scripts/tax-engine.test.mjs",

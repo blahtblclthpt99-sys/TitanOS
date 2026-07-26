@@ -1,33 +1,52 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Car, Plus, Users, Radio } from "lucide-react";
+import { BookOpen, Brain, Car, Plus, Users, Radio } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
 import DriverDirectory from "@/components/driver/DriverDirectory";
 import DriverShiftPanel from "@/components/driver/DriverShiftPanel";
 import DriverLocationPanel from "@/components/driver/DriverLocationPanel";
+import DriverIntelligencePanel from "@/components/driver/activity/DriverIntelligencePanel";
+import VehicleLogbookPanel from "@/components/driver/activity/VehicleLogbookPanel";
+import { useAuth } from "@/lib/AuthContext";
+import {
+  readShiftHistory,
+  readSession,
+  readStops,
+  readPrefs,
+  estimateGasPriceUsd,
+} from "@/lib/driverHubApi";
 
 const TABS = [
-  { id: "directory", label: "Find drivers", icon: Users },
-  { id: "shift", label: "My shift", icon: Car },
+  { id: "shift", label: "My shift", icon: Car, short: "Shift" },
+  { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log" },
+  { id: "intel", label: "Intelligence", icon: Brain, short: "AI" },
+  { id: "directory", label: "Find drivers", icon: Users, short: "Find" },
 ];
 
 export default function DriverHub() {
+  const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const qParam = params.get("q") || "";
-  const initialTab = tabParam === "directory" ? "directory" : "shift";
+  const allowed = new Set(TABS.map((t) => t.id));
+  const initialTab = allowed.has(tabParam) ? tabParam : "shift";
   const [tab, setTab] = useState(initialTab);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
-    if (tabParam === "shift" || tabParam === "directory") setTab(tabParam);
+    if (allowed.has(tabParam)) setTab(tabParam);
     else if (!tabParam) setTab("shift");
   }, [tabParam]);
 
   useEffect(() => {
     if (qParam && tab !== "directory") setTab("directory");
   }, [qParam, tab]);
+
+  useEffect(() => {
+    if (tab === "intel" || tab === "logbook") setRefreshTick((t) => t + 1);
+  }, [tab]);
 
   const selectTab = (id) => {
     setTab(id);
@@ -37,13 +56,20 @@ export default function DriverHub() {
     setParams(next, { replace: true });
   };
 
-  const subtitle = useMemo(
-    () =>
-      tab === "directory"
-        ? "Browse published drivers nearby — or publish yourself to get hired."
-        : "Track miles, stops, fuel, and sync to Tax Center.",
-    [tab]
-  );
+  const subtitle = useMemo(() => {
+    if (tab === "directory") return "Browse published drivers nearby — or publish yourself to get hired.";
+    if (tab === "intel")
+      return "Trip intelligence, rush windows, goals, and coaching from your real driving history.";
+    if (tab === "logbook")
+      return "Classify miles, log fuel and expenses, download Excel trip reports with every timer.";
+    return "Track miles, stops, fuel, and sync to Tax Center.";
+  }, [tab]);
+
+  const prefs = user?.id ? readPrefs(user.id) : {};
+  const history = user?.id ? readShiftHistory(user.id) : [];
+  const session = user?.id ? readSession(user.id) : null;
+  const stops = user?.id ? readStops(user.id) : [];
+  const gasUsd = estimateGasPriceUsd(prefs.zip || "");
 
   return (
     <PageShell maxWidth="xl" className="space-y-5">
@@ -71,11 +97,11 @@ export default function DriverHub() {
       />
 
       <div
-        className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted p-1"
+        className="grid grid-cols-4 gap-1 rounded-lg border border-border bg-muted p-1"
         role="tablist"
         aria-label="Driver Hub sections"
       >
-        {TABS.map(({ id, label, icon: Icon }) => {
+        {TABS.map(({ id, label, icon: Icon, short }) => {
           const active = tab === id;
           return (
             <button
@@ -87,25 +113,43 @@ export default function DriverHub() {
               aria-selected={active}
               tabIndex={active ? 0 : -1}
               onClick={() => selectTab(id)}
-              className={`flex min-h-[48px] items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors duration-fast focus-ring ${
+              className={`flex min-h-[48px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-fast focus-ring ${
                 active
                   ? "bg-card text-foreground shadow-soft"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {label}
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="hidden md:inline">{label}</span>
+              <span className="md:hidden text-xs">{short}</span>
             </button>
           );
         })}
       </div>
 
-      <div
-        role="tabpanel"
-        id={`driver-hub-panel-${tab}`}
-        aria-labelledby={`driver-hub-tab-${tab}`}
-      >
-        {tab === "directory" ? <DriverDirectory initialQuery={qParam} /> : (
+      <div role="tabpanel" id={`driver-hub-panel-${tab}`} aria-labelledby={`driver-hub-tab-${tab}`}>
+        {tab === "directory" ? (
+          <DriverDirectory initialQuery={qParam} />
+        ) : tab === "logbook" ? (
+          <VehicleLogbookPanel
+            key={refreshTick}
+            userId={user?.id}
+            history={history}
+            liveSession={session?.active ? session : null}
+            stops={stops}
+          />
+        ) : tab === "intel" ? (
+          <DriverIntelligencePanel
+            key={refreshTick}
+            userId={user?.id}
+            history={history}
+            liveSession={session?.active ? session : null}
+            stops={stops}
+            mpg={Number(prefs.mpg) || 22}
+            gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
+            defaultZip={prefs.zip || ""}
+          />
+        ) : (
           <div className="space-y-4">
             <DriverLocationPanel />
             <DriverShiftPanel />

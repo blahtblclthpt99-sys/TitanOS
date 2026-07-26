@@ -75,6 +75,7 @@ const Escrow = lazy(() => import("@/pages/Escrow"));
 const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 const DriverHub = lazy(() => import("@/pages/DriverHub"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
+const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
@@ -141,6 +142,13 @@ function NonTabPage() {
     return (
       <Suspense fallback={<Spinner />}>
         <InvoiceDetail />
+      </Suspense>
+    );
+  }
+  if (pathname.startsWith("/driver/trip/")) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <DriverTripDetail />
       </Suspense>
     );
   }

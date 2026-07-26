@@ -21,6 +21,7 @@ import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import { useDriverActivityTracker } from "@/components/driver/activity/useDriverActivityTracker";
+import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
@@ -681,6 +682,7 @@ export default function DriverShiftPanel() {
                   onPause={handlePauseSession}
                   onResume={handleResumeSession}
                   busy={busy}
+                  rushLabel={classifyRushWindow(new Date()).label}
                 />
               </ErrorBoundary>
             )}

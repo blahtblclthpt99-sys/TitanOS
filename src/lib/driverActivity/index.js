@@ -9,19 +9,35 @@ export * from "./stopDetection.js";
 export * from "./stats.js";
 export * from "./export.js";
 export * from "./betweenStops.js";
+export * from "./intelligence.js";
+export * from "./goals.js";
+export * from "./vehicleLogbook.js";
+export * from "./tripJournal.js";
+export * from "./offerAnalyzer.js";
+export * from "./zipBenchmarks.js";
+export * from "./excelExport.js";
 export { createBrowserTracker } from "./tracker.js";
 
 /** Feature modules reserved for expansion (no-ops / stubs). */
 export const ACTIVITY_MODULES = {
   multiVehicle: false,
-  expenseTracking: false,
-  fuelLogs: false,
+  expenseTracking: true,
+  fuelLogs: true,
   tollTracking: false,
-  parkingExpenses: false,
+  parkingExpenses: true,
   receiptScanning: false,
-  maintenanceReminders: false,
+  maintenanceReminders: true,
   routeOptimization: false,
   safetyAlerts: false,
   fleetSupport: false,
   timeBetweenStops: true,
+  driverIntelligence: true,
+  tripWorthMeter: true,
+  rushWindows: true,
+  aiCoach: true,
+  vehicleLogbook: true,
+  tripClassification: true,
+  offerAnalyzer: true,
+  zipBenchmarks: true,
+  excelExport: true,
 };

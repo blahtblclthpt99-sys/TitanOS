@@ -9,6 +9,7 @@ import {
   parseMilesInput,
   summarizeRecordedShifts,
 } from "@/lib/driverHubMath";
+import { syncSessionLegsToJournal } from "@/lib/driverActivity/tripJournal";
 
 export {
   IRS_MILEAGE_RATE_USD,
@@ -591,7 +592,12 @@ export async function stopDrivingSession(userId, snapshot = {}) {
   };
   writeLocal(PREFIX, userId, SESSION_KEY, ended);
   const history = readLocal(PREFIX, userId, "history", []);
-  writeLocal(PREFIX, userId, "history", [ended, ...history].slice(0, 12));
+  writeLocal(PREFIX, userId, "history", [ended, ...history].slice(0, 90));
+  try {
+    syncSessionLegsToJournal(userId, ended, stops);
+  } catch {
+    /* journal is best-effort */
+  }
   return ended;
 }
 
@@ -716,7 +722,13 @@ export function endStop(userId, stopId) {
     };
   });
   writeLocal(PREFIX, userId, STOPS_KEY, next);
-  return next.find((s) => s.id === stopId);
+  const endedStop = next.find((s) => s.id === stopId);
+  try {
+    if (session && endedStop) syncSessionLegsToJournal(userId, session, next);
+  } catch {
+    /* journal is best-effort */
+  }
+  return endedStop;
 }
 
 export function updateSessionMiles(userId, miles) {

@@ -2,9 +2,10 @@ import React from "react";
 import { Gauge, MapPin, Pause, Play, Timer } from "lucide-react";
 import StatHint from "@/components/shared/StatHint";
 import { formatDuration, IRS_MILEAGE_RATE_USD } from "@/lib/driverHubApi";
+import { cn } from "@/lib/utils";
 
 /**
- * Large, glanceable live driving dashboard — minimize interaction while moving.
+ * Large, glanceable live driving dashboard — drive timer and idle timer are separate.
  */
 export default function ActivityLiveDash({
   dash,
@@ -14,6 +15,7 @@ export default function ActivityLiveDash({
   onPause,
   onResume,
   busy,
+  rushLabel,
 }) {
   if (!dash) return null;
 
@@ -21,16 +23,19 @@ export default function ActivityLiveDash({
     paused
       ? "Paused"
       : stopPhase === "stopped"
-        ? "At stop"
+        ? "At stop · idle timer running"
         : stopPhase === "potential"
           ? "Possible stop"
-          : "Driving";
+          : "Driving · drive timer running";
 
   const statusColor = paused
     ? "text-titan-amber"
     : stopPhase === "stopped"
-      ? "text-primary"
+      ? "text-titan-amber"
       : "text-emerald-500";
+
+  const drivingNow = !paused && stopPhase !== "stopped" && stopPhase !== "potential";
+  const idlingNow = !paused && (stopPhase === "stopped" || stopPhase === "potential");
 
   return (
     <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -40,11 +45,11 @@ export default function ActivityLiveDash({
             Live work session
           </p>
           <p className={`text-sm font-semibold ${statusColor}`}>{statusLabel}</p>
+          {rushLabel ? (
+            <p className="text-[11px] text-muted-foreground mt-0.5">{rushLabel}</p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-2xl font-bold text-foreground tabular-nums tracking-tight">
-            {formatDuration(dash.elapsedSec || 0)}
-          </p>
           {paused ? (
             <button
               type="button"
@@ -69,7 +74,51 @@ export default function ActivityLiveDash({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {/* Separate drive vs idle clocks — primary focus */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div
+          className={cn(
+            "rounded-2xl border px-4 py-4 text-center",
+            drivingNow
+              ? "border-emerald-500/50 bg-emerald-500/15 shadow-[0_0_24px_rgba(16,185,129,0.15)]"
+              : "border-border bg-background/50"
+          )}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-1 flex items-center justify-center gap-1">
+            <Timer className="w-3.5 h-3.5" /> Drive timer
+          </p>
+          <p className="text-3xl sm:text-4xl font-bold tabular-nums text-foreground tracking-tight">
+            {formatDuration(dash.driveSec || 0)}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">Moving time only</p>
+        </div>
+        <div
+          className={cn(
+            "rounded-2xl border px-4 py-4 text-center",
+            idlingNow
+              ? "border-titan-amber/50 bg-titan-amber/10 shadow-[0_0_24px_rgba(245,158,11,0.12)]"
+              : "border-border bg-background/50"
+          )}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-titan-amber mb-1 flex items-center justify-center gap-1">
+            <Timer className="w-3.5 h-3.5" /> Idle timer
+          </p>
+          <p className="text-3xl sm:text-4xl font-bold tabular-nums text-foreground tracking-tight">
+            {formatDuration(dash.idleSec || 0)}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">Stopped / waiting</p>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground mb-3 text-center">
+        Total session clock:{" "}
+        <span className="tabular-nums text-foreground font-semibold">
+          {formatDuration(dash.elapsedSec || 0)}
+        </span>{" "}
+        (drive + idle; pauses excluded)
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="rounded-xl bg-background/50 border border-border px-3 py-3">
           <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
             Trip miles
@@ -79,65 +128,36 @@ export default function ActivityLiveDash({
                   ? "Auto-recorded from GPS during this work session."
                   : "Manually entered or corrected."}
               </p>
-              <p>You can correct miles below if needed.</p>
             </StatHint>
           </p>
           <p className="text-2xl font-bold text-foreground tabular-nums">{dash.miles}</p>
         </div>
         <div className="rounded-xl bg-background/50 border border-border px-3 py-3">
           <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-            <Timer className="w-3 h-3" /> Drive time
-            <StatHint label="Active driving time">
-              <p>Time spent moving above the stop-speed threshold.</p>
-            </StatHint>
-          </p>
-          <p className="text-2xl font-bold text-foreground tabular-nums">
-            {formatDuration(dash.driveSec || 0)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-background/50 border border-border px-3 py-3">
-          <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-            Idle
-            <StatHint label="Idle / stopped time">
-              <p>Time spent effectively stationary (traffic grace + confirmed stops).</p>
-            </StatHint>
-          </p>
-          <p className="text-2xl font-bold text-foreground tabular-nums">
-            {formatDuration(dash.idleSec || 0)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-background/50 border border-border px-3 py-3">
-          <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> Stops
-            <StatHint label="Detected stops">
-              <p>Automatic stops after sustained stillness, plus any you log manually.</p>
-              <p>Short traffic delays are filtered when possible.</p>
+            <MapPin className="w-3 h-3" /> Trips / stops
+            <StatHint label="Detected trips">
+              <p>Each confirmed stop closes one trip leg with its own drive and idle times.</p>
             </StatHint>
           </p>
           <p className="text-2xl font-bold text-foreground tabular-nums">{dash.stops}</p>
         </div>
+        <div className="rounded-xl bg-background/50 border border-border px-3 py-3 col-span-2 sm:col-span-1">
+          <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+            <Gauge className="w-3 h-3" /> Speed
+          </p>
+          <p className="text-lg font-bold text-foreground tabular-nums">
+            {dash.avgSpeedMph > 0 ? `Avg ${dash.avgSpeedMph}` : "—"}
+            {dash.maxSpeedMph > 0 ? ` · Max ${dash.maxSpeedMph}` : ""} mph
+          </p>
+        </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-2">
-          <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-            <Gauge className="w-3 h-3" /> Avg speed
-          </p>
-          <p className="text-sm font-semibold text-foreground tabular-nums">
-            {dash.avgSpeedMph > 0 ? `${dash.avgSpeedMph} mph` : "—"}
-          </p>
-        </div>
-        <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-2">
-          <p className="text-[10px] text-muted-foreground uppercase">Max speed</p>
-          <p className="text-sm font-semibold text-foreground tabular-nums">
-            {dash.maxSpeedMph > 0 ? `${dash.maxSpeedMph} mph` : "—"}
-          </p>
-        </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-background/40 border border-border/60 px-2.5 py-2">
           <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
             Avg stop
             <StatHint label="Average stop duration">
-              <p>Average time of completed stops this session.</p>
+              <p>Average idle time of completed stops this session.</p>
             </StatHint>
           </p>
           <p className="text-sm font-semibold text-foreground tabular-nums">
@@ -152,7 +172,6 @@ export default function ActivityLiveDash({
                 Miles × IRS standard rate (${IRS_MILEAGE_RATE_USD}/mi) for recordkeeping — not tax
                 advice.
               </p>
-              <p>Export full logs from Tax assistant below.</p>
             </StatHint>
           </p>
           <p className="text-sm font-semibold text-emerald-500 tabular-nums">
@@ -162,8 +181,8 @@ export default function ActivityLiveDash({
       </div>
 
       <p className="text-[11px] text-muted-foreground mt-3">
-        Keep eyes on the road — glance only. Pause if you need to interact. Location is collected
-        only while this work session is active
+        Drive and idle timers run separately. Every trip is saved for your end-of-day spreadsheet
+        report in Logbook
         {milesSource === "gps" ? " · GPS miles on" : " · manual miles"}.
       </p>
     </div>

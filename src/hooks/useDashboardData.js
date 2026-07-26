@@ -51,7 +51,7 @@ function buildDashboardData(jobs, invoices, estimates, customers, employees) {
     return i.status === "paid" && d >= prevMonthStart && d <= prevMonthEnd;
   });
   const weekPaid = invoices.filter((i) => {
-    const d = (i.paid_at || i.created_date || i.created_at || "").slice(0, 10);
+    const d = (i.updated_at || i.created_date || i.created_at || "").slice(0, 10);
     return i.status === "paid" && d >= weekStart && d <= weekEnd;
   });
   const monthRevenue = thisMonthPaid.reduce((s, i) => s + (i.total || 0), 0);
@@ -167,7 +167,15 @@ export function useDashboardData({ enabled = true } = {}) {
   const error = allFailed ? queries.find((query) => query.error)?.error ?? null : null;
   const partialError =
     anyLoaded && queries.some((query) => query.error)
-      ? queries.find((query) => query.error)?.error ?? null
+      ? (() => {
+          const failed = DASHBOARD_QUERIES.filter((_, i) => queries[i]?.error).map((d) => d.entity);
+          const first = queries.find((query) => query.error)?.error;
+          const err = first ?? new Error("Partial load failed");
+          err.message = failed.length
+            ? `${failed.join(", ")} failed to load${first?.message ? `: ${first.message}` : ""}`
+            : err.message;
+          return err;
+        })()
       : null;
 
   const data = useMemo(() => {

@@ -35,6 +35,7 @@ export default async function handler(req, res) {
       process.env.STRIPE_PROFILE_ID &&
         /^profile_[A-Za-z0-9_]+$/.test(String(process.env.STRIPE_PROFILE_ID).trim())
     ),
+    mppTestnet: String(process.env.MPP_TESTNET || "1") !== "0",
   };
 
   const deep =

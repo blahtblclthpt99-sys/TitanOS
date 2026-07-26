@@ -3,29 +3,49 @@
  * Transaction fee *rates* are owned by the Fee Engine (`shared/feeEngine.js` + DB).
  * plan.feeRate values seed / display defaults and must stay aligned with fee seed rules.
  *
- * FREE_DURING_BETA must stay false for paid launch. PayPal NCP links remain the checkout path.
+ * Founding 100: first users get free membership forever (`founding_user` + lifetime_premium).
+ * Fees still apply on collected payments. After 100 founding slots, beta closes and
+ * PayPal membership checkout goes live (see `isFreeDuringBeta` / migration 035).
  */
 import { isOwnerAccount } from "@/lib/ownerAccount";
+import {
+  FOUNDING_USER_CAP,
+  getLaunchStatus,
+  isBetaActive,
+  isMembershipCheckoutLive,
+} from "@/lib/launchStatus";
 
+export { FOUNDING_USER_CAP, isBetaActive, isMembershipCheckoutLive };
+
+/**
+ * True while founding spots remain — membership checkout hidden; founding users unlocked.
+ * Prefer this over the deprecated FREE_DURING_BETA constant.
+ */
+export function isFreeDuringBeta() {
+  return isBetaActive();
+}
+
+/**
+ * @deprecated Use isFreeDuringBeta(). Kept as a getter-compatible alias for older imports
+ * that expect a boolean at call time — always read via isFreeDuringBeta() in new code.
+ */
 export const FREE_DURING_BETA = false;
 
-/** @deprecated Use FREE_DURING_BETA */
-export const FREE_LAUNCH = FREE_DURING_BETA;
+/** @deprecated Use isFreeDuringBeta / founding users */
+export const FREE_LAUNCH = false;
 
-export const BETA_PERK_LABEL = "Launch perk";
+export const BETA_PERK_LABEL = "Founding 100 perk";
 
-/** Live PayPal No-Code Payment links (memberships + marketplace modules). */
+/** Live PayPal No-Code Payment links (memberships only — no per-module checkout). */
 export const PAYPAL_CHECKOUT = Object.freeze({
   /** Worker Premium — $29.99 */
   worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
   /** Business — $49.99 */
   business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
-  /** Marketplace module — $1.99 */
-  module: "https://www.paypal.com/ncp/payment/76HUUNKTX9RSW",
 });
 
-/** Post-launch module sticker price (matches PayPal NCP). */
-export const PAYPAL_MODULE_PRICE = 1.99;
+/** @deprecated Modules are included with Premium/Business — always 0. */
+export const PAYPAL_MODULE_PRICE = 0;
 export const PLANS = Object.freeze({
   customer: Object.freeze({
     id: "customer",
@@ -60,9 +80,7 @@ export const PLANS = Object.freeze({
     featuredProfile: false,
     searchPriority: false,
     storageLabel: "Standard photo & document storage",
-    blurb: FREE_DURING_BETA
-      ? "Full worker tools while we launch."
-      : "Try TitanOS with no monthly fee — 8% on payments you collect. Shift tracking included; premium Driver Hub add-ons require Premium.",
+    blurb: "Try TitanOS with no monthly fee — 8% on payments you collect. Shift tracking included; premium Driver Hub add-ons require Premium.",
     checkoutUrl: null,
   }),
   worker_premium: Object.freeze({
@@ -70,7 +88,7 @@ export const PLANS = Object.freeze({
     name: "Worker Premium",
     audience: "Workers",
     launchPriceMonthly: 29.99,
-    priceMonthly: FREE_DURING_BETA ? 0 : 29.99,
+    priceMonthly: 29.99,
     feeRate: 0.025,
     feeLabel: "2.5%",
     maxActiveListings: Infinity,
@@ -80,17 +98,15 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
-    blurb: FREE_DURING_BETA
-      ? "Premium unlocked for early users."
-      : "$29.99/mo — lower 2.5% fee, Driver Hub add-ons, Marketplace Apps, lasting TitanCom channels.",
-    checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.worker_premium,
+    blurb: "$29.99/mo — lower 2.5% fee, Driver Hub add-ons, Marketplace Apps, lasting TitanCom channels.",
+    checkoutUrl: PAYPAL_CHECKOUT.worker_premium,
   }),
   business: Object.freeze({
     id: "business",
     name: "Business",
     audience: "Businesses",
     launchPriceMonthly: 49.99,
-    priceMonthly: FREE_DURING_BETA ? 0 : 49.99,
+    priceMonthly: 49.99,
     feeRate: 0.015,
     feeLabel: "1.5%",
     maxActiveListings: Infinity,
@@ -100,10 +116,8 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
-    blurb: FREE_DURING_BETA
-      ? "Business tools unlocked for early teams."
-      : "$49.99/mo for teams — lowest 1.5% fee plus every Premium unlock.",
-    checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.business,
+    blurb: "$49.99/mo for teams — lowest 1.5% fee plus every Premium unlock.",
+    checkoutUrl: PAYPAL_CHECKOUT.business,
   }),
 });
 
@@ -196,14 +210,34 @@ export function resolvePlan(user) {
 }
 
 export function getPlanConfig(userOrPlanId) {
-  if (!userOrPlanId) return PLANS.worker_free;
+  if (!userOrPlanId) return applyBetaPricing(PLANS.worker_free);
   if (typeof userOrPlanId === "string") {
     const id = PLAN_ALIASES[userOrPlanId] || userOrPlanId;
-    return PLANS[id] || PLANS.worker_free;
+    return applyBetaPricing(PLANS[id] || PLANS.worker_free);
   }
   const id = resolvePlan(userOrPlanId);
-  if (id === "anonymous") return PLANS.worker_free;
-  return PLANS[id] || PLANS.worker_free;
+  if (id === "anonymous") return applyBetaPricing(PLANS.worker_free);
+  return applyBetaPricing(PLANS[id] || PLANS.worker_free, userOrPlanId);
+}
+
+/** While founding beta is open, hide membership prices; founding users keep free access via lifetime_premium. */
+function applyBetaPricing(plan, user) {
+  if (!plan) return PLANS.worker_free;
+  if (!isFreeDuringBeta()) return plan;
+  if (plan.id !== "worker_premium" && plan.id !== "business") return plan;
+  const founding = isFoundingUser(user);
+  return {
+    ...plan,
+    priceMonthly: 0,
+    checkoutUrl: null,
+    blurb: founding
+      ? `${plan.name} unlocked for Founding 100 — free membership; payment fees still apply.`
+      : `${plan.name} is free during the Founding 100 window — payment fees still apply.`,
+  };
+}
+
+export function isFoundingUser(user) {
+  return Boolean(user?.founding_user);
 }
 
 export function isPaidPlan(user) {
@@ -217,13 +251,21 @@ export function isCustomerPlan(user) {
 
 export function canAccessFeature(user, featureKey) {
   if (!user) return false;
-  if (FREE_DURING_BETA) return true;
+  // Open founding window: unlock app features (fees still charged on payments).
+  if (isFreeDuringBeta()) return true;
   if (isOwnerAccount(user)) return true;
   if (user.role === "admin") return true;
+  // Founding 100 keep free membership after beta closes (fees still apply).
+  if (isFoundingUser(user) || user.lifetime_premium === true) {
+    if (resolvePlan(user) === "customer") {
+      if (featureKey === PRO_FEATURES.marketplace) return true;
+      return !PAID_WORKER_FEATURES.has(featureKey);
+    }
+    return true;
+  }
 
   const plan = resolvePlan(user);
   if (plan === "customer") {
-    // Customers hire / browse listings — not Marketplace Apps or Driver Hub add-ons
     if (featureKey === PRO_FEATURES.marketplace) return true;
     return !PAID_WORKER_FEATURES.has(featureKey);
   }
@@ -252,7 +294,17 @@ export function isMarketplaceFree(_user) {
   return true;
 }
 
-export function betaBadgeLabel() {
+export function betaBadgeLabel(user) {
+  if (isFoundingUser(user)) {
+    const n = user.founding_number;
+    return n != null && n !== ""
+      ? `Founding #${n} · free app (fees apply)`
+      : "Founding 100 · free app (fees apply)";
+  }
+  const launch = getLaunchStatus();
+  if (launch.betaActive && launch.spotsRemaining > 0) {
+    return `Founding beta · ${launch.spotsRemaining} free spots left (fees apply)`;
+  }
   return null;
 }
 
@@ -279,16 +331,16 @@ export function assertWithinFreeLimit(user, kind, currentCount) {
           ? "hire job posts"
           : kind;
     throw new Error(
-      FREE_DURING_BETA
-        ? `You've hit the ${label} limit on Worker Free. Premium is a free beta perk — contact support or switch plan in Settings.`
+      isFreeDuringBeta() || isFoundingUser(user)
+        ? `You've hit the ${label} limit on Worker Free. Founding / Premium unlocks higher limits — see Pricing.`
         : `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($29.99/mo) for unlimited.`
     );
   }
 }
 
-/** PayPal / external checkout URL for a plan id, or null for free tiers / beta. */
+/** PayPal / external checkout URL for a plan id, or null for free tiers / open founding beta. */
 export function getPlanCheckoutUrl(planId) {
-  if (FREE_DURING_BETA) return null;
+  if (isFreeDuringBeta() || !isMembershipCheckoutLive()) return null;
   const id = PLAN_ALIASES[planId] || planId;
   return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

@@ -76,6 +76,15 @@ export default async function handler(req, res) {
 
     await recordSignupEmail(admin, { email, fullName, source: "register" });
 
+    // Founding 100 claim (also runs from profiles AFTER INSERT trigger — best-effort here)
+    if (created.user?.id) {
+      try {
+        await admin.rpc("claim_founding_slot", { p_user_id: created.user.id });
+      } catch {
+        /* trigger may already have claimed; ignore */
+      }
+    }
+
     if (requireConfirm) {
       return res.status(200).json({
         user: {

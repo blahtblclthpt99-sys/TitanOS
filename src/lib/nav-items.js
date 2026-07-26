@@ -14,7 +14,6 @@ import {
   Store,
   ClipboardList,
   Shield,
-  Gift,
   UserPlus,
   UsersRound,
   Calculator,
@@ -81,7 +80,6 @@ export const APP_NAV_ITEMS = [
   { icon: CreditCard, label: "Payments", path: "/payments", group: "reports" },
   { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "reports" },
   { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "reports" },
-  { icon: Gift, label: "Referrals", path: "/referral", group: "reports" },
 
   // —— Communication
   { icon: Radio, label: "TitanCom", path: "/comms", group: "communication" },
@@ -178,7 +176,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Reports",
     description: "Money, tax, and exports",
-    paths: ["/reports", "/finances", "/payments", "/tax-center", "/receipts", "/referral"],
+    paths: ["/reports", "/finances", "/payments", "/tax-center", "/receipts"],
   },
   {
     title: "Communication",

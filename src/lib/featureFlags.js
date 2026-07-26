@@ -19,6 +19,8 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   growth_coach: true,
   /** Kill switch — when false, hide Labs surfaces that look unfinished. */
   labs_surfaces: true,
+  /** Referral program paused — restore by flipping true + re-adding nav. */
+  referrals: false,
 });
 
 let memory = { ...DEFAULT_FEATURE_FLAGS };
@@ -108,6 +110,14 @@ export async function refreshFeatureFlagsFromServer() {
     if (data?.flags && typeof data.flags === "object") {
       writeJson(CACHE_KEY, { flags: data.flags, fetchedAt: Date.now() });
       memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));
+    }
+    if (data?.launch && typeof data.launch === "object") {
+      try {
+        const { applyLaunchStatus } = await import("@/lib/launchStatus");
+        applyLaunchStatus(data.launch);
+      } catch {
+        /* */
+      }
     }
   } catch {
     /* offline — keep cache */

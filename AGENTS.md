@@ -25,6 +25,7 @@ Package ID for Google Play: `com.titanos.myapp`.
 - Lint/build before finishing significant changes: `npm run lint` && `npm run build`
 - Play AAB: `npm run android:sign` ? `release/TitanOS.aab`
 - Final objective: OS feel + ship gate (see `.cursor/rules/final-objective.mdc`)
+- Founding 100: first users free membership (fees still apply); after 100 beta closes + PayPal live (`docs/FOUNDING_100.md`, migration 035)
 - UI rule: every screen answers **What's happening? / What's next? / Where for more?** (see `.cursor/rules/three-question-ui.mdc`)
 - Nav rule: **?3 taps**, clear title, Back, breadcrumbs when nested, no dead ends (see `.cursor/rules/navigation.mdc`)
 - IA rule: domains **Live / History / Analytics / Reports / Communication / AI / Configuration / Administration / Labs** (see `.cursor/rules/information-architecture.mdc`)

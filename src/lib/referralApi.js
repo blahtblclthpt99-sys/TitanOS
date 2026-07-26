@@ -2,8 +2,13 @@ import { api } from "@/api/apiClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { makeReferralCode } from "@/lib/platformConstants";
 import { REFERRAL_REWARD } from "@/lib/plan";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 const PREFIX = "titanos_referrals";
+
+function referralsEnabled() {
+  return isFeatureEnabled("referrals");
+}
 
 export async function ensureReferralCode(user, updateMe) {
   if (user?.referral_code) return user.referral_code;
@@ -48,6 +53,9 @@ export function referralStats(referrals = []) {
 }
 
 export async function inviteReferral(user, email, code) {
+  if (!referralsEnabled()) {
+    throw new Error("Referral program is paused.");
+  }
   const normalized = email.trim().toLowerCase();
   if (!normalized.includes("@")) throw new Error("Enter a valid email address.");
 
@@ -103,7 +111,7 @@ export async function inviteReferral(user, email, code) {
 
 /** Call on register when ?ref=CODE is present — uses server for correct attribution. */
 export async function attachReferralOnSignup({ userId, email, refCode }) {
-  if (!refCode || !userId) return null;
+  if (!referralsEnabled() || !refCode || !userId) return null;
   try {
     const result = await api.functions.invoke("attachReferral", {
       userId,

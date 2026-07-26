@@ -3,6 +3,7 @@ import { logInfo } from "../_lib/safeLog.js";
 
 /**
  * Public feature-flag snapshot (non-secret). Override via FEATURE_FLAGS_JSON env.
+ * Also returns founding-100 launch status from `platform_launch` when Supabase is configured.
  */
 const DEFAULTS = {
   driver_autopilot: true,
@@ -14,7 +15,10 @@ const DEFAULTS = {
   export_share_links: true,
   growth_coach: true,
   labs_surfaces: true,
+  referrals: false,
 };
+
+const FOUNDING_CAP_DEFAULT = 100;
 
 function loadFlags() {
   const out = { ...DEFAULTS };
@@ -31,6 +35,38 @@ function loadFlags() {
   return out;
 }
 
+async function loadLaunchStatus() {
+  const fallback = {
+    foundingCap: FOUNDING_CAP_DEFAULT,
+    foundingClaimed: 0,
+    spotsRemaining: FOUNDING_CAP_DEFAULT,
+    betaActive: true,
+    membershipPaymentsLive: false,
+  };
+  try {
+    const { getSupabaseAdmin } = await import("../_lib/supabase.js");
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
+      .from("platform_launch")
+      .select("founding_cap, founding_claimed, beta_active")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error || !data) return fallback;
+    const cap = Number(data.founding_cap) || FOUNDING_CAP_DEFAULT;
+    const claimed = Number(data.founding_claimed) || 0;
+    const betaActive = data.beta_active !== false && claimed < cap;
+    return {
+      foundingCap: cap,
+      foundingClaimed: claimed,
+      spotsRemaining: Math.max(0, cap - claimed),
+      betaActive,
+      membershipPaymentsLive: !betaActive,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
@@ -38,9 +74,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
   const flags = loadFlags();
-  logInfo("featureFlags", "served", { count: Object.keys(flags).length });
+  const launch = await loadLaunchStatus();
+  logInfo("featureFlags", "served", {
+    count: Object.keys(flags).length,
+    betaActive: launch.betaActive,
+    foundingClaimed: launch.foundingClaimed,
+  });
   return res.status(200).json({
     flags,
+    launch,
     ts: new Date().toISOString(),
   });
 }

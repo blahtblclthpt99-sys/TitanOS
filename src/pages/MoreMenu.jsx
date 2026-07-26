@@ -27,9 +27,9 @@ export default function MoreMenu() {
         <ThemeToggle variant="segmented" className="w-full sm:w-auto sm:min-w-[240px]" />
       </div>
 
-      {betaBadgeLabel() && (
+      {betaBadgeLabel(user) && (
         <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-medium text-primary">
-          {betaBadgeLabel()}
+          {betaBadgeLabel(user)}
         </div>
       )}
 

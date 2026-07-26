@@ -61,6 +61,8 @@ function userFromSession(session) {
     is_pro: false,
     lifetime_premium: false,
     paying_subscriber: false,
+    founding_user: false,
+    founding_number: null,
     plan_tier: "",
     account_type: "",
     theme_pref: "system",

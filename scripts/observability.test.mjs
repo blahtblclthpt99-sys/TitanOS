@@ -59,7 +59,9 @@ describe("product analytics", () => {
 describe("feature flags", () => {
   it("defaults include killable labs + replay off", () => {
     assert.equal(DEFAULT_FEATURE_FLAGS.session_replay, false);
+    assert.equal(DEFAULT_FEATURE_FLAGS.referrals, false);
     assert.equal(isFeatureEnabled("ai_assistant"), true);
+    assert.equal(isFeatureEnabled("referrals"), false);
   });
 
   it("supports local overrides", () => {

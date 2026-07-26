@@ -4,6 +4,7 @@ import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initSentry, captureException } from '@/lib/sentry'
 import { hydrateFeatureFlags, refreshFeatureFlagsFromServer } from '@/lib/featureFlags'
+import { hydrateLaunchStatus } from '@/lib/launchStatus'
 import { trackEvent } from '@/lib/productAnalytics'
 import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
@@ -15,6 +16,7 @@ const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 // Observability — crash/perf (Sentry), flags, first-party analytics
 initSentry();
 hydrateFeatureFlags();
+hydrateLaunchStatus();
 trackEvent("app_boot");
 runWhenIdle(() => {
   refreshFeatureFlagsFromServer().catch(() => {});

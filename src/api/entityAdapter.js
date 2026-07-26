@@ -110,6 +110,8 @@ const PROFILE_SERVER_ONLY_KEYS = new Set([
   "account_type",
   "verified_worker",
   "verification_notes",
+  "founding_user",
+  "founding_number",
 ]);
 
 /** Defense-in-depth: block money/privilege escalation via entity adapter (RLS/triggers are source of truth). */

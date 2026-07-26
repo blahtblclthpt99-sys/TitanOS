@@ -5,7 +5,7 @@ import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
 import {
   User, Building2, Bell, LogOut, ChevronRight, Check,
-  Trash2, Gift, Upload, ShieldAlert, Sparkles,
+  Trash2, Upload, ShieldAlert, Sparkles,
   Search, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import SuccessCheck from "@/components/shared/SuccessCheck";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
-import { getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
+import { getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, isFreeDuringBeta, isFoundingUser } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
@@ -424,17 +424,23 @@ export default function Settings() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground">
-                {FREE_DURING_BETA ? "Plan perks during beta" : "Upgrade your plan"}
+                {isFoundingUser(user)
+                  ? "Founding 100 member"
+                  : isFreeDuringBeta()
+                    ? "Plan perks during Founding 100"
+                    : "Upgrade your plan"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {FREE_DURING_BETA
-                  ? `Current: ${getPlanConfig(user).name}. Premium and Business tools are a ${BETA_PERK_LABEL} at $0 while we launch.`
-                  : `Current: ${getPlanConfig(user).name}. Pay securely with PayPal — Premium $${PLANS.worker_premium.priceMonthly}/mo or Business $${PLANS.business.priceMonthly}/mo.`}
+                {isFoundingUser(user)
+                  ? `Current: ${getPlanConfig(user).name}. Free membership forever — payment fees still apply when you get paid.`
+                  : isFreeDuringBeta()
+                    ? `Current: ${getPlanConfig(user).name}. Premium tools are free for the first 100 members — fees still apply on collected payments.`
+                    : `Current: ${getPlanConfig(user).name}. Pay securely with PayPal — Premium $${PLANS.worker_premium.priceMonthly}/mo or Business $${PLANS.business.priceMonthly}/mo.`}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!FREE_DURING_BETA && (
+            {!isFreeDuringBeta() && !isFoundingUser(user) && (
               <>
                 <Button asChild size="sm" className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold">
                   <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
@@ -448,27 +454,12 @@ export default function Settings() {
                 </Button>
               </>
             )}
-            <Button asChild size="sm" variant={FREE_DURING_BETA ? "default" : "ghost"} className={FREE_DURING_BETA ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold" : ""}>
-              <Link to="/pricing">{FREE_DURING_BETA ? "See free beta plans" : "Compare plans"}</Link>
+            <Button asChild size="sm" variant={isFreeDuringBeta() ? "default" : "ghost"} className={isFreeDuringBeta() ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold" : ""}>
+              <Link to="/pricing">{isFreeDuringBeta() ? "See Founding 100 plans" : "Compare plans"}</Link>
             </Button>
           </div>
         </motion.div>
       )}
-
-      {/* Referral Banner */}
-      <Link to="/referral">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="titan-surface p-4 mb-3 border border-titan-indigo/20 bg-titan-indigo/5 flex items-center gap-4 hover:bg-titan-indigo/10 transition-colors cursor-pointer">
-          <div className="w-10 h-10 rounded-md bg-titan-indigo/20 flex items-center justify-center flex-shrink-0">
-            <Gift className="w-5 h-5 text-titan-indigo" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">Refer a friend</p>
-            <p className="text-xs text-muted-foreground">Refer 3 paying subscribers after launch → Lifetime Premium</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-titan-indigo/50" />
-        </motion.div>
-      </Link>
 
       {user?.role === "admin" && <Link to="/admin/moderation">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}

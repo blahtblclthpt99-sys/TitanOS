@@ -43,7 +43,6 @@ import ErrorState from "@/components/shared/ErrorState";
 import { useAuth } from "@/lib/AuthContext";
 import {
   MARKETPLACE_CATEGORIES,
-  MODULE_PRICE,
   formatInstallCount,
   formatModulePrice,
 } from "@/lib/marketplaceCatalog";
@@ -306,22 +305,13 @@ export default function Marketplace() {
     clearMessages();
     setActionLoading(true);
     try {
-      const { payment, alreadyOwned, free } = await purchaseAndInstallModule(user, module);
+      const { alreadyOwned } = await purchaseAndInstallModule(user, module);
       await invalidate();
       if (alreadyOwned) {
         setActionSuccess(`${module.name} is already in your toolkit.`);
         return;
       }
-      if (free || !(Number(module.price) > 0)) {
-        setActionSuccess(`${module.name} installed.`);
-        return;
-      }
-      setActionSuccess(
-        `${module.name} unlocked — complete $${Number(module.price || MODULE_PRICE).toFixed(2)} checkout to finish.`
-      );
-      if (payment?.checkout_url) {
-        window.open(payment.checkout_url, "_blank", "noopener,noreferrer");
-      }
+      setActionSuccess(`${module.name} installed — included with your Premium plan.`);
     } catch (error) {
       setActionError(error?.message || "Failed to purchase module. Please try again.");
     } finally {
@@ -414,7 +404,7 @@ export default function Marketplace() {
                 TitanOS <span className="gradient-text">Marketplace</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {modules.length} modules · $1.99 each · trades, care, AI &amp; more
+                {modules.length} modules · included with Premium · trades, care, AI &amp; more
               </p>
             </div>
           </div>
@@ -445,7 +435,7 @@ export default function Marketplace() {
               Modules for <span className="gradient-text">Premium members</span>
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Install industry workflows, creative tools, legal agents, and more — $1.99 per module via PayPal.
+              Install industry workflows, creative tools, legal agents, and more — included with Worker Premium ($29.99) or Business ($49.99).
             </p>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">

@@ -1,6 +1,6 @@
-/** Default one-time install price for every marketplace module (PayPal NCP $1.99). */
-export const MODULE_PRICE = 1.99;
-export const MODULE_PRICE_LABEL = "";
+/** Marketplace modules are included with Premium / Business — no per-module fee. */
+export const MODULE_PRICE = 0;
+export const MODULE_PRICE_LABEL = "Included with Premium";
 
 export const MARKETPLACE_CATEGORIES = [
   "All",
@@ -36,8 +36,8 @@ function mod(partial) {
 }
 
 /**
- * Marketplace app catalog — modules priced via PayPal NCP ($1.99).
- * Membership (Premium/Business) required to access Apps tab.
+ * Marketplace app catalog — included with Worker Premium ($29.99) or Business ($49.99).
+ * No per-module checkout. Membership required to access Apps tab.
  * Static catalog is the product source of truth (DB seed syncs from here).
  */
 export const MARKETPLACE_MODULES = [
@@ -479,11 +479,10 @@ export function formatInstallCount(count) {
 export function formatModulePrice(module) {
   const price = Number(module?.price);
   if (!Number.isFinite(price) || price <= 0) {
-    return module?.price_label || "Free";
+    return module?.price_label || "Included with Premium";
   }
   const cents = Math.round(price * 100) / 100;
   const label = String(module?.price_label || "").trim();
-  // Avoid "$1.99$1.99" when price_label already includes currency
   if (label.startsWith("$")) return label;
   return label ? `$${cents.toFixed(2)} · ${label}` : `$${cents.toFixed(2)}`;
 }

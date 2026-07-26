@@ -29,6 +29,7 @@ describe("regression: test script wiring", () => {
       "test:scalability",
       "test:maintainability",
       "test:final-qa",
+      "test:founding",
     ]) {
       assert.match(t, new RegExp(key.replace(":", "\\:")));
     }

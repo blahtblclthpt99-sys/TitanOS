@@ -15,11 +15,13 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
-import { PLANS, betaBadgeLabel, getPlanCheckoutUrl, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
+import { PLANS, betaBadgeLabel, getPlanCheckoutUrl, isFreeDuringBeta, BETA_PERK_LABEL } from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
-const CARDS = [
+function buildCards() {
+  const freeBeta = isFreeDuringBeta();
+  return [
   {
     plan: PLANS.customer,
     icon: UserRound,
@@ -51,6 +53,7 @@ const CARDS = [
     icon: Sparkles,
     features: [
       `${PLANS.worker_premium.feeLabel} transaction fee`,
+      freeBeta ? "Free during Founding 100 (fees still apply)" : "$29.99/mo membership",
       "Unlimited listings & hire visibility",
       "Featured profile + search priority",
       "AI assistant, booking page, analytics",
@@ -59,7 +62,7 @@ const CARDS = [
     cta: {
       href: getPlanCheckoutUrl("worker_premium"),
       to: "/register",
-      label: FREE_DURING_BETA ? `Unlock Premium — ${BETA_PERK_LABEL}` : "Go Premium — $29.99",
+      label: freeBeta ? `Unlock Premium — ${BETA_PERK_LABEL}` : "Go Premium — $29.99",
     },
     highlighted: true,
   },
@@ -76,11 +79,12 @@ const CARDS = [
     cta: {
       href: getPlanCheckoutUrl("business"),
       to: "/register",
-      label: FREE_DURING_BETA ? `Unlock Business — ${BETA_PERK_LABEL}` : "Get Business — $49.99",
+      label: freeBeta ? `Unlock Business — ${BETA_PERK_LABEL}` : "Get Business — $49.99",
     },
     highlighted: false,
   },
 ];
+}
 
 function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
   const checkoutHref = cta.href || plan.checkoutUrl || null;
@@ -108,7 +112,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
           </span>
           <p className="text-xs text-muted-foreground mt-0.5">
             {plan.priceMonthly === 0
-              ? FREE_DURING_BETA
+              ? isFreeDuringBeta()
                 ? BETA_PERK_LABEL
                 : "to start"
               : "/ month"}
@@ -154,6 +158,8 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
 }
 
 export default function Pricing() {
+  const freeBeta = isFreeDuringBeta();
+  const cards = buildCards();
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
     <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
@@ -165,10 +171,10 @@ export default function Pricing() {
           </div>
         )}
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
-          {FREE_DURING_BETA ? (
+          {freeBeta ? (
             <>
-              Public beta — everything is<br />
-              <span className="gradient-text">a free perk</span>
+              Founding 100 — free app<br />
+              <span className="gradient-text">fees still apply</span>
             </>
           ) : (
             <>
@@ -178,14 +184,14 @@ export default function Pricing() {
           )}
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-          {FREE_DURING_BETA
-            ? "Customers hire free. Workers and businesses unlock Premium tools at $0 while we launch — Free beta perks."
+          {freeBeta
+            ? "First 100 members get Premium tools free forever. Transaction fees still apply when you collect payment. After 100, membership checkout goes live."
             : `Customers hire free. Workers start at $0 with an ${PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.`}
         </p>
       </motion.div>
 
       <div className="w-full max-w-6xl grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-        {CARDS.map((card, index) => (
+        {cards.map((card, index) => (
           <PlanCard key={card.plan.id} {...card} delay={0.05 + index * 0.05} />
         ))}
       </div>
@@ -203,7 +209,7 @@ export default function Pricing() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground mb-0.5">TitanOS for Android</p>
             <p className="text-xs text-muted-foreground">
-              {FREE_DURING_BETA ? "Same free beta access on mobile via Google Play" : "Same launch pricing on mobile via Google Play"}
+              {freeBeta ? "Same Founding 100 access on mobile via Google Play" : "Same launch pricing on mobile via Google Play"}
             </p>
           </div>
           <Button

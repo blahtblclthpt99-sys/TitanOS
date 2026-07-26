@@ -12,13 +12,15 @@ import { toast } from "@/components/ui/use-toast";
 import { attachReferralOnSignup } from "@/lib/referralApi";
 import { useAuth } from "@/lib/AuthContext";
 import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 export default function Register() {
   const navigate = useNavigate();
   const location = useLocation();
   const { checkUserAuth } = useAuth();
   const [searchParams] = useSearchParams();
-  const refCode = searchParams.get("ref") || "";
+  const referralsLive = isFeatureEnabled("referrals");
+  const refCode = referralsLive ? searchParams.get("ref") || "" : "";
   const returnTo = resolveReturnTo(location);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");

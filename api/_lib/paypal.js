@@ -116,11 +116,11 @@ export function planTierFromAmount(amount) {
   const n = Math.round(Number(amount) * 100) / 100;
   if (n === 29.99 || n === 29.9) return "worker_premium";
   if (n === 49.99 || n === 49.9) return "business";
-  // $1.99 marketplace modules do not change plan_tier
+  // Legacy $1.99 module NCP (retired) — does not change plan_tier
   return null;
 }
 
-/** True when amount matches the live PayPal module NCP ($1.99). */
+/** @deprecated Legacy $1.99 module NCP — modules are now included with Premium/Business. */
 export function isMarketplaceModuleAmount(amount) {
   const n = Math.round(Number(amount) * 100) / 100;
   return n === 1.99 || n === 1.9;

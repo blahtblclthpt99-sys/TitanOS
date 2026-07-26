@@ -82,12 +82,12 @@ describe("PayPal membership path", () => {
 });
 
 describe("Marketplace free + payment fees", () => {
-  it("marketplace catalog modules are priced at PayPal module NCP ($1.99)", async () => {
+  it("marketplace modules are included with Premium (no $1.99 fee)", async () => {
     const { MODULE_PRICE, MODULE_PRICE_LABEL, MARKETPLACE_MODULES, formatModulePrice } = await import(
       "../src/lib/marketplaceCatalog.js"
     );
-    assert.equal(MODULE_PRICE, 1.99);
-    assert.equal(MODULE_PRICE_LABEL, "");
+    assert.equal(MODULE_PRICE, 0);
+    assert.match(MODULE_PRICE_LABEL, /Premium/i);
     assert.ok(MARKETPLACE_MODULES.length >= 25);
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "law-mastermind-ai"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "babysitting-pro"));
@@ -99,8 +99,12 @@ describe("Marketplace free + payment fees", () => {
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-car-wash"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-mechanic"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "christmas-light-installer"));
-    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 1.99));
-    assert.equal(formatModulePrice({ price: 1.99 }), "$1.99");
+    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0));
+    assert.equal(formatModulePrice({ price: 0 }), "Included with Premium");
+    const { PAYPAL_CHECKOUT } = await import("../src/lib/plan.js");
+    assert.ok(PAYPAL_CHECKOUT.worker_premium);
+    assert.ok(PAYPAL_CHECKOUT.business);
+    assert.equal(PAYPAL_CHECKOUT.module, undefined);
   });
 
   it("createPaymentLink supports module purpose without service fee", () => {
@@ -143,6 +147,8 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/032_database_integrity_lockdown.sql",
     "supabase/migrations/033_audit_events.sql",
     "supabase/migrations/034_scalability_hot_paths.sql",
+    "supabase/migrations/035_founding_100_beta.sql",
+    "supabase/migrations/036_marketplace_modules_subscription_only.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {

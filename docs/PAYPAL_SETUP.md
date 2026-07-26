@@ -15,9 +15,10 @@ The block you pasted is PayPal’s **public** `live_api` certificate (CN=`live_a
 |---------|--------|------|
 | Worker Premium | $29.99 | `https://www.paypal.com/ncp/payment/Q63SUKNY5AK58` |
 | Business | $49.99 | `https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4` |
-| Marketplace module | $1.99 | `https://www.paypal.com/ncp/payment/76HUUNKTX9RSW` |
 
-Shown on `/pricing`, Settings → Upgrade, and Marketplace module install (post-beta / paid modules).
+Marketplace **modules are included** with Premium / Business — there is no $1.99 per-module checkout.
+
+Shown on `/pricing` and Settings → Upgrade (after Founding 100 beta closes).
 
 ## Auto-upgrade after payment (webhook)
 
@@ -45,7 +46,6 @@ PAYPAL_MODE=live
 ### How we match the buyer to a TitanOS account
 
 Payer **email** on the PayPal payment must match `profiles.email` (case-insensitive).  
-Amount maps: **$29.99 → worker_premium**, **$49.99 → business**.  
-**$1.99** is a marketplace module purchase (does not change plan tier).
+Amount maps: **$29.99 → worker_premium**, **$49.99 → business**.
 
 If emails don’t match, payment succeeds but the account won’t auto-upgrade — an admin can set `plan_tier` / `paying_subscriber` manually.

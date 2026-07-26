@@ -58,11 +58,12 @@
     "test:observability": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/observability.test.mjs",
     "test:regression": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/regression-wiring.test.mjs",
     "test:final-qa": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/final-qa.test.mjs",
+    "test:founding": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/founding-beta.test.mjs",
     "test:db-security": "node scripts/verify-db-security.mjs",
     "test:e2e": "playwright test --project=chromium-desktop",
     "test:e2e:browsers": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit",
-    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:final-qa && npm run test:regression"
+    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:final-qa && npm run test:founding && npm run test:regression"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

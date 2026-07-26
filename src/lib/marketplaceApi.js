@@ -2,12 +2,8 @@ import { api } from "@/api/apiClient";
 import {
   getCatalogModules,
   MARKETPLACE_MODULES,
-  MODULE_PRICE,
   normalizeModule,
 } from "@/lib/marketplaceCatalog";
-import { createPaymentLink } from "@/lib/paymentsApi";
-import { isLocalOrStub } from "@/lib/dataSource";
-import { PAYPAL_CHECKOUT, PAYPAL_MODULE_PRICE } from "@/lib/plan";
 
 const STORAGE_PREFIX = "titanos_marketplace";
 
@@ -121,7 +117,7 @@ export async function installModule(user, module) {
 
 /**
  * Install a module. Requires Premium/Business membership (Marketplace Apps).
- * Paid modules still use live PayPal NCP ($1.99) or Stripe after membership unlock.
+ * Modules are included with the subscription — no per-module checkout.
  */
 export async function purchaseAndInstallModule(user, module) {
   const { canUseMarketplaceApps } = await import("@/lib/plan");
@@ -136,45 +132,8 @@ export async function purchaseAndInstallModule(user, module) {
     return { payment: null, installed: existing.find((i) => i.module_slug === module.slug), alreadyOwned: true };
   }
 
-  const amount = Number(module.price);
-  const charge = Number.isFinite(amount) && amount > 0 ? amount : MODULE_PRICE;
-
-  if (!(charge > 0)) {
-    const installed = await installModule(user, module);
-    return { payment: null, installed, alreadyOwned: false, free: true };
-  }
-
-  // Prefer PayPal No-Code Payment link (live $1.99 module button)
-  if (PAYPAL_CHECKOUT.module) {
-    const installed = await installModule(user, module);
-    return {
-      payment: {
-        checkout_url: PAYPAL_CHECKOUT.module,
-        provider: "paypal_ncp",
-        amount: Number(charge) || PAYPAL_MODULE_PRICE,
-      },
-      installed,
-      alreadyOwned: false,
-    };
-  }
-
-  const payment = await createPaymentLink(user, {
-    amount: charge,
-    customer_name: `Module: ${module.name}`,
-    note: `module:${module.slug}`,
-    purpose: "module",
-  });
-
-  if (isLocalOrStub(payment) || !payment.checkout_url) {
-    const err = new Error(
-      payment?.message || "Checkout isn't available. Configure PayPal or Stripe to purchase modules."
-    );
-    err.code = "MODULE_CHECKOUT_UNAVAILABLE";
-    throw err;
-  }
-
   const installed = await installModule(user, module);
-  return { payment, installed, alreadyOwned: false };
+  return { payment: null, installed, alreadyOwned: false, free: true };
 }
 
 export async function uninstallModule(user, moduleSlug) {

@@ -101,7 +101,7 @@ export default async function handler(req, res) {
     }
 
     // Ignore any client-supplied fee / total — recalculate from Fee Engine.
-    // Module installs use marketplace_sales (0%) so checkout totals $1.99 flat.
+    // Legacy purpose=module used marketplace_sales (0%); new modules are subscription-included.
     const purpose = String(body.purpose || "").toLowerCase();
     const categoryId = purpose === "module" ? "marketplace_sales" : "service_requests";
     const contextKey = categoryId === "marketplace_sales" ? "*" : planId;

@@ -239,9 +239,11 @@ export default function Fleet() {
 
         <section className="space-y-3">
           {rows.length === 0 && (
-            <p className="text-sm text-muted-foreground glass rounded-2xl p-5">
-              No fleet yet. Add a vehicle with make & model to use it in Driver Hub.
-            </p>
+            <EmptyState
+              icon={Truck}
+              title="No fleet yet"
+              description="Add a vehicle with make & model to use it in Driver Hub."
+            />
           )}
           {rows.map((row) => (
             <article key={row.id} className="glass rounded-2xl p-4 flex gap-3">

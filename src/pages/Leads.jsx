@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createLead, deleteLead, listLeads, updateStatus } from "@/lib/leadsApi";
 import { importLeadsFromCsv } from "@/lib/leadImportApi";
@@ -25,18 +26,32 @@ export default function Leads() {
   const [filter, setFilter] = useState("all");
   const [csvText, setCsvText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const add = async (e) => {
     e.preventDefault();
-    if (!name) return;
-    const row = await createLead(user, { name });
-    setRows([row, ...rows]);
-    setName("");
+    if (saving || !name) return;
+    setSaving(true);
+    try {
+      const row = await createLead(user, { name });
+      setRows((current) => [row, ...current]);
+      setName("");
+      toast({ title: "Lead added" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't add lead", description: error?.message || "Please try again." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const move = async (row, status) => {
-    const saved = await updateStatus(user.id, row.id, status);
-    setRows(rows.map((lead) => (lead.id === row.id ? saved : lead)));
+    try {
+      const saved = await updateStatus(user.id, row.id, status);
+      setRows((current) => current.map((lead) => (lead.id === row.id ? saved : lead)));
+      toast({ title: `Lead moved to ${status}` });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update lead" });
+    }
   };
 
   const remove = async (row) => {
@@ -75,7 +90,7 @@ export default function Leads() {
       <PageHeader title="Leads" subtitle="Find, qualify, and convert new work" />
       <form onSubmit={add} className="glass rounded-2xl p-4 flex gap-2 mb-4">
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Lead name" className="bg-muted border-border text-foreground" />
-        <Button><Plus className="w-4 h-4" />Add lead</Button>
+        <Button disabled={saving}><Plus className="w-4 h-4" />{saving ? "Adding…" : "Add lead"}</Button>
       </form>
 
       <section className="glass rounded-2xl p-4 mb-4 space-y-2">
@@ -108,6 +123,13 @@ export default function Leads() {
           );
         })}
       </div>
+      {!display.length && (
+        <EmptyState
+          icon={UserRound}
+          title={filter === "all" ? "No leads yet" : "No matches"}
+          description={filter === "all" ? "Add a lead above or import a CSV to get started." : "No leads match this status filter."}
+        />
+      )}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {display.map((row) => (
           <article key={row.id} className="glass rounded-2xl p-4">

@@ -3,6 +3,7 @@ import { Copy, Star } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
@@ -80,7 +81,14 @@ export default function Reputation() {
           />
           <Button
             type="button"
-            onClick={() => navigator.clipboard?.writeText(reply)}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(reply);
+                toast({ title: "Reply copied" });
+              } catch {
+                toast({ variant: "destructive", title: "Couldn't copy reply" });
+              }
+            }}
             className="mt-3"
           >
             <Copy className="h-4 w-4" aria-hidden="true" />

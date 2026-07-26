@@ -29,30 +29,50 @@ export default function Escrow() {
     { enabled: Boolean(user?.id), initial: [] }
   );
   const [form, setForm] = useState({ customer_name: "", job_title: "", amount: "" });
+  const [saving, setSaving] = useState(false);
   const deviceOnly = getSource(rows) === DATA_SOURCE.local;
 
   const add = async (e) => {
     e.preventDefault();
-    if (!form.customer_name || !Number(form.amount)) return;
-    const row = await createEscrowHold(user, form);
-    setRows([row, ...rows]);
-    setForm({ customer_name: "", job_title: "", amount: "" });
-    if (getSource(row) === DATA_SOURCE.local) {
-      toast({
-        title: "Hold saved on this device only",
-        description: "Demo status tracking — no funds are held.",
-      });
+    if (saving || !form.customer_name || !Number(form.amount)) return;
+    setSaving(true);
+    try {
+      const row = await createEscrowHold(user, form);
+      setRows((current) => [row, ...current]);
+      setForm({ customer_name: "", job_title: "", amount: "" });
+      if (getSource(row) === DATA_SOURCE.local) {
+        toast({
+          title: "Hold saved on this device only",
+          description: "Demo status tracking — no funds are held.",
+        });
+      } else {
+        toast({ title: "Hold record created" });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't create hold", description: error?.message || "Please try again." });
+    } finally {
+      setSaving(false);
     }
   };
 
   const confirm = async (row, side) => {
-    const saved = await confirmEscrowSide(user.id, row, side);
-    setRows(rows.map((r) => (r.id === row.id ? saved : r)));
+    try {
+      const saved = await confirmEscrowSide(user.id, row, side);
+      setRows((current) => current.map((r) => (r.id === row.id ? saved : r)));
+      toast({ title: side === "customer" ? "Customer confirmed" : "Confirmed done" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't confirm" });
+    }
   };
 
   const refund = async (row) => {
-    const saved = await updateEscrowHold(user.id, row.id, { status: "refunded" });
-    setRows(rows.map((r) => (r.id === row.id ? saved : r)));
+    try {
+      const saved = await updateEscrowHold(user.id, row.id, { status: "refunded" });
+      setRows((current) => current.map((r) => (r.id === row.id ? saved : r)));
+      toast({ title: "Marked refunded" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update hold" });
+    }
   };
 
   if (loading) return <PageLoader variant="list" label="Loading job holds" />;
@@ -98,8 +118,8 @@ export default function Escrow() {
             placeholder="0.00"
           />
         </div>
-        <Button type="submit" className="gap-2">
-          <Plus className="w-4 h-4" aria-hidden="true" /> Create hold record
+        <Button type="submit" disabled={saving} className="gap-2">
+          <Plus className="w-4 h-4" aria-hidden="true" /> {saving ? "Creating…" : "Create hold record"}
         </Button>
       </form>
       <div className="space-y-3">
@@ -118,8 +138,13 @@ export default function Escrow() {
                 <DeleteButton
                   label={`hold for ${row.customer_name}`}
                   onDelete={async () => {
-                    await deleteEscrowHold(user.id, row.id);
-                    setRows((prev) => prev.filter((r) => r.id !== row.id));
+                    try {
+                      await deleteEscrowHold(user.id, row.id);
+                      setRows((prev) => prev.filter((r) => r.id !== row.id));
+                      toast({ title: "Hold deleted" });
+                    } catch {
+                      toast({ variant: "destructive", title: "Couldn't delete hold" });
+                    }
                   }}
                 />
               </div>

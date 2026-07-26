@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/shared/PageHeader";
+import PageLoader from "@/components/shared/PageLoader";
+import EmptyState from "@/components/shared/EmptyState";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
 import {
   CHANNELS,
@@ -17,19 +20,31 @@ import {
 import DeleteButton from "@/components/shared/DeleteButton";
 
 export default function MarketingStudio() {
-  const { user } = useAuth();
+  const { user, authChecked } = useAuth();
   const [channel, setChannel] = useState("facebook");
   const [service, setService] = useState("home services");
   const [city, setCity] = useState("");
   const [draft, setDraft] = useState(null);
   const [saved, setSaved] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    if (user?.id) setSaved(await listMarketingAssets(user.id));
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      setSaved(await listMarketingAssets(user.id));
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't load saved assets" });
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
+    if (!authChecked) return;
+    if (!user?.id) { setLoading(false); return; }
     load();
-  }, [user?.id]);
+  }, [authChecked, user?.id]);
 
   const generate = () => {
     const copy = generateMarketingCopy({
@@ -42,15 +57,27 @@ export default function MarketingStudio() {
   };
 
   const save = async () => {
-    if (!draft || !user) return;
-    const row = await createMarketingAsset(user, draft);
-    setSaved([row, ...saved]);
-    toast({ title: "Saved to Marketing Studio" });
+    if (!draft || !user || saving) return;
+    setSaving(true);
+    try {
+      const row = await createMarketingAsset(user, draft);
+      setSaved((current) => [row, ...current]);
+      toast({ title: "Saved to Marketing Studio" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't save asset", description: error?.message || "Please try again." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const markReady = async (row) => {
-    const updated = await updateMarketingAsset(user.id, row.id, { status: "ready" });
-    setSaved(saved.map((item) => (item.id === row.id ? updated : item)));
+    try {
+      const updated = await updateMarketingAsset(user.id, row.id, { status: "ready" });
+      setSaved((current) => current.map((item) => (item.id === row.id ? updated : item)));
+      toast({ title: "Marked ready" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update asset" });
+    }
   };
 
   const copyBody = async (text) => {
@@ -62,9 +89,27 @@ export default function MarketingStudio() {
     }
   };
 
+  if (!authChecked || loading) return <PageLoader variant="list" label="Loading Marketing Studio" />;
+  if (!user?.id) {
+    return (
+      <div className="p-4 md:p-8 max-w-5xl mx-auto pb-24">
+        <PageHeader title="AI Marketing" subtitle="One-click posts for Facebook, Instagram, Google, email & flyers" />
+        <EmptyState
+          title="Sign in to use Marketing Studio"
+          description="Generating and saving marketing copy requires an account."
+          actionLabel="Sign in"
+          onAction={() => { window.location.href = "/login"; }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto pb-28">
       <PageHeader title="AI Marketing" subtitle="One-click posts for Facebook, Instagram, Google, email & flyers" />
+      <FeatureHonestyBanner>
+        Copy is generated from templates on this device — not a live AI copywriter. Review before posting.
+      </FeatureHonestyBanner>
       <div className="glass rounded-2xl p-5 mb-5 space-y-3">
         <div className="flex flex-wrap gap-2">
           {CHANNELS.map((c) => (
@@ -94,7 +139,7 @@ export default function MarketingStudio() {
             <Button type="button" variant="outline" onClick={() => copyBody(draft.body)}>
               <Copy className="w-4 h-4" /> Copy
             </Button>
-            <Button type="button" onClick={save}>Save asset</Button>
+            <Button type="button" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save asset"}</Button>
           </div>
         </div>
       )}
@@ -102,7 +147,11 @@ export default function MarketingStudio() {
       <h3 className="font-semibold text-foreground mb-3">Saved assets</h3>
       <div className="space-y-3">
         {saved.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No saved posts yet — generate your first one above.</p>
+          <EmptyState
+            icon={Megaphone}
+            title="No saved posts yet"
+            description="Generate your first marketing post above."
+          />
         ) : (
           saved.map((row) => (
             <article key={row.id} className="glass rounded-2xl p-4">
@@ -119,8 +168,13 @@ export default function MarketingStudio() {
                 <DeleteButton
                   label={row.title || "this asset"}
                   onDelete={async () => {
-                    await deleteMarketingAsset(user.id, row.id);
-                    setSaved((prev) => prev.filter((item) => item.id !== row.id));
+                    try {
+                      await deleteMarketingAsset(user.id, row.id);
+                      setSaved((prev) => prev.filter((item) => item.id !== row.id));
+                      toast({ title: "Asset deleted" });
+                    } catch {
+                      toast({ variant: "destructive", title: "Couldn't delete asset" });
+                    }
                   }}
                 />
               </div>

@@ -3,9 +3,11 @@ import { AlertTriangle, PackagePlus } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import {
@@ -26,18 +28,31 @@ export default function Inventory() {
     { enabled: Boolean(user?.id), initial: [] }
   );
   const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
 
   const add = async (e) => {
     e.preventDefault();
-    if (!form.name) return;
-    const item = await createInventoryItem(user, form);
-    setItems([item, ...items]);
-    setForm(EMPTY);
+    if (saving || !form.name) return;
+    setSaving(true);
+    try {
+      const item = await createInventoryItem(user, form);
+      setItems((current) => [item, ...current]);
+      setForm(EMPTY);
+      toast({ title: "Item added" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't add item", description: error?.message || "Please try again." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const adjust = async (item, quantity) => {
-    const saved = await updateInventoryItem(user.id, item.id, { quantity });
-    setItems(items.map((row) => (row.id === item.id ? saved : row)));
+    try {
+      const saved = await updateInventoryItem(user.id, item.id, { quantity });
+      setItems((current) => current.map((row) => (row.id === item.id ? saved : row)));
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update quantity" });
+    }
   };
 
   if (loading) return <PageLoader variant="list" label="Loading inventory" />;
@@ -64,9 +79,16 @@ export default function Inventory() {
               className="bg-muted border-border text-foreground"
             />
           ))}
-          <Button className="w-full">Save item</Button>
+          <Button className="w-full" disabled={saving}>{saving ? "Saving…" : "Save item"}</Button>
         </form>
         <section className="space-y-3">
+          {!items.length && (
+            <EmptyState
+              icon={PackagePlus}
+              title="No inventory yet"
+              description="Add your first supply or part to start tracking stock."
+            />
+          )}
           {items.map((item) => (
             <article className="glass rounded-2xl p-4 flex justify-between gap-3" key={item.id}>
               <div>
@@ -87,8 +109,13 @@ export default function Inventory() {
                 <DeleteButton
                   label={item.name}
                   onDelete={async () => {
-                    await deleteInventoryItem(user.id, item.id);
-                    setItems((prev) => prev.filter((row) => row.id !== item.id));
+                    try {
+                      await deleteInventoryItem(user.id, item.id);
+                      setItems((prev) => prev.filter((row) => row.id !== item.id));
+                      toast({ title: "Item removed" });
+                    } catch {
+                      toast({ variant: "destructive", title: "Couldn't remove item" });
+                    }
                   }}
                 />
               </div>

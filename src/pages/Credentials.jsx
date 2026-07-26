@@ -3,9 +3,11 @@ import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { createCredential, daysUntilExpiry, deleteCredential, listCredentials } from "@/lib/credentialsApi";
@@ -19,14 +21,23 @@ export default function Credentials() {
   );
   const [title, setTitle] = useState("");
   const [expires, setExpires] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const add = async (e) => {
     e.preventDefault();
-    if (!title) return;
-    const row = await createCredential(user, { title, expires_on: expires || null });
-    setItems([...items, row]);
-    setTitle("");
-    setExpires("");
+    if (saving || !title) return;
+    setSaving(true);
+    try {
+      const row = await createCredential(user, { title, expires_on: expires || null });
+      setItems((current) => [...current, row]);
+      setTitle("");
+      setExpires("");
+      toast({ title: "Credential added" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't add credential", description: error?.message || "Please try again." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <PageLoader variant="list" label="Loading credentials" />;
@@ -38,8 +49,15 @@ export default function Credentials() {
       <form onSubmit={add} className="glass rounded-2xl p-4 flex flex-wrap gap-2 mb-5">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="License or certificate" className="flex-1 bg-muted border-border text-foreground" />
         <Input value={expires} onChange={(e) => setExpires(e.target.value)} type="date" className="bg-muted border-border text-foreground" />
-        <Button>Add</Button>
+        <Button disabled={saving}>{saving ? "Adding…" : "Add"}</Button>
       </form>
+      {!items.length && (
+        <EmptyState
+          icon={ShieldCheck}
+          title="No credentials yet"
+          description="Track licenses, certifications, and insurance expirations here."
+        />
+      )}
       <div className="space-y-3">
         {items.map((item) => {
           const days = daysUntilExpiry(item);
@@ -60,8 +78,13 @@ export default function Credentials() {
               <DeleteButton
                 label={item.title}
                 onDelete={async () => {
-                  await deleteCredential(user.id, item.id);
-                  setItems((prev) => prev.filter((row) => row.id !== item.id));
+                  try {
+                    await deleteCredential(user.id, item.id);
+                    setItems((prev) => prev.filter((row) => row.id !== item.id));
+                    toast({ title: "Credential removed" });
+                  } catch {
+                    toast({ variant: "destructive", title: "Couldn't remove credential" });
+                  }
                 }}
               />
             </article>

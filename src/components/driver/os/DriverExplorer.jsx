@@ -24,7 +24,7 @@ import PremiumGate from "@/components/shared/PremiumGate";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { canUseDriverAddons } from "@/lib/plan";
-import { DRIVER_OS_FOLDERS } from "@/lib/driverOs/folders.js";
+import { DRIVER_OS_FOLDERS, FOLDER_GROUPS } from "@/lib/driverOs/folders.js";
 
 const LiveShiftFolder = lazy(() => import("./folders/LiveShiftFolder.jsx"));
 const TodaysOrdersFolder = lazy(() => import("./folders/TodaysOrdersFolder.jsx"));
@@ -164,9 +164,18 @@ export default function DriverExplorer({
       (f) =>
         f.label.toLowerCase().includes(q) ||
         f.description.toLowerCase().includes(q) ||
-        f.id.includes(q)
+        f.id.includes(q) ||
+        String(f.group || "").includes(q)
     );
   }, [q]);
+
+  const grouped = useMemo(() => {
+    if (q) return [{ id: "search", label: "Results", folders }];
+    return FOLDER_GROUPS.map((g) => ({
+      ...g,
+      folders: folders.filter((f) => f.group === g.id),
+    })).filter((g) => g.folders.length > 0);
+  }, [folders, q]);
 
   return (
     <section aria-label="Driver Explorer" className="space-y-3">
@@ -174,7 +183,7 @@ export default function DriverExplorer({
         <p className="text-[11px] font-medium text-muted-foreground">Need more info?</p>
         <h2 className="text-sm font-semibold text-foreground">Explorer</h2>
         <p className="text-xs text-muted-foreground">
-          History, analytics, platforms, and settings — open only what you need.
+          Live, history, analytics, and settings — open only what you need. Live status stays pinned above.
         </p>
       </div>
 
@@ -190,31 +199,40 @@ export default function DriverExplorer({
         />
       </label>
 
-      <div className="space-y-2">
-        {folders.map((folder) => {
-          const open = Boolean(openMap?.[folder.id] || (forceOpenId && forceOpenId === folder.id));
-          const locked = Boolean(folder.premium && !addonsOk);
-          const Body = FOLDER_BODY[folder.id];
-          return (
-            <div key={folder.id} id={`driver-os-folder-${folder.id}`}>
-              <FolderRow
-                folder={folder}
-                open={open}
-                summary={summaries[folder.id]}
-                locked={locked}
-                onToggle={() => onToggle?.(folder.id)}
-              >
-                {open && !locked && Body ? (
-                  <ErrorBoundary message={`${folder.label} couldn't load. Try refresh.`}>
-                    <Suspense fallback={<PageLoader variant="list" label={`Loading ${folder.label}`} />}>
-                      <Body user={user} initialQuery={directoryQuery} refreshTick={refreshTick} />
-                    </Suspense>
-                  </ErrorBoundary>
-                ) : null}
-              </FolderRow>
-            </div>
-          );
-        })}
+      <div className="space-y-4">
+        {grouped.map((group) => (
+          <div key={group.id} className="space-y-2">
+            {!q ? (
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-0.5">
+                {group.label}
+              </h3>
+            ) : null}
+            {group.folders.map((folder) => {
+              const open = Boolean(openMap?.[folder.id] || (forceOpenId && forceOpenId === folder.id));
+              const locked = Boolean(folder.premium && !addonsOk);
+              const Body = FOLDER_BODY[folder.id];
+              return (
+                <div key={folder.id} id={`driver-os-folder-${folder.id}`}>
+                  <FolderRow
+                    folder={folder}
+                    open={open}
+                    summary={summaries[folder.id]}
+                    locked={locked}
+                    onToggle={() => onToggle?.(folder.id)}
+                  >
+                    {open && !locked && Body ? (
+                      <ErrorBoundary message={`${folder.label} couldn't load. Try refresh.`}>
+                        <Suspense fallback={<PageLoader variant="list" label={`Loading ${folder.label}`} />}>
+                          <Body user={user} initialQuery={directoryQuery} refreshTick={refreshTick} />
+                        </Suspense>
+                      </ErrorBoundary>
+                    ) : null}
+                  </FolderRow>
+                </div>
+              );
+            })}
+          </div>
+        ))}
         {folders.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No folders match that search.</p>
         ) : null}

@@ -89,7 +89,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`w-full glass rounded-3xl p-6 border ${
+      className={`w-full titan-surface p-6 border ${
         highlighted ? "border-titan-cyan/40 titan-glow" : "border-border"
       }`}
     >
@@ -194,7 +194,7 @@ export default function Pricing() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="w-full max-w-6xl glass rounded-2xl p-5 border border-titan-indigo/20 mb-5"
+        className="w-full max-w-6xl titan-surface p-5 border border-titan-indigo/20 mb-5"
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-titan-indigo/30 to-titan-cyan/20 flex items-center justify-center flex-shrink-0">
@@ -220,7 +220,7 @@ export default function Pricing() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="w-full max-w-6xl glass rounded-2xl p-5 border border-border"
+        className="w-full max-w-6xl titan-surface p-5 border border-border"
       >
         <div className="flex items-start gap-3">
           <Zap className="w-5 h-5 text-titan-amber flex-shrink-0 mt-0.5" />

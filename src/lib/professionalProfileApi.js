@@ -4,7 +4,7 @@
  * Local-first with optional profiles.professional_profile sync.
  */
 import { api } from "@/api/apiClient";
-import { readLocal, writeLocal, uid } from "@/lib/localStore";
+import { readLocal, writeLocal } from "@/lib/localStore";
 import { averageRating, listReviewsForUser } from "@/lib/jobReviewsApi";
 
 const PREFIX = "titanos_pro_profile";

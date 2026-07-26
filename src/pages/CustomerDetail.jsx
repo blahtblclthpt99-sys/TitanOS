@@ -31,7 +31,7 @@ function customerMatches(record, id, fullName) {
 
 function RecordList({ title, icon: Icon, records, empty, renderRecord, to }) {
   return (
-    <section className="glass rounded-2xl p-5">
+    <section className="titan-surface p-5">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
           <Icon className="w-4 h-4 text-titan-cyan" /> {title}
@@ -292,7 +292,7 @@ export default function CustomerDetail() {
       </motion.div>
 
       {editing ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl p-5 space-y-4 mb-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="titan-surface p-5 space-y-4 mb-4">
           <div className="grid grid-cols-2 gap-3">
             <FormField label="First Name" value={form.first_name} onChange={e => f("first_name", e.target.value)} />
             <FormField label="Last Name"  value={form.last_name}  onChange={e => f("last_name",  e.target.value)} />
@@ -337,13 +337,13 @@ export default function CustomerDetail() {
               { label: "Estimates", value: estimates.length, color: "text-foreground" },
               { label: "Paid", value: `$${paidTotal.toLocaleString()}`, color: "text-emerald-400" },
               { label: "Outstanding", value: `$${outstandingTotal.toLocaleString()}`, color: "text-titan-amber" },
-            ].map(stat => <div key={stat.label} className="glass rounded-2xl p-4">
+            ].map(stat => <div key={stat.label} className="titan-surface p-4">
               <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p><p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
             </div>)}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
-          <div className="glass rounded-2xl p-5 space-y-3">
+          <div className="titan-surface p-5 space-y-3">
             <h2 className="text-base font-semibold text-foreground">Contact info</h2>
             <a href={customer.email ? `mailto:${customer.email}` : undefined} className={`flex items-center gap-3 text-sm min-h-[44px] ${customer.email ? "text-foreground/90 hover:text-foreground" : "text-muted-foreground"}`}>
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -372,13 +372,13 @@ export default function CustomerDetail() {
               <span className="capitalize">Source: {(customer.source || "unknown").replace("_", " ")}</span>
             </div>
           </div>
-          <div className="glass rounded-2xl p-5">
+          <div className="titan-surface p-5">
             <h2 className="text-base font-semibold text-foreground mb-3">Notes</h2>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes || "No customer notes yet."}</p>
           </div>
           </div>
 
-          <div className="glass rounded-2xl p-5">
+          <div className="titan-surface p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-3"><ImageIcon className="w-4 h-4 text-titan-cyan" /> Files & photos</h2>
             <label className="inline-flex mb-4 cursor-pointer">
               <span className="inline-flex items-center rounded-xl border border-border px-3 py-2 text-xs text-foreground/90 hover:bg-muted"><Plus className="w-3.5 h-3.5 mr-1.5" />{uploadingFile ? "Uploading…" : "Upload file"}</span>
@@ -405,7 +405,7 @@ export default function CustomerDetail() {
               renderRecord={invoice => <div key={invoice.id} className="rounded-xl bg-muted/50 p-3 flex justify-between gap-3"><div><p className="text-sm text-foreground">{invoice.invoice_number || "Draft invoice"}</p><p className="text-xs text-muted-foreground">${Number(invoice.balance_due ?? invoice.total ?? 0).toLocaleString()} due</p></div><StatusBadge status={invoice.status} /></div>} />
           </div>
 
-          <section className="glass rounded-2xl p-5">
+          <section className="titan-surface p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
               <CalendarDays className="w-4 h-4 text-titan-cyan" /> Business Timeline
             </h2>
@@ -415,7 +415,7 @@ export default function CustomerDetail() {
             <BusinessTimeline events={timeline} empty="No appointments or transactions recorded." max={25} />
           </section>
 
-          <section className="glass rounded-2xl p-5">
+          <section className="titan-surface p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4"><MessageSquare className="w-4 h-4 text-titan-cyan" /> Communication history</h2>
             <div className="grid sm:grid-cols-[140px_1fr_auto] gap-2 mb-4">
               <Select value={communicationForm.type} onValueChange={type => setCommunicationForm(prev => ({ ...prev, type }))}><SelectTrigger className="bg-muted border-border text-foreground rounded-xl"><SelectValue /></SelectTrigger><SelectContent className="bg-muted border-border">{COMMUNICATION_TYPES.map(type => <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>)}</SelectContent></Select>

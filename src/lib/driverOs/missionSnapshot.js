@@ -1,5 +1,6 @@
 /**
  * Mission Control live snapshot — only operational "what do I need now?" fields.
+ * @returns {import("./interfaces.js").MissionSnapshot | null}
  */
 import {
   computeShiftDashboard,
@@ -8,11 +9,13 @@ import {
   readSession,
   readStops,
   estimateGasPriceUsd,
+  readShiftHistory,
 } from "@/lib/driverHubApi";
-import { classifyRushWindow } from "@/lib/driverActivity/intelligence.js";
-import { readActiveDelivery, liveSnapshot, DD_STAGE_META } from "@/lib/driverActivity/doorDashWorkflow.js";
+import { classifyRushWindow, detectRushIntensity } from "@/lib/driverActivity/intelligence.js";
+import { readActiveDelivery, liveSnapshot, DD_STAGE_META, readDoorDashHistory } from "@/lib/driverActivity/doorDashWorkflow.js";
 import { composeSmartCoachTip } from "@/lib/driverActivity/driverCoach.js";
 import { readDriverGoals } from "@/lib/driverActivity/goals.js";
+import { resolveWorkflowPhase, phaseLabel } from "@/lib/driverOs/workflowEngine.js";
 
 function batteryStatus() {
   if (typeof navigator === "undefined" || !navigator.getBattery) {
@@ -69,6 +72,29 @@ export function buildMissionSnapshot(userId, extra = {}) {
   }
 
   const rush = classifyRushWindow(new Date());
+  let intensity = { id: "quiet", label: "Quiet", recentTrips: 0, windowMin: 90 };
+  try {
+    const cutoff = Date.now() - 90 * 60 * 1000;
+    const recent = [];
+    for (const s of readShiftHistory(userId) || []) {
+      const t = s.ended_at || s.started_at;
+      if (t && new Date(t).getTime() >= cutoff) recent.push({ started_at: s.started_at || s.ended_at });
+    }
+    if (session?.active && session.started_at) {
+      recent.push({ started_at: session.started_at });
+    }
+    for (const d of readDoorDashHistory(userId) || []) {
+      const t = d.endedAt || d.startedAt;
+      if (t && new Date(t).getTime() >= cutoff) recent.push({ started_at: d.startedAt || d.endedAt });
+    }
+    intensity = detectRushIntensity(recent, new Date());
+  } catch {
+    /* keep quiet */
+  }
+
+  const workflowPhase = resolveWorkflowPhase({ session, delivery: dd });
+  const idleSec = Number(session?.idle_sec || 0) || 0;
+  const driveSec = Number(session?.drive_sec || 0) || 0;
   let goals = {};
   try {
     goals = readDriverGoals(userId) || {};
@@ -142,6 +168,15 @@ export function buildMissionSnapshot(userId, extra = {}) {
     netLabel: net.label,
     rushId: rush?.id,
     rushLabel: rush?.label || "—",
+    rushIntensityId: intensity?.id,
+    rushIntensityLabel: intensity?.label || "Quiet",
+    rushIntensityTrips: intensity?.recentTrips ?? 0,
+    workflowPhase,
+    workflowPhaseLabel: phaseLabel(workflowPhase),
+    idleSec,
+    idleLabel: formatDuration(idleSec),
+    driveSec,
+    driveLabel: formatDuration(driveSec),
     goalPct,
     goalLabel: goalPct != null ? `${goalPct}% of $${goalEarn}` : "No daily goal set",
     aiTip: String(aiTip).slice(0, 220),

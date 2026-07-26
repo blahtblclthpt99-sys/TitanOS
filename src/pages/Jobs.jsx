@@ -21,6 +21,7 @@ import FilterChip from "@/components/shared/FilterChip";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
 import ReviewForm from "@/components/shared/ReviewForm";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
 import { useAuth } from "@/lib/AuthContext";
@@ -32,6 +33,7 @@ import { googleMapsLink, jobSiteCoords, openStreetMapEmbed } from "@/lib/geofenc
 import { generateJobSummary } from "@/lib/jobSummary";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { listItemMotion } from "@/lib/listMotion";
+import { jobsExportSpec } from "@/lib/export/moduleSpecs";
 
 const PRIORITY_COLORS = {
   low: "text-muted-foreground", medium: "text-primary",
@@ -411,7 +413,7 @@ export default function Jobs({ isActive = true }) {
     <div
       id={`job-row-${job.id}`}
       onClick={() => (bulkMode ? toggleSelect(job.id) : openOps(job))}
-      className={`glass rounded-2xl p-4 transition-all ${bulkMode ? "cursor-pointer" : "glass-hover cursor-pointer"} ${
+      className={`titan-surface p-4 transition-all ${bulkMode ? "cursor-pointer" : "titan-surface-interactive cursor-pointer"} ${
         bulkMode && selected.has(job.id) ? "border border-primary/40 bg-primary/5" : ""
       } ${focusJobId === job.id ? "ring-2 ring-primary/40" : ""}`}
     >
@@ -597,6 +599,7 @@ export default function Jobs({ isActive = true }) {
         subtitle={`${jobs.length} total · Create, assign, and track every job from quote to done.`}
         actions={
           <>
+            <ExportMenu spec={jobsExportSpec(jobs)} size="sm" />
             {!bulkMode && (
               <Button type="button" variant="outline" size="sm" onClick={() => setBulkMode(true)} className="gap-1.5">
                 <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" /> Bulk edit
@@ -675,7 +678,7 @@ export default function Jobs({ isActive = true }) {
             transition={{ duration: reduceMotion ? 0 : 0.2 }}
             className="fixed left-1/2 -translate-x-1/2 z-[60] flex flex-wrap items-center justify-center gap-2 bg-card border border-border rounded-2xl shadow-2xl px-4 py-3 max-w-[calc(100vw-1.5rem)]"
             style={{
-              bottom: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
+              bottom: "var(--mobile-chrome-bottom, calc(6.75rem + env(safe-area-inset-bottom, 0px)))",
             }}
           >
             <span className="text-xs text-muted-foreground mr-1">{selected.size} job{selected.size > 1 ? "s" : ""}</span>
@@ -729,7 +732,7 @@ export default function Jobs({ isActive = true }) {
       </AnimatePresence>
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-card border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg  max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">New Job</DialogTitle>
             <DialogDescription>Schedule a job with customer, timing, and site details.</DialogDescription>

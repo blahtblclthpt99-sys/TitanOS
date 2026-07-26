@@ -46,7 +46,7 @@ export default function Credentials() {
   return (
     <div className="page-pad max-w-5xl mx-auto">
       <PageHeader title="Credentials" subtitle="Keep licenses, certifications, and insurance current" />
-      <form onSubmit={add} className="glass rounded-2xl p-4 flex flex-wrap gap-2 mb-5">
+      <form onSubmit={add} className="titan-surface p-4 flex flex-wrap gap-2 mb-5">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="License or certificate" className="flex-1 bg-muted border-border text-foreground" />
         <Input value={expires} onChange={(e) => setExpires(e.target.value)} type="date" className="bg-muted border-border text-foreground" />
         <Button disabled={saving}>{saving ? "Adding…" : "Add"}</Button>
@@ -63,7 +63,7 @@ export default function Credentials() {
           const days = daysUntilExpiry(item);
           const bad = days !== null && days < 30;
           return (
-            <article className="glass rounded-2xl p-4 flex gap-3 items-start" key={item.id}>
+            <article className="titan-surface p-4 flex gap-3 items-start" key={item.id}>
               {bad ? <AlertTriangle className="text-titan-amber" /> : <ShieldCheck className="text-titan-cyan" />}
               <div className="flex-1">
                 <p className="font-semibold text-foreground">{item.title}</p>

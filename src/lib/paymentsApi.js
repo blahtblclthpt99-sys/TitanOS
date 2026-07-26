@@ -1,14 +1,16 @@
 import { api } from "@/api/apiClient";
-import { readLocal, writeLocal, uid } from "@/lib/localStore";
+import { readLocal, writeLocal } from "@/lib/localStore";
 import { calcPlatformFee } from "@/lib/platformFee";
 import { DATA_SOURCE, PersistenceError, withSource, getSource } from "@/lib/dataSource";
+import { reportError } from "@/lib/reportError";
 
 const PREFIX = "titanos_pay";
 
 export async function listPaymentAccounts(userId) {
   try {
     return withSource(await api.entities.PaymentAccount.filter({ user_id: userId }), DATA_SOURCE.remote);
-  } catch {
+  } catch (error) {
+    reportError("paymentsApi:listAccounts", error);
     return withSource(readLocal(PREFIX, userId, "accounts", []), DATA_SOURCE.local);
   }
 }
@@ -28,21 +30,21 @@ export async function upsertPaymentAccount(user, { provider, account_label, exte
       ? await api.entities.PaymentAccount.update(existing[0].id, payload)
       : await api.entities.PaymentAccount.create(payload);
     return withSource(row, DATA_SOURCE.remote);
-  } catch {
-    const rows = readLocal(PREFIX, user.id, "accounts", []);
-    const idx = rows.findIndex((r) => r.provider === provider);
-    const row = { id: idx >= 0 ? rows[idx].id : uid(), ...payload, created_at: new Date().toISOString() };
-    if (idx >= 0) rows[idx] = row;
-    else rows.push(row);
-    writeLocal(PREFIX, user.id, "accounts", rows);
-    return withSource(row, DATA_SOURCE.local);
+  } catch (error) {
+    reportError("paymentsApi:upsertAccount", error);
+    throw new PersistenceError("Couldn't save payment account. Check your connection and try again.", {
+      source: DATA_SOURCE.remote,
+      code: "PAYMENT_ACCOUNT_SAVE_FAILED",
+      cause: error,
+    });
   }
 }
 
 export async function listPayments(userId) {
   try {
     return withSource(await api.entities.Payment.filter({ user_id: userId }), DATA_SOURCE.remote);
-  } catch {
+  } catch (error) {
+    reportError("paymentsApi:list", error);
     return withSource(readLocal(PREFIX, userId, "payments", []), DATA_SOURCE.local);
   }
 }

@@ -119,6 +119,8 @@
 
     --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
     --shadow-lift: 0 4px 12px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(37, 99, 235, 0.08);
+    /* Fixed chrome above MobileNav — dock / bulk bars / FABs share this */
+    --mobile-chrome-bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
   }
 
   .dark {
@@ -240,6 +242,12 @@
     -webkit-user-select: none;
   }
 
+  /* Responsive / high-DPI media */
+  img, picture, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* Typography hierarchy */
   h1 {
     @apply font-heading tracking-tight text-foreground text-2xl md:text-3xl font-bold;
@@ -273,7 +281,7 @@
   }
   input::placeholder,
   textarea::placeholder {
-    color: hsl(var(--muted-foreground) / 0.8) !important;
+    color: hsl(var(--muted-foreground)) !important;
     opacity: 1;
   }
 }
@@ -343,7 +351,7 @@
   }
 
   .glass {
-    /* Alias to titan-surface language — keep blur for legacy call sites */
+    /* @deprecated — alias of titan-surface for legacy call sites. Prefer .titan-surface. */
     background: hsl(var(--card));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -438,6 +446,13 @@
   @media (min-width: 768px) {
     .page-pad {
       padding: var(--space-3) var(--space-4);
+    }
+  }
+
+  /* Short landscape — keep content usable under header + dock + tab bar */
+  @media (orientation: landscape) and (max-height: 480px) {
+    .page-pad {
+      padding-block: var(--space-1);
     }
   }
 }
@@ -667,5 +682,23 @@ html.high-contrast :focus-visible {
   overflow: visible;
   clip: auto;
   white-space: normal;
+}
+
+/* Printable reports — hide app chrome when printing ExportMenu / share pages */
+@media print {
+  header,
+  nav,
+  [data-mobile-dock],
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .titan-surface {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
 }
 

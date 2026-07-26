@@ -9,7 +9,7 @@ export default function ConfirmationCard({ summary, details = [], onConfirm, onC
     <motion.div
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="glass rounded-2xl rounded-bl-md overflow-hidden border border-primary/20 max-w-[85%] md:max-w-[65%]"
+      className="titan-surface rounded-bl-md overflow-hidden border border-primary/20 max-w-[85%] md:max-w-[65%]"
     >
       <div className="flex items-center gap-2 px-4 py-3 bg-primary/5 border-b border-primary/10">
         <Zap className="w-3.5 h-3.5 text-primary flex-shrink-0" aria-hidden="true" />

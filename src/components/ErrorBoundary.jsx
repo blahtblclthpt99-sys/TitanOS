@@ -1,6 +1,7 @@
 import React from "react";
 import AppError from "@/components/shared/AppError";
 import { captureException } from "@/lib/sentry";
+import { trackEvent } from "@/lib/productAnalytics";
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
@@ -58,6 +59,7 @@ export default class ErrorBoundary extends React.Component {
       tags: { boundary: "ErrorBoundary" },
       extra: { componentStack: info?.componentStack },
     });
+    trackEvent("error_boundary");
 
     // After a deploy, stale tabs often fail on missing hashed chunks — one hard reload usually fixes it.
     if (isChunkLoadError(error) && typeof window !== "undefined") {

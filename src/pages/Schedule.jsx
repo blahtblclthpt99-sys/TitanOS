@@ -116,7 +116,7 @@ export default function Schedule() {
               key={tip.text}
               type="button"
               onClick={() => tip.path && navigate(tip.path)}
-              className="glass rounded-md px-4 py-3 text-left text-sm text-foreground hover:border-primary/30 border border-transparent transition-colors"
+              className="titan-surface rounded-md px-4 py-3 text-left text-sm text-foreground hover:border-primary/30 border border-transparent transition-colors"
             >
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Smart schedule</span>
               <p className="mt-1">{tip.text}</p>
@@ -208,7 +208,7 @@ export default function Schedule() {
                           navigate(`/jobs?id=${job.id}`);
                         }
                       }}
-                      className={`glass rounded-md p-3 border-l-2 cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
+                      className={`titan-surface rounded-md p-3 border-l-2 cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">

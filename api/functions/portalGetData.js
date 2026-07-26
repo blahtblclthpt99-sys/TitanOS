@@ -2,6 +2,7 @@ import { getSupabaseAdmin, readJson, toEntityRow } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
+import { requirePortalSession } from "../_lib/requirePortalSession.js";
 import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
@@ -15,24 +16,9 @@ export default async function handler(req, res) {
   try {
     const admin = getSupabaseAdmin();
     const { token } = readJson(req);
-
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ error: "Missing session token" });
-    }
-
-    const { data: sessions } = await admin
-      .from("portal_sessions")
-      .select("*")
-      .eq("token", token)
-      .limit(1);
-
-    const session = sessions?.[0];
-    if (!session || !session.verified) {
-      return res.status(401).json({ error: "Invalid or expired session" });
-    }
-    if (!session.token_expires_at || new Date(session.token_expires_at) < new Date()) {
-      return res.status(401).json({ error: "Session expired. Please sign in again." });
-    }
+    const auth = await requirePortalSession(admin, token);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+    const session = auth.session;
 
     const { data: customer, error: customerError } = await admin
       .from("customers")

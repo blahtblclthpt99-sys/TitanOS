@@ -22,7 +22,7 @@ import {
 
 function Card({ title, icon: Icon, children }) {
   return (
-    <section className="glass rounded-2xl border border-border p-4 sm:p-5 space-y-3">
+    <section className="titan-surface border border-border p-4 sm:p-5 space-y-3">
       <div className="flex items-center gap-2">
         <div className="w-9 h-9 rounded-xl bg-titan-cyan/10 text-titan-cyan grid place-items-center">
           <Icon className="w-4 h-4" aria-hidden="true" />

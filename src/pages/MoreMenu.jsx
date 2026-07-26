@@ -19,7 +19,7 @@ export default function MoreMenu() {
     <PageShell maxWidth="md">
       <PageHeader
         title="More"
-        subtitle="TitanOS domains — Live, History, Analytics, Reports, Communication, AI, Configuration."
+        subtitle="Your operating system — Live, History, Analytics, Reports, Communication, AI, Configuration, and Labs. Domains, not a feature list."
       />
 
       <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">

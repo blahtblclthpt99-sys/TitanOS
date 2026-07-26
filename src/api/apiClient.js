@@ -19,4 +19,16 @@ export function createTitanApi() {
   };
 }
 
-export const api = createTitanApi();
+let _api;
+
+/** Lazy so unit tests can import modules that reference `api` without forcing a live client. */
+export const api = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (!_api) _api = createTitanApi();
+      const value = _api[prop];
+      return typeof value === "function" ? value.bind(_api) : value;
+    },
+  }
+);

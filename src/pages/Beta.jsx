@@ -145,7 +145,7 @@ export default function Beta() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
           {BENEFITS.map((b, i) => (
             <motion.div key={b.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
-              className="glass rounded-2xl p-4 border border-border flex items-start gap-3">
+              className="titan-surface p-4 border border-border flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-titan-cyan/10 flex items-center justify-center flex-shrink-0">
                 <b.icon className="w-4 h-4 text-titan-cyan" />
               </div>
@@ -159,7 +159,7 @@ export default function Beta() {
 
         {/* ── TESTER APPLICATION FORM ── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="glass rounded-3xl p-6 sm:p-8 border border-titan-cyan/20 titan-glow mb-6">
+          className="titan-surface p-6 sm:p-8 border border-titan-cyan/20 titan-glow mb-6">
 
           {applied ? (
             <div className="text-center py-6">
@@ -270,7 +270,7 @@ export default function Beta() {
 
         {/* ── FEEDBACK FORM ── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-          className="glass rounded-3xl p-6 sm:p-8 border border-titan-indigo/20 bg-titan-indigo/5 mb-6">
+          className="titan-surface p-6 sm:p-8 border border-titan-indigo/20 bg-titan-indigo/5 mb-6">
 
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-2xl bg-titan-indigo/20 flex items-center justify-center flex-shrink-0">

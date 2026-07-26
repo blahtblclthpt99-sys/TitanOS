@@ -21,6 +21,10 @@ export * from "./trueCostPerMile.js";
 export * from "./voiceCommands.js";
 export * from "./driverCoach.js";
 export * from "./doorDashWorkflow.js";
+export * from "./gpsOwner.js";
+export * from "./analyticsDigest.js";
+export * from "./autoTripStart.js";
+export * from "./deliveryClassify.js";
 export { createBrowserTracker } from "./tracker.js";
 export { createDoorDashTracker } from "./doorDashTracker.js";
 
@@ -49,4 +53,9 @@ export const ACTIVITY_MODULES = {
   offerAutopilot: true,
   voiceCommands: true,
   doorDashWorkflow: true,
+  gpsOwner: true,
+  analyticsDigest: true,
+  autoTripStart: true,
+  deliveryClassify: true,
+  cloudTripSync: true,
 };

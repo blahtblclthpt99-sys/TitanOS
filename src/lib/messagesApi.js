@@ -10,13 +10,17 @@ import { showMessagePush } from "@/lib/messagePush";
 const PREFIX = "titanos_dm";
 const TYPING_TTL_MS = 3500;
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+/** Device-local ring buffers — not a warehouse. Cloud MarketplaceMessage is source when available. */
+const MAX_LOCAL_MESSAGES = 500;
+const MAX_LOCAL_THREADS = 100;
 
 function allMessages() {
   return readLocal(PREFIX, "global", "messages", []);
 }
 
 function saveMessages(rows) {
-  writeLocal(PREFIX, "global", "messages", rows);
+  const list = Array.isArray(rows) ? rows : [];
+  writeLocal(PREFIX, "global", "messages", list.slice(0, MAX_LOCAL_MESSAGES));
 }
 
 function allThreads() {
@@ -24,7 +28,8 @@ function allThreads() {
 }
 
 function saveThreads(rows) {
-  writeLocal(PREFIX, "global", "threads", rows);
+  const list = Array.isArray(rows) ? rows : [];
+  writeLocal(PREFIX, "global", "threads", list.slice(0, MAX_LOCAL_THREADS));
 }
 
 export function threadIdFor(userA, userB, context = "dm") {

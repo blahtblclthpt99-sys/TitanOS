@@ -33,6 +33,8 @@ import { listNotifications, ensureNotificationCenter } from "@/lib/notifications
 import { unreadMessageCount } from "@/lib/messagesApi";
 import { relativeTime } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
+import ExportMenu from "@/components/shared/ExportMenu";
+import { analyticsExportSpec } from "@/lib/export/moduleSpecs";
 
 function TrendIcon({ direction }) {
   if (direction === "up") return <ArrowUpRight className="h-3.5 w-3.5 text-success" aria-hidden="true" />;
@@ -170,10 +172,21 @@ export default function Analytics() {
           title="Analytics"
           subtitle="Activity, engagement, growth, and performance at a glance"
         />
-        <Button variant="outline" className="border-border" onClick={() => navigate("/reports")}>
-          <LineChart className="mr-2 h-4 w-4" />
-          Full reports
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportMenu
+            spec={analyticsExportSpec({
+              ...snapshot,
+              kpis: (snapshot.kpis || []).map((k) => ({
+                ...k,
+                value: `${k.value}${k.suffix || ""}`,
+              })),
+            })}
+          />
+          <Button variant="outline" className="border-border" onClick={() => navigate("/reports")}>
+            <LineChart className="mr-2 h-4 w-4" />
+            Full reports
+          </Button>
+        </div>
       </div>
 
       {/* KPI row */}

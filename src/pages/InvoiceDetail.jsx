@@ -87,7 +87,7 @@ export default function InvoiceDetail() {
         }
       />
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="glass rounded-2xl p-6 mb-4">
+        <div className="titan-surface p-6 mb-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground text-xs mb-1">Due Date</p>
@@ -102,7 +102,7 @@ export default function InvoiceDetail() {
 
         {/* Line items */}
         {invoice.line_items?.length > 0 && (
-          <div className="glass rounded-2xl p-5 mb-4">
+          <div className="titan-surface p-5 mb-4">
             <p className="text-xs text-muted-foreground font-medium mb-3">Line Items</p>
             <div className="space-y-3">
               {invoice.line_items.map((item, i) => (
@@ -119,7 +119,7 @@ export default function InvoiceDetail() {
         )}
 
         {/* Totals */}
-        <div className="glass rounded-2xl p-5 mb-4 space-y-2">
+        <div className="titan-surface p-5 mb-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="text-foreground tabular-nums">${(invoice.subtotal || 0).toFixed(2)}</span>
@@ -179,7 +179,7 @@ export default function InvoiceDetail() {
         )}
 
         {/* Status update */}
-        <div className="glass rounded-2xl p-5">
+        <div className="titan-surface p-5">
           <p className="text-xs text-muted-foreground font-medium mb-3">Update Status</p>
           <Select value={invoice.status} onValueChange={updateStatus} disabled={saving}>
             <SelectTrigger className="bg-muted border-border text-foreground rounded-xl h-11">
@@ -194,7 +194,7 @@ export default function InvoiceDetail() {
         </div>
 
         {invoice.notes && (
-          <div className="glass rounded-2xl p-5 mt-4">
+          <div className="titan-surface p-5 mt-4">
             <p className="text-xs text-muted-foreground font-medium mb-2">Notes</p>
             <p className="text-sm text-foreground/90">{invoice.notes}</p>
           </div>

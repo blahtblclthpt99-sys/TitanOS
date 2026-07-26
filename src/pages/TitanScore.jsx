@@ -4,6 +4,9 @@ import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "@/components/shared/PageHeader";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
+import PageLoader from "@/components/shared/PageLoader";
+import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
 import { useEntityData } from "@/hooks/useEntityData";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -19,7 +22,7 @@ export default function TitanScore() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const owner = isOwnerAccount(user);
-  const { data: [invoices, jobs, customers, estimates, reviews] } = useEntityData([
+  const { data: [invoices, jobs, customers, estimates, reviews], loading, error, reload } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 200] },
     { entity: "Job", method: "list", args: ["-created_date", 200] },
     { entity: "Customer", method: "list", args: ["-created_date", 200] },
@@ -43,6 +46,35 @@ export default function TitanScore() {
     verificationLevel,
     yearsExperience: user?.years_experience != null ? Number(user.years_experience) : null,
   });
+
+  if (loading) return <PageLoader variant="cards" label="Loading Titan Score" />;
+  if (error) return <ErrorState title="Couldn't load Titan Score" onRetry={reload} />;
+
+  const hasActivity =
+    (jobs?.length || 0) + (invoices?.length || 0) + (customers?.length || 0) + (reviews?.length || 0) > 0;
+
+  if (!hasActivity) {
+    return (
+      <div className="page-pad mx-auto max-w-5xl pb-28">
+        <PageHeader
+          title="Titan Score"
+          subtitle="Activity score from your jobs, invoices, customers, estimates, and reviews"
+        />
+        <FeatureHonestyBanner tone="info">
+          This score is calculated from your TitanOS records — not a third-party credit or background check.
+        </FeatureHonestyBanner>
+        <EmptyState
+          icon={Award}
+          title="No activity to score yet"
+          description="Complete jobs, send invoices, and collect reviews — your Titan Score builds from real work."
+          actionLabel="Go to Jobs"
+          actionTo="/jobs"
+          secondaryLabel="Add a customer"
+          secondaryTo="/customers"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="page-pad mx-auto max-w-5xl pb-28">

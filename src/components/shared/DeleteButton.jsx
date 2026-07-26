@@ -21,6 +21,7 @@ export default function DeleteButton({
   className,
   stopPropagation = true,
   successTitle = "Deleted",
+  disabled = false,
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +30,7 @@ export default function DeleteButton({
       e.preventDefault();
       e.stopPropagation();
     }
-    if (busy) return;
+    if (busy || disabled) return;
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
     setBusy(true);
     try {
@@ -50,9 +51,9 @@ export default function DeleteButton({
     <button
       type="button"
       onClick={handleClick}
-      disabled={busy}
+      disabled={busy || disabled}
       className={cn(
-        "p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 min-h-[44px] min-w-[44px] inline-flex items-center justify-center disabled:opacity-50",
+        "p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 min-h-[44px] min-w-[44px] inline-flex items-center justify-center disabled:opacity-50 btn-press active:scale-[0.97]",
         className
       )}
       aria-label={`Delete ${label}`}

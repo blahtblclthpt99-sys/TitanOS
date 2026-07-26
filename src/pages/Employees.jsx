@@ -99,7 +99,7 @@ export default function Employees() {
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <PageHeader title="Employees" subtitle="Manage your field team" />
       <div className="grid lg:grid-cols-[.8fr_1.2fr] gap-5">
-        <form onSubmit={add} className="glass rounded-2xl p-5 space-y-3">
+        <form onSubmit={add} className="titan-surface p-5 space-y-3">
           <h2 className="font-semibold text-foreground flex gap-2">
             <UserPlus className="w-5 h-5 text-titan-cyan" />Add employee
           </h2>
@@ -130,7 +130,7 @@ export default function Employees() {
         <section className="space-y-3">
           {rows.length ? (
             rows.map((row) => (
-              <article key={row.id} className="glass rounded-2xl p-4 flex justify-between gap-3">
+              <article key={row.id} className="titan-surface p-4 flex justify-between gap-3">
                 <div>
                   <p className="font-semibold text-foreground">{row.name}</p>
                   <p className="text-sm text-foreground/45 capitalize">

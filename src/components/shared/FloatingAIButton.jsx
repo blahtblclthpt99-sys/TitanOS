@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useAuth } from "@/lib/AuthContext";
+import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";
+import { upsertSearchDocs } from "@/lib/searchIndex";
 
 const SUGGESTIONS = [
   { icon: Calendar, label: "Schedule a job", action: "/jobs?new=1" },
@@ -30,6 +33,7 @@ export default function FloatingAIButton({ onOpenFeedback }) {
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const ref = useRef(null);
   const reduceMotion = usePrefersReducedMotion();
 
@@ -71,6 +75,10 @@ export default function FloatingAIButton({ onOpenFeedback }) {
       rec.onresult = (ev) => {
         const text = ev.results?.[0]?.[0]?.transcript?.trim();
         setListening(false);
+        if (text && user?.id) {
+          appendVoiceTranscript(user.id, text, "ai-mic");
+          upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id));
+        }
         if (text) navigate(`/assistant?q=${encodeURIComponent(text)}`);
         else navigate("/assistant");
       };
@@ -116,7 +124,8 @@ export default function FloatingAIButton({ onOpenFeedback }) {
                     setOpen(false);
                     navigate(s.action);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[44px]"
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs text-foreground hover:bg-muted transition-all text-left min-h-[44px] focus-ring"
                 >
                   <s.icon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                   {s.label}

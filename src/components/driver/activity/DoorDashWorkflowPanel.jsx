@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, MapPin, Package, Zap } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
+import { haptic } from "@/lib/haptic";
 import { cn } from "@/lib/utils";
 import {
   acceptNewOrder,
@@ -27,15 +28,6 @@ import {
   saveDeliverySnapshot,
   summarizeDoorDashPerformance,
 } from "@/lib/driverActivity/doorDashWorkflow.js";
-
-function haptic(pattern = 12) {
-  if (typeof navigator === "undefined" || !navigator.vibrate) return;
-  try {
-    navigator.vibrate(pattern);
-  } catch {
-    /* ignore */
-  }
-}
 
 function SquareShell({ children, className, as: Comp = "div", ...rest }) {
   return (
@@ -234,8 +226,19 @@ export default function DoorDashWorkflowPanel() {
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 500);
-    return () => clearInterval(id);
+    let id = null;
+    const arm = () => {
+      if (id != null) window.clearInterval(id);
+      id = null;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    };
+    arm();
+    document.addEventListener("visibilitychange", arm);
+    return () => {
+      document.removeEventListener("visibilitychange", arm);
+      if (id != null) window.clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {

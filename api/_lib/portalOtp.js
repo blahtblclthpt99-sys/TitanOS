@@ -31,9 +31,11 @@ export function portalOtpMatches(stored, email, code) {
     }
   }
 
-  // Legacy rows written before hashing (expire within 10 minutes)
-  if (/^\d{6}$/.test(storedStr) && storedStr === submitted) {
-    return true;
+  // Legacy plaintext OTPs only when explicitly enabled (transition window)
+  if (String(process.env.PORTAL_OTP_ALLOW_LEGACY || "0") === "1") {
+    if (/^\d{6}$/.test(storedStr) && storedStr === submitted) {
+      return true;
+    }
   }
   return false;
 }

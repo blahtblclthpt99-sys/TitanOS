@@ -1,0 +1,36 @@
+---
+description: Reporting — every module exports CSV, Excel, PDF/print, share, schedule
+alwaysApply: true
+---
+
+# REPORTING
+
+Every module that holds tabular or summary data must support export through the shared stack.
+
+## Formats
+
+| Format | Rule |
+|---|---|
+| CSV | Always via `downloadCsv` / `ExportMenu` |
+| Excel | SpreadsheetML `.xls` via `downloadExcelFile` (multi-sheet when useful) |
+| PDF | Printable HTML → browser **Print → Save as PDF** (no fake PDF claims) |
+| Print | `openPrintableReport` / print CSS |
+| Shareable links | Token snapshot at `/share/report/:token` — label device/expiry limits honestly |
+| Scheduled | Local cadence (`schedule.js`) while app is open; do not claim email until server job exists |
+
+## Architecture
+
+- Shared API: `src/lib/export/*`
+- UI: `ExportMenu` on list/report pages
+- Specs: `moduleSpecs.js` (Jobs, Customers, Invoices, Finances, Analytics, Reports pack)
+- Driver Hub may keep domain builders but should call shared download helpers
+
+## Honesty
+
+- Marketplace / copy must not advertise formats that are not wired  
+- Share links are device-local until a signed cloud share API ships  
+- Schedules toast/download in-app — not silent email  
+
+## Definition of done
+
+Incomplete if a History/Reports/Analytics list page has no ExportMenu, if PDF is claimed without a print path, or if schedule implies email delivery that does not exist.

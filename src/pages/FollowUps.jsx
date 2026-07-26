@@ -129,7 +129,7 @@ export default function FollowUps() {
         </Button>
       </div>
       <div className="grid lg:grid-cols-2 gap-5">
-        <section className="glass rounded-2xl p-5">
+        <section className="titan-surface p-5">
           <h2 className="font-semibold text-foreground mb-3">Automation rules</h2>
           {rules.map((rule) => (
             <div key={rule.id} className="py-3 border-b border-border text-sm flex gap-2 items-start">
@@ -159,7 +159,7 @@ export default function FollowUps() {
             <Button>Add</Button>
           </form>
         </section>
-        <section className="glass rounded-2xl p-5">
+        <section className="titan-surface p-5">
           <h2 className="font-semibold text-foreground mb-3">Pending queue</h2>
           {queue.filter((row) => row.status === "pending").map((row) => (
             <div key={row.id} className="border-b border-border py-3 flex gap-3">

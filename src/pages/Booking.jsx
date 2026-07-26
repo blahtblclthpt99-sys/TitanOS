@@ -106,9 +106,9 @@ export default function Booking() {
   if (!form) return <PageLoader variant="list" label="Loading booking page" />;
   return <div className="p-4 md:p-8 max-w-5xl mx-auto pb-28">
     <PageHeader title="Booking" subtitle="Publish a shareable page for customers to request service." />
-    {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
+    {betaBadgeLabel() && <div className="titan-surface mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
     <div className="grid lg:grid-cols-[1.3fr_.7fr] gap-5">
-      <form onSubmit={savePage} className="glass rounded-3xl p-5 md:p-7 border border-border space-y-4">
+      <form onSubmit={savePage} className="titan-surface p-5 md:p-7 border border-border space-y-4">
         <div className="flex items-center justify-between gap-4"><h2 className="font-semibold text-foreground">Public booking page</h2><label className="flex items-center gap-2 text-sm text-foreground/85"><input type="checkbox" checked={!!form.is_published} onChange={(e) => update("is_published", e.target.checked)} className="accent-cyan-400" /> Published</label></div>
         <div className="grid sm:grid-cols-2 gap-4"><label className="text-sm text-muted-foreground">Title<Input value={form.title || ""} onChange={(e) => update("title", e.target.value)} className={`mt-1 ${inputClass}`} /></label><label className="text-sm text-muted-foreground">Services (comma separated)<Input value={form.servicesText} onChange={(e) => update("servicesText", e.target.value)} className={`mt-1 ${inputClass}`} /></label></div>
         <label className="block text-sm text-muted-foreground">Bio<Textarea value={form.bio || ""} onChange={(e) => update("bio", e.target.value)} className={`mt-1 ${inputClass}`} rows={3} /></label>
@@ -117,7 +117,7 @@ export default function Booking() {
         {user?.verified_worker && <p className="flex items-center gap-1.5 text-xs text-titan-cyan"><ShieldCheck className="w-4 h-4" /> Verified provider badge shown publicly</p>}
         <Button disabled={saving} type="submit" className="w-full">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save booking page"}</Button>
       </form>
-      <aside className="glass rounded-3xl p-5 border border-border h-fit space-y-3">
+      <aside className="titan-surface p-5 border border-border h-fit space-y-3">
         <p className="text-xs text-muted-foreground uppercase tracking-wider">Your booking website</p>
         <p className="text-sm text-foreground break-all font-medium">{bookingPublicUrl(page.slug)}</p>
         <p className="text-xs text-muted-foreground">
@@ -138,7 +138,68 @@ export default function Booking() {
         </Button>
       </aside>
     </div>
-    <section className="glass rounded-3xl p-5 md:p-7 border border-border mt-5"><div className="flex justify-between gap-4 items-center"><h2 className="font-semibold text-foreground">Availability</h2><Button onClick={saveSlots} disabled={savingAvailability}>{savingAvailability ? "Saving…" : "Save availability"}</Button></div><div className="mt-4 space-y-2">{slots.map((slot, index) => <div key={slot.weekday} className="flex flex-wrap gap-3 items-center rounded-xl bg-muted/50 p-3"><label className="w-24 flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={slot.is_open} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, is_open: e.target.checked } : item))} className="accent-cyan-400" />{WEEKDAYS[slot.weekday]}</label><Input type="time" disabled={!slot.is_open} value={slot.start_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, start_time: e.target.value } : item))} className={`${inputClass} w-32`} /><span className="text-muted-foreground">to</span><Input type="time" disabled={!slot.is_open} value={slot.end_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, end_time: e.target.value } : item))} className={`${inputClass} w-32`} /></div>)}</div></section>
-    <section className="mt-5"><h2 className="font-semibold text-foreground mb-3">Incoming requests</h2><div className="space-y-3">{requests.length ? requests.map((request) => <article key={request.id} className="glass rounded-2xl p-4 border border-border flex flex-col sm:flex-row sm:items-center gap-3"><div className="flex-1"><p className="font-medium text-foreground">{request.customer_name} <span className="text-xs text-titan-cyan">· {request.service}</span></p><p className="text-xs text-foreground/45 mt-1">{request.preferred_date || "Flexible"} {request.preferred_time} · {request.customer_phone || request.customer_email || "No contact"}</p>{request.notes && <p className="text-sm text-muted-foreground mt-2">{request.notes}</p>}</div><div className="flex gap-2 items-center"><span className="text-xs capitalize text-foreground/45">{request.status}</span>{request.status === "new" && <><Button onClick={() => updateRequest(request, "accepted")} disabled={saving} className="h-8 bg-emerald-500/20 text-emerald-300">Accept</Button><Button onClick={() => updateRequest(request, "declined")} disabled={saving} variant="outline" className="h-8 border-border text-foreground">Decline</Button></>}<DeleteButton label={`request from ${request.customer_name}`} onDelete={async () => { await api.entities.BookingRequest.delete(request.id); setRequests((current) => current.filter((item) => item.id !== request.id)); }} /></div></article>) : <p className="glass rounded-2xl p-6 text-sm text-muted-foreground">No booking requests yet.</p>}</div></section>
+    <section className="titan-surface p-5 md:p-7 border border-border mt-5"><div className="flex justify-between gap-4 items-center"><h2 className="font-semibold text-foreground">Availability</h2><Button onClick={saveSlots} disabled={savingAvailability}>{savingAvailability ? "Saving…" : "Save availability"}</Button></div><div className="mt-4 space-y-2">{slots.map((slot, index) => <div key={slot.weekday} className="flex flex-wrap gap-3 items-center rounded-xl bg-muted/50 p-3"><label className="w-24 flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={slot.is_open} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, is_open: e.target.checked } : item))} className="accent-cyan-400" />{WEEKDAYS[slot.weekday]}</label><Input type="time" disabled={!slot.is_open} value={slot.start_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, start_time: e.target.value } : item))} className={`${inputClass} w-32`} /><span className="text-muted-foreground">to</span><Input type="time" disabled={!slot.is_open} value={slot.end_time} onChange={(e) => setSlots((items) => items.map((item, i) => i === index ? { ...item, end_time: e.target.value } : item))} className={`${inputClass} w-32`} /></div>)}</div></section>
+    <section className="mt-5">
+      <h2 className="font-semibold text-foreground mb-3">Incoming requests</h2>
+      <div className="space-y-3">
+        {requests.length ? (
+          requests.map((request) => (
+            <article
+              key={request.id}
+              className="titan-surface p-4 border border-border flex flex-col sm:flex-row sm:items-center gap-3"
+            >
+              <div className="flex-1">
+                <p className="font-medium text-foreground">
+                  {request.customer_name}{" "}
+                  <span className="text-xs text-titan-cyan">· {request.service}</span>
+                </p>
+                <p className="text-xs text-foreground/45 mt-1">
+                  {request.preferred_date || "Flexible"} {request.preferred_time} ·{" "}
+                  {request.customer_phone || request.customer_email || "No contact"}
+                </p>
+                {request.notes && <p className="text-sm text-muted-foreground mt-2">{request.notes}</p>}
+              </div>
+              <div className="flex gap-2 items-center">
+                <span className="text-xs capitalize text-foreground/45">{request.status}</span>
+                {request.status === "new" && (
+                  <>
+                    <Button
+                      onClick={() => updateRequest(request, "accepted")}
+                      disabled={saving}
+                      className="h-8 bg-emerald-500/20 text-emerald-300"
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      onClick={() => updateRequest(request, "declined")}
+                      disabled={saving}
+                      variant="outline"
+                      className="h-8 border-border text-foreground"
+                    >
+                      Decline
+                    </Button>
+                  </>
+                )}
+                <DeleteButton
+                  label={`request from ${request.customer_name}`}
+                  onDelete={async () => {
+                    await api.entities.BookingRequest.delete(request.id);
+                    setRequests((current) => current.filter((item) => item.id !== request.id));
+                  }}
+                />
+              </div>
+            </article>
+          ))
+        ) : (
+          <EmptyState
+            className="py-10"
+            title="No booking requests yet"
+            description="Share your public booking link so customers can request time on your calendar."
+            actionLabel="Copy booking link"
+            onAction={copyLink}
+          />
+        )}
+      </div>
+    </section>
   </div>;
 }

@@ -137,8 +137,8 @@ export default async function handler(req, res) {
       const type = String(event.event_type || "");
       const resource = event.resource || {};
       const moneyEvents = new Set([
+        // Settled funds only — never grant premium on ORDER.APPROVED (pre-capture).
         "PAYMENT.CAPTURE.COMPLETED",
-        "CHECKOUT.ORDER.APPROVED",
         "CHECKOUT.ORDER.COMPLETED",
         "PAYMENT.SALE.COMPLETED",
       ]);

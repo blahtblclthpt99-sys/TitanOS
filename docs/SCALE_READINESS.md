@@ -1,6 +1,7 @@
 # Scale & UI performance readiness
 
 Goal: keep the UI fast and failure-free when many users are online at once.
+Product law: design for **millions of users, trips, and jobs** — see `.cursor/rules/scalability.mdc`.
 
 ## Honest capacity note
 
@@ -8,43 +9,45 @@ Goal: keep the UI fast and failure-free when many users are online at once.
 
 What we *can* control in the app:
 
-1. Cut per-session polling and payload size (done in this pass)
-2. Cap every list/filter so a bug cannot download ~1000 rows
+1. Cut per-session polling and payload size
+2. Cap every list/filter so a bug cannot download unbounded rows
 3. Stagger reconnect storms so network flaps do not stampede the DB
 4. Fail closed on payments/auth; show ErrorBoundaries instead of blank screens
+5. Index hot filters; keyset-ready pagination; durable rate limits when Upstash is configured
+6. Cloud `driver_trips` for multi-device history (local journal is a capped cache)
 
-Claiming “handles 10k” without a measured Supabase load test against authenticated queries would be dishonest. Use the checklist below before a big launch event.
+Claiming “handles millions” without measured authenticated PostgREST load tests would be dishonest.
 
-## Hardened in this pass
+## Hardened
 
 | Area | Change |
 |------|--------|
-| Notifications | One shared unread query (head/count), 45s poll, pauses when tab hidden |
-| Entity adapter | Default page size 100, hard max 500; `count()` + range filters (`gt`/`in`/`is`) |
-| Customer detail | Loads related jobs/estimates/invoices by `customer_id` (not 3×500 global lists) |
-| Nav badges | Status-filtered slim queries instead of 3×100 full lists |
-| React Query | Jittered reconnect refetch (0.4–3s); no window-focus refetch |
-| Auth | Skip full profile reload on `TOKEN_REFRESHED` / `INITIAL_SESSION`; narrower profile select |
-| Messages | 20s poll (was 12s); inbox merge capped at 100 |
-| Community | Activity “since” uses server-side `created_at` filter when possible |
-| API rate limit | Larger in-memory bucket map (still per-instance; abuse only) |
+| Notifications | One shared unread query, 45s poll, pauses when tab hidden |
+| Entity adapter | Default/preferred page 100, hard max 500; `count()`; `filterPage` keyset helper |
+| Finances / Tax / Expenses | List pulls 100 (not 500) |
+| Customer detail | Related entities by `customer_id` with limits |
+| Messages | Local ring: 500 messages / 100 threads |
+| Driver trips | Local `MAX_JOURNAL=2000` + sync to `driver_trips` (migration 034) |
+| Indexes | Migration 034: customer_id, unread notifications, owner timelines |
+| Rate limit | Memory + optional Upstash (`assertRateLimitAsync` on payment/AI) |
+| Serverless | `maxDuration` on webhooks / AI / OCR / payments |
+| React Query | Jittered reconnect; no window-focus refetch |
+| Auth | Skip full profile reload on TOKEN_REFRESHED |
 
 ## Ops commands
 
 ```bash
-# Public HTTP soak (landing/API edge — not authenticated DB)
 npm run ops:load:smoke
 npm run ops:load -- --profile scale
-
-# App correctness
 npm test
 npm run build
 ```
 
-## Before a 10k-user event
+## Before a large launch
 
-1. Confirm Supabase plan connection pool / compute headroom for peak concurrent queries
-2. Add indexes on hot filters: `notifications(user_id, read_at)`, `jobs(customer_id)`, `invoices(status)`, etc.
-3. Prefer Supabase Realtime for notifications/messages instead of polling at very high concurrency
-4. Run authenticated k6/Artillery scenarios against PostgREST (login + dashboard + messages), not only `ops:load`
-5. Watch p95 latency and error rate in Supabase + Sentry during a staged ramp (1k → 3k → 10k)
+1. Apply migrations **032–034** on Supabase
+2. Confirm connection pool / compute headroom
+3. Set `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` for cross-instance API limits
+4. Prefer Realtime for notifications/messages at very high concurrency
+5. Run **authenticated** k6/Artillery (login + dashboard + messages), not only public `ops:load`
+6. Watch p95 in Supabase + Sentry during staged ramp

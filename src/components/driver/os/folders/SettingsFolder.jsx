@@ -48,6 +48,18 @@ export default function SettingsFolder({ user }) {
         />
       </label>
       <label className="flex items-center justify-between gap-3 min-h-[48px] rounded-xl border border-border bg-muted/40 px-3">
+        <div className="min-w-0">
+          <span className="text-sm font-medium block">Auto-start trip on motion</span>
+          <span className="text-xs text-muted-foreground">Starts a shift when you keep moving (opt-in)</span>
+        </div>
+        <input
+          type="checkbox"
+          className="h-5 w-5 accent-sky-500 shrink-0"
+          checked={Boolean(prefs.autoStartOnMotion)}
+          onChange={(e) => patch({ autoStartOnMotion: e.target.checked })}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-3 min-h-[48px] rounded-xl border border-border bg-muted/40 px-3">
         <span className="text-sm font-medium">Location privacy acknowledged</span>
         <input
           type="checkbox"

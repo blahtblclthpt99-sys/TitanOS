@@ -39,15 +39,19 @@ async function localFallback(functionName, payload) {
     const { answerFromSummary } = await import("@/lib/ai-business-summary");
     const last =
       (payload.messages || []).filter((m) => m.role === "user").slice(-1)[0]?.content || "";
-    const summary = payload.businessSummary || null;
-    const local = answerFromSummary(last, summary);
+    // Offline: only answer from a client display snapshot with clear provenance —
+    // never claim server truth. Prefer empty/unavailable over invented facts.
+    const summary = payload.offlineSnapshot || null;
+    const local = summary ? answerFromSummary(last, summary) : null;
     return {
       data: {
         type: "response",
-        source: "local",
+        source: "offline",
+        dataBasis: summary ? "device_cache" : "none",
+        generalKnowledge: false,
         message:
           local ||
-          "Titan AI is temporarily unavailable. Please try again in a moment.",
+          "Titan AI needs a connection for live YOUR DATA answers. Reconnect, or open Jobs / Invoices / Customers directly.",
       },
     };
   }

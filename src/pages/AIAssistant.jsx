@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale } from "lucide-react";
@@ -8,8 +9,11 @@ import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 import ConfirmationCard from "@/components/ai/ConfirmationCard";
 import ActionResult from "@/components/ai/ActionResult";
 import { buildBusinessSummary } from "@/lib/ai-business-summary";
+import { buildAiPageContext } from "@/lib/aiPageContext";
 import { useAuth } from "@/lib/AuthContext";
 import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
+import { appendAiConversationTurn, listAiConversationDocs } from "@/lib/aiConversationStore";
+import { upsertSearchDocs } from "@/lib/searchIndex";
 
 const SUGGESTIONS = [
   { label: "Today's jobs", prompt: "What jobs do I have scheduled today?" },
@@ -33,6 +37,7 @@ const LAW_SUGGESTIONS = [
 
 export default function AIAssistant() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,6 +48,7 @@ export default function AIAssistant() {
   const [lawMastermind, setLawMastermind] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const seededQ = useRef(false);
 
   const loadBusinessData = useCallback(async () => {
     setDataLoading(true);
@@ -102,22 +108,46 @@ export default function AIAssistant() {
     setMessages((prev) => [...prev, userEntry, placeholder]);
     setLoading(true);
 
+    if (user?.id) {
+      appendAiConversationTurn(user.id, { role: "user", text: userMsg });
+      upsertSearchDocs(user.id, listAiConversationDocs(user.id));
+    }
+
     try {
       const history = [...messages, userEntry]
         .filter((m) => m.type !== "loading")
         .slice(-8)
         .map((m) => ({ role: m.role, content: m.content || m.meta?.summary || "" }));
 
+      const pageContext = buildAiPageContext({
+        pathname: "/assistant",
+        workflow: lawMastermind ? "law_mastermind" : "office",
+      });
+
+      // Never send businessSummary as trusted facts — server loads owned snapshot.
+      // offlineSnapshot is only used if the API is unreachable (device cache, labeled).
       const result = await api.functions.invoke("titanAI", {
         messages: history,
-        businessSummary: businessSummary || undefined,
+        pageContext,
+        offlineSnapshot: businessSummary || undefined,
         lawMastermind,
       });
 
       const data = result.data;
 
       if (data.type === "response" || data.type === "clarify") {
-        replaceLastMessage({ role: "assistant", content: data.message, type: "text" });
+        replaceLastMessage({
+          role: "assistant",
+          content: data.message,
+          type: "text",
+          source: data.source,
+          dataBasis: data.dataBasis,
+          generalKnowledge: data.generalKnowledge,
+        });
+        if (user?.id && data.message) {
+          appendAiConversationTurn(user.id, { role: "assistant", text: data.message });
+          upsertSearchDocs(user.id, listAiConversationDocs(user.id));
+        }
       } else if (data.type === "confirm") {
         replaceLastMessage({
           role: "assistant",
@@ -136,6 +166,7 @@ export default function AIAssistant() {
           role: "assistant",
           content: data.message || "I'm not sure how to handle that.",
           type: "text",
+          source: data.source,
         });
       }
     } catch (e) {
@@ -149,6 +180,14 @@ export default function AIAssistant() {
     }
   };
 
+  // Deep-link: /assistant?q=…
+  useEffect(() => {
+    const q = params.get("q");
+    if (!q || seededQ.current || dataLoading) return;
+    seededQ.current = true;
+    setInput(q);
+  }, [params, dataLoading]);
+
   const handleConfirm = async (msgIndex) => {
     const confirmMsg = messages[msgIndex];
     if (!confirmMsg?.meta) return;
@@ -158,7 +197,7 @@ export default function AIAssistant() {
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
-        businessSummary: businessSummary || undefined,
+        pageContext: buildAiPageContext({ pathname: "/assistant" }),
         confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params },
       });
       const data = result.data;
@@ -219,7 +258,7 @@ export default function AIAssistant() {
     if (msg.type === "loading") {
       return (
         <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-          <div className="glass rounded-2xl rounded-bl-md px-4 py-3">
+          <div className="titan-surface rounded-bl-md px-4 py-3">
             <div className="flex items-center gap-1.5">
               {[0, 150, 300].map((delay) => (
                 <div
@@ -236,7 +275,7 @@ export default function AIAssistant() {
     if (msg.type === "executing") {
       return (
         <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-          <div className="glass rounded-2xl rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3">
+          <div className="titan-surface rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3">
             <div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0" />
             <span className="text-xs text-muted-foreground">Executing…</span>
           </div>
@@ -265,7 +304,26 @@ export default function AIAssistant() {
     }
     return (
       <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-        <div className="glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
+        <div className="titan-surface rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%] space-y-2">
+          {(msg.source || msg.dataBasis) && (
+            <div className="flex flex-wrap gap-1.5">
+              {msg.dataBasis === "server_snapshot" || msg.source === "local" ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-primary/10 text-primary px-1.5 py-0.5">
+                  Your data
+                </span>
+              ) : null}
+              {msg.generalKnowledge || msg.source === "openai" ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-muted text-muted-foreground px-1.5 py-0.5">
+                  May include general knowledge
+                </span>
+              ) : null}
+              {msg.source === "offline" || msg.dataBasis === "device_cache" ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-warning/15 text-warning-foreground px-1.5 py-0.5">
+                  Offline cache
+                </span>
+              ) : null}
+            </div>
+          )}
           <ReactMarkdown
             className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"
             components={safeMarkdownComponents}
@@ -309,8 +367,8 @@ export default function AIAssistant() {
                 <>
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-xs text-muted-foreground">
-                    Your data · {businessSummary?.counts?.customers || 0} customers ·{" "}
-                    {businessSummary?.counts?.jobs || 0} jobs
+                    Preview · {businessSummary?.counts?.customers || 0} customers ·{" "}
+                    {businessSummary?.counts?.jobs || 0} jobs · answers use server snapshot
                   </span>
                 </>
               )}
@@ -352,7 +410,7 @@ export default function AIAssistant() {
                   key={s.label}
                   onClick={() => sendMessage(s.prompt)}
                   disabled={loading}
-                  className="text-left px-4 py-3 rounded-xl glass glass-hover text-sm text-muted-foreground hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+                  className="text-left px-4 py-3 rounded-lg titan-surface titan-surface-interactive text-sm text-muted-foreground hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
                 >
                   <Zap className="w-3 h-3 inline mr-2 text-titan-cyan" />
                   {s.label}

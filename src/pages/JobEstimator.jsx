@@ -127,9 +127,9 @@ export default function JobEstimator() {
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <PageHeader title="Job Price Estimator" subtitle="Build a market-aware price range for any job." />
-      {betaBadgeLabel() && <div className="glass rounded-2xl mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
+      {betaBadgeLabel() && <div className="titan-surface mb-5 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">{betaBadgeLabel()}</div>}
       <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-5">
-        <section className="glass rounded-2xl p-5">
+        <section className="titan-surface p-5">
           <div className="flex items-center gap-2 mb-5"><Calculator className="w-5 h-5 text-titan-cyan" /><h2 className="font-semibold text-foreground">Job inputs</h2></div>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Service type"><select value={form.service_type} onChange={(event) => changeService(event.target.value)} className={`${inputClass} px-3 w-full`}>{SERVICE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></Field>
@@ -150,7 +150,7 @@ export default function JobEstimator() {
           </div>
         </section>
 
-        <section className="glass rounded-2xl p-5 h-fit">
+        <section className="titan-surface p-5 h-fit">
           <h2 className="font-semibold text-foreground mb-4">Recommended range</h2>
           <div className="grid grid-cols-3 gap-2 mb-5">{[["Low", estimate.low_estimate, "text-foreground/90"], ["Average", estimate.avg_estimate, "text-titan-cyan"], ["Premium", estimate.premium_estimate, "text-titan-amber"]].map(([label, value, color]) => <div key={label} className="bg-muted/50 rounded-xl p-3 text-center"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-bold mt-1 ${color}`}>${Number(value).toLocaleString()}</p></div>)}</div>
           <div className="space-y-3 border-t border-border pt-4">

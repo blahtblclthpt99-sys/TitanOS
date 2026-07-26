@@ -5,6 +5,7 @@ import { requireAdmin } from "../_lib/auth.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
+import { secretsEqual } from "../_lib/secureCompare.js";
 
 /**
  * Admin-only marketplace catalog seed / sync.
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
 
   const seedSecret = process.env.SEED_MARKETPLACE_SECRET;
   const headerSecret = req.headers["x-seed-secret"];
-  const secretOk = seedSecret && headerSecret && headerSecret === seedSecret;
+  const secretOk = Boolean(seedSecret) && secretsEqual(headerSecret, seedSecret);
 
   if (!secretOk) {
     const auth = await requireAdmin(req, res);

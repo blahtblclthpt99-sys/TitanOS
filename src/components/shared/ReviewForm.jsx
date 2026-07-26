@@ -60,7 +60,7 @@ export default function ReviewForm({
   };
 
   return (
-    <form onSubmit={submit} className="glass rounded-2xl p-4 space-y-3">
+    <form onSubmit={submit} className="titan-surface p-4 space-y-3">
       <p className="text-sm font-semibold text-foreground">Leave a rating</p>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (

@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initSentry, captureException } from '@/lib/sentry'
+import { hydrateFeatureFlags, refreshFeatureFlagsFromServer } from '@/lib/featureFlags'
+import { trackEvent } from '@/lib/productAnalytics'
 import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
 import '@/index.css'
@@ -10,8 +12,13 @@ import '@/index.css'
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 
-// Observability — no-ops when VITE_SENTRY_DSN is unset
+// Observability — crash/perf (Sentry), flags, first-party analytics
 initSentry();
+hydrateFeatureFlags();
+trackEvent("app_boot");
+runWhenIdle(() => {
+  refreshFeatureFlagsFromServer().catch(() => {});
+});
 
 /** Log uncaught async/sync failures without crashing the shell (ErrorBoundary covers React tree). */
 function installGlobalErrorLogging() {

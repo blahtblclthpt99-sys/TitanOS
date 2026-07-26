@@ -13,7 +13,8 @@ export function createBrowserTracker(handlers = {}, options = {}) {
   const cfg = {
     ...DEFAULT_STOP_CONFIG,
     enableHighAccuracy: true,
-    maximumAge: 4000,
+    // Allow slightly stale fixes to cut GNSS wakeups while driving still feels live
+    maximumAge: 5000,
     timeout: 15000,
     ...options,
   };
@@ -127,6 +128,26 @@ export function createBrowserTracker(handlers = {}, options = {}) {
     resume() {
       paused = false;
       emit("tracking_resumed", {});
+    },
+    /** Stop GNSS hardware (keeps counters). Use when tab is hidden to save battery. */
+    suspendHardware() {
+      if (watchId != null && navigator.geolocation?.clearWatch) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = null;
+      emit("tracking_hardware_suspended", {});
+    },
+    /** Restart GNSS after suspendHardware. */
+    resumeHardware() {
+      if (watchId != null) return true;
+      if (typeof navigator === "undefined" || !navigator.geolocation) return false;
+      watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
+        enableHighAccuracy: cfg.enableHighAccuracy,
+        maximumAge: cfg.maximumAge,
+        timeout: cfg.timeout,
+      });
+      emit("tracking_hardware_resumed", {});
+      return true;
     },
     stop() {
       if (watchId != null && navigator.geolocation?.clearWatch) {

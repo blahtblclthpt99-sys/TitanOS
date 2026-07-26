@@ -4,6 +4,29 @@ import pluginReact from "eslint-plugin-react";
 import pluginReactHooks from "eslint-plugin-react-hooks";
 import pluginUnusedImports from "eslint-plugin-unused-imports";
 
+const reactRules = {
+  "no-unused-vars": "off",
+  "react/jsx-uses-vars": "error",
+  "react/jsx-uses-react": "error",
+  "unused-imports/no-unused-imports": "error",
+  "unused-imports/no-unused-vars": [
+    "warn",
+    {
+      vars: "all",
+      varsIgnorePattern: "^_",
+      args: "after-used",
+      argsIgnorePattern: "^_",
+    },
+  ],
+  "react/prop-types": "off",
+  "react/react-in-jsx-scope": "off",
+  "react/no-unknown-property": [
+    "error",
+    { ignore: ["cmdk-input-wrapper", "toast-close"] },
+  ],
+  "react-hooks/rules-of-hooks": "error",
+};
+
 export default [
   {
     ignores: [
@@ -11,17 +34,23 @@ export default [
       "**/dist/**",
       "**/release/**",
       "**/android/**",
-      "**/api/**",
       "**/.tools/**",
+      // API is Node/serverless — lint separately when Node globals block is ready
+      "**/api/**",
+      // Generated / vendor-style shadcn primitives (adopt or prune intentionally)
+      "src/components/ui/**",
     ],
   },
   {
     files: [
-      "src/components/**/*.{js,mjs,cjs,jsx}",
       "src/pages/**/*.{js,mjs,cjs,jsx}",
+      "src/components/**/*.{js,mjs,cjs,jsx}",
+      "src/hooks/**/*.{js,mjs,cjs,jsx}",
       "src/Layout.jsx",
+      "src/App.jsx",
+      "src/main.jsx",
+      "src/AuthenticatedShell.jsx",
     ],
-    ignores: ["src/lib/**/*", "src/components/ui/**/*"],
     ...pluginJs.configs.recommended,
     ...pluginReact.configs.flat.recommended,
     languageOptions: {
@@ -29,25 +58,36 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
       },
     },
-    settings: {
-      react: {
-        version: "detect",
-      },
-    },
+    settings: { react: { version: "detect" } },
     plugins: {
       react: pluginReact,
       "react-hooks": pluginReactHooks,
       "unused-imports": pluginUnusedImports,
     },
+    rules: reactRules,
+  },
+  {
+    // Pure libs — catch dead imports without React JSX rules noise
+    files: ["src/lib/**/*.{js,mjs,cjs}"],
+    ...pluginJs.configs.recommended,
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+      },
+    },
+    plugins: {
+      "unused-imports": pluginUnusedImports,
+    },
     rules: {
       "no-unused-vars": "off",
-      "react/jsx-uses-vars": "error",
-      "react/jsx-uses-react": "error",
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "warn",
@@ -58,13 +98,7 @@ export default [
           argsIgnorePattern: "^_",
         },
       ],
-      "react/prop-types": "off",
-      "react/react-in-jsx-scope": "off",
-      "react/no-unknown-property": [
-        "error",
-        { ignore: ["cmdk-input-wrapper", "toast-close"] },
-      ],
-      "react-hooks/rules-of-hooks": "error",
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 ];

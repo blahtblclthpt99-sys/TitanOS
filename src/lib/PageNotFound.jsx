@@ -26,7 +26,7 @@ export default function PageNotFound() {
           </div>
 
           {authChecked && isAuthenticated && user?.role === 'admin' && (
-            <div className="mt-8 p-4 glass rounded-2xl text-left">
+            <div className="mt-8 p-4 titan-surface text-left">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-titan-amber/20 flex items-center justify-center mt-0.5">
                   <div className="w-2 h-2 rounded-full bg-titan-amber" />

@@ -1,10 +1,12 @@
 /**
  * Intelligent global search — autocomplete, history, saved, fuzzy, suggestions.
+ * Entity hits come from the local search index (sync / instant).
  */
 import { APP_NAV_ITEMS, QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { editDistance, fuzzyMatch, listDrivers } from "@/lib/driverDirectoryApi";
 import { searchConversationsSync } from "@/lib/messagesApi";
 import { getSearchAssistance, getSearchAutocomplete } from "@/lib/aiInsights";
+import { querySearchIndex } from "@/lib/searchIndex";
 
 const RECENT_KEY = "titanos_search_recent";
 const SAVED_KEY = "titanos_search_saved";
@@ -18,6 +20,8 @@ const SUGGESTIONS = [
   "Customers",
   "Schedule",
   "Ask Titan AI",
+  "Voice notes",
+  "Analytics revenue",
 ];
 
 function readList(key) {
@@ -144,20 +148,23 @@ export function runGlobalSearch(query, options = {}) {
     }
   }
 
-  // Intent shortcuts
   const intents = [
     { re: /invoice|bill|overdue/i, label: "Invoices", path: "/invoices", hint: "Billing" },
     { re: /estimate|quote/i, label: "Estimates", path: "/estimates", hint: "Quotes" },
-    { re: /driver|cdl|truck|van|otr|hazmat/i, label: "Find drivers", path: "/driver", hint: "Driver Hub" },
+    { re: /driver|cdl|truck|van|otr|hazmat|trip/i, label: "Find drivers / trips", path: "/driver", hint: "Driver Hub" },
     { re: /tax|1099|mileage/i, label: "Tax Center", path: "/tax-center", hint: "Taxes" },
     { re: /ai|assistant|help/i, label: "Titan AI", path: "/assistant", hint: "Ask Titan" },
     { re: /message|chat|inbox|dm/i, label: "Messages", path: "/messages", hint: "Inbox" },
+    { re: /analytics|kpi|metric/i, label: "Analytics", path: "/analytics", hint: "Metrics" },
+    { re: /setting|theme|privacy|password/i, label: "Settings", path: "/settings", hint: "Configuration" },
+    { re: /voice|transcript|speech/i, label: "Voice / AI", path: "/assistant", hint: "Transcripts" },
+    { re: /file|receipt|document|upload/i, label: "Receipts & files", path: "/receipts", hint: "Files" },
   ];
   if (q) {
     for (const intent of intents) {
       if (intent.re.test(q)) {
         results.push({
-          id: `intent-${intent.path}`,
+          id: `intent-${intent.path}-${intent.label}`,
           label: intent.label,
           hint: intent.hint,
           path: intent.path,
@@ -196,28 +203,37 @@ export function runGlobalSearch(query, options = {}) {
     } catch {
       /* ignore */
     }
+
+    try {
+      for (const hit of querySearchIndex(options.userId, q, { limit: 24 })) {
+        results.push(hit);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
-  // Dedupe by path+label, sort by score
   const seen = new Set();
   return results
     .filter((r) => {
-      const key = `${r.path}|${r.label}`;
+      const key = `${r.group}|${r.path}|${r.label}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, q ? 12 : 8);
+    .slice(0, q ? 16 : 8);
 }
 
 export function getAiSearchTips(query) {
   const assist = getSearchAssistance(query);
   const tips = [assist.tip];
   const q = String(query || "").toLowerCase();
-  if (/driver|truck|cdl|van/.test(q)) tips.push("Open Driver Hub → Find Drivers to filter by CDL, van, or OTR.");
+  if (/driver|truck|cdl|van|trip/.test(q)) tips.push("Open Driver Hub → Find Drivers or Trip History.");
   if (/invoice|pay/.test(q)) tips.push("Check Invoices for overdue balances and send reminders.");
   if (/job|schedule/.test(q)) tips.push("Jump to Jobs or Schedule to manage today's work.");
   if (/message|chat|inbox/.test(q)) tips.push("Open Messages to search conversations, send photos, or voice notes.");
+  if (/customer/.test(q)) tips.push("Customer records are indexed locally for instant Cmd/Ctrl+K results.");
+  if (/voice|transcript/.test(q)) tips.push("Voice transcripts from the dock and AI mic are searchable after you speak.");
   return tips.slice(0, 3);
 }

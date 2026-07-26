@@ -51,7 +51,7 @@ export default function RoutePlanner() {
       <FeatureHonestyBanner>
         Without Mapbox, stops are ordered with a simple nearest-neighbor pass. Add MAPBOX_ACCESS_TOKEN for live optimized trips.
       </FeatureHonestyBanner>
-      <div className="glass rounded-2xl p-5 border border-titan-cyan/15 mb-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+      <div className="titan-surface p-5 border border-titan-cyan/15 mb-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Estimated route distance</p>
           <p className="text-3xl font-bold text-foreground">
@@ -78,11 +78,11 @@ export default function RoutePlanner() {
         />
       ) : (
         <div className="grid lg:grid-cols-2 gap-6">
-          <section className="glass rounded-2xl p-5 border border-border">
+          <section className="titan-surface p-5 border border-border">
             <h2 className="font-semibold text-foreground mb-4">Original order</h2>
             <div className="space-y-3">{jobs.map((job, index) => <Stop key={job.id} index={index + 1} job={job} onOpen={() => navigate(`/jobs?id=${job.id}`)} />)}</div>
           </section>
-          <section className="glass rounded-2xl p-5 border border-titan-cyan/15">
+          <section className="titan-surface p-5 border border-titan-cyan/15">
             <h2 className="font-semibold text-foreground mb-4">Optimized order</h2>
             <div className="space-y-3">
               {route.ordered.map((job, index) => (

@@ -1,7 +1,16 @@
 /**
  * Driver OS 4.0 — Explorer folder registry.
  * Folders lazy-load contents; Mission Control stays outside this tree.
+ * `group` mirrors product IA: live | history | analytics | reports | settings
  */
+
+export const FOLDER_GROUPS = Object.freeze([
+  { id: "live", label: "Live" },
+  { id: "history", label: "History" },
+  { id: "analytics", label: "Analytics" },
+  { id: "reports", label: "Reports" },
+  { id: "settings", label: "Configuration" },
+]);
 
 export const DRIVER_OS_FOLDERS = Object.freeze([
   {
@@ -10,118 +19,7 @@ export const DRIVER_OS_FOLDERS = Object.freeze([
     description: "Active session controls & telemetry",
     premium: false,
     icon: "radio",
-  },
-  {
-    id: "todays-orders",
-    label: "Today's Orders",
-    description: "Deliveries completed today",
-    premium: false,
-    icon: "package",
-  },
-  {
-    id: "trip-history",
-    label: "Trip History",
-    description: "Year → month → day archives",
-    premium: false,
-    icon: "history",
-  },
-  {
-    id: "analytics",
-    label: "Analytics",
-    description: "Driving, stops, revenue, efficiency",
-    premium: true,
-    icon: "chart",
-  },
-  {
-    id: "rush",
-    label: "Rush Intelligence",
-    description: "Breakfast through overnight windows",
-    premium: true,
-    icon: "zap",
-  },
-  {
-    id: "platforms",
-    label: "Platform Statistics",
-    description: "DoorDash, Uber, Lyft, and more",
-    premium: true,
-    icon: "layers",
-  },
-  {
-    id: "heatmaps",
-    label: "Heat Maps",
-    description: "Revenue, tips, ZIP performance",
-    premium: true,
-    icon: "map",
-  },
-  {
-    id: "vehicle",
-    label: "Vehicle",
-    description: "Economics, MPG, true cost",
-    premium: true,
-    icon: "car",
-  },
-  {
-    id: "expenses",
-    label: "Expenses",
-    description: "Fuel, parking, tolls, logbook",
-    premium: true,
-    icon: "wallet",
-  },
-  {
-    id: "tax",
-    label: "Tax Center",
-    description: "Mileage sync & deduction estimates",
-    premium: false,
-    icon: "file",
-  },
-  {
-    id: "reports",
-    label: "Reports",
-    description: "Excel / exportable trip reports",
-    premium: true,
-    icon: "sheet",
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    description: "Prefs, GPS, privacy, equipment",
-    premium: false,
-    icon: "settings",
-  },
-  {
-    id: "ai",
-    label: "AI Insights",
-    description: "Titan AI performance observations",
-    premium: true,
-    icon: "sparkles",
-  },
-  {
-    id: "performance",
-    label: "Performance",
-    description: "Daily score & trends",
-    premium: true,
-    icon: "trophy",
-  },
-  {
-    id: "goals",
-    label: "Goals",
-    description: "Earnings & hour targets",
-    premium: true,
-    icon: "target",
-  },
-  {
-    id: "maintenance",
-    label: "Maintenance",
-    description: "Reminders & vehicle care",
-    premium: true,
-    icon: "wrench",
-  },
-  {
-    id: "directory",
-    label: "Find Drivers",
-    description: "Publish or hire nearby",
-    premium: false,
-    icon: "users",
+    group: "live",
   },
   {
     id: "doordash",
@@ -129,11 +27,144 @@ export const DRIVER_OS_FOLDERS = Object.freeze([
     description: "Guided delivery stages",
     premium: true,
     icon: "package",
+    group: "live",
+  },
+  {
+    id: "todays-orders",
+    label: "Today's Orders",
+    description: "Deliveries completed today",
+    premium: false,
+    icon: "package",
+    group: "history",
+  },
+  {
+    id: "trip-history",
+    label: "Trip History",
+    description: "Year → month → day archives",
+    premium: false,
+    icon: "history",
+    group: "history",
+  },
+  {
+    id: "expenses",
+    label: "Expenses",
+    description: "Fuel, parking, tolls, logbook",
+    premium: true,
+    icon: "wallet",
+    group: "history",
+  },
+  {
+    id: "analytics",
+    label: "Analytics",
+    description: "Driving, stops, revenue, efficiency",
+    premium: true,
+    icon: "chart",
+    group: "analytics",
+  },
+  {
+    id: "rush",
+    label: "Rush Intelligence",
+    description: "Breakfast through overnight windows",
+    premium: true,
+    icon: "zap",
+    group: "analytics",
+  },
+  {
+    id: "platforms",
+    label: "Platform Statistics",
+    description: "DoorDash, Uber, Lyft, and more",
+    premium: true,
+    icon: "layers",
+    group: "analytics",
+  },
+  {
+    id: "heatmaps",
+    label: "Heat Maps",
+    description: "Revenue, tips, ZIP performance",
+    premium: true,
+    icon: "map",
+    group: "analytics",
+  },
+  {
+    id: "performance",
+    label: "Performance",
+    description: "Daily score & trends",
+    premium: true,
+    icon: "trophy",
+    group: "analytics",
+  },
+  {
+    id: "ai",
+    label: "AI Insights",
+    description: "Titan AI performance observations",
+    premium: true,
+    icon: "sparkles",
+    group: "analytics",
+  },
+  {
+    id: "goals",
+    label: "Goals",
+    description: "Earnings & hour targets",
+    premium: true,
+    icon: "target",
+    group: "analytics",
+  },
+  {
+    id: "vehicle",
+    label: "Vehicle",
+    description: "Economics, MPG, true cost",
+    premium: true,
+    icon: "car",
+    group: "analytics",
+  },
+  {
+    id: "tax",
+    label: "Tax Center",
+    description: "Mileage sync & deduction estimates",
+    premium: false,
+    icon: "file",
+    group: "reports",
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    description: "Excel / exportable trip reports",
+    premium: true,
+    icon: "sheet",
+    group: "reports",
+  },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    description: "Reminders & vehicle care",
+    premium: true,
+    icon: "wrench",
+    group: "settings",
+  },
+  {
+    id: "directory",
+    label: "Find Drivers",
+    description: "Publish or hire nearby",
+    premium: false,
+    icon: "users",
+    group: "settings",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    description: "Prefs, GPS, privacy, equipment",
+    premium: false,
+    icon: "settings",
+    group: "settings",
   },
 ]);
 
 export function folderById(id) {
   return DRIVER_OS_FOLDERS.find((f) => f.id === id) || null;
+}
+
+export function foldersByGroup(groupId) {
+  return DRIVER_OS_FOLDERS.filter((f) => f.group === groupId);
 }
 
 /** Modular platform registry for Platform Statistics folders. */

@@ -2,18 +2,8 @@ import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions, resolveAppOrigin, allowedOrigins } from "../_lib/cors.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
+import { requirePortalSession } from "../_lib/requirePortalSession.js";
 import { logError } from "../_lib/safeLog.js";
-
-async function requirePortalSession(admin, token) {
-  if (!token || typeof token !== "string") return { error: "Missing session token", status: 400 };
-  const { data: sessions } = await admin.from("portal_sessions").select("*").eq("token", token).limit(1);
-  const session = sessions?.[0];
-  if (!session?.verified) return { error: "Invalid or expired session", status: 401 };
-  if (!session.token_expires_at || new Date(session.token_expires_at) < new Date()) {
-    return { error: "Session expired. Please sign in again.", status: 401 };
-  }
-  return { session };
-}
 
 export default async function handler(req, res) {
   applyCors(res, req);

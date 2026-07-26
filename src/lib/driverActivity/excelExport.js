@@ -1,80 +1,12 @@
 /**
- * Excel workbook export (SpreadsheetML) — opens in Microsoft Excel, LibreOffice, Numbers.
- * Zero heavy deps; multi-sheet workbooks for trip timers + logbook.
+ * Driver Excel reports — domain sheets built on the shared SpreadsheetML exporter.
+ * Do not re-implement XML builders here; extend `@/lib/export/excel` instead.
  */
-
+import { buildSpreadsheetMl, downloadExcelFile } from "@/lib/export/excel";
 import { withAllTimers, summarizeDayTrips } from "./tripJournal.js";
 import { IRS_MILEAGE_RATE_USD } from "../driverHubMath.js";
 
-function xmlEscape(v) {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function cellXml(value, typeHint) {
-  if (value == null || value === "") {
-    return `<Cell><Data ss:Type="String"></Data></Cell>`;
-  }
-  if (typeHint === "Number" || (typeof value === "number" && Number.isFinite(value))) {
-    return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`;
-  }
-  const s = String(value);
-  if (typeHint !== "String" && /^-?\d+(\.\d+)?$/.test(s.trim())) {
-    return `<Cell><Data ss:Type="Number">${s.trim()}</Data></Cell>`;
-  }
-  return `<Cell><Data ss:Type="String">${xmlEscape(s)}</Data></Cell>`;
-}
-
-function rowXml(values, types = []) {
-  return `<Row>${values.map((v, i) => cellXml(v, types[i])).join("")}</Row>`;
-}
-
-function worksheetXml(sheet) {
-  const name = xmlEscape(sheet.name || "Sheet1").slice(0, 31);
-  const rows = (sheet.rows || []).map((r, ri) => rowXml(r, sheet.types?.[ri] || [])).join("");
-  return `<Worksheet ss:Name="${name}"><Table>${rows}</Table></Worksheet>`;
-}
-
-/**
- * Build a SpreadsheetML workbook string Excel opens as a real multi-sheet file.
- */
-export function buildSpreadsheetMl(sheets = []) {
-  const body = (sheets || []).map(worksheetXml).join("");
-  return (
-    `<?xml version="1.0"?>\r\n` +
-    `<?mso-application progid="Excel.Sheet"?>\r\n` +
-    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\r\n` +
-    ` xmlns:o="urn:schemas-microsoft-com:office:office"\r\n` +
-    ` xmlns:x="urn:schemas-microsoft-com:office:excel"\r\n` +
-    ` xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\r\n` +
-    ` xmlns:html="http://www.w3.org/TR/REC-html40">\r\n` +
-    `<DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">` +
-    `<Title>TitanOS Driver Report</Title>` +
-    `<Author>TitanOS</Author>` +
-    `</DocumentProperties>\r\n` +
-    body +
-    `</Workbook>`
-  );
-}
-
-export function downloadExcelFile(filename, sheets) {
-  if (typeof document === "undefined") return false;
-  const xml = typeof sheets === "string" ? sheets : buildSpreadsheetMl(sheets);
-  const blob = new Blob([xml], {
-    type: "application/vnd.ms-excel;charset=utf-8",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const base = String(filename || "titanos-report");
-  a.download = /\.xls$/i.test(base) ? base : `${base.replace(/\.xlsx$/i, "")}.xls`;
-  a.click();
-  URL.revokeObjectURL(url);
-  return true;
-}
+export { buildSpreadsheetMl, downloadExcelFile };
 
 const TRIP_HEADERS = [
   "date",
@@ -241,7 +173,7 @@ export function buildDailyTripReportExcel(trips = [], { date = "", liveRow = nul
   return {
     filename: `titanos-daily-trips-${date || "report"}.xls`,
     sheets,
-    xml: buildSpreadsheetMl(sheets),
+    xml: buildSpreadsheetMl(sheets, { title: "TitanOS Driver Report" }),
   };
 }
 
@@ -285,6 +217,6 @@ export function buildLogbookExcel(enrichedTrips = []) {
   return {
     filename: `titanos-mileage-logbook-${stamp}.xls`,
     sheets,
-    xml: buildSpreadsheetMl(sheets),
+    xml: buildSpreadsheetMl(sheets, { title: "TitanOS Mileage Logbook" }),
   };
 }

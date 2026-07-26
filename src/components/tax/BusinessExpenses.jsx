@@ -1,26 +1,26 @@
 import React, { useMemo, useRef, useState } from "react";
 import { api } from "@/api/apiClient";
-import { Camera, Download, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Camera, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import FormField from "@/components/shared/FormField";
 import NativeSelect from "@/components/shared/NativeSelect";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { useEntityData } from "@/hooks/useEntityData";
 import { EXPENSE_CATEGORIES } from "@/lib/platformConstants";
 import { formatMonthDayYear, todayISO } from "@/lib/date-utils";
 import { toast } from "@/components/ui/use-toast";
+import { expensesExportSpec } from "@/lib/export/moduleSpecs";
 
 const blankExpense = () => ({
   category: "other", amount: "", date: todayISO(), description: "", notes: "", vendor: "",
   receipt_url: "", is_tax_deductible: true, business_use_percent: 100,
 });
 
-const csvValue = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-
 export default function BusinessExpenses({ taxYear, onChanged }) {
   const { data: [expenses], loading, reload } = useEntityData([
-    { entity: "Expense", method: "list", args: ["-date", 500] },
+    { entity: "Expense", method: "list", args: ["-date", 100] },
   ]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blankExpense);
@@ -125,26 +125,21 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
     }
   };
 
-  const exportCsv = () => {
-    const columns = ["date", "category", "description", "vendor", "amount", "business_use_percent", "is_tax_deductible", "notes"];
-    const contents = [columns.join(","), ...yearExpenses.map(expense => columns.map(column => csvValue(expense[column])).join(","))].join("\n");
-    const url = URL.createObjectURL(new Blob([contents], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `titanos-business-expenses-${taxYear}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <section className="glass rounded-2xl p-5 md:p-6 mb-6">
+    <section className="titan-surface p-5 md:p-6 mb-6">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Business Expenses</h2>
           <p className="text-xs text-muted-foreground mt-1">Track Schedule C expenses and receipt records for {taxYear}.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportCsv} disabled={!yearExpenses.length} className="border-border text-foreground/90 rounded-xl"><Download className="w-4 h-4 mr-1" /> CSV</Button>
+          <ExportMenu
+            spec={{
+              ...expensesExportSpec(yearExpenses),
+              filename: `titanos-business-expenses-${taxYear}`,
+              title: `Business Expenses ${taxYear}`,
+            }}
+          />
           <Button onClick={() => setShowForm(true)} className="bg-titan-cyan hover:bg-titan-cyan/90 text-black rounded-xl"><Plus className="w-4 h-4 mr-1" /> Add expense</Button>
         </div>
       </div>
@@ -167,7 +162,7 @@ export default function BusinessExpenses({ taxYear, onChanged }) {
       ) : <p className="text-sm text-muted-foreground py-4">No business expenses recorded for {taxYear}.</p>}
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); else setShowForm(true); }}>
-        <DialogContent className="bg-card border-border text-foreground max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg  max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? "Edit" : "Add"} business expense</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormField label="Description" value={form.description} onChange={event => f("description", event.target.value)} placeholder="e.g. Fuel fill-up" />

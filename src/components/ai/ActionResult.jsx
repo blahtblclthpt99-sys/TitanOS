@@ -9,7 +9,7 @@ export default function ActionResult({ message, isError = false }) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`glass rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%] border ${
+      className={`titan-surface rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%] border ${
         isError ? "border-red-400/20 bg-red-400/5" : "border-emerald-400/20 bg-emerald-400/5"
       }`}
       role={isError ? "alert" : "status"}

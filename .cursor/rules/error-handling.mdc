@@ -1,0 +1,32 @@
+---
+description: TitanOS error handling — log, categorize, recover, never leak
+alwaysApply: true
+---
+
+# Error Handling
+
+Nothing fails silently.
+
+## Every exception must
+
+1. **Be logged** — `logError` / `reportError` with a stable scope (`category:route`)
+2. **Be categorized** — payments, portal, webhooks, ai, referrals, ocr, email, admin, ui
+3. **Be recoverable when possible** — retry UI, keep prior state, local demo only when tagged `_source: local`
+4. **Provide useful feedback** — toast / ErrorState / public API `error` + `code`
+5. **Never expose internals** — no Stripe/PostgREST/stack traces in client JSON or toasts
+
+## Server
+
+- Prefer `sendApiError` / `sendDbClientError` / `AppError` from `api/_lib/apiError.js`
+- Pair unexpected failures with Sentry (`captureApiException` via `sendApiError`)
+- Money writes fail closed — never invent a successful payment/escrow settlement
+
+## Client
+
+- Use `reportError` + toast / ErrorState for user-visible failures
+- Optimistic UI must roll back on failure
+- Empty `catch {}` only for truly non-fatal probes (WakeLock, storage quota, telemetry)
+
+## Definition of done
+
+Incomplete if a catch swallows without log+category, returns `error.message` from infrastructure, or pretends a remote money write succeeded.

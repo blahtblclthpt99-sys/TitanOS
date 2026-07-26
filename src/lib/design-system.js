@@ -1,9 +1,11 @@
 /**
  * TitanOS Design System — single source of truth for tokens & control recipes.
  * Prefer these names in new UI; map legacy titan-cyan → primary.
+ * Deprecated: `glass` / `glass-hover` — use SURFACE / SURFACE_INTERACTIVE.
  *
  * Typography: text-display | text-title | text-heading | text-body | text-caption
  * Surfaces:   titan-surface | titan-surface-interactive | Card
+ * Elevation:  shadow-soft | shadow-lift
  * Focus:      focus-ring
  * Motion:     duration-fast | duration-base | duration-slow + ease-out
  */
@@ -45,7 +47,8 @@ export const ICON_SIZE = {
   xl: "h-8 w-8", // 32
 };
 
-/** Control heights — keep inputs, selects, and buttons aligned */
+/** Control heights — keep inputs, selects, and buttons aligned.
+ *  Prefer `md` (≥44px) for interactive controls. `sm` is dense-only (desktop tables). */
 export const CONTROL = {
   sm: "h-9 min-h-[36px]",
   md: "h-11 min-h-[44px]",
@@ -58,9 +61,12 @@ export const FIELD_CLASS =
   "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
   "focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50";
 
-/** Surface / card */
+/** Surface / card — prefer over legacy `glass` */
 export const SURFACE = "titan-surface";
 export const SURFACE_INTERACTIVE = "titan-surface titan-surface-interactive";
+
+/** Card body padding — match CardHeader / CardContent */
+export const CARD_PAD = "p-4 md:p-5";
 
 export const RADIUS = {
   sm: "rounded-sm",
@@ -68,6 +74,17 @@ export const RADIUS = {
   lg: "rounded-lg",
   xl: "rounded-xl",
   full: "rounded-full",
+};
+
+export const ELEVATION = {
+  soft: "shadow-soft",
+  lift: "shadow-lift",
+};
+
+export const MOTION = {
+  fast: "duration-fast",
+  base: "duration-base",
+  slow: "duration-slow",
 };
 
 export const TYPE = {
@@ -79,5 +96,9 @@ export const TYPE = {
   eyebrow: "text-caption font-bold uppercase tracking-wider text-primary",
 };
 
+/** Overlay content chrome (menus / popovers) — match Dialog elevation */
+export const OVERLAY_CONTENT =
+  "rounded-md border border-border bg-popover text-popover-foreground shadow-lift duration-fast";
+
 /** Design system version — bump when breaking token changes ship */
-export const DS_VERSION = "3.0.0";
+export const DS_VERSION = "3.1.0";

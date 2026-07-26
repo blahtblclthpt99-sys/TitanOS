@@ -38,8 +38,20 @@ async function writeHistory(admin, feeRuleId, action, snapshot, actorId) {
     fee_rule_id: feeRuleId,
     action,
     snapshot,
-    actor_id: actorId,
+    actor_id: actorId || null,
   });
+  try {
+    const { writeAuditEvent } = await import("../_lib/auditLog.js");
+    await writeAuditEvent(admin, {
+      actorId,
+      action: `fee_rule.${action}`,
+      entityType: "fee_rule",
+      entityId: feeRuleId,
+      metadata: { version: snapshot?.version },
+    });
+  } catch {
+    /* audit table may not exist yet */
+  }
 }
 
 /**
@@ -88,7 +100,7 @@ export default async function handler(req, res) {
         .upsert(payload)
         .select("*")
         .single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       clearFeeConfigCache();
       return res.status(200).json({ category: data });
     }
@@ -134,7 +146,7 @@ export default async function handler(req, res) {
       };
 
       const { data, error } = await auth.admin.from("fee_rules").insert(row).select("*").single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       await writeHistory(auth.admin, data.id, "create", data, auth.user.id);
       clearFeeConfigCache();
       return res.status(200).json({ rule: data });
@@ -149,7 +161,7 @@ export default async function handler(req, res) {
         .eq("id", id)
         .select("*")
         .single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       await writeHistory(auth.admin, data.id, "disable", data, auth.user.id);
       clearFeeConfigCache();
       return res.status(200).json({ rule: data });
@@ -190,7 +202,7 @@ export default async function handler(req, res) {
         created_by_id: auth.user.id,
       };
       const { data, error } = await auth.admin.from("fee_rules").insert(row).select("*").single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       await writeHistory(auth.admin, data.id, "schedule", data, auth.user.id);
       clearFeeConfigCache();
       return res.status(200).json({ rule: data });
@@ -205,7 +217,7 @@ export default async function handler(req, res) {
         .limit(100);
       if (feeRuleId) query = query.eq("fee_rule_id", feeRuleId);
       const { data, error } = await query;
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       return res.status(200).json({ history: data || [] });
     }
 
@@ -254,7 +266,7 @@ export default async function handler(req, res) {
         created_by_id: auth.user.id,
       };
       const { data, error } = await auth.admin.from("fee_rules").insert(row).select("*").single();
-      if (error) return res.status(400).json({ error: error.message });
+      if (error) { const { sendDbClientError } = await import("../_lib/apiError.js"); return sendDbClientError(res, error, { route: "adminFees", category: "admin", publicMessage: "Fee update failed" }); }
       await writeHistory(auth.admin, data.id, "rollback", { ...data, from_history: historyId }, auth.user.id);
       clearFeeConfigCache();
       return res.status(200).json({ rule: data });
@@ -262,9 +274,6 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (error) {
-    const { logError } = await import("../_lib/safeLog.js");
-    logError("adminFees", error);
-    captureApiException(error, { tags: { route: "adminFees" } });
-    return res.status(500).json({ error: "Admin fees failed" });
+    const { sendApiError } = await import("../_lib/apiError.js"); return sendApiError(res, error, { route: "adminFees", category: "admin", publicMessage: "Admin fees failed", publicCode: "ADMIN_FEES_FAILED" });
   }
 }

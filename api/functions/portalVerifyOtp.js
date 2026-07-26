@@ -3,6 +3,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { portalOtpMatches } from "../_lib/portalOtp.js";
+import { hashPortalToken } from "../_lib/portalToken.js";
 import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
@@ -63,21 +64,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Account not found" });
     }
 
-    const token = crypto.randomUUID() + crypto.randomUUID();
+    const rawToken = crypto.randomUUID() + crypto.randomUUID();
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     await admin
       .from("portal_sessions")
       .update({
         verified: true,
-        token,
+        token: hashPortalToken(rawToken),
         token_expires_at: tokenExpiresAt,
         otp_code: null,
       })
       .eq("id", session.id);
 
     return res.status(200).json({
-      token,
+      token: rawToken,
       customer: {
         id: customer.id,
         first_name: customer.first_name,

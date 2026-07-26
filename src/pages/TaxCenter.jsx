@@ -6,6 +6,7 @@ import {
   Home, Phone, Utensils, Briefcase, Shield, ScanLine
 } from "lucide-react";
 import NativeSelect from "@/components/shared/NativeSelect";
+import ExportMenu from "@/components/shared/ExportMenu";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import { useEntityData } from "@/hooks/useEntityData";
@@ -13,6 +14,7 @@ import MileTracker from "@/components/tax/MileTracker";
 import BusinessExpenses from "@/components/tax/BusinessExpenses";
 import { getDateMonth, getDateYear } from "@/lib/date-utils";
 import { IRS_MILEAGE_RATE_USD } from "@/lib/driverHubMath";
+import { taxCenterExportSpec } from "@/lib/export";
 
 const MILEAGE_RATE = IRS_MILEAGE_RATE_USD;
 
@@ -74,8 +76,8 @@ export default function TaxCenter({ isActive = true }) {
   }, []);
 
   const { data: [invoices, expenses], loading, error, reload } = useEntityData([
-    { entity: "Invoice", method: "list", args: ["-created_date", 500] },
-    { entity: "Expense", method: "list", args: ["-date", 500] },
+    { entity: "Invoice", method: "list", args: ["-created_date", 100] },
+    { entity: "Expense", method: "list", args: ["-date", 100] },
   ], { enabled: isActive });
 
   const yr = parseInt(taxYear, 10);
@@ -140,30 +142,42 @@ export default function TaxCenter({ isActive = true }) {
 
   const years = [currentYear, currentYear - 1, currentYear - 2].map(String);
 
+  const paidYearInvoices = useMemo(
+    () => invoices.filter((inv) => inv.status === "paid" && getDateYear(inv.created_date) === yr),
+    [invoices, yr]
+  );
+  const taxExportSpec = useMemo(
+    () => taxCenterExportSpec(paidYearInvoices, yearExpenses),
+    [paidYearInvoices, yearExpenses]
+  );
+
   if (!isActive && !invoices.length) return null;
   if (loading && !invoices.length) return <PageLoader variant="list" label="Loading tax center" />;
   if (error) return <ErrorState title="Couldn't load tax data" onRetry={reload} />;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">1099 Tax Center</h1>
           <p className="text-sm text-muted-foreground mt-1">Self-employment tax prep &amp; write-offs</p>
         </div>
-        <NativeSelect
-          value={taxYear}
-          onValueChange={setTaxYear}
-          placeholder="Year"
-          options={years.map(y => ({ value: y, label: y }))}
-          className="w-28 bg-card border-border"
-        />
+        <div className="flex items-center gap-2">
+          <ExportMenu spec={taxExportSpec} size="sm" />
+          <NativeSelect
+            value={taxYear}
+            onValueChange={setTaxYear}
+            placeholder="Year"
+            options={years.map(y => ({ value: y, label: y }))}
+            className="w-28 bg-card border-border"
+          />
+        </div>
       </div>
 
       <button
         type="button"
         onClick={() => navigate("/receipts")}
-        className="mt-4 w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover titan-surface-interactive"
+        className="mt-4 w-full titan-surface titan-surface-interactive p-4 flex items-center gap-3 text-left"
       >
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <ScanLine className="w-5 h-5 text-primary" />
@@ -183,7 +197,7 @@ export default function TaxCenter({ isActive = true }) {
           { label: "Est. Tax Owed",    value: totalTaxEstimate, color: "text-red-400",     bg: "bg-red-400/10",      icon: Calculator },
         ].map((card, i) => (
           <motion.div key={card.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            className="glass rounded-2xl p-5">
+            className="titan-surface p-5">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.bg}`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </div>
@@ -198,7 +212,7 @@ export default function TaxCenter({ isActive = true }) {
       <div className="grid md:grid-cols-2 gap-6 mb-6">
 
         {/* ── Tax Breakdown ── */}
-        <div className="glass rounded-2xl p-6">
+        <div className="titan-surface p-6">
           <h3 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
             <Calculator className="w-4 h-4 text-primary" /> Tax Breakdown
           </h3>
@@ -225,7 +239,7 @@ export default function TaxCenter({ isActive = true }) {
         </div>
 
         {/* ── Deductions by Category ── */}
-        <div className="glass rounded-2xl p-6">
+        <div className="titan-surface p-6">
           <h3 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
             <TrendingDown className="w-4 h-4 text-primary" /> Write-offs by Category
           </h3>
@@ -283,7 +297,7 @@ export default function TaxCenter({ isActive = true }) {
       </div>
 
       {/* ── Quarterly Estimated Taxes ── */}
-      <div className="glass rounded-2xl p-6 mb-6">
+      <div className="titan-surface p-6 mb-6">
         <h3 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" /> Quarterly Estimated Tax Schedule
         </h3>
@@ -312,7 +326,7 @@ export default function TaxCenter({ isActive = true }) {
       <MileTracker taxYear={yr} onTotalsChange={handleTripTotals} />
 
       {/* ── Tax Advantages ── */}
-      <div className="glass rounded-2xl p-6 mt-6">
+      <div className="titan-surface p-6 mt-6">
         <h3 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
           <Lightbulb className="w-4 h-4 text-titan-amber" /> 1099 Tax Advantages
         </h3>

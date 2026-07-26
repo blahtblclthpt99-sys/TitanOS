@@ -8,10 +8,13 @@ import {
   readStops,
 } from "@/lib/driverHubApi";
 
+const PERSIST_MIN_MS = 3000;
+const PERSIST_MIN_MILES = 0.05;
+
 /**
  * Foreground GPS tracker bound to an active Driver Hub work session.
  * Seeds counters from persisted session so refresh does not reset timers.
- * Flushes snapshot on pagehide / visibility hidden.
+ * Throttles localStorage writes; suspends GNSS hardware while the tab is hidden.
  */
 export function useDriverActivityTracker({
   userId,
@@ -24,6 +27,7 @@ export function useDriverActivityTracker({
 }) {
   const trackerRef = useRef(null);
   const onUpdateRef = useRef(onUpdate);
+  const lastPersistRef = useRef({ at: 0, miles: 0 });
   onUpdateRef.current = onUpdate;
 
   useEffect(() => {
@@ -36,18 +40,34 @@ export function useDriverActivityTracker({
     const session = readSession(userId);
     const stops = readStops(userId);
     const openStop = [...stops].reverse().find((s) => s && !s.ended_at) || null;
+    lastPersistRef.current = {
+      at: 0,
+      miles: Number(session?.auto_miles ?? session?.miles ?? 0),
+    };
+
+    const persistTelemetry = (patch, { force = false } = {}) => {
+      const now = Date.now();
+      const miles = Number(patch.auto_miles ?? lastPersistRef.current.miles) || 0;
+      const elapsed = now - lastPersistRef.current.at;
+      const deltaMi = Math.abs(miles - lastPersistRef.current.miles);
+      if (!force && elapsed < PERSIST_MIN_MS && deltaMi < PERSIST_MIN_MILES) {
+        return null;
+      }
+      lastPersistRef.current = { at: now, miles };
+      return patchSessionTelemetry(userId, patch);
+    };
 
     const tracker = createBrowserTracker(
       {
         onMiles(miles) {
-          const next = patchSessionTelemetry(userId, {
+          const next = persistTelemetry({
             auto_miles: miles,
             miles_source: "gps",
           });
-          onUpdateRef.current?.(next, readStops(userId));
+          if (next) onUpdateRef.current?.(next, readStops(userId));
         },
         onTelemetry(t) {
-          const next = patchSessionTelemetry(userId, {
+          const next = persistTelemetry({
             auto_miles: t.miles,
             drive_sec: t.driveSec,
             idle_sec: t.idleSec,
@@ -56,14 +76,13 @@ export function useDriverActivityTracker({
             lat: t.lat,
             lng: t.lng,
           });
-          onUpdateRef.current?.(next, readStops(userId));
+          if (next) onUpdateRef.current?.(next, readStops(userId));
         },
         onStopStart(ev) {
-          // Avoid duplicate open stops after refresh while still parked
           const existing = readStops(userId);
           const alreadyOpen = existing.some((s) => !s.ended_at);
           if (alreadyOpen) {
-            const next = patchSessionTelemetry(userId, { stop_phase: "stopped" });
+            const next = persistTelemetry({ stop_phase: "stopped" }, { force: true });
             onUpdateRef.current?.(next, readStops(userId));
             return;
           }
@@ -75,16 +94,16 @@ export function useDriverActivityTracker({
             auto: true,
             label: "Detected stop",
           });
-          const next = patchSessionTelemetry(userId, { stop_phase: "stopped" });
+          const next = persistTelemetry({ stop_phase: "stopped" }, { force: true });
           onUpdateRef.current?.(next, readStops(userId));
         },
         onStopEnd(ev) {
           endStop(userId, ev.id);
-          const next = patchSessionTelemetry(userId, { stop_phase: "moving" });
+          const next = persistTelemetry({ stop_phase: "moving" }, { force: true });
           onUpdateRef.current?.(next, readStops(userId));
         },
         onPotentialStop() {
-          const next = patchSessionTelemetry(userId, { stop_phase: "potential" });
+          const next = persistTelemetry({ stop_phase: "potential" }, { force: true });
           onUpdateRef.current?.(next, readStops(userId));
         },
         onError(err) {
@@ -112,19 +131,29 @@ export function useDriverActivityTracker({
     const flush = () => {
       const snap = tracker.getSnapshot?.();
       if (!snap) return;
-      const next = patchSessionTelemetry(userId, {
-        auto_miles: snap.miles,
-        drive_sec: snap.driveSec,
-        idle_sec: snap.idleSec,
-        max_speed_mph: snap.maxSpeedMph,
-        avg_speed_mph: snap.avgSpeedMph,
-        stop_phase: snap.stopPhase,
-      });
-      onUpdateRef.current?.(next, readStops(userId));
+      const next = persistTelemetry(
+        {
+          auto_miles: snap.miles,
+          drive_sec: snap.driveSec,
+          idle_sec: snap.idleSec,
+          max_speed_mph: snap.maxSpeedMph,
+          avg_speed_mph: snap.avgSpeedMph,
+          stop_phase: snap.stopPhase,
+        },
+        { force: true }
+      );
+      if (next) onUpdateRef.current?.(next, readStops(userId));
     };
 
     const onHide = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") flush();
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "hidden") {
+        flush();
+        tracker.suspendHardware?.();
+      } else {
+        tracker.resumeHardware?.();
+        if (paused) tracker.pause();
+      }
     };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", onHide);

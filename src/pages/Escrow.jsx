@@ -10,6 +10,7 @@ import EmptyState from "@/components/shared/EmptyState";
 import FormField from "@/components/shared/FormField";
 import DeleteButton from "@/components/shared/DeleteButton";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
+import SyncStatus from "@/components/shared/SyncStatus";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { getSource, DATA_SOURCE } from "@/lib/dataSource";
 import {
@@ -19,7 +20,7 @@ import {
   listEscrowHolds,
   updateEscrowHold,
 } from "@/lib/escrowApi";
-import { toast } from "@/components/ui/use-toast";
+import { toastDone, toastFail, toastInfo } from "@/lib/interaction";
 
 export default function Escrow() {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ export default function Escrow() {
   );
   const [form, setForm] = useState({ customer_name: "", job_title: "", amount: "" });
   const [saving, setSaving] = useState(false);
+  const [rowBusy, setRowBusy] = useState(null); // `${id}:action`
   const deviceOnly = getSource(rows) === DATA_SOURCE.local;
 
   const add = async (e) => {
@@ -41,37 +43,44 @@ export default function Escrow() {
       setRows((current) => [row, ...current]);
       setForm({ customer_name: "", job_title: "", amount: "" });
       if (getSource(row) === DATA_SOURCE.local) {
-        toast({
-          title: "Hold saved on this device only",
-          description: "Demo status tracking — no funds are held.",
-        });
+        toastInfo("Hold saved on this device only", "Demo status tracking — no funds are held.");
       } else {
-        toast({ title: "Hold record created" });
+        toastDone("Hold record created");
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't create hold", description: error?.message || "Please try again." });
+      toastFail("Couldn't create hold", error?.message || "Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const confirm = async (row, side) => {
+    const key = `${row.id}:confirm:${side}`;
+    if (rowBusy) return;
+    setRowBusy(key);
     try {
       const saved = await confirmEscrowSide(user.id, row, side);
       setRows((current) => current.map((r) => (r.id === row.id ? saved : r)));
-      toast({ title: side === "customer" ? "Customer confirmed" : "Confirmed done" });
+      toastDone(side === "customer" ? "Customer confirmed" : "Confirmed done");
     } catch {
-      toast({ variant: "destructive", title: "Couldn't confirm" });
+      toastFail("Couldn't confirm");
+    } finally {
+      setRowBusy(null);
     }
   };
 
   const refund = async (row) => {
+    const key = `${row.id}:refund`;
+    if (rowBusy) return;
+    setRowBusy(key);
     try {
       const saved = await updateEscrowHold(user.id, row.id, { status: "refunded" });
       setRows((current) => current.map((r) => (r.id === row.id ? saved : r)));
-      toast({ title: "Marked refunded" });
+      toastDone("Marked refunded");
     } catch {
-      toast({ variant: "destructive", title: "Couldn't update hold" });
+      toastFail("Couldn't update hold");
+    } finally {
+      setRowBusy(null);
     }
   };
 
@@ -92,8 +101,8 @@ export default function Escrow() {
       <FeatureHonestyBanner>
         Practice hold records only. Confirms do not charge cards or release money. Real escrow needs Stripe
         Connect (or similar) before this can go live.
-        {deviceOnly ? " Holds below are stored on this device until Escrow sync is live." : ""}
       </FeatureHonestyBanner>
+      {deviceOnly ? <SyncStatus source={DATA_SOURCE.local} className="mb-4" /> : null}
       <form onSubmit={add} className="titan-surface p-5 mb-5 space-y-3">
         <div className="flex items-center gap-2 text-primary font-semibold text-sm">
           <ShieldCheck className="w-5 h-5" aria-hidden="true" /> New job hold
@@ -141,13 +150,16 @@ export default function Escrow() {
                 </div>
                 <DeleteButton
                   label={`hold for ${row.customer_name}`}
+                  disabled={Boolean(rowBusy)}
+                  successTitle="Hold deleted"
                   onDelete={async () => {
+                    if (rowBusy) return;
+                    setRowBusy(`${row.id}:delete`);
                     try {
                       await deleteEscrowHold(user.id, row.id);
                       setRows((prev) => prev.filter((r) => r.id !== row.id));
-                      toast({ title: "Hold deleted" });
-                    } catch {
-                      toast({ variant: "destructive", title: "Couldn't delete hold" });
+                    } finally {
+                      setRowBusy(null);
                     }
                   }}
                 />
@@ -163,14 +175,29 @@ export default function Escrow() {
             </div>
             {row.status === "held" && (
               <div className="flex flex-wrap gap-2 mt-3">
-                <Button size="sm" variant="outline" onClick={() => confirm(row, "customer")}>
-                  Customer confirms
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={Boolean(rowBusy)}
+                  onClick={() => confirm(row, "customer")}
+                >
+                  {rowBusy === `${row.id}:confirm:customer` ? "Saving…" : "Customer confirms"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => confirm(row, "provider")}>
-                  I confirm done
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={Boolean(rowBusy)}
+                  onClick={() => confirm(row, "provider")}
+                >
+                  {rowBusy === `${row.id}:confirm:provider` ? "Saving…" : "I confirm done"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => refund(row)}>
-                  Mark refunded
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={Boolean(rowBusy)}
+                  onClick={() => refund(row)}
+                >
+                  {rowBusy === `${row.id}:refund` ? "Saving…" : "Mark refunded"}
                 </Button>
               </div>
             )}

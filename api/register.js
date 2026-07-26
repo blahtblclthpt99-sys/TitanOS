@@ -8,8 +8,9 @@ import { captureApiException } from "./_lib/sentry.js";
 
 /**
  * Server-side registration.
- * Set REGISTER_REQUIRE_EMAIL_CONFIRM=true to create unconfirmed users (no session until email verified).
- * Default (unset/false): auto-confirm for closed beta — still rate-limited.
+ * Production (VERCEL_ENV=production) requires email confirm unless
+ * REGISTER_REQUIRE_EMAIL_CONFIRM is explicitly set to "false".
+ * Non-production defaults to auto-confirm for closed beta — still rate-limited.
  */
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -28,8 +29,11 @@ export default async function handler(req, res) {
       .toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
+    const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
     const requireConfirm =
-      String(process.env.REGISTER_REQUIRE_EMAIL_CONFIRM || "").toLowerCase() === "true";
+      flag != null && String(flag).trim() !== ""
+        ? String(flag).toLowerCase() === "true"
+        : String(process.env.VERCEL_ENV || "").toLowerCase() === "production";
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: "Valid email is required" });
@@ -50,9 +54,24 @@ export default async function handler(req, res) {
     });
 
     if (createError) {
-      const msg = createError.message || "Registration failed";
-      const status = /already|registered|exists/i.test(msg) ? 409 : 400;
-      return res.status(status).json({ error: msg });
+      const msg = String(createError.message || "");
+      if (/already|registered|exists/i.test(msg)) {
+        return res.status(409).json({
+          error: "An account with this email already exists",
+          code: "EMAIL_TAKEN",
+        });
+      }
+      if (/password|weak|least/i.test(msg)) {
+        return res.status(400).json({
+          error: "Password does not meet requirements",
+          code: "WEAK_PASSWORD",
+        });
+      }
+      logError("api/register:createUser", createError);
+      return res.status(400).json({
+        error: "Could not create account. Check your email and password.",
+        code: "REGISTER_FAILED",
+      });
     }
 
     await recordSignupEmail(admin, { email, fullName, source: "register" });
@@ -83,8 +102,10 @@ export default async function handler(req, res) {
       password,
     });
     if (signInError || !signedIn.session) {
+      logError("api/register:signIn", signInError);
       return res.status(500).json({
-        error: signInError?.message || "Account created but sign-in failed. Try logging in.",
+        error: "Account created but sign-in failed. Try logging in.",
+        code: "SIGN_IN_AFTER_REGISTER_FAILED",
         userId: created.user?.id,
       });
     }

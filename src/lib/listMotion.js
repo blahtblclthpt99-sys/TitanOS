@@ -16,5 +16,12 @@ export function listItemMotion(reduceMotion, index = 0) {
 
 export function hoverLiftMotion(reduceMotion) {
   if (reduceMotion) return {};
-  return { whileHover: { y: -3 } };
+  return {
+    whileHover: { y: -2, transition: { duration: 0.15 } },
+    whileTap: { scale: 0.98, transition: { duration: 0.1 } },
+  };
 }
+
+/** Subtle card/list press without framer — use with PRESSABLE class. */
+export const CARD_PRESS =
+  "titan-surface-interactive transition-transform duration-fast ease-out active:scale-[0.99]";

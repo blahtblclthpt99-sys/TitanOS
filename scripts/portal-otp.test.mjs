@@ -12,8 +12,15 @@ describe("portal OTP hashing", () => {
     assert.equal(portalOtpMatches(hashed, email, "000000"), false);
   });
 
-  it("accepts legacy plaintext during transition", () => {
+  it("rejects legacy plaintext by default", () => {
+    delete process.env.PORTAL_OTP_ALLOW_LEGACY;
+    assert.equal(portalOtpMatches("654321", "b@example.com", "654321"), false);
+  });
+
+  it("accepts legacy plaintext when PORTAL_OTP_ALLOW_LEGACY=1", () => {
+    process.env.PORTAL_OTP_ALLOW_LEGACY = "1";
     assert.equal(portalOtpMatches("654321", "b@example.com", "654321"), true);
     assert.equal(portalOtpMatches("654321", "b@example.com", "111111"), false);
+    delete process.env.PORTAL_OTP_ALLOW_LEGACY;
   });
 });

@@ -15,12 +15,14 @@ function read(rel) {
 }
 
 describe("Sentry wiring", () => {
-  it("client sentry sets release/environment and user helpers", () => {
+  it("client sentry sets release/environment, tracing, and privacy-safe replay hooks", () => {
     const src = read("src/lib/sentry.js");
     assert.match(src, /release:/);
     assert.match(src, /setSentryUser/);
     assert.match(src, /clearSentryUser/);
     assert.match(src, /sendDefaultPii:\s*false/);
+    assert.match(src, /browserTracingIntegration/);
+    assert.match(src, /maskAllText/);
   });
 
   it("API instrument initializes with traces and flush path", () => {
@@ -39,6 +41,8 @@ describe("Health readiness", () => {
     assert.match(src, /api\.stripe\.com\/v1\/balance/);
     assert.match(src, /sentryConfigured/);
     assert.match(src, /paypalConfigured/);
+    assert.match(src, /opsAlertConfigured/);
+    assert.match(src, /observability/);
   });
 });
 
@@ -135,6 +139,10 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/028_marketplace_free.sql",
     "supabase/migrations/029_marketplace_module_price.sql",
     "supabase/migrations/030_titan_comms.sql",
+    "supabase/migrations/031_titancom_channel_rules.sql",
+    "supabase/migrations/032_database_integrity_lockdown.sql",
+    "supabase/migrations/033_audit_events.sql",
+    "supabase/migrations/034_scalability_hot_paths.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {
@@ -157,7 +165,7 @@ describe("Critical workflow surfaces (structural)", () => {
     assert.match(read("api/register.js"), /assertRateLimit|captureApiException/);
   });
 
-  it("Driver Hub, Dashboard, Estimates, Payments, Profile, TitanComms routes exist", () => {
+  it("Driver Hub, Dashboard, Estimates, Payments, Profile, TitanCom routes exist", () => {
     for (const f of [
       "src/pages/Dashboard.jsx",
       "src/pages/Estimates.jsx",
@@ -171,7 +179,8 @@ describe("Critical workflow surfaces (structural)", () => {
       assert.ok(existsSync(join(root, f)), `missing ${f}`);
     }
     assert.match(read("src/components/layout/TabStack.jsx"), /\/comms/);
-    assert.match(read("src/lib/nav-items.js"), /TitanComms/);
+    assert.match(read("src/lib/nav-items.js"), /TitanCom/);
+    assert.match(read("src/lib/nav-items.js"), /path:\s*"\/comms"/);
   });
 
   it("AuthContext clears Sentry user on logout path", () => {
@@ -189,11 +198,13 @@ describe("Critical workflow surfaces (structural)", () => {
 });
 
 describe("Scale / concurrent-session hardening", () => {
-  it("entity adapter caps page size and exposes count()", () => {
+  it("entity adapter caps page size and exposes count() + filterPage", () => {
     const src = read("src/api/entityAdapter.js");
     assert.match(src, /DEFAULT_ENTITY_PAGE_SIZE\s*=\s*100/);
     assert.match(src, /MAX_ENTITY_PAGE_SIZE\s*=\s*500/);
+    assert.match(src, /PREFERRED_ENTITY_PAGE_SIZE\s*=\s*100/);
     assert.match(src, /async count\(/);
+    assert.match(src, /async filterPage\(/);
     assert.match(src, /resolvePageSize/);
   });
 

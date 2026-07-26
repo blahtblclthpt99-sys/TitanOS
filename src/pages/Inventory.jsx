@@ -64,7 +64,7 @@ export default function Inventory() {
     <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Inventory" subtitle={`${low.length} low-stock alert${low.length === 1 ? "" : "s"}`} />
       <div className="grid lg:grid-cols-[.75fr_1.25fr] gap-5">
-        <form className="glass rounded-2xl p-5 space-y-3" onSubmit={add}>
+        <form className="titan-surface p-5 space-y-3" onSubmit={add}>
           <h2 className="font-semibold text-foreground flex gap-2">
             <PackagePlus className="text-titan-cyan" />Add item
           </h2>
@@ -90,7 +90,7 @@ export default function Inventory() {
             />
           )}
           {items.map((item) => (
-            <article className="glass rounded-2xl p-4 flex justify-between gap-3" key={item.id}>
+            <article className="titan-surface p-4 flex justify-between gap-3" key={item.id}>
               <div>
                 <p className="font-semibold text-foreground">{item.name}</p>
                 <p className="text-sm text-foreground/45">

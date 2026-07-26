@@ -37,13 +37,21 @@ export function hasAskedMessagePush() {
  * Show a system notification when a message arrives (best-effort).
  * Skips when the Messages page is focused and visible.
  */
-export function showMessagePush({ title, body, threadId }) {
+export function showMessagePush({ title, body, threadId, href } = {}) {
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
   if (typeof document !== "undefined" && !document.hidden) {
     const path = typeof window !== "undefined" ? window.location?.pathname || "" : "";
-    if (path.startsWith("/messages")) return;
+    if (path.startsWith("/messages") || path.startsWith("/comms")) return;
   }
+
+  const target =
+    href ||
+    (threadId?.startsWith("comms-")
+      ? `/comms?channel=${encodeURIComponent(threadId.slice("comms-".length))}`
+      : threadId
+        ? `/messages?thread=${encodeURIComponent(threadId)}`
+        : "/messages");
 
   try {
     const n = new Notification(title || "New message", {
@@ -54,11 +62,7 @@ export function showMessagePush({ title, body, threadId }) {
     n.onclick = () => {
       try {
         window.focus();
-        if (threadId) {
-          window.location.assign(`/messages?thread=${encodeURIComponent(threadId)}`);
-        } else {
-          window.location.assign("/messages");
-        }
+        window.location.assign(target);
       } catch {
         /* ignore */
       }

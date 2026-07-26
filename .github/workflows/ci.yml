@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,25 +34,24 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Fee engine tests
-        run: npm run test:fees
-
-      - name: Hire security tests
-        run: npm run test:hire
-
-      - name: Payment security tests
-        run: npm run test:payments
-
-      - name: Driver Hub tests
-        run: npm run test:driver
-
-      - name: Money & portal OTP tests
-        run: npm run test:money
+      - name: Unit / integration / regression pack
+        run: npm test
 
       - name: Production build
         run: npm run build
         env:
           # Public placeholders so Vite can compile without real secrets
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
+          VITE_API_BASE_URL: https://titanos-web.vercel.app
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke (Chromium)
+        run: npm run test:e2e
+        env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
           VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app

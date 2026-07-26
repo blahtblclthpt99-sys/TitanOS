@@ -1,5 +1,6 @@
 // Inspired by react-hot-toast library
 import { useState, useEffect } from "react";
+import { announce } from "@/lib/a11y";
 
 const TOAST_LIMIT = 5;
 /** How long a toast stays visible before auto-dismiss. */
@@ -143,6 +144,12 @@ function toast({ duration = TOAST_DURATION, ...props }) {
   if (duration !== Infinity && Number(duration) > 0) {
     const timeout = setTimeout(dismiss, Number(duration));
     durationTimeouts.set(id, timeout);
+  }
+
+  // Screen readers — pair visual toast with live region
+  const message = [props.title, props.description].filter(Boolean).join(". ");
+  if (message) {
+    announce(message, { assertive: props.variant === "destructive" });
   }
 
   return {

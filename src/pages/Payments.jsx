@@ -4,6 +4,8 @@ import { CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import ExportMenu from "@/components/shared/ExportMenu";
+import { paymentsExportSpec } from "@/lib/export";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import FormField from "@/components/shared/FormField";
 import NativeSelect from "@/components/shared/NativeSelect";
@@ -232,6 +234,7 @@ export default function Payments() {
       <PageHeader
         title="Payments"
         subtitle="Checkout is live when Stripe is configured — paid status comes only from the Stripe webhook"
+        actions={<ExportMenu spec={paymentsExportSpec(payments)} size="sm" />}
       />
       <FeatureHonestyBanner>
         Stripe Checkout collects live payments when configured. TitanOS never marks a payment paid from the
@@ -241,7 +244,7 @@ export default function Payments() {
           ? " Payment records below are from this device — the payments table was unreachable."
           : ""}
       </FeatureHonestyBanner>
-      <div className="glass rounded-2xl p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/90">
+      <div className="titan-surface p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/90">
         <span className="text-titan-cyan font-semibold">
           Your plan: {plan.name} · {plan.feeLabel} fee
         </span>
@@ -261,7 +264,7 @@ export default function Payments() {
         {PROVIDERS.map((provider) => {
           const connected = accounts.find((account) => account.provider === provider)?.is_connected;
           return (
-            <article key={provider} className="glass rounded-2xl p-5 border border-border">
+            <article key={provider} className="titan-surface p-5 border border-border">
               <div className="flex items-center justify-between">
                 <CreditCard className="w-5 h-5 text-titan-cyan" />
                 <span
@@ -302,7 +305,7 @@ export default function Payments() {
       </section>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        <form onSubmit={submit} className="glass rounded-2xl p-6 border border-border lg:col-span-2 space-y-4">
+        <form onSubmit={submit} className="titan-surface p-6 border border-border lg:col-span-2 space-y-4">
           <h2 className="font-semibold text-foreground">Create payment link</h2>
           <FormField
             label="Amount ($)"
@@ -354,7 +357,7 @@ export default function Payments() {
           </Button>
         </form>
 
-        <section className="glass rounded-2xl p-6 border border-border lg:col-span-3">
+        <section className="titan-surface p-6 border border-border lg:col-span-3">
           <h2 className="font-semibold text-foreground mb-4">Payment history</h2>
           {loading ? (
             <PageLoader variant="list" label="Loading payments" />

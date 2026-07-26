@@ -114,7 +114,7 @@ export default function Fleet() {
         </Link>
       </p>
       <div className="grid lg:grid-cols-[.85fr_1.15fr] gap-5">
-        <form className="glass rounded-2xl p-5 space-y-3" onSubmit={add}>
+        <form className="titan-surface p-5 space-y-3" onSubmit={add}>
           <h2 className="font-semibold text-foreground flex gap-2">
             <Plus className="text-titan-cyan" />
             Add equipment
@@ -246,7 +246,7 @@ export default function Fleet() {
             />
           )}
           {rows.map((row) => (
-            <article key={row.id} className="glass rounded-2xl p-4 flex gap-3">
+            <article key={row.id} className="titan-surface p-4 flex gap-3">
               <Truck className="text-titan-cyan flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground">{vehicleLabel(row)}</p>

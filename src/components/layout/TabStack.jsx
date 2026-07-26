@@ -9,9 +9,10 @@ import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import PageNotFound from "@/lib/PageNotFound";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+
+const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
 const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
 /** Home always warm + last N tab visits (including active). */
@@ -82,6 +83,7 @@ const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
+const ShareReport = lazy(() => import("@/pages/ShareReport"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -131,6 +133,13 @@ function NonTabPage() {
   const { pathname: rawPath } = useLocation();
   const pathname = normalizeAppPath(rawPath);
 
+  if (pathname.startsWith("/share/report/")) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <ShareReport />
+      </Suspense>
+    );
+  }
   if (pathname.startsWith("/customers/")) {
     return (
       <Suspense fallback={<Spinner />}>
@@ -162,7 +171,13 @@ function NonTabPage() {
 
   const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
   const Page = NON_TAB_ROUTES[routeKey];
-  if (!Page) return <PageNotFound />;
+  if (!Page) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <PageNotFound />
+      </Suspense>
+    );
+  }
 
   return (
     <Suspense fallback={<Spinner />}>

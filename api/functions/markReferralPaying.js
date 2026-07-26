@@ -1,6 +1,7 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
-import { logError } from "../_lib/safeLog.js";
+import { secretsEqual } from "../_lib/secureCompare.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
 
 /**
  * Marks a referred user as paying and grants lifetime premium when eligible.
@@ -14,19 +15,20 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!assertRateLimit(req, res, { limit: 20, windowMs: 60_000, key: "markReferralPaying" })) return;
 
   try {
     const admin = getSupabaseAdmin();
     const body = readJson(req);
     const hookSecret = process.env.TITANOS_BILLING_HOOK_SECRET;
     const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     const isHook =
-      hookSecret &&
-      (req.headers["x-titanos-hook"] === hookSecret ||
-        authHeader === `Bearer ${hookSecret}`);
+      Boolean(hookSecret) &&
+      (secretsEqual(req.headers["x-titanos-hook"], hookSecret) || secretsEqual(bearer, hookSecret));
 
     if (!isHook) {
-      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const token = bearer;
       if (!token) return res.status(401).json({ error: "Unauthorized" });
       const { data: userData, error: userErr } = await admin.auth.getUser(token);
       if (userErr || !userData?.user) return res.status(401).json({ error: "Unauthorized" });
@@ -111,7 +113,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, updated: updated.length });
   } catch (error) {
-    logError("markReferralPaying", error);
-    return res.status(500).json({ error: error.message || "Failed" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "markReferralPaying",
+      category: "referrals",
+      publicMessage: "Referral update failed",
+      publicCode: "REFERRAL_MARK_PAYING_FAILED",
+    });
   }
 }

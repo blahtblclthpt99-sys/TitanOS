@@ -2,7 +2,7 @@ import React, { useState, useRef, Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, TrendingDown, Receipt, Plus, Camera, X, ScanLine } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Receipt, Camera, X, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import NativeSelect from "@/components/shared/NativeSelect";
@@ -10,10 +10,13 @@ import PageHeader from "@/components/shared/PageHeader";
 import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { toast } from "@/components/ui/use-toast";
 import { useEntityData } from "@/hooks/useEntityData";
 import { todayISO, formatMonthDay } from "@/lib/date-utils";
 import { buildFinanceSummary, buildExpenseCategoryData } from "@/lib/finance-metrics";
+import { financesExportSpec } from "@/lib/export/moduleSpecs";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { EXPENSE_CATEGORIES } from "@/lib/platformConstants";
 
@@ -33,8 +36,8 @@ const BLANK_EXPENSE = {
 export default function Finances() {
   const navigate = useNavigate();
   const { data: [invoices, expenses], loading, error, reload } = useEntityData([
-    { entity: "Invoice", method: "list", args: ["-created_date", 500] },
-    { entity: "Expense", method: "list", args: ["-date", 500] },
+    { entity: "Invoice", method: "list", args: ["-created_date", 100] },
+    { entity: "Expense", method: "list", args: ["-date", 100] },
   ]);
 
   const [showForm, setShowForm] = useState(false);
@@ -132,12 +135,18 @@ export default function Finances() {
 
   return (
     <div className="page-pad max-w-7xl mx-auto">
-      <PageHeader title="Finances" subtitle="Profit & loss overview" onAdd={() => setShowForm(true)} addLabel="Add Expense" />
+      <PageHeader
+        title="Finances"
+        subtitle="Profit & loss overview"
+        onAdd={() => setShowForm(true)}
+        addLabel="Add Expense"
+        actions={<ExportMenu spec={financesExportSpec(invoices, expenses)} />}
+      />
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => navigate("/receipts")}
-          className="w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover"
+          className="w-full titan-surface p-4 border border-border flex items-center gap-3 text-left titan-surface-interactive"
         >
           <div className="w-10 h-10 rounded-xl bg-titan-cyan/10 flex items-center justify-center">
             <ScanLine className="w-5 h-5 text-titan-cyan" />
@@ -150,7 +159,7 @@ export default function Finances() {
         <button
           type="button"
           onClick={() => navigate("/tax-center")}
-          className="w-full glass rounded-2xl p-4 border border-border flex items-center gap-3 text-left glass-hover"
+          className="w-full titan-surface p-4 border border-border flex items-center gap-3 text-left titan-surface-interactive"
         >
           <div className="w-10 h-10 rounded-xl bg-titan-amber/10 flex items-center justify-center">
             <Receipt className="w-5 h-5 text-titan-amber" />
@@ -171,7 +180,7 @@ export default function Finances() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
             onClick={card.onClick}
-            className="glass rounded-2xl p-5 text-left glass-hover"
+            className="titan-surface p-5 text-left titan-surface-interactive"
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.bg}`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
@@ -186,7 +195,7 @@ export default function Finances() {
         {categoryData.length > 0 ? (
           <Suspense
             fallback={
-              <div className="glass rounded-2xl p-6 min-h-[200px] flex items-center justify-center">
+              <div className="titan-surface p-6 min-h-[200px] flex items-center justify-center">
                 <div className="w-6 h-6 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin" />
               </div>
             }
@@ -194,33 +203,27 @@ export default function Finances() {
             <FinancesExpenseChart categoryData={categoryData} expenseCount={expenses.length} />
           </Suspense>
         ) : (
-          <div className="glass rounded-2xl p-6 flex flex-col items-center justify-center text-center min-h-[200px]">
-            <TrendingDown className="w-8 h-8 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No expense data yet</p>
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="text-xs text-titan-cyan mt-2 hover:text-titan-cyan/80"
-            >
-              Add your first expense
-            </button>
-          </div>
+          <EmptyState
+            className="min-h-[200px] py-8"
+            icon={TrendingDown}
+            title="No expense data yet"
+            description="Log purchases and receipts so category charts and tax-ready totals stay accurate."
+            actionLabel="Add expense"
+            onAction={() => setShowForm(true)}
+          />
         )}
 
-        <div className="glass rounded-2xl p-6">
+        <div className="titan-surface p-6">
           <h3 className="text-base font-semibold text-foreground mb-1">Recent Expenses</h3>
           <p className="text-xs text-muted-foreground mb-4">Last {Math.min(expenses.length, 8)} entries</p>
           {expenses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-center">
-              <p className="text-sm text-muted-foreground">No expenses recorded</p>
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="text-xs text-titan-cyan mt-2 hover:text-titan-cyan/80 transition-colors flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" /> Add your first expense
-              </button>
-            </div>
+            <EmptyState
+              className="h-auto py-8"
+              title="No expenses recorded"
+              description="Add your first expense to start tracking spend."
+              actionLabel="Add expense"
+              onAction={() => setShowForm(true)}
+            />
           ) : (
             <div className="space-y-2">
               {expenses.slice(0, 8).map((exp) => (
@@ -253,7 +256,7 @@ export default function Finances() {
           if (!v) setForm(BLANK_EXPENSE);
         }}
       >
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md ">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">Add Expense</DialogTitle>
           </DialogHeader>

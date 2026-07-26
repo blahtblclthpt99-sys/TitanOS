@@ -132,7 +132,7 @@ export default function DesktopTopBar() {
             setSearchOpen(true);
             setTimeout(() => inputRef.current?.focus(), 40);
           }}
-          className={`flex h-10 w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-left text-muted-foreground shadow-soft transition-colors duration-fast hover:border-primary/30 focus-ring ${
+          className={`flex h-11 w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-left text-muted-foreground shadow-soft transition-colors duration-fast hover:border-primary/30 focus-ring ${
             searchOpen ? "border-primary/40 ring-2 ring-ring" : ""
           }`}
         >
@@ -334,7 +334,7 @@ export default function DesktopTopBar() {
           onClick={() => setCreateOpen((v) => !v)}
           aria-expanded={createOpen}
           aria-haspopup="menu"
-          className="inline-flex h-10 items-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-soft transition-all duration-fast hover:bg-primary/90 hover:shadow-lift focus-ring btn-press"
+          className="inline-flex h-11 items-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-soft transition-all duration-fast hover:bg-primary/90 hover:shadow-lift focus-ring btn-press"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Create</span>

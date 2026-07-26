@@ -1,4 +1,5 @@
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { secretsEqual } from "../_lib/secureCompare.js";
 
 /**
  * Liveness + readiness probe for load balancers and outage drills.
@@ -6,6 +7,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
  *
  * - Default: config presence checks (always 200 if process is up)
  * - ?deep=1: live Supabase query + optional Stripe balance ping
+ *   (requires header x-titanos-ops: HEALTH_DEEP_SECRET or TITANOS_OPS_SECRET)
  * - readiness.ok=false when money path is incomplete (visible, not silent)
  */
 export default async function handler(req, res) {
@@ -30,6 +32,10 @@ export default async function handler(req, res) {
         process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
     sentryConfigured: Boolean(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN),
+    opsAlertConfigured: Boolean(
+      process.env.OPS_ALERT_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
+    ),
+    analyticsIngestEnabled: String(process.env.ANALYTICS_INGEST_ENABLED || "") === "1",
     mppConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
     mppProfileConfigured: Boolean(
       process.env.STRIPE_PROFILE_ID &&
@@ -41,6 +47,16 @@ export default async function handler(req, res) {
   const deep =
     String(req.query?.deep || "").toLowerCase() === "1" ||
     String(new URL(req.url || "http://x", "http://x").searchParams.get("deep") || "") === "1";
+
+  if (deep) {
+    const opsSecret = process.env.HEALTH_DEEP_SECRET || process.env.TITANOS_OPS_SECRET;
+    const provided = req.headers["x-titanos-ops"] || req.headers["x-health-deep"];
+    if (!opsSecret || !secretsEqual(opsSecret, provided)) {
+      return res.status(401).json({
+        error: "Deep health requires x-titanos-ops header matching HEALTH_DEEP_SECRET",
+      });
+    }
+  }
 
   if (deep && checks.supabaseConfigured) {
     try {
@@ -85,12 +101,16 @@ export default async function handler(req, res) {
   const readiness = {
     ok: moneyReady && !deepFail,
     moneyPath: moneyReady ? "ready" : "incomplete",
+    observability: {
+      sentry: checks.sentryConfigured ? "configured" : "missing_dsn",
+      opsAlert: checks.opsAlertConfigured ? "configured" : "missing_webhook",
+      analyticsIngest: checks.analyticsIngestEnabled ? "on" : "off",
+    },
     notes: moneyReady
       ? undefined
       : "Need Supabase service role plus (Stripe secret+webhook) and/or (PayPal client+secret+webhook id).",
   };
 
-  // Liveness stays 200 unless deep dependency is down; readiness is explicit in body.
   const status = deep && deepFail ? 503 : 200;
   return res.status(status).json({
     status: deep && deepFail ? "degraded" : "ok",

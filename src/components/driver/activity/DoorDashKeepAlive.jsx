@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { createDoorDashTracker } from "@/lib/driverActivity/doorDashTracker.js";
+import { haptic } from "@/lib/haptic";
+import { notifyGpsOwnerChanged } from "@/lib/driverActivity/gpsOwner.js";
 import {
   applyMiles,
   DD_EVENT,
@@ -64,6 +66,7 @@ export default function DoorDashKeepAlive() {
         lastPersistAt.current = 0;
         lastPersistedMiles.current = 0;
         releaseWake();
+        notifyGpsOwnerChanged({ from: "doordash", active: false });
       } else {
         deliveryRef.current = next;
         trackerRef.current?.setMilesTracking(Boolean(next.milesTracking));
@@ -80,9 +83,11 @@ export default function DoorDashKeepAlive() {
     const active = readActiveDelivery(userId);
     deliveryRef.current = active;
     if (!active || active.status !== "active") {
+      const had = Boolean(trackerRef.current);
       trackerRef.current?.stop();
       trackerRef.current = null;
       releaseWake();
+      if (had) notifyGpsOwnerChanged({ from: "doordash", active: false });
       return;
     }
 
@@ -138,13 +143,7 @@ export default function DoorDashKeepAlive() {
           gps: { lat, lng },
         });
         if (departed) {
-          if (typeof navigator !== "undefined" && navigator.vibrate) {
-            try {
-              navigator.vibrate([40, 40, 80]);
-            } catch {
-              /* ignore */
-            }
-          }
+          haptic([40, 40, 80]);
           persist(next, { soft: false, departed: true });
           return;
         }
@@ -172,6 +171,7 @@ export default function DoorDashKeepAlive() {
     tracker.start();
     trackerRef.current = tracker;
     lastPersistedMiles.current = Number(active.miles || 0);
+    notifyGpsOwnerChanged({ from: "doordash", active: true });
   }, [userId, persist, releaseWake, requestWake]);
 
   useEffect(() => {
@@ -192,10 +192,18 @@ export default function DoorDashKeepAlive() {
     };
     window.addEventListener(DD_EVENT, onChange);
     const onVis = () => {
-      if (document.visibilityState === "visible") {
-        ensureTracker();
-        if (deliveryRef.current?.status === "active") requestWake();
+      if (document.visibilityState === "hidden") {
+        const cur = deliveryRef.current || readActiveDelivery(userId);
+        if (cur?.status === "active") {
+          saveDeliverySnapshot(userId, cur, { silent: true });
+        }
+        trackerRef.current?.suspendHardware?.();
+        releaseWake();
+        return;
       }
+      trackerRef.current?.resumeHardware?.();
+      ensureTracker();
+      if (deliveryRef.current?.status === "active") requestWake();
     };
     document.addEventListener("visibilitychange", onVis);
     const onHide = () => {

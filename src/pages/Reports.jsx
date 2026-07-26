@@ -1,16 +1,18 @@
 import React, { Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { TrendingUp, Users, Briefcase, Receipt, DollarSign, ArrowDownRight, Download } from "lucide-react";
+import { TrendingUp, Users, Briefcase, Receipt, DollarSign, ArrowDownRight } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
 import { useEntityData } from "@/hooks/useEntityData";
 import { lastNMonthKeys } from "@/lib/date-utils";
 import { sumPaidRevenue, sumExpenses, sumOutstanding } from "@/lib/finance-metrics";
-import { buildCohorts, exportCsv } from "@/lib/advancedAnalytics";
+import { buildCohorts } from "@/lib/advancedAnalytics";
+import { reportsPackSpec } from "@/lib/export/moduleSpecs";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
@@ -27,6 +29,23 @@ export default function Reports() {
 
   if (loading) return <PageLoader variant="list" label="Loading reports" />;
   if (error) return <ErrorState title="Couldn't load reports" onRetry={reload} />;
+
+  if (!jobs.length && !customers.length && !invoices.length) {
+    return (
+      <div className="page-pad mx-auto max-w-6xl">
+        <PageHeader title="Reports" subtitle="Performance across jobs, customers, and money" />
+        <EmptyState
+          icon={TrendingUp}
+          title="Nothing to report yet"
+          description="Add jobs, customers, and invoices — reports fill in from your real activity."
+          actionLabel="Create a job"
+          actionTo="/jobs"
+          secondaryLabel="Add invoice"
+          secondaryTo="/invoices"
+        />
+      </div>
+    );
+  }
 
   const paidInvoices = invoices.filter((i) => i.status === "paid");
   const outstanding = sumOutstanding(invoices);
@@ -82,23 +101,7 @@ export default function Reports() {
   const hasService = serviceData.length > 0;
   const hasExpCat = expCatData.length > 0;
 
-  const downloadRevenue = () => {
-    if (!paidInvoices.length) {
-      toast({
-        variant: "destructive",
-        title: "Nothing to export",
-        description: "No paid invoices yet.",
-      });
-      return;
-    }
-    exportCsv("titanos-revenue.csv", paidInvoices, [
-      { label: "Invoice", value: (r) => r.invoice_number || r.id },
-      { label: "Customer", value: (r) => r.customer_name || r.customer_id || "" },
-      { label: "Total", value: (r) => r.total || 0 },
-      { label: "Date", value: (r) => (r.created_date || "").slice(0, 10) },
-    ]);
-    toast({ title: "Export started", description: `${paidInvoices.length} paid invoices.` });
-  };
+  const exportSpec = reportsPackSpec({ paidInvoices, expenses, jobs, cohorts });
 
   return (
     <div className="page-pad max-w-7xl mx-auto">
@@ -111,15 +114,7 @@ export default function Reports() {
           <Button asChild type="button" variant="outline" className="border-border text-foreground">
             <Link to="/analytics">Analytics</Link>
           </Button>
-          <Button
-            type="button"
-            onClick={downloadRevenue}
-            variant="outline"
-            className="border-border text-foreground"
-            disabled={!paidInvoices.length}
-          >
-            <Download className="w-4 h-4 mr-2" aria-hidden="true" /> Export paid CSV
-          </Button>
+          <ExportMenu spec={exportSpec} />
         </div>
       </div>
 
@@ -142,7 +137,7 @@ export default function Reports() {
       </div>
 
       {cohorts.length > 0 && (
-        <section className="glass rounded-2xl p-5 mb-6 border border-border">
+        <section className="titan-surface p-5 mb-6 border border-border">
           <h2 className="font-semibold text-foreground mb-3">Customer cohorts (by signup month)</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

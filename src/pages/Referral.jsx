@@ -109,7 +109,7 @@ export default function Referral() {
         subtitle="Invite your network. Unlock premium for life. Email invites need a configured mail provider."
       />
 
-      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6 mb-5 border border-titan-cyan/20 bg-titan-cyan/5">
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="titan-surface p-6 mb-5 border border-titan-cyan/20 bg-titan-cyan/5">
         <div className="flex gap-4">
           <div className="w-12 h-12 shrink-0 rounded-2xl bg-titan-cyan/15 grid place-items-center"><Gift className="w-6 h-6 text-titan-cyan" /></div>
           <div>
@@ -122,7 +122,7 @@ export default function Referral() {
         </div>
       </motion.section>
 
-      <section className="glass rounded-2xl p-5 mb-5">
+      <section className="titan-surface p-5 mb-5">
         <div className="flex justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-foreground">{stats.progressLabel}</p>
@@ -133,7 +133,7 @@ export default function Referral() {
         <div className="h-2 bg-muted rounded-full overflow-hidden mt-4"><div className="h-full bg-titan-cyan transition-all duration-500" style={{ width: `${progress}%` }} /></div>
       </section>
 
-      <section className="glass rounded-2xl p-5 mb-5">
+      <section className="titan-surface p-5 mb-5">
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Your unique referral code</p>
         <p className="font-mono font-bold tracking-widest text-titan-cyan">{code}</p>
         <div className="flex gap-2 mt-4">
@@ -144,7 +144,7 @@ export default function Referral() {
         </div>
       </section>
 
-      <section className="glass rounded-2xl p-5 mb-5">
+      <section className="titan-surface p-5 mb-5">
         <h3 className="font-semibold text-foreground flex gap-2 items-center mb-3"><Mail className="w-4 h-4 text-titan-cyan" /> Invite by email</h3>
         <form onSubmit={handleSendInvite} className="flex gap-2">
           <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="friend@example.com" type="email" className="bg-card border-border text-foreground rounded-xl h-10" />
@@ -160,7 +160,7 @@ export default function Referral() {
         <ReferralList title="Successful paying referrals" icon={CheckCircle2} rows={stats.paying} empty={FREE_DURING_BETA ? "Verified paying referrals begin after launch." : "No verified paying referrals yet."} successful />
       </div>
 
-      <section className="glass rounded-2xl p-5 mt-5">
+      <section className="titan-surface p-5 mt-5">
         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-titan-cyan" /> Referral history</h3>
         {referrals.length ? <div className="space-y-2">{referrals.map((row) => <div key={row.id} className="flex items-center justify-between py-2 border-b border-border last:border-0"><div><p className="text-sm text-foreground">{row.referred_email || "Referral"}</p><p className="text-xs text-muted-foreground">{new Date(row.created_at || row.created_date || Date.now()).toLocaleDateString()}</p></div><span className={`text-xs ${row.is_paying || row.status === "completed" ? "text-titan-cyan" : "text-titan-amber"}`}>{row.is_paying || row.status === "completed" ? "Verified paying" : row.status === "signed_up" ? "Signed up" : "Pending"}</span></div>)}</div> : <p className="text-sm text-muted-foreground">Your sent invitations will appear here.</p>}
       </section>
@@ -169,5 +169,5 @@ export default function Referral() {
 }
 
 function ReferralList({ title, icon: Icon, rows, empty, successful = false }) {
-  return <section className="glass rounded-2xl p-5"><h3 className="font-semibold text-foreground flex gap-2 items-center mb-3"><Icon className={`w-4 h-4 ${successful ? "text-titan-cyan" : "text-titan-amber"}`} /> {title}</h3>{rows.length ? <div className="space-y-2">{rows.map((row) => <p key={row.id} className="text-sm text-foreground/85 truncate py-1 border-b border-border last:border-0">{row.referred_email || "Referral"}</p>)}</div> : <p className="text-sm text-muted-foreground">{empty}</p>}</section>;
+  return <section className="titan-surface p-5"><h3 className="font-semibold text-foreground flex gap-2 items-center mb-3"><Icon className={`w-4 h-4 ${successful ? "text-titan-cyan" : "text-titan-amber"}`} /> {title}</h3>{rows.length ? <div className="space-y-2">{rows.map((row) => <p key={row.id} className="text-sm text-foreground/85 truncate py-1 border-b border-border last:border-0">{row.referred_email || "Referral"}</p>)}</div> : <p className="text-sm text-muted-foreground">{empty}</p>}</section>;
 }

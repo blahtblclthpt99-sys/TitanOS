@@ -1,3 +1,7 @@
+/**
+ * TitanCom — push-to-talk channels (product name).
+ * Module/file prefix remains `TitanComms` / `titanComms*` for stable imports.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -17,6 +21,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { haptic } from "@/lib/haptic";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import PageLoader from "@/components/shared/PageLoader";
@@ -48,11 +53,15 @@ export default function TitanComms() {
   const [loading, setLoading] = useState(true);
   const [sessionState, setSessionState] = useState({
     connected: false,
+    reconnecting: false,
     talking: false,
     floorHolder: null,
     floorName: null,
     members: [],
     error: null,
+    micReady: false,
+    audioHint: null,
+    hasTurn: false,
   });
   const [voiceStatus, setVoiceStatusUi] = useState("available");
   const [shareLoc, setShareLoc] = useState(false);
@@ -145,11 +154,11 @@ export default function TitanComms() {
     await sessionRef.current?.setShareLocation(next);
   };
 
-  const beginPtt = async () => {
+  const beginPtt = useCallback(async () => {
     if (pttActive.current) return;
     pttActive.current = true;
     try {
-      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(12);
+      haptic(12);
     } catch {
       /* ignore */
     }
@@ -162,18 +171,82 @@ export default function TitanComms() {
         description: result?.reason || "Try again",
       });
     }
-  };
+  }, []);
 
-  const endPtt = async () => {
-    if (!pttActive.current && !sessionState.talking) return;
+  const endPtt = useCallback(async () => {
+    if (!pttActive.current && !sessionRef.current?.talking) return;
     pttActive.current = false;
     await sessionRef.current?.stopTalk();
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      beginPtt();
+    };
+    const onKeyUp = (e) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+      e.preventDefault();
+      endPtt();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [beginPtt, endPtt]);
+
+  const reconnect = async () => {
+    try {
+      await sessionRef.current?.reconnectNow();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Reconnect failed", description: err?.message });
+    }
+  };
+
+  const sendSos = async () => {
+    let lat = null;
+    let lng = null;
+    if (navigator.geolocation) {
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000, maximumAge: 30000 });
+        });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch {
+        /* optional */
+      }
+    }
+    const result = await sessionRef.current?.sendSos({ lat, lng, note: "SOS from TitanCom" });
+    if (!result?.ok) {
+      toast({ variant: "destructive", title: "SOS not sent", description: result?.reason || "Not connected" });
+      return;
+    }
+    try {
+      haptic(40);
+    } catch {
+      /* ignore */
+    }
+    toast({ title: "SOS broadcast", description: "Crew on this channel was alerted." });
+    setVoiceStatusUi("emergency");
   };
 
   const sendText = async (e) => {
     e?.preventDefault?.();
     if (!user?.id || !draft.trim()) return;
     try {
+      const { requestMessagePushPermission, getMessagePushPermission } = await import("@/lib/messagePush");
+      if (getMessagePushPermission() === "default") {
+        await requestMessagePushPermission();
+      }
       const row = await postChannelMessage(user, channelId, draft.trim());
       setMessages((m) => [...m, row]);
       setDraft("");
@@ -261,16 +334,22 @@ export default function TitanComms() {
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1",
                 sessionState.connected
                   ? "border-emerald-500/40 text-emerald-400"
-                  : "border-border text-muted-foreground"
+                  : sessionState.reconnecting
+                    ? "border-titan-amber/40 text-titan-amber"
+                    : "border-border text-muted-foreground"
               )}
             >
               <Circle
                 className={cn(
                   "w-2 h-2 fill-current",
-                  sessionState.connected ? "text-emerald-400" : "text-muted-foreground"
+                  sessionState.connected
+                    ? "text-emerald-400"
+                    : sessionState.reconnecting
+                      ? "text-titan-amber animate-pulse"
+                      : "text-muted-foreground"
                 )}
               />
-              {sessionState.connected ? "Live" : "Offline"}
+              {sessionState.connected ? "Live" : sessionState.reconnecting ? "Reconnecting" : "Offline"}
             </span>
           </div>
         }
@@ -397,6 +476,11 @@ export default function TitanComms() {
                         Admin
                       </span>
                     ) : null}
+                    {String(activeChannel?.id || "").startsWith("tc-") ? (
+                      <span className="text-[10px] font-bold uppercase text-sky-300 border border-sky-500/40 px-1.5 py-0.5 rounded">
+                        Open network
+                      </span>
+                    ) : null}
                     {activeChannel?.kind === "emergency" && (
                       <span className="text-[10px] font-bold uppercase text-red-400 border border-red-500/40 px-1.5 py-0.5 rounded">
                         Urgent
@@ -404,6 +488,11 @@ export default function TitanComms() {
                     )}
                   </h2>
                   {sessionState.error && <p className="text-xs text-titan-amber mt-1">{sessionState.error}</p>}
+                  {!sessionState.hasTurn ? (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      STUN only — set VITE_TURN_* for hard NATs.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
                   <select
@@ -426,6 +515,20 @@ export default function TitanComms() {
                   >
                     <MapPin className="w-4 h-4" />
                     {shareLoc ? "GPS on" : "GPS off"}
+                  </Button>
+                  {!sessionState.connected ? (
+                    <Button type="button" variant="outline" onClick={reconnect} className="min-h-[44px]">
+                      Reconnect
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={sendSos}
+                    className="gap-1 min-h-[44px] border-red-500/40 text-red-400 hover:text-red-300"
+                  >
+                    <Siren className="w-4 h-4" />
+                    SOS
                   </Button>
                 </div>
               </div>
@@ -482,8 +585,14 @@ export default function TitanComms() {
                   {sessionState.talking ? "RELEASE" : "HOLD TO TALK"}
                 </button>
                 <p className="text-xs text-muted-foreground text-center max-w-xs">
-                  Large hold target — press and hold anywhere on the circle. Release to stop.
+                  Hold the circle or Space — release to stop.
+                  {sessionState.micReady ? " Mic warmed." : ""}
                 </p>
+                {sessionState.audioHint ? (
+                  <p className="text-[11px] text-muted-foreground/80 text-center max-w-sm leading-snug">
+                    {sessionState.audioHint}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

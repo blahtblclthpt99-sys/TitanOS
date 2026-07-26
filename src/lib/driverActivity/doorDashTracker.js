@@ -10,7 +10,7 @@ const SPEED_EMA_ALPHA = 0.35;
 export function createDoorDashTracker(handlers = {}, options = {}) {
   const cfg = {
     enableHighAccuracy: true,
-    maximumAge: 1000,
+    maximumAge: 3000,
     timeout: 12000,
     ...options,
   };
@@ -118,6 +118,17 @@ export function createDoorDashTracker(handlers = {}, options = {}) {
         navigator.geolocation.clearWatch(watchId);
       }
       watchId = null;
+    },
+    /** Stop GNSS hardware (keeps miles). Use when tab is hidden to save battery. */
+    suspendHardware() {
+      if (watchId != null && typeof navigator !== "undefined") {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = null;
+    },
+    resumeHardware() {
+      if (watchId != null) return;
+      this.start();
     },
     setMilesTracking(on) {
       trackingMiles = Boolean(on);

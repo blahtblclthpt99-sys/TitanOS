@@ -19,9 +19,11 @@ import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { useEntityData } from "@/hooks/useEntityData";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { listItemMotion } from "@/lib/listMotion";
+import { customersExportSpec } from "@/lib/export/moduleSpecs";
 
 const BLANK_FORM = {
   first_name: "", last_name: "", email: "", phone: "",
@@ -107,7 +109,7 @@ export default function Customers({ isActive = true }) {
             open();
           }
         }}
-        className="titan-surface p-4 glass-hover cursor-pointer focus-ring titan-surface-interactive"
+        className="titan-surface p-4 titan-surface-interactive cursor-pointer focus-ring titan-surface-interactive"
       >
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 rounded-md bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0" aria-hidden="true">
@@ -152,7 +154,13 @@ export default function Customers({ isActive = true }) {
   return (
     <div ref={containerRef} className="page-pad max-w-7xl mx-auto pb-28 md:pb-10 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
       <PullToRefreshIndicator pullProgress={pullProgress} isRefreshing={isRefreshing} pullDist={pullDist} />
-      <PageHeader title="Customers" subtitle={`${displayCustomers.length} total`} onAdd={openForm} addLabel="Add Customer" />
+      <PageHeader
+        title="Customers"
+        subtitle={`${displayCustomers.length} total`}
+        onAdd={openForm}
+        addLabel="Add Customer"
+        actions={<ExportMenu spec={customersExportSpec(displayCustomers)} size="sm" />}
+      />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -195,7 +203,7 @@ export default function Customers({ isActive = true }) {
       )}
 
       <Dialog open={showForm} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md ">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">Add Customer</DialogTitle>
             <DialogDescription>Add contact details and status for a new customer.</DialogDescription>

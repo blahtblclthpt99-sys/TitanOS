@@ -1,3 +1,10 @@
+/**
+ * Driver Hub persistence + session helpers.
+ *
+ * Owns local session/prefs/telemetry storage for the live shift surface.
+ * Prefer `driverOs/workflowEngine` for event names; prefer `driverActivity/*`
+ * for GPS, DoorDash, and intelligence math — keep this module as Hub glue.
+ */
 import { api } from "@/api/apiClient";
 import { listEquipment } from "@/lib/equipmentApi";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
@@ -7,9 +14,9 @@ import {
   calcFuelCost,
   estimateShiftEarnings,
   parseMilesInput,
-  summarizeRecordedShifts,
 } from "@/lib/driverHubMath";
 import { syncSessionLegsToJournal } from "@/lib/driverActivity/tripJournal";
+import { generateShiftDigest } from "@/lib/driverActivity/analyticsDigest.js";
 
 export {
   IRS_MILEAGE_RATE_USD,
@@ -77,6 +84,8 @@ export function readPrefs(userId) {
     stopConfirmSec: 90,
     /** Acknowledge location privacy notice */
     locationPrivacyAck: false,
+    /** Opt-in: start a work session when sustained motion is detected while off-shift */
+    autoStartOnMotion: false,
   });
 }
 
@@ -630,6 +639,13 @@ export async function stopDrivingSession(userId, snapshot = {}) {
     syncSessionLegsToJournal(userId, ended, stops);
   } catch {
     /* journal is best-effort */
+  }
+  try {
+    generateShiftDigest(userId, ended, stops, {
+      history: readShiftHistory(userId),
+    });
+  } catch {
+    /* digest is best-effort */
   }
   emitDriverSessionChanged();
   return ended;

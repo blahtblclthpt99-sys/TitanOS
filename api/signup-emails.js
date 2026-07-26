@@ -3,6 +3,7 @@ import { recordSignupEmail, formatSignupEmailFile, getLocalSignupEmailsPath } fr
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimit } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
+import { secretsEqual } from "./_lib/secureCompare.js";
 import fs from "node:fs";
 
 /**
@@ -33,10 +34,9 @@ export default async function handler(req, res) {
         return res.status(503).json({ error: "Export not configured" });
       }
       const auth = String(req.headers.authorization || "");
-      const key = String(req.query?.key || "");
       const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      // Never accept SUPABASE_SERVICE_ROLE_KEY as the export credential
-      if (bearer !== secret && key !== secret) {
+      // Header-only — never accept ?key= (Referer / access-log leakage)
+      if (!secretsEqual(bearer, secret)) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 

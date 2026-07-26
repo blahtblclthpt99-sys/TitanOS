@@ -1,8 +1,11 @@
 /**
  * Permanent per-trip journal — every drive leg stays its own row (never merged).
  * Drive time and idle time are stored as separate fields for spreadsheet export.
+ *
+ * Local MAX_JOURNAL is a device ring buffer. After migration 034, rows sync to
+ * `driver_trips` when online so multi-device / long history can scale.
  */
-import { readLocal, writeLocal, uid } from "../localStore.js";
+import { readLocal, writeLocal } from "../localStore.js";
 import { IRS_MILEAGE_RATE_USD } from "../driverHubMath.js";
 
 const PREFIX = "titanos_driver";
@@ -122,10 +125,41 @@ export function upsertTripJournal(userId, row) {
   if (!userId || !row?.id) return null;
   const rows = readJournal(userId);
   const idx = rows.findIndex((r) => r.id === row.id);
-  if (idx >= 0) rows[idx] = { ...rows[idx], ...row };
-  else rows.unshift(row);
+  const merged = idx >= 0 ? { ...rows[idx], ...row } : row;
+  if (idx >= 0) rows[idx] = merged;
+  else rows.unshift(merged);
   writeJournal(userId, rows);
-  return row;
+  void syncTripJournalRowToCloud(userId, merged).catch(() => {});
+  return merged;
+}
+
+/**
+ * Best-effort cloud upsert into `driver_trips` (migration 034).
+ * No-ops when offline / table missing / unauthenticated.
+ */
+export async function syncTripJournalRowToCloud(userId, row) {
+  if (!userId || !row?.id) return { ok: false };
+  try {
+    const { supabase } = await import("@/api/supabaseClient");
+    const payload = {
+      user_id: userId,
+      client_id: String(row.id),
+      started_at: row.started_at || null,
+      ended_at: row.ended_at || null,
+      status: row.status || "completed",
+      miles: Number(row.miles) || 0,
+      earnings: row.earnings != null && row.earnings !== "" ? Number(row.earnings) : null,
+      payload: row,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("driver_trips").upsert(payload, {
+      onConflict: "user_id,client_id",
+    });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err?.message || "sync_failed" };
+  }
 }
 
 /** Sync all stop legs from a session into the journal (each stop = one trip). */

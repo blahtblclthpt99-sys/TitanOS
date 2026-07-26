@@ -1,0 +1,30 @@
+---
+description: TitanOS accessibility — keyboard, SR, touch, contrast, motion, responsive
+alwaysApply: true
+---
+
+# Accessibility
+
+Every interactive surface must work with keyboard, screen reader, touch (≥44px), and reduced motion — across phone, tablet, desktop, landscape, and high-DPI.
+
+## Requirements
+
+| Area | Rule |
+|---|---|
+| Keyboard | Native `<button>` / `<a>` / labeled inputs; Escape closes overlays; use `activatableProps` from `src/lib/a11y.js` for custom activators |
+| Screen reader | Icon-only: `aria-label`; dialogs: `DialogTitle` + `DialogDescription` (or `aria-describedby={undefined}` intentionally); live updates via `announce()` / `role="status\|alert"` |
+| Touch | Interactive targets ≥44×44px (`CONTROL.md`, Button/Input defaults). Do not use sub-44 controls for primary actions |
+| Contrast | Semantic tokens (`foreground`, `muted-foreground`). No `text-*/40–50` or `foreground/45` for required reading; honor `html.high-contrast` |
+| Focus | Never strip outlines without `focus-visible:ring-*` / `.focus-ring` |
+| Reduced motion | `usePrefersReducedMotion` (not framer alone); CSS `html.reduce-motion`; no haptic under reduce-motion |
+| Scaling | Rem-based layout; respect `theme.js` text scales (90–125%); no fixed px that break at 125% |
+| High DPI | Prefer SVG / `Icon` for chrome; meaningful `alt` on content images |
+| Landscape / tablet / desktop | `PageShell` clears header/nav/dock; `md:` sidebar vs bottom nav; don’t crush content on short landscape heights |
+
+## Skip link
+
+App chrome: skip to `#main-content`. Public pages: same pattern to main landmark.
+
+## Definition of done
+
+Incomplete if a primary control is &lt;44px, keyboard-unreachable, unlabeled to SR, animates under reduce-motion, or relies on low-opacity muted text for meaning.

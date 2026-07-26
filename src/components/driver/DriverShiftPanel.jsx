@@ -32,9 +32,9 @@ import {
   collectTrips,
   filterTripsByPeriod,
   summarizeTrips,
-} from "@/lib/driverActivity/intelligence";
-import { composeSmartCoachTip } from "@/lib/driverActivity/driverCoach";
-import { DRIVER_SESSION_EVENT } from "@/components/driver/activity/DriverSessionKeepAlive";
+  composeSmartCoachTip,
+} from "@/lib/driverActivity";
+import { DRIVER_SESSION_EVENT } from "@/lib/driverOs";
 import {
   addStop,
   buildHotspots,
@@ -128,8 +128,19 @@ export default function DriverShiftPanel() {
     if (!session?.active) return undefined;
     setMilesDraft(String(session.miles ?? 0));
     setMilesError("");
-    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
-    return () => window.clearInterval(id);
+    let id = null;
+    const arm = () => {
+      if (id != null) window.clearInterval(id);
+      id = null;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    };
+    arm();
+    document.addEventListener("visibilitychange", arm);
+    return () => {
+      document.removeEventListener("visibilitychange", arm);
+      if (id != null) window.clearInterval(id);
+    };
     // Only re-seed draft when a session becomes active (not on every miles save)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.active, session?.id]);
@@ -586,7 +597,7 @@ export default function DriverShiftPanel() {
       ) : null}
 
       {/* Mode: Requesting a ride vs Driving */}
-      <section className="glass rounded-2xl p-4 border border-border">
+      <section className="titan-surface p-4 border border-border">
         <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Mode</p>
         <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted border border-border">
           <button
@@ -617,7 +628,7 @@ export default function DriverShiftPanel() {
       </section>
 
       {/* Active session toggles */}
-      <section className="glass rounded-2xl p-5 border border-border">
+      <section className="titan-surface p-5 border border-border">
         {mode === "riding" ? (
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="min-w-0">
@@ -837,7 +848,7 @@ export default function DriverShiftPanel() {
       </section>
 
       {/* Lit hotspot map — early so it's front-and-center */}
-      <section className="glass rounded-2xl p-5 border border-border">
+      <section className="titan-surface p-5 border border-border">
         <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">
@@ -968,7 +979,7 @@ export default function DriverShiftPanel() {
 
       {/* Fleet + fuel — driving only */}
       {mode === "driving" && (
-        <section className="glass rounded-2xl p-5 border border-border">
+        <section className="titan-surface p-5 border border-border">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
@@ -1037,7 +1048,7 @@ export default function DriverShiftPanel() {
       )}
 
       {mode === "driving" && session && (
-        <section className="glass rounded-2xl p-5 border border-border">
+        <section className="titan-surface p-5 border border-border">
           <ErrorBoundary message="Time between stops couldn't load. Other shift tools still work.">
             <BetweenStopsPanel
               session={session}
@@ -1074,7 +1085,7 @@ export default function DriverShiftPanel() {
       )}
 
       {mode === "driving" && (
-        <section className="glass rounded-2xl p-5 border border-border" aria-label="Recorded driver totals">
+        <section className="titan-surface p-5 border border-border" aria-label="Recorded driver totals">
           <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground">Recorded totals</h2>
@@ -1238,7 +1249,7 @@ export default function DriverShiftPanel() {
       )}
 
       {/* Emergency — last so driving tools stay uninterrupted */}
-      <section className="glass rounded-2xl p-5 border border-red-500/30 bg-red-500/5">
+      <section className="titan-surface p-5 border border-red-500/30 bg-red-500/5">
         <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
           <Siren className="w-4 h-4 text-red-400" /> Emergency
         </h2>

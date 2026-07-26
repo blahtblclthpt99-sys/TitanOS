@@ -2,6 +2,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
 import { calculateCategoryFees } from "../_lib/feeConfig.js";
 import { readJson } from "../_lib/supabase.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
 
 /**
  * Server-side fee quote. Client amounts are never trusted for charging —
@@ -11,6 +12,7 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 30, windowMs: 60_000, key: "calculateFee" })) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;
@@ -24,6 +26,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Valid grossAmount required" });
     }
 
+    const { data: profile } = await auth.admin
+      .from("profiles")
+      .select("role")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    const isAdmin = profile?.role === "admin" || auth.user.app_metadata?.role === "admin";
+
     const result = await calculateCategoryFees(auth.admin, {
       categoryId,
       contextKey,
@@ -32,7 +41,7 @@ export default async function handler(req, res) {
       userId: auth.user.id,
       currency: (body.currency || "usd").toLowerCase(),
       context: body.context || {},
-      persistLog: Boolean(body.persistLog),
+      persistLog: isAdmin ? Boolean(body.persistLog) : false,
     });
 
     return res.status(200).json({
@@ -55,8 +64,12 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
-    const { logError } = await import("../_lib/safeLog.js");
-    logError("calculateFee", error);
-    return res.status(500).json({ error: "Fee calculation failed" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "calculateFee",
+      category: "payments",
+      publicMessage: "Fee calculation failed",
+      publicCode: "FEE_CALC_FAILED",
+    });
   }
 }

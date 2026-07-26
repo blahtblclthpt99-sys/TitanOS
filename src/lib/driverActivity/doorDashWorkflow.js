@@ -5,6 +5,8 @@
 
 import { readLocal, writeLocal, uid } from "../localStore.js";
 import { classifyRushWindow } from "./intelligence.js";
+import { withDeliveryClassification } from "./deliveryClassify.js";
+import { generateDeliveryDigest } from "./analyticsDigest.js";
 
 export const DD_PREFIX = "titanos_driver";
 export const DD_ACTIVE_SUFFIX = "doordash_active";
@@ -305,7 +307,7 @@ export function cancelDelivery(delivery, { gps, now = Date.now() } = {}) {
     events: pushEvent(delivery, "cancelled", { gps, at: new Date(now).toISOString() }),
   };
   stopped.analytics = computeAnalytics(stopped, { now });
-  return stopped;
+  return withDeliveryClassification(stopped, { now });
 }
 
 export function completeDelivery(delivery, { gps, payoutUsd = null, now = Date.now() } = {}) {
@@ -324,7 +326,7 @@ export function completeDelivery(delivery, { gps, payoutUsd = null, now = Date.n
     events: pushEvent(delivery, "delivered", { gps, at: new Date(now).toISOString() }),
   };
   stopped.analytics = computeAnalytics(stopped, { now });
-  return stopped;
+  return withDeliveryClassification(stopped, { now });
 }
 
 /**
@@ -382,16 +384,20 @@ export function computeAnalytics(delivery, { now = Date.now() } = {}) {
   const estimatedProfit = payout; // payout-only until cost model patched in
 
   const rush = classifyRushWindow(new Date(startMs));
+  const classification = delivery.classification || null;
 
   return {
     platform: "DoorDash",
     orderType: delivery.orderTypeLabel,
     orderTypeId: delivery.orderTypeId,
+    suggestedOrderTypeId: delivery.suggestedOrderTypeId || classification?.orderTypeId || null,
+    classification,
     status: delivery.status,
     startTime: delivery.startedAt,
     endTime: delivery.endedAt,
     dayOfWeek: delivery.dayOfWeek,
     rushPeriod: rush?.label || rush?.id || null,
+    rushId: rush?.id || null,
     timeToRestaurantSec: Math.round(timeToRestaurantMs / 1000),
     restaurantWaitSec: Math.round(restaurantWaitMs / 1000),
     timeToCustomerSec: Math.round(timeToCustomerMs / 1000),
@@ -464,6 +470,11 @@ export function saveDeliverySnapshot(userId, delivery, opts = {}) {
   }
   clearActiveDelivery(userId, { silent: true });
   appendDoorDashHistory(userId, delivery);
+  try {
+    generateDeliveryDigest(userId, delivery);
+  } catch {
+    /* digest is best-effort */
+  }
   return delivery;
 }
 

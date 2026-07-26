@@ -21,6 +21,13 @@ Official TitanOS app — React frontend, Supabase backend, Capacitor Android she
 
 The app ships **free**. Monetization hooks live in `src/lib/plan.js` (`FREE_LAUNCH`). Flip that flag and set `profiles.is_pro` when you add paid plans later.
 
+## Architecture & onboarding
+
+- **Architecture map:** [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- **New developer guide:** [`docs/ONBOARDING.md`](./docs/ONBOARDING.md)
+- **Contributing:** [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- **Agent / product laws:** [`AGENTS.md`](./AGENTS.md)
+
 ## Setup
 
 1. Copy `.env.example` → `.env.local` and add Supabase keys
@@ -69,3 +76,5 @@ Privacy policy route: `/privacy-policy` (required for Play).
 | `npm run android:build` | Debug APK + release AAB |
 | `npm run android:sign` | Signed Play AAB + APK |
 | `npm run supabase:check` | Verify tables |
+| `npm test` | Unit / integration pack |
+| `npm run lint` | ESLint |

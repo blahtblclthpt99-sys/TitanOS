@@ -78,7 +78,7 @@ export default function PublicProfile() {
   if (status === "missing" || !profile) {
     return (
       <main className="min-h-screen bg-background grid place-items-center p-6 text-center">
-        <div className="glass rounded-3xl p-8 text-foreground max-w-md border border-border">
+        <div className="titan-surface p-8 text-foreground max-w-md border border-border">
           <h1 className="text-xl font-semibold">Profile unavailable</h1>
           <p className="text-muted-foreground mt-2">This professional profile is private or doesn&apos;t exist.</p>
           <Button asChild className="mt-5 rounded-xl">
@@ -107,7 +107,7 @@ export default function PublicProfile() {
         </div>
 
         <div className="relative max-w-4xl mx-auto p-4 md:p-8 pb-20 space-y-5">
-          <header className="glass rounded-3xl border border-border p-6 md:p-8">
+          <header className="titan-surface border border-border p-6 md:p-8">
             <div className="flex flex-col sm:flex-row gap-5">
               <div className="w-24 h-24 rounded-2xl bg-muted overflow-hidden shrink-0 border border-border">
                 {profile.avatar_url ? (
@@ -190,7 +190,7 @@ export default function PublicProfile() {
           </header>
 
           {(profile.skills || []).length > 0 && (
-            <section className="glass rounded-3xl border border-border p-6">
+            <section className="titan-surface border border-border p-6">
               <h2 className="font-semibold text-lg">Skills</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {profile.skills.map((skill) => (
@@ -203,7 +203,7 @@ export default function PublicProfile() {
           )}
 
           {(profile.badges || []).length > 0 && (
-            <section className="glass rounded-3xl border border-border p-6">
+            <section className="titan-surface border border-border p-6">
               <h2 className="font-semibold text-lg flex items-center gap-2">
                 <Award className="w-5 h-5 text-titan-cyan" /> Badges
               </h2>
@@ -222,7 +222,7 @@ export default function PublicProfile() {
           )}
 
           {(profile.portfolio || []).length > 0 && (
-            <section className="glass rounded-3xl border border-border p-6">
+            <section className="titan-surface border border-border p-6">
               <h2 className="font-semibold text-lg">Portfolio</h2>
               <div className="mt-4 grid sm:grid-cols-2 gap-4">
                 {profile.portfolio.map((item) => (
@@ -248,7 +248,7 @@ export default function PublicProfile() {
           )}
 
           {(profile.work_history || []).length > 0 && (
-            <section className="glass rounded-3xl border border-border p-6">
+            <section className="titan-surface border border-border p-6">
               <h2 className="font-semibold text-lg flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-titan-cyan" /> Work history
               </h2>
@@ -268,7 +268,7 @@ export default function PublicProfile() {
           )}
 
           {(profile.achievements || []).length > 0 && (
-            <section className="glass rounded-3xl border border-border p-6">
+            <section className="titan-surface border border-border p-6">
               <h2 className="font-semibold text-lg">Achievements</h2>
               <ul className="mt-4 space-y-3">
                 {profile.achievements.map((a) => (
@@ -284,7 +284,7 @@ export default function PublicProfile() {
             </section>
           )}
 
-          <section className="glass rounded-3xl border border-border p-6">
+          <section className="titan-surface border border-border p-6">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <Star className="w-5 h-5 text-amber-400" /> Reviews
             </h2>

@@ -93,7 +93,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
       )}
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-        <DialogContent className="rounded-2xl max-w-md">
+        <DialogContent className=" max-w-md">
           <DialogHeader>
             <DialogTitle>Report {targetName || "user"}</DialogTitle>
           </DialogHeader>

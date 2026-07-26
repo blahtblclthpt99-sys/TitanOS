@@ -15,7 +15,7 @@ export default function SessionExpiryBanner() {
       role="status"
       aria-live="polite"
     >
-      <div className="max-w-3xl mx-auto glass border border-titan-amber/30 bg-titan-amber/10 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg">
+      <div className="max-w-3xl mx-auto titan-surface border border-warning/30 bg-warning/10 px-4 py-3 flex items-center gap-3 shadow-lift">
         <Clock className="w-4 h-4 text-titan-amber flex-shrink-0" aria-hidden="true" />
         <p className="text-sm text-foreground flex-1">
           Your session expires in{" "}

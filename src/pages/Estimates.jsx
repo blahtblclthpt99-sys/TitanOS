@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from "@/components/ui/textarea";
 import NativeSelect from "@/components/shared/NativeSelect";
 import PageHeader from "@/components/shared/PageHeader";
+import ExportMenu from "@/components/shared/ExportMenu";
+import { estimatesExportSpec } from "@/lib/export";
 import EmptyState from "@/components/shared/EmptyState";
 import FilterChip from "@/components/shared/FilterChip";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -245,7 +247,7 @@ export default function Estimates() {
   const renderEstimateRow = (est) => (
     <div
       id={`estimate-row-${est.id}`}
-      className={`titan-surface p-4 glass-hover ${focusId === est.id ? "ring-2 ring-primary/40" : ""}`}
+      className={`titan-surface p-4 titan-surface-interactive ${focusId === est.id ? "ring-2 ring-primary/40" : ""}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -296,7 +298,13 @@ export default function Estimates() {
 
   return (
     <div className="page-pad max-w-7xl mx-auto pb-28 md:pb-10">
-      <PageHeader title="Estimates" subtitle={`${estimates.length} total`} onAdd={() => setShowForm(true)} addLabel="New Estimate" />
+      <PageHeader
+        title="Estimates"
+        subtitle={`${estimates.length} total`}
+        onAdd={() => setShowForm(true)}
+        addLabel="New Estimate"
+        actions={<ExportMenu spec={estimatesExportSpec(filtered)} size="sm" />}
+      />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -330,7 +338,7 @@ export default function Estimates() {
       )}
 
       <Dialog open={showForm} onOpenChange={v => { setShowForm(v); if (!v) { setForm(BLANK_FORM); setLineItems([{ ...BLANK_LINE }]); setJobLocation(emptyJobLocation()); setTaxPreview(null); } }}>
-        <DialogContent className="bg-card border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-2xl  max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">New Estimate</DialogTitle>
             <DialogDescription>

@@ -59,7 +59,7 @@ export default function ThemeToggle({ variant = "cycle", className = "", onChang
               type="button"
               onClick={() => apply(option)}
               aria-pressed={active}
-              className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors focus-ring ${
+              className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors focus-ring ${
                 active
                   ? "bg-card text-foreground shadow-soft"
                   : "text-muted-foreground hover:text-foreground"
@@ -79,7 +79,7 @@ export default function ThemeToggle({ variant = "cycle", className = "", onChang
     <button
       type="button"
       onClick={cycle}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted text-foreground hover:bg-secondary focus-ring ${className}`}
+      className={`inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-border bg-muted text-foreground hover:bg-secondary focus-ring ${className}`}
       aria-label={`Theme: ${LABELS[pref]}. Click to change.`}
       title={`Theme: ${LABELS[pref]}`}
     >

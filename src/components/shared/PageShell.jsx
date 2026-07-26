@@ -11,7 +11,7 @@ const MAX = {
 
 /**
  * Standard page chrome — consistent padding, width, and bottom clearance
- * for mobile nav / FABs so every screen feels like the same product.
+ * so every screen feels like one operating system, not unrelated pages.
  */
 const PageShell = forwardRef(function PageShell(
   { children, maxWidth = "lg", className, dense = false, style },

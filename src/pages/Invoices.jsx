@@ -17,6 +17,7 @@ import FormField from "@/components/shared/FormField";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import VirtualList, { shouldVirtualize } from "@/components/shared/VirtualList";
+import ExportMenu from "@/components/shared/ExportMenu";
 import { useEntityData } from "@/hooks/useEntityData";
 import { addDaysISO, formatMonthDayYear } from "@/lib/date-utils";
 import { toast } from "@/components/ui/use-toast";
@@ -24,6 +25,7 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { listItemMotion } from "@/lib/listMotion";
 import { sanitizeLineItems, totalsFromTaxResult } from "@/lib/moneyDocument";
 import JobLocationFields from "@/components/location/JobLocationFields";
+import { invoicesExportSpec } from "@/lib/export/moduleSpecs";
 import {
   emptyJobLocation,
   jobLocationFromCustomer,
@@ -225,7 +227,7 @@ export default function Invoices({ isActive = true }) {
             open();
           }
         }}
-        className="titan-surface p-4 glass-hover cursor-pointer focus-ring titan-surface-interactive"
+        className="titan-surface p-4 titan-surface-interactive cursor-pointer focus-ring titan-surface-interactive"
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -259,7 +261,13 @@ export default function Invoices({ isActive = true }) {
 
   return (
     <div className="page-pad max-w-7xl mx-auto pb-28 md:pb-10">
-      <PageHeader title="Invoices" subtitle={`${invoices.length} total`} onAdd={() => setShowForm(true)} addLabel="New Invoice" />
+      <PageHeader
+        title="Invoices"
+        subtitle={`${invoices.length} total`}
+        onAdd={() => setShowForm(true)}
+        addLabel="New Invoice"
+        actions={<ExportMenu spec={invoicesExportSpec(invoices)} size="sm" />}
+      />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -309,7 +317,7 @@ export default function Invoices({ isActive = true }) {
           }
         }}
       >
-        <DialogContent className="bg-card border-border text-foreground max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-2xl  max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground text-lg">New Invoice</DialogTitle>
             <DialogDescription>

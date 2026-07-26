@@ -132,7 +132,7 @@ export default function ReceiptScanner() {
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
       <PageHeader title="Receipt Scanner" subtitle="Turn receipts into tax-deductible expenses" />
-      <div className="glass rounded-2xl p-6 border border-border space-y-5">
+      <div className="titan-surface p-6 border border-border space-y-5">
         <input ref={inputRef} type="file" accept="image/*" onChange={selectFile} className="hidden" />
         {preview ? (
           <img src={preview} alt="Receipt preview" className="w-full max-h-72 object-contain rounded-xl bg-black/20" />
@@ -172,7 +172,7 @@ export default function ReceiptScanner() {
           )}
         </Button>
       </div>
-      <div className="glass rounded-2xl p-6 mt-6 border border-border space-y-4">
+      <div className="titan-surface p-6 mt-6 border border-border space-y-4">
         <h2 className="font-semibold text-foreground">Review expense</h2>
         <Input
           value={receipt.vendor}

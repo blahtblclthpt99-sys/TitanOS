@@ -33,6 +33,7 @@ const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
 const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const PublicSign = lazy(() => import("@/pages/PublicSign"));
+const ShareReport = lazy(() => import("@/pages/ShareReport"));
 
 /** Marketing + auth screens that must not use the app shell. */
 const PUBLIC_EXACT = new Set([
@@ -59,6 +60,7 @@ function isPublicPath(pathname) {
   if (p.startsWith("/book/")) return true;
   if (p.startsWith("/u/")) return true;
   if (p.startsWith("/sign/")) return true;
+  if (p.startsWith("/share/report/")) return true;
   return false;
 }
 
@@ -86,6 +88,7 @@ function PublicRoutes() {
           <Route path="/book/:slug" element={<PublicBooking />} />
           <Route path="/u/:username" element={<PublicProfile />} />
           <Route path="/sign/:token" element={<PublicSign />} />
+          <Route path="/share/report/:token" element={<ShareReport />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Suspense>

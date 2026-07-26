@@ -1,8 +1,10 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
-import { assertRateLimit } from "../_lib/rateLimit.js";
+import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
+import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.js";
+import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 
 function money(n) {
   return (Number(n) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -85,6 +87,23 @@ function buildSummary(businessData = {}) {
   };
 }
 
+/** Server-owned snapshot only — never trust client businessData / businessSummary. */
+async function loadOwnedBusinessSummary(admin, userId) {
+  const [jobsRes, invoicesRes, customersRes, expensesRes] = await Promise.all([
+    admin.from("jobs").select("title,status,customer_name,scheduled_date,scheduled_time,scheduled_at").eq("created_by_id", userId).limit(80),
+    admin.from("invoices").select("customer_name,bill_to,total,amount,balance_due,status,due_date,paid_at,invoice_date,created_date,created_at").eq("created_by_id", userId).limit(80),
+    admin.from("customers").select("first_name,last_name,name,email,lifetime_value").eq("created_by_id", userId).limit(40),
+    admin.from("expenses").select("amount,date,created_date,created_at").eq("created_by_id", userId).limit(80),
+  ]);
+  return buildSummary({
+    jobs: jobsRes.data || [],
+    invoices: invoicesRes.data || [],
+    customers: customersRes.data || [],
+    expenses: expensesRes.data || [],
+    employees: [],
+  });
+}
+
 function answerLocally(question, summary) {
   const q = String(question || "").toLowerCase();
   if (!summary) return null;
@@ -127,7 +146,7 @@ function answerLocally(question, summary) {
 
   if (/how many (customers|jobs|invoices|employees)/.test(q)) {
     const c = summary.counts;
-    return `You have **${c.customers}** customers, **${c.jobs}** jobs, **${c.invoices}** invoices, and **${c.employees}** employees.`;
+    return `**YOUR DATA** (current snapshot sample): **${c.customers}** customers, **${c.jobs}** jobs, **${c.invoices}** invoices, and **${c.employees}** employees. Counts are capped to recent rows — open Customers/Jobs/Invoices for the full list.`;
   }
 
   if (/schedule a job|create (an )?estimate|create (an )?invoice|record (a )?payment/.test(q)) {
@@ -135,19 +154,6 @@ function answerLocally(question, summary) {
   }
 
   return null;
-}
-
-function summaryPrompt(summary) {
-  return [
-    `Counts: ${JSON.stringify(summary.counts)}`,
-    `Collected this month: ${money(summary.collectedThisMonth)}`,
-    `Outstanding AR: ${money(summary.outstandingTotal)}`,
-    `Expenses this month: ${money(summary.expensesThisMonth)}`,
-    `Net this month: ${money(summary.netThisMonth)}`,
-    `Today's jobs: ${JSON.stringify(summary.todaysJobs)}`,
-    `Unpaid sample: ${JSON.stringify(summary.unpaidInvoices)}`,
-    `Top customers: ${JSON.stringify(summary.topCustomers)}`,
-  ].join("\n");
 }
 
 function detectConfirmIntent(question) {
@@ -201,10 +207,11 @@ function detectConfirmIntent(question) {
     return {
       type: "confirm",
       intent: send ? "send_invoice" : "create_invoice",
-      confirmationSummary: `${send ? "Send" : "Create"} an invoice${customer ? ` for ${customer}` : ""}${amount ? ` for $${amount}` : ""}?`,
+      confirmationSummary: `${send ? "Create invoice marked sent" : "Create"} an invoice${customer ? ` for ${customer}` : ""}${amount ? ` for $${amount}` : ""}?`,
       confirmationDetails: [
         customer ? `Customer: ${customer}` : "Customer: (optional)",
         amount ? `Amount: $${amount}` : "Amount: set after creation",
+        send ? "Note: marks status sent — email/share is separate in Invoices" : "Status: draft",
       ],
       params: { customer_name: customer, total: amount },
     };
@@ -219,7 +226,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!assertRateLimit(req, res, { limit: 30, windowMs: 60_000, key: "titanAI" })) return;
+  if (!(await assertRateLimitAsync(req, res, { limit: 30, windowMs: 60_000, key: "titanAI" }))) return;
 
   try {
     const authHeader = req.headers.authorization || "";
@@ -235,99 +242,28 @@ export default async function handler(req, res) {
     }
 
     const body = readJson(req);
-    const {
-      messages = [],
-      confirmedAction = null,
-      businessData = null,
-      businessSummary = null,
-      lawMastermind = false,
-    } = body;
+    const { messages = [], confirmedAction = null, lawMastermind = false } = body;
+    const pageContext = sanitizePageContext(body.pageContext);
 
     if (confirmedAction?.intent) {
-      // Delegate to executable office actions
-      try {
-        const { default: execute } = await import("./aiExecuteAction.js");
-        // Re-invoke logic inline to avoid nested HTTP
-        req.body = confirmedAction;
-        // Fall through: call shared insert logic by reusing handler pattern
-      } catch {
-        /* continue with inline */
+      if (!isAllowedAiIntent(confirmedAction.intent)) {
+        return res.status(400).json({ error: "That action is not available through Titan AI." });
       }
-
-      const intent = confirmedAction.intent;
-      const params = confirmedAction.params || {};
-      const user = userData.user;
-
       try {
-        if (intent === "schedule_job" || intent === "create_job") {
-          const row = {
-            title: params.title || `Job for ${params.customer_name || "Customer"}`,
-            customer_name: params.customer_name || "",
-            scheduled_date: params.scheduled_date || new Date().toISOString().slice(0, 10),
-            scheduled_time: params.scheduled_time || "09:00",
-            status: "scheduled",
-            service_type: params.service_type || "General",
-            notes: "Created by Titan AI",
-            created_by_id: user.id,
-            user_id: user.id,
-          };
-          const { data, error } = await admin.from("jobs").insert(row).select("*").maybeSingle();
-          if (error) throw error;
-          return res.status(200).json({
-            data: {
-              type: "done",
-              message: `Scheduled **${data.title}** for ${data.scheduled_date}. Open Jobs to fine-tune.`,
-              path: "/jobs",
-              id: data.id,
-            },
-          });
-        }
-        if (intent === "create_estimate") {
-          const total = Number(params.total) || 0;
-          const row = {
-            customer_name: params.customer_name || "",
-            status: "draft",
-            total,
-            line_items: [{ description: params.title || "Service", qty: 1, unit_price: total, total }],
-            notes: "Drafted by Titan AI",
-            created_by_id: user.id,
-            user_id: user.id,
-          };
-          const { data, error } = await admin.from("estimates").insert(row).select("*").maybeSingle();
-          if (error) throw error;
-          return res.status(200).json({
-            data: {
-              type: "done",
-              message: `Estimate draft ready${data.customer_name ? ` for **${data.customer_name}**` : ""} · $${total.toLocaleString()}.`,
-              path: "/estimates",
-              id: data.id,
-            },
-          });
-        }
-        if (intent === "create_invoice" || intent === "send_invoice") {
-          const total = Number(params.total) || 0;
-          const row = {
-            customer_name: params.customer_name || "",
-            status: intent === "send_invoice" ? "sent" : "draft",
-            total,
-            balance_due: total,
-            notes: "Created by Titan AI",
-            created_by_id: user.id,
-            user_id: user.id,
-          };
-          const { data, error } = await admin.from("invoices").insert(row).select("*").maybeSingle();
-          if (error) throw error;
-          return res.status(200).json({
-            data: {
-              type: "done",
-              message: `Invoice ${intent === "send_invoice" ? "sent" : "drafted"} · $${total.toLocaleString()}.`,
-              path: "/invoices",
-              id: data.id,
-            },
-          });
-        }
+        const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
+        const data = await executeAiOfficeAction(
+          admin,
+          userData.user,
+          confirmedAction.intent,
+          confirmedAction.params || {}
+        );
+        return res.status(200).json({ data });
       } catch (execErr) {
         logError("titanAI:action_execute", execErr);
+        const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
+        if (status !== 200) {
+          return res.status(status).json({ error: execErr.message || "Action rejected" });
+        }
         return res.status(200).json({
           data: {
             type: "error",
@@ -336,29 +272,28 @@ export default async function handler(req, res) {
           },
         });
       }
-
-      return res.status(200).json({
-        data: {
-          type: "done",
-          message: "Action noted — open Jobs, Invoices, or Estimates to finish.",
-        },
-      });
     }
 
     const lastMessage =
       messages.filter((m) => m.role === "user").slice(-1)[0]?.content || body.message || "";
-    const summary = businessSummary || buildSummary(businessData || {});
+    // Never trust client-supplied businessData (prompt injection). Load owned snapshot.
+    const summary = await loadOwnedBusinessSummary(admin, userData.user.id);
 
     const confirm = detectConfirmIntent(lastMessage);
     if (confirm) {
       return res.status(200).json({ data: confirm });
     }
 
-    // Fast path: answer common ops questions without calling OpenAI
     const local = answerLocally(lastMessage, summary);
     if (local) {
       return res.status(200).json({
-        data: { type: "response", message: local, source: "local" },
+        data: {
+          type: "response",
+          message: local,
+          source: "local",
+          dataBasis: "server_snapshot",
+          generalKnowledge: false,
+        },
       });
     }
 
@@ -374,13 +309,21 @@ export default async function handler(req, res) {
         data: {
           type: "response",
           source: "local",
+          dataBasis: "server_snapshot",
+          generalKnowledge: false,
           message:
-            `I'm Titan AI with your live snapshot: **${c.customers || 0}** customers, **${c.jobs || 0}** jobs, **${c.invoices || 0}** invoices.\n\n` +
+            `**YOUR DATA** (live snapshot): **${c.customers || 0}** customers, **${c.jobs || 0}** jobs, **${c.invoices || 0}** invoices.\n\n` +
             `Outstanding AR **${money(summary.outstandingTotal)}**, collected this month **${money(summary.collectedThisMonth)}**.\n\n` +
             `Ask about today's jobs, who owes money, revenue, profit, or top customers — or say "schedule a job" / "create an estimate" / "send an invoice".`,
         },
       });
     }
+
+    const systemPrompt = buildTitanSystemPrompt({
+      summary,
+      pageContext,
+      lawMastermind: Boolean(lawMastermind),
+    });
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -395,20 +338,7 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: lawMastermind
-              ? "You are Titan AI Law Mastermind — a rigorous legal strategy coach inside TitanOS. " +
-                "Help with issue spotting, plain-language explanations of legal concepts, contract red-flag reviews, research outlines, and structured next-step checklists. " +
-                "CRITICAL: You are NOT a lawyer and do NOT provide legal advice or attorney representation. Always include a brief disclaimer when discussing rights, liability, or contracts. " +
-                "Encourage consulting a licensed attorney for jurisdiction-specific decisions. " +
-                "Reply with: (1) one-line framing, (2) short markdown bullets, (3) risks/unknowns, (4) suggested next step. " +
-                "Use the business snapshot when relevant. Do not invent case law citations or fake statutes.\n\n" +
-                `BUSINESS SNAPSHOT:\n${summaryPrompt(summary)}`
-              : "You are Titan AI, a concise field-service business copilot inside TitanOS. " +
-                "Always reply with a clear structure: (1) a one-line answer, then (2) short markdown bullets if helpful, then (3) one suggested next step in TitanOS when relevant. " +
-                "Use the business snapshot for facts. Do not invent customers, jobs, or dollar amounts. " +
-                "If data is missing, say so plainly and suggest the right screen (Jobs, Estimates, Invoices, Customers, or Driver Hub). " +
-                "Keep a professional, friendly tone. Avoid slang, filler, and contradictory claims.\n\n" +
-                `BUSINESS SNAPSHOT:\n${summaryPrompt(summary)}`,
+            content: systemPrompt,
           },
           ...recent,
         ],
@@ -422,9 +352,11 @@ export default async function handler(req, res) {
         data: {
           type: "response",
           source: "local",
+          dataBasis: "server_snapshot",
+          generalKnowledge: false,
           message:
             local ||
-            `AI provider is briefly unavailable. Snapshot: **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. Try "today's jobs" or "who owes money?".`,
+            `AI provider is briefly unavailable. **YOUR DATA:** **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. Try "today's jobs" or "who owes money?".`,
         },
       });
     }
@@ -437,6 +369,8 @@ export default async function handler(req, res) {
         type: "response",
         message: content,
         source: "openai",
+        dataBasis: "server_snapshot",
+        generalKnowledge: true,
       },
     });
   } catch (error) {

@@ -16,9 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { DRIVER_SESSION_EVENT } from "@/components/driver/activity/DriverSessionKeepAlive";
-import { buildMissionSnapshot } from "@/lib/driverOs/missionSnapshot.js";
-import { resolveDriverIntent } from "@/lib/driverOs/intent.js";
+import { DRIVER_SESSION_EVENT, buildMissionSnapshot, resolveDriverIntent } from "@/lib/driverOs";
 
 function McCard({ icon: Icon, label, value, sub, accent = "cyan", className }) {
   const accents = {
@@ -89,19 +87,33 @@ export default function MissionControl({ userId, onOpenFolder }) {
       setSnap(null);
       return undefined;
     }
-    const refresh = () => setSnap(safeSnapshot(userId, { battery }));
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      setSnap(safeSnapshot(userId, { battery }));
+    };
     refresh();
     window.addEventListener(DRIVER_SESSION_EVENT, refresh);
     window.addEventListener("online", refresh);
     window.addEventListener("offline", refresh);
     window.addEventListener("focus", refresh);
-    const id = window.setInterval(refresh, 1000);
+    let id = window.setInterval(refresh, 1000);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        window.clearInterval(id);
+        id = 0;
+        return;
+      }
+      refresh();
+      if (!id) id = window.setInterval(refresh, 1000);
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener(DRIVER_SESSION_EVENT, refresh);
       window.removeEventListener("online", refresh);
       window.removeEventListener("offline", refresh);
       window.removeEventListener("focus", refresh);
-      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      if (id) window.clearInterval(id);
     };
   }, [userId, battery]);
 
@@ -167,7 +179,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
 
       {/* Essential metrics only */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <McCard icon={Activity} label="Stage" value={snap.stage} accent="amber" />
+        <McCard icon={Activity} label="Stage" value={snap.stage} sub={snap.workflowPhaseLabel} accent="amber" />
         <McCard
           icon={Wallet}
           label="Earnings"
@@ -175,7 +187,13 @@ export default function MissionControl({ userId, onOpenFolder }) {
           sub={snap.profitLabel}
           accent="emerald"
         />
-        <McCard icon={Timer} label="Shift" value={snap.shiftTimeLabel} accent="cyan" />
+        <McCard
+          icon={Timer}
+          label="Shift"
+          value={snap.shiftTimeLabel}
+          sub={snap.active ? `Idle ${snap.idleLabel}` : undefined}
+          accent="cyan"
+        />
         <McCard
           icon={Gauge}
           label="Miles"
@@ -192,7 +210,8 @@ export default function MissionControl({ userId, onOpenFolder }) {
         className="w-full flex items-center justify-between gap-2 rounded-xl bg-muted/25 px-3 py-2.5 min-h-[44px] text-left hover:bg-muted/40 transition-colors duration-150"
       >
         <span className="text-xs text-muted-foreground truncate">
-          Systems · {snap.rushLabel} · {snap.gpsLabel} · {snap.netLabel}
+          Systems · {snap.rushLabel}
+          {snap.rushIntensityLabel ? ` · ${snap.rushIntensityLabel}` : ""} · {snap.gpsLabel} · {snap.netLabel}
           {snap.goalPct != null ? ` · ${snap.goalPct}% goal` : ""}
         </span>
         <ChevronDown
@@ -206,7 +225,20 @@ export default function MissionControl({ userId, onOpenFolder }) {
 
       {systemsOpen ? (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          <McCard icon={Zap} label="Rush" value={snap.rushLabel} accent="amber" />
+          <McCard
+            icon={Zap}
+            label="Rush"
+            value={snap.rushLabel}
+            sub={`${snap.rushIntensityLabel || "Quiet"} · ${snap.rushIntensityTrips || 0} recent`}
+            accent="amber"
+          />
+          <McCard
+            icon={Timer}
+            label="Idle"
+            value={snap.idleLabel || "0s"}
+            sub={snap.driveLabel ? `Drive ${snap.driveLabel}` : undefined}
+            accent="slate"
+          />
           <McCard icon={MapPin} label="GPS" value={snap.gpsLabel} accent={snap.gpsOk ? "emerald" : "rose"} />
           <McCard icon={Battery} label="Battery" value={snap.batteryLabel} accent="slate" />
           <McCard

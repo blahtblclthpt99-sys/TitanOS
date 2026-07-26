@@ -1,0 +1,25 @@
+---
+description: TitanOS empty states — never blank pages
+alwaysApply: true
+---
+
+# Empty States
+
+Every empty screen provides guidance.
+
+## Required
+
+1. **Why** it is empty (plain language)
+2. **What to do next**
+3. **Shortcut** to create content or clear filters (primary CTA)
+4. Never a blank page or lone muted “No X yet” without action
+
+## Use
+
+`EmptyState` from `src/components/shared/EmptyState.jsx` — title, description, `onAction` / `actionTo`, optional secondary.
+
+Labs may pair with `FeatureHonestyBanner` / `ComingSoonState`.
+
+## Definition of done
+
+Incomplete if an empty list/collection leaves the user without a next step.

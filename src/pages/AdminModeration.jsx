@@ -131,7 +131,7 @@ export default function AdminModeration() {
               {trustReports.length ? (
                 <div className="space-y-3">
                   {trustReports.map((report) => (
-                    <article key={report.id} className="glass rounded-2xl border border-border p-5">
+                    <article key={report.id} className="titan-surface border border-border p-5">
                       <p className="text-sm font-semibold text-foreground capitalize">
                         {report.kind}
                         {report.type ? ` · ${String(report.type).replace(/_/g, " ")}` : ""}
@@ -201,7 +201,7 @@ export default function AdminModeration() {
               {reports.length ? (
                 <div className="space-y-3">
                   {reports.map((report) => (
-                    <article key={report.id} className="glass rounded-2xl border border-border p-5">
+                    <article key={report.id} className="titan-surface border border-border p-5">
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-foreground">
@@ -269,7 +269,7 @@ export default function AdminModeration() {
               {listings.length ? (
                 <div className="grid md:grid-cols-2 gap-3">
                   {listings.map((listing) => (
-                    <article key={listing.id} className="glass rounded-2xl border border-border p-5">
+                    <article key={listing.id} className="titan-surface border border-border p-5">
                       <p className="font-semibold text-foreground truncate">{listing.title || "Untitled listing"}</p>
                       <p className="text-xs font-mono text-titan-cyan mt-1">{listing.id}</p>
                       <p className="text-sm text-foreground/45 mt-3 line-clamp-2">{listing.description}</p>

@@ -4,6 +4,7 @@
  */
 import { getPlanConfig, PLANS } from "@/lib/plan";
 import { calculateFees, formatFeePercent, pickSeedRule } from "@/lib/feeEngine";
+export { formatMoney } from "@/lib/formatCurrency";
 
 /** @deprecated Prefer calcPlatformFee(amount, user) */
 export const PLATFORM_FEE_RATE = PLANS.worker_free.feeRate;
@@ -58,8 +59,4 @@ export function calcPlatformFee(amount, userOrPlanId = "worker_free") {
     appliedRules: result.appliedRules,
     _displayOnly: true,
   };
-}
-
-export function formatMoney(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
 }

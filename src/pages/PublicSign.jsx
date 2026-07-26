@@ -47,7 +47,7 @@ export default function PublicSign() {
   if (status === "missing") {
     return (
       <main className="min-h-screen bg-background grid place-items-center p-6">
-        <div className="glass rounded-3xl p-8 text-center text-foreground">
+        <div className="titan-surface p-8 text-center text-foreground">
           <h1 className="text-xl font-semibold">Contract unavailable</h1>
           <p className="text-foreground/45 mt-2">This signing link is invalid or has expired.</p>
         </div>
@@ -57,7 +57,7 @@ export default function PublicSign() {
   if (status === "success") {
     return (
       <main className="min-h-screen bg-background grid place-items-center p-6">
-        <div className="glass rounded-3xl p-8 text-center text-foreground">
+        <div className="titan-surface p-8 text-center text-foreground">
           <h1 className="text-2xl font-bold">Signed successfully</h1>
           <p className="text-muted-foreground mt-2">Thank you for signing this agreement.</p>
         </div>
@@ -67,7 +67,7 @@ export default function PublicSign() {
 
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <div className="max-w-3xl mx-auto glass rounded-3xl p-6 md:p-8 border border-border">
+      <div className="max-w-3xl mx-auto titan-surface p-6 md:p-8 border border-border">
         <p className="text-xs text-titan-cyan uppercase tracking-widest">TitanOS agreement</p>
         <h1 className="text-2xl font-bold mt-2">{contract.title}</h1>
         {contract.customer_name && <p className="text-muted-foreground mt-1">Prepared for {contract.customer_name}</p>}

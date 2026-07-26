@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
+import PageLoader from "@/components/shared/PageLoader";
 import {
   deleteTaxRule,
   loadTaxRules,
@@ -107,7 +108,7 @@ export default function AdminTaxRules() {
     toast({ title: "Restored starter tax catalog", description: "Verify rates before production use." });
   };
 
-  if (!authChecked) return null;
+  if (!authChecked) return <PageLoader variant="list" label="Loading tax rules" />;
   if (!isAdmin) {
     return (
       <PageShell>

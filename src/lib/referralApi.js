@@ -114,7 +114,7 @@ export async function attachReferralOnSignup({ userId, email, refCode }) {
   } catch {
     // Client fallback
     try {
-      const all = await api.entities.Referral.list("-created_date", 500);
+      const all = await api.entities.Referral.list("-created_date", 100);
       const match = all.find(
         (r) =>
           (r.referral_code || "").toUpperCase() === refCode.toUpperCase() &&

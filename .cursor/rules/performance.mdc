@@ -1,0 +1,31 @@
+---
+description: TitanOS performance — battery, renders, bundle, GPS
+alwaysApply: true
+---
+
+# Performance
+
+Treat battery, memory, and jank as product bugs.
+
+## Requirements
+
+- No unnecessary re-renders (isolate timers; don’t tick whole trees at 500ms)
+- Lazy load routes and heavy folders
+- Virtual scrolling for long lists
+- Memoization only where it prevents real work (follow React Compiler guidance; don’t spam useMemo)
+- Cache + prefetch thoughtfully; batch requests
+- Code split / tree shake; remove unused deps
+- Optimize images, icons, fonts
+- Compress responses (platform CDN); keep Vite chunks lean
+- Minimize GPS: one watch when possible, raise `maximumAge`, pause on `visibilityState === hidden`, throttle localStorage + session events
+- Animations ≤200ms; always honor reduce-motion
+
+## Driver GPS
+
+- Prefer shared / throttled telemetry persistence (seconds or Δmiles), not every fix
+- High accuracy only when moving / active delivery; idle can degrade
+- Never keep dual high-accuracy watches without reason
+
+## Definition of done
+
+A performance change is incomplete if it increases battery drain, doubles render frequency, or grows the critical path bundle without measurement.

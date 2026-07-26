@@ -1,0 +1,28 @@
+---
+description: Code quality — dead code, DRY, naming, typing, complexity, formatting
+alwaysApply: true
+---
+
+# CODE QUALITY
+
+Ship maintainable code. Prefer deletion and reuse over cleverness.
+
+## Rules
+
+1. **Dead code** — remove unused files, exports, and imports. Do not leave “maybe later” modules wired to nothing.
+2. **DRY** — one SpreadsheetML builder, one path sanitizer, one money formatter policy. Extend shared modules instead of copy-paste.
+3. **Extract** — pages/components over ~400 lines should split into focused modules; prefer existing PageShell / EmptyState / ExportMenu / catalog patterns.
+4. **Naming** — product name **TitanCom**; code prefix `titanComms*` / `TitanComms` is legacy-compatible. Prefer camelCase files for new libs (`driverHubApi.js`); keep `@shared/` for Node+Vite shared engines.
+5. **Comments** — explain *why* and invariants; delete stale TODOs; JSDoc public money/driver/auth helpers.
+6. **Typing** — JSDoc on exported APIs in `src/lib` and `api/_lib`; grow `checkJs` / shared TS gradually; never invent types that lie.
+7. **Complexity** — early returns, small pure helpers, no nested try/catch soup.
+8. **Formatting** — EditorConfig + ESLint; run `npm run lint` before calling work done. Prefer existing Tailwind token classes over one-off values.
+9. **Debt** — deprecate with a redirect/re-export, then delete callers; do not add new `@deprecated` shims without a removal plan.
+
+## Lint scope
+
+ESLint covers `src/pages`, `src/components` (except heavy `ui/`), `src/lib`, and `src/hooks`. `api/` uses Node globals — keep structured and redacted; expand lint carefully.
+
+## Definition of done
+
+Incomplete if new helpers duplicate existing export/money/path utilities, if orphans are added, or if lint is left red on touched files.

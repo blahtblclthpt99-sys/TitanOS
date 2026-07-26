@@ -117,7 +117,7 @@ function StatPill({ icon: Icon, label, value, accent }) {
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className={`glass rounded-2xl px-5 py-3 border ${accent} min-w-[110px]`}
+      className={`titan-surface px-5 py-3 border ${accent} min-w-[110px]`}
     >
       <div className="flex items-center gap-2 mb-1">
         <Icon className="w-3.5 h-3.5 text-muted-foreground" />
@@ -158,7 +158,7 @@ function ModuleCard({ module, index, isInstalled, isOnWaitlist, onView }) {
           : "border-border hover:border-border hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
       }`}
     >
-      <div className="absolute inset-0 glass opacity-80 group-hover:opacity-90 transition-opacity" />
+      <div className="absolute inset-0 titan-surface opacity-80 group-hover:opacity-90 transition-opacity" />
       <div className="absolute top-0 right-0 w-32 h-32 bg-muted rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-muted transition-colors" />
 
       {isInstalled && (
@@ -434,7 +434,7 @@ export default function Marketplace() {
         className="relative mb-8 rounded-3xl overflow-hidden border border-titan-cyan/20"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-titan-cyan/15 via-titan-indigo/10 to-titan-amber/5" />
-        <div className="absolute inset-0 glass" />
+        <div className="absolute inset-0 titan-surface" />
         <div className="relative p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="max-w-lg">
             <div className="flex items-center gap-2 mb-2">
@@ -454,7 +454,7 @@ export default function Marketplace() {
               { icon: Clock, label: "1-click install" },
               { icon: Download, label: "PayPal checkout" },
             ].map(({ icon: Icon, label }) => (
-              <span key={label} className="flex items-center gap-1.5 glass rounded-xl px-3 py-2 border border-border">
+              <span key={label} className="flex items-center gap-1.5 titan-surface px-3 py-2 border border-border">
                 <Icon className="w-3.5 h-3.5 text-titan-cyan" />
                 {label}
               </span>
@@ -479,7 +479,7 @@ export default function Marketplace() {
               <button
                 key={module.slug}
                 onClick={() => module.route ? navigate(module.route) : setSelected(module)}
-                className="flex items-center gap-2.5 glass rounded-2xl px-4 py-2.5 border border-titan-green/20 hover:border-titan-green/40 transition-all flex-shrink-0 group"
+                className="flex items-center gap-2.5 titan-surface px-4 py-2.5 border border-titan-green/20 hover:border-titan-green/40 transition-all flex-shrink-0 group"
               >
                 <span className="text-lg">{module.icon}</span>
                 <span className="text-xs font-medium text-foreground/90 group-hover:text-foreground whitespace-nowrap">
@@ -525,7 +525,7 @@ export default function Marketplace() {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-medium whitespace-nowrap transition-colors ${
-                isActive ? "text-titan-cyan" : "text-muted-foreground hover:text-foreground/85 glass border border-border"
+                isActive ? "text-titan-cyan" : "text-muted-foreground hover:text-foreground/85 titan-surface border border-border"
               }`}
             >
               {isActive && (
@@ -544,7 +544,7 @@ export default function Marketplace() {
 
       {/* Results count */}
       <div className="flex items-center gap-2 mb-5 text-xs text-muted-foreground">
-        <span className="glass rounded-full px-3 py-1 border border-border">
+        <span className="titan-surface rounded-full px-3 py-1 border border-border">
           {filtered.length} {filtered.length === 1 ? "module" : "modules"}
           {activeCategory !== "All" && ` in ${activeCategory}`}
         </span>
@@ -560,7 +560,7 @@ export default function Marketplace() {
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass rounded-3xl p-14 text-center border border-border"
+          className="titan-surface p-14 text-center border border-border"
         >
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
             <Search className="w-7 h-7 text-muted-foreground" />
@@ -602,7 +602,7 @@ export default function Marketplace() {
         <div className="absolute inset-0 bg-gradient-to-br from-titan-indigo/20 via-transparent to-titan-cyan/10" />
         <div className="absolute top-4 left-6 text-foreground/5 font-mono text-xs select-none">&lt;module /&gt;</div>
         <div className="absolute bottom-4 right-6 text-foreground/5 font-mono text-xs select-none">{"{ publish }"}</div>
-        <div className="relative glass p-8 md:p-10 text-center">
+        <div className="relative titan-surface p-8 md:p-10 text-center">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-titan-indigo/30 to-titan-cyan/20 border border-titan-indigo/30 flex items-center justify-center mx-auto mb-4 titan-glow">
             <Code2 className="w-8 h-8 text-titan-indigo" />
           </div>
@@ -676,7 +676,7 @@ export default function Marketplace() {
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        className="flex items-center gap-2.5 text-sm text-foreground/90 glass rounded-xl px-3 py-2 border border-border"
+                        className="flex items-center gap-2.5 text-sm text-foreground/90 titan-surface px-3 py-2 border border-border"
                       >
                         <div className="w-5 h-5 rounded-full bg-titan-green/15 flex items-center justify-center flex-shrink-0">
                           <Check className="w-3 h-3 text-titan-green" />
@@ -687,7 +687,7 @@ export default function Marketplace() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between glass rounded-2xl px-4 py-3 border border-border">
+                <div className="flex items-center justify-between titan-surface px-4 py-3 border border-border">
                   <div className="flex items-center gap-3">
                     <StarRating rating={selected.rating} />
                     <span className="text-xs text-muted-foreground">{selected.review_count} reviews</span>
@@ -723,7 +723,7 @@ export default function Marketplace() {
 
                 {selected.status === "coming_soon" ? (
                   <div className="space-y-3">
-                    <div className="glass rounded-2xl p-4 border border-titan-amber/20 text-center">
+                    <div className="titan-surface p-4 border border-titan-amber/20 text-center">
                       <Sparkles className="w-5 h-5 text-titan-amber mx-auto mb-2" />
                       <p className="text-sm font-semibold text-titan-amber mb-1">Coming Soon</p>
                       <p className="text-xs text-muted-foreground">Be first to know when this launches.</p>
@@ -747,7 +747,7 @@ export default function Marketplace() {
                   </div>
                 ) : selectedInstalled ? (
                   <div className="space-y-3">
-                    <div className="glass rounded-2xl p-4 border border-titan-green/25 text-center bg-titan-green/5">
+                    <div className="titan-surface p-4 border border-titan-green/25 text-center bg-titan-green/5">
                       <PackageCheck className="w-5 h-5 text-titan-green mx-auto mb-2" />
                       <p className="text-sm font-semibold text-titan-green mb-1">Installed &amp; Active</p>
                       <p className="text-xs text-muted-foreground">This module is running on your account.</p>

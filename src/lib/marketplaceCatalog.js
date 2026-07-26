@@ -385,7 +385,7 @@ export const MARKETPLACE_MODULES = [
     review_count: 189,
     icon: "📈",
     gradient: "from-titan-green/20 to-titan-amber/20",
-    features: ["Job costing", "Tech performance", "Export to PDF/CSV", "Custom date ranges"],
+    features: ["Job costing", "Tech performance", "CSV / Excel / Print→PDF", "Custom date ranges"],
     install_count: 3100,
     route: "/reports",
   }),

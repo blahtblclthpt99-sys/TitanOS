@@ -1,0 +1,29 @@
+---
+description: TitanOS security — assume hostile input on every endpoint
+alwaysApply: true
+---
+
+# Security
+
+Every endpoint, upload, message, payment, AI call, and GPS write assumes hostile input.
+
+## Requirements
+
+- Authentication / authorization / sessions / permissions validated server-side
+- Tokens hashed at rest when stored (portal); secrets compared with constant-time helpers
+- API routes: JWT or signed webhook / hook secret — never trust client money or entitlement fields
+- Uploads: private storage + uid path; validate size/type
+- Payments: signature verification + idempotency; settle only on captured funds
+- AI: ownership + money sanitize; never trust client business snapshots or unbounded actions
+- GPS / location: minimize retention; treat as sensitive PII
+- Secrets only in server env; never `VITE_` for private keys
+- Security headers (CSP, HSTS, frame deny) via platform config
+- Rate limit auth, OTP, OCR, AI, mail, billing hooks
+- Validate + sanitize + filter inputs; encode outputs; allowlist deep links
+- Defend CSRF (SameSite + CORS allowlist), XSS, SQLi (parameterized / PostgREST), prompt injection
+- Abuse / brute-force / replay: rate limits, OTP attempt caps, webhook idempotency
+- Log safely (redact secrets); monitor webhooks and privilege paths; alert on spikes
+
+## Definition of done
+
+Incomplete if a client can escalate privileges, mark money settled, inject prompts that change facts, open-redirect via notifications, or burn paid APIs without auth/rate limits.

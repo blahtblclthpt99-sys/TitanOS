@@ -10,7 +10,15 @@
 
 TitanOS is no longer a prototype or feature demo.
 
-Treat TitanOS as a commercial SaaS / Driver Operating System preparing for public launch.
+Treat TitanOS as a **cohesive, enterprise-grade operating system** for workers, contractors, drivers, businesses, and teams — preparing for public launch.
+
+It must **not** feel like a web application with many features. Every interaction is fast, intuitive, visually consistent, reliable, and purposeful. Architecture stays modular; UI minimizes cognitive load; AI improves productivity; the platform scales and remains maintainable for years.
+
+### FINAL OBJECTIVE — Guiding Principle
+
+**No feature ships until it is secure, performant, intuitive, accessible, thoroughly tested, visually polished, and integrated seamlessly with the rest of TitanOS.**
+
+Source: `.cursor/rules/final-objective.mdc` · `docs/FINAL_OBJECTIVE.md`.
 
 Every screen, workflow, API, animation, calculation, database query, AI interaction, and user action must be reviewed, redesigned where necessary, optimized, tested, hardened, polished, documented, and standardized.
 
@@ -27,6 +35,7 @@ Nothing is considered complete until it is:
 - Secure  
 - Scalable  
 - Honest (never fake money, fake live systems, or placeholder social proof presented as real)
+- Integrated into OS domains (not a bolted-on mini-app)
 
 ---
 
@@ -65,6 +74,389 @@ Rules:
 - Live/ops above the fold; analytics inside folders.  
 - No heavy letter-spacing uppercase chrome that stretches text on mobile.  
 - Large touch targets (≥44px). Animations ≤200ms. Respect reduce-motion.
+
+---
+
+## PERFORMANCE
+
+Review queries, APIs, renders, components, animations, calculations, and subscriptions before calling work done.
+
+### Requirements
+
+- No unnecessary re-renders; isolate live clocks from page trees  
+- Lazy loading + code splitting + tree shaking  
+- Virtual scrolling for long lists  
+- Memoization only where it prevents real work  
+- Caching, prefetching, request batching  
+- Optimized images / icons / fonts  
+- DB indexing + connection pooling on the server  
+- Compression, smaller bundles, faster startup, lower memory  
+- **Minimize GPS polling while preserving accuracy** — throttle persistence, pause when backgrounded, avoid dual high-accuracy watches  
+
+Source: `.cursor/rules/performance.mdc`. Hotspots historically: Driver session + DoorDash GPS, Mission Control / DoorDash UI ticks, Community polling without visibility checks.
+
+---
+
+## DATABASE
+
+Review every table, relationship, foreign key, index, policy, trigger, function, and migration before calling work done.
+
+### Requirements
+
+- Normalize data; avoid duplication of entitlement / money truth  
+- Referential integrity (real FKs for new tables; document soft IDs when legacy)  
+- Proper indexes on ownership + hot filters used by RLS and lists  
+- Optimize queries; batch where the API layer allows  
+- **RLS on every public table** — least privilege, validate ownership, prevent leakage  
+- Privileged fields and settlement status are server/admin-only (triggers / service_role)  
+- SECURITY DEFINER: fixed `search_path`; revoke EXECUTE from PUBLIC unless intentional public RPC  
+
+Source: `.cursor/rules/database.mdc`. Apply `supabase/migrations/032_database_integrity_lockdown.sql` and verify with `npm run test:db-security`.
+
+---
+
+## SECURITY
+
+Audit authentication, authorization, sessions, permissions, tokens, API routes, uploads, messages, payments, AI, GPS/location, files, logs, encryption, secrets, headers, rate limiting, validation, sanitization, CSRF/XSS/SQLi/prompt injection, abuse, brute force, replay, logging, monitoring, and alerts.
+
+### Requirements
+
+- Every endpoint assumes **hostile input**  
+- Server-side authZ; hash portal tokens; constant-time secret compares  
+- Payments: verify signatures; settle only on captured funds; idempotency  
+- AI: owned data only; sanitize money/actions; block prompt-injected “facts”  
+- Rate-limit OTP, register, OCR, AI, mail, billing hooks  
+- Allowlist notification deep links; private uploads; redact logs  
+
+Source: `.cursor/rules/security.mdc`.
+
+---
+
+## ERROR HANDLING
+
+Nothing should fail silently.
+
+Every exception should:
+
+- **Be logged** (`logError` / `reportError` with `category:route`)  
+- **Be categorized** (payments, portal, webhooks, ai, referrals, ocr, email, admin, ui)  
+- **Be recoverable when possible** (retry, keep prior UI state, honest `_source: local`)  
+- **Provide useful feedback** (toast / ErrorState / `{ error, code, requestId }`)  
+- **Never expose internal implementation details** (no Stripe/DB/stack in client responses)
+
+Use `api/_lib/apiError.js` (`sendApiError`, `AppError`) and `src/lib/reportError.js`.
+
+Source: `.cursor/rules/error-handling.mdc`.
+
+---
+
+## LOADING STATES
+
+Every asynchronous operation should display appropriate loading feedback.
+
+- Skeleton loaders (`PageLoader`) for page fetches  
+- Progress bars for long work  
+- Spinners only when necessary (Suspense / inline)  
+- Optimistic UI where rollback is clear  
+- Graceful retries (`ErrorState`)  
+- Offline indicators (`OfflineIndicator`)  
+- Sync status when data is local/stub (`SyncStatus`)  
+
+Never `return null` or blank content while loading. Source: `.cursor/rules/loading-states.mdc`.
+
+---
+
+## EMPTY STATES
+
+Every empty screen should provide guidance.
+
+- Explain **why** it is empty  
+- Explain **what to do next**  
+- Offer a **shortcut** to create content (or clear filters)  
+- Never show blank pages  
+
+Use `EmptyState`. Source: `.cursor/rules/empty-states.mdc`.
+
+---
+
+## MICROINTERACTIONS
+
+Every action should provide feedback.
+
+**Surfaces:** buttons, cards, forms, tabs, uploads, downloads, messages, voice, GPS, payments, jobs.
+
+**Motion:** subtle, fast (≤150–200ms), smooth, consistent. Honor reduce-motion.
+
+**Patterns:**
+- Press: `.btn-press` / `PRESSABLE` / `<Button>` — scale `0.97`
+- Success / error: `toastDone` / `toastFail` (`src/lib/interaction.js`) or `SuccessCheck`
+- In-flight: disable + “Saving…” / “Uploading…”
+- Haptics: `haptic()` for primary ops only (PTT, shift, delivery) — never under reduce-motion
+
+Source: `.cursor/rules/microinteractions.mdc`.
+
+---
+
+## VISUAL CONSISTENCY
+
+Everything should use the same design language.
+
+Standardize: typography, spacing, margins, padding, border radius, cards, buttons, icons, colors, elevation, animations, transitions, modals, dialogs, tooltips, menus.
+
+| Concern | Use |
+|---------|-----|
+| Page chrome | `PageShell` + `PageHeader` |
+| Surfaces | `titan-surface` / `<Card>` (not `glass`) |
+| Radius | controls `md`; cards/overlays `lg`; no `rounded-3xl` in app UI |
+| Type | `text-title` / `text-heading` / `text-body` / `text-caption` |
+| Elevation | `shadow-soft` · `shadow-lift` |
+| Motion | `duration-fast` \| `base` \| `slow` (≤250ms) |
+| Overlays | Dialog / Sheet / Dropdown / Tooltip / Popover from `components/ui` |
+
+Source: `.cursor/rules/visual-consistency.mdc` · recipes in `src/lib/design-system.js`.
+
+---
+
+## ACCESSIBILITY
+
+Every interactive surface must work with keyboard, screen reader, touch (≥44px), and reduced motion — across phone, tablet, desktop, landscape, and high-DPI.
+
+| Area | Rule |
+|------|------|
+| Keyboard | Native controls; Escape closes overlays; `activatableProps` for custom activators |
+| Screen reader | Icon-only `aria-label`; dialogs need Title + Description (or intentional `aria-describedby={undefined}`); toasts call `announce()` |
+| Touch | ≥44×44px (`CONTROL.md`) |
+| Contrast | Semantic tokens; no low-opacity muted text for meaning; honor high-contrast |
+| Focus | `.focus-ring` / `focus-visible:ring-*` |
+| Reduced motion | `usePrefersReducedMotion`; `html.reduce-motion`; no haptic when reduced |
+| Scaling | Rem layout; text scales 90–125% |
+| Layout | `PageShell` clears chrome; `md:` desktop nav; short landscape must not crush content |
+
+Source: `.cursor/rules/accessibility.mdc` · helpers in `src/lib/a11y.js`.
+
+---
+
+## MOBILE EXPERIENCE
+
+Optimize for one-handed use, thumb reach, driving, large controls, minimal typing, offline honesty, fast resume, background strategy, battery, and GPS efficiency.
+
+| Area | Rule |
+|------|------|
+| Thumb zone | Nav + primary CTAs in bottom third; no colliding FABs |
+| Driving | Live Driver Hub: hide Create/AI dock; one ≥48px next action; voice/chips over forms |
+| Offline | Honest banner (device/shell — not full sync queue); `SyncStatus` for local writes |
+| GPS | One watch — DoorDash wins while delivery active; suspend when hidden |
+| Battery | `useVisibilityInterval`; wake lock only when needed |
+| Chrome | `--mobile-chrome-bottom` for dock / bulk bars |
+
+Source: `.cursor/rules/mobile-experience.mdc`. Overlaps `performance.mdc` for GPS/battery detail.
+
+---
+
+## DRIVER HUB
+
+Convert Driver Hub into a **workflow engine**.
+
+- **Mission Control** — sticky live-only (status, next action, miles, idle, rush)  
+- **Explorer** — analytics/history/reports/settings in IA groups (`live` / `history` / `analytics` / `reports` / `settings`)  
+- **Auto** — trip stop detection + opt-in motion auto-start; delivery classification; clock rush + intensity; idle timers; digests on shift/delivery end  
+
+Source: `.cursor/rules/driver-hub.mdc` · `workflowEngine.js` · `analyticsDigest.js`.
+
+---
+
+## TITAN AI
+
+Titan AI should understand context, pages, workflows, and user history — then act only through approved APIs.
+
+| Rule | Detail |
+|------|--------|
+| Context | Allowlisted `pageContext` + page catalog (`api/_lib/aiContext.js`) |
+| Data | Server-owned snapshot only — never trust client business summaries |
+| Actions | `ALLOWED_AI_INTENTS` → `executeAiOfficeAction` only |
+| Output | Explanations + recommendations; label **YOUR DATA** vs **GENERAL KNOWLEDGE** |
+| Honesty | No invented customers/jobs/money; no claimed side effects the API doesn't do |
+
+Source: `.cursor/rules/titan-ai.mdc`.
+
+---
+
+## COMMS (TitanCom)
+
+Crew PTT must feel like a radio: fast press-to-audio, survive drops, respect channel access, notify reliably.
+
+| Rule | Detail |
+|------|--------|
+| Latency | Warm mic (mute/unmute); keep WebRTC mesh across presses |
+| Reconnect | Backoff on Realtime drop + online/visibility; honest Reconnecting status |
+| Audio | AEC/NS/AGC; STUN + optional `VITE_TURN_*`; Bluetooth via OS route |
+| Permissions | Membership gate before Realtime topic; `tc-*` = open network radios |
+| PTT | Pointer + Space; floor lease; SOS broadcast |
+| Notify | Channel text → inbox + OS push → `/comms?channel=` |
+
+Source: `.cursor/rules/comms.mdc` · `titanCommsPtt.js` · `titanCommsApi.js`.
+
+---
+
+## SEARCH
+
+Global search must be **instant** (sync local index) and cover the OS:
+
+Jobs · Trips · Messages · Invoices · Customers · Voice transcripts · Files · Analytics · Settings · AI conversations.
+
+Warm/prefetch fills the index in the background; keystrokes never await the network.
+
+Source: `.cursor/rules/search.mdc` · `searchIndex.js` · `globalSearch.js`.
+
+---
+
+## REPORTING
+
+Every module with tabular/summary data must export through the shared stack:
+
+| Format | Implementation |
+|--------|----------------|
+| CSV | `downloadCsv` |
+| Excel | SpreadsheetML `.xls` |
+| PDF | Printable HTML → Print → Save as PDF |
+| Print | `openPrintableReport` |
+| Share | `/share/report/:token` (device link, 7-day expiry — labeled) |
+| Schedule | Local cadence while app open — no silent email claim |
+
+UI: `ExportMenu` on Reports, Finances, Analytics, Jobs, Customers, Invoices, Tax expenses.  
+Source: `.cursor/rules/reporting.mdc` · `src/lib/export/*`.
+
+---
+
+## SETTINGS
+
+Settings must be **categorized**, **searchable**, **documented**, with explicit **defaults** and **reset**.
+
+| Rule | Detail |
+|------|--------|
+| Categories | Account · Business · Communications · Safety · Appearance |
+| Search | In-page + catalog-backed options |
+| Docs | Every panel/option has description + docs |
+| Defaults | Notifications on; privacy sharing off; marketing weekly; theme system |
+| Reset | Restore defaults on preference panels only |
+
+Source: `.cursor/rules/settings.mdc` · `settingsCatalog.js`.
+
+---
+
+## TESTING
+
+Automated tests protect money, driver, auth, and critical OS flows.
+
+| Layer | Command / tool | Focus |
+|------|----------------|--------|
+| Unit | `npm test` (`node --test` + `scripts/node-test-setup.mjs`) | Fees, money, driver, export, search, settings, AI intents, GPS owner, voice |
+| Integration | Same pack + ops scripts | API errors, offline wiring, payments drills |
+| E2E | `npm run test:e2e` (Playwright) | Landing, login, privacy smoke; Chromium default |
+| Cross-browser / device | `npm run test:e2e:browsers` | Chromium desktop/mobile, Firefox, WebKit |
+| Regression | Hardening + wiring suites | Nav/comms surfaces, production policies |
+| Performance | `test:perf` + `ops:load*` | Search/export microbench; HTTP load vs deploy |
+| Accessibility | `test:a11y` | Catalog + structural a11y smoke |
+| Security | `test:security` + hire/payments/auth | Allowlists, headers, no secret leaks |
+| Offline / GPS / Voice / AI | `test:offline` `test:gps` `test:voice` `test:ai` | Local stores, DoorDash GNSS owner, intent parse |
+
+Incomplete if new business logic ships without a Node test, or CI skips the pack.
+
+Source: `.cursor/rules/testing.mdc`.
+
+---
+
+## OBSERVABILITY
+
+Production must be **visible** without leaking PII.
+
+| Capability | Detail |
+|------|--------|
+| Crash reporting | Sentry client + API (`sendDefaultPii: false`) |
+| Performance | Browser tracing + web vitals; API traces; optional profiling |
+| Structured logging | JSON `safeLog` levels + `X-Request-Id` |
+| Health | `/api/functions/health` (+ deep ops probe) |
+| Analytics | Allowlisted first-party events; Privacy opt-out |
+| Audit trails | `audit_events` + fee/webhook ledgers |
+| Feature flags | Defaults + `/api/functions/featureFlags` + `FEATURE_FLAGS_JSON` |
+| Session replay | Masked Sentry Replay — opt-in + `VITE_SENTRY_REPLAY` |
+| Alerting | `OPS_ALERT_WEBHOOK_URL` / Slack on API 5xx |
+
+Source: `.cursor/rules/observability.mdc`.
+
+---
+
+## CODE QUALITY
+
+Prefer deletion and reuse over cleverness.
+
+| Rule | Detail |
+|------|--------|
+| Dead code | Remove unused files/exports/imports |
+| DRY | Shared export/excel, safePath, formatMoney |
+| Extract | Split >400-line surfaces; reuse PageShell / ExportMenu / catalogs |
+| Naming | Product **TitanCom**; libs camelCase; `@shared/` for dual-runtime |
+| Typing | JSDoc public money/driver/auth APIs |
+| Formatting | EditorConfig + ESLint (`npm run lint`) |
+
+Source: `.cursor/rules/code-quality.mdc`.
+
+---
+
+## SCALABILITY
+
+Design for **millions of users, trips, and jobs**. No one-page-load architecture.
+
+| Rule | Detail |
+|------|--------|
+| Bounded reads | Prefer ≤100 rows; adapter max 500 is a safety net |
+| Pagination | Keyset/`filterPage` for deep history |
+| Indexes | Filter/RLS columns indexed (migration 034) |
+| Hot path | Browser→PostgREST; measure authenticated p95 |
+| Local caps | Messages/journals/search enforce MAX_* |
+| Rate limits | Upstash when set; `assertRateLimitAsync` on money/AI |
+| Serverless | Explicit `maxDuration` on slow routes |
+| Driver trips | Cloud `driver_trips` + local cache ring |
+
+Source: `.cursor/rules/scalability.mdc` · `docs/SCALE_READINESS.md`.
+
+---
+
+## MAINTAINABILITY
+
+Modular architecture so the next developer can ship safely.
+
+| Rule | Detail |
+|------|--------|
+| Layers | pages → components → lib/*Api → api → shared → migrations |
+| Barrels | `@/lib/driverActivity`, `@/lib/driverOs`, `@/lib/export`, `@/components/shared` |
+| MODULE.md | Feature folders document public API + do-nots |
+| Interfaces | JSDoc contracts in `driverOs/interfaces.js` |
+| Onboarding | `ARCHITECTURE.md`, `docs/ONBOARDING.md`, `CONTRIBUTING.md` |
+
+Source: `.cursor/rules/maintainability.mdc`.
+
+---
+
+## FINAL QA
+
+Before calling TitanOS production-ready: clear critical / high / medium issues and document residual risk honestly.
+
+| Gate | Detail |
+|------|--------|
+| Automated | `npm test` (incl. `test:final-qa`), lint, typecheck, build, Playwright smoke |
+| Structural | Nav↔routes, ExportMenu on money lists, migrations 031–034, GPS watch release, escrow honesty |
+| Ops still required | Apply 031–034 + `test:db-security`; live Stripe Checkout→webhook; device GPS/offline |
+
+Source: `.cursor/rules/final-qa.mdc` · `docs/FINAL_QA.md`. Honest ceiling: **controlled beta** until ops boxes are checked.
+
+---
+
+## FINAL OBJECTIVE
+
+TitanOS is a **cohesive operating system**, not a feature pile. Guiding principle: no feature ships until secure, performant, intuitive, accessible, tested, polished, and integrated.
+
+Source: `.cursor/rules/final-objective.mdc` · `docs/FINAL_OBJECTIVE.md`.
 
 ---
 

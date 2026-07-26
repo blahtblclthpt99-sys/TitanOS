@@ -86,6 +86,25 @@ export function classifyRushWindow(date = new Date(), windows = DEFAULT_RUSH_WIN
   return windows[windows.length - 1] || { id: "unknown", label: "Unknown" };
 }
 
+/**
+ * Demand intensity from recent trip density (additive to clock rush windows).
+ * @returns {{ id: "quiet"|"normal"|"busy", label: string, recentTrips: number, windowMin: number }}
+ */
+export function detectRushIntensity(trips = [], now = new Date(), { windowMin = 90 } = {}) {
+  const end = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  const start = end - Math.max(15, Number(windowMin) || 90) * 60 * 1000;
+  let recent = 0;
+  for (const t of trips || []) {
+    const raw = t.started_at || t.startedAt || t.startTime || t.ended_at || t.endedAt;
+    if (!raw) continue;
+    const ms = new Date(raw).getTime();
+    if (Number.isFinite(ms) && ms >= start && ms <= end) recent += 1;
+  }
+  if (recent >= 5) return { id: "busy", label: "Busy", recentTrips: recent, windowMin };
+  if (recent >= 2) return { id: "normal", label: "Normal", recentTrips: recent, windowMin };
+  return { id: "quiet", label: "Quiet", recentTrips: recent, windowMin };
+}
+
 export function estimateFuelCost(miles, { mpg = 22, gasUsd = 3.5 } = {}) {
   const m = Math.max(0, num(miles));
   const g = Math.max(1, num(mpg, 22));

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import {
   Calendar,
   DollarSign,
@@ -13,11 +14,17 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { matchVoiceCommand, speechSupported } from "@/lib/voiceCommands";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { readSession } from "@/lib/driverHubApi";
+import { DD_EVENT, readActiveDelivery } from "@/lib/driverActivity";
+import { DRIVER_SESSION_EVENT } from "@/lib/driverOs";
+import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";
+import { upsertSearchDocs } from "@/lib/searchIndex";
 
 const AI_SUGGESTIONS = [
   { icon: Calendar, label: "Schedule a job", action: "/jobs?new=1" },
@@ -27,18 +34,60 @@ const AI_SUGGESTIONS = [
   { icon: Users, label: "Find a customer", action: "/customers" },
 ];
 
+function useLiveDrivingMode(userId) {
+  const { pathname } = useLocation();
+  const onDriver = pathname === "/driver";
+  const [live, setLive] = useState(() => {
+    if (!userId || !onDriver) return false;
+    const session = readSession(userId);
+    const delivery = readActiveDelivery(userId);
+    return Boolean(session?.active) || delivery?.status === "active";
+  });
+
+  useEffect(() => {
+    if (!userId || !onDriver) {
+      setLive(false);
+      return undefined;
+    }
+    const sync = () => {
+      const session = readSession(userId);
+      const delivery = readActiveDelivery(userId);
+      setLive(Boolean(session?.active) || delivery?.status === "active");
+    };
+    sync();
+    window.addEventListener(DRIVER_SESSION_EVENT, sync);
+    window.addEventListener(DD_EVENT, sync);
+    window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.removeEventListener(DRIVER_SESSION_EVENT, sync);
+      window.removeEventListener(DD_EVENT, sync);
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, [userId, onDriver]);
+
+  return onDriver && live;
+}
+
 /**
  * Single mobile action dock above the bottom nav — Create, AI, Voice.
- * Replaces stacked FABs that collided with each other and the tab bar.
+ * Hidden in live driving mode on Driver Hub so Mission Control owns the thumb zone.
  */
 export default function MobileActionDock({ onOpenFeedback }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
+  const drivingMode = useLiveDrivingMode(user?.id);
   const rootRef = useRef(null);
-  const [menu, setMenu] = useState(null); // "create" | "ai" | null
+  const [menu, setMenu] = useState(null);
   const [voiceSupported] = useState(() => speechSupported());
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if (drivingMode) setMenu(null);
+  }, [drivingMode]);
 
   useEffect(() => {
     const onPointer = (e) => {
@@ -95,6 +144,10 @@ export default function MobileActionDock({ onOpenFeedback }) {
     };
     recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || "";
+      if (user?.id && transcript.trim()) {
+        appendVoiceTranscript(user.id, transcript, "dock");
+        upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id));
+      }
       const match = matchVoiceCommand(transcript);
       if (match?.path) {
         toast({ title: match.label, description: `“${transcript}”` });
@@ -108,11 +161,13 @@ export default function MobileActionDock({ onOpenFeedback }) {
   const dockBtn =
     "inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-border bg-card text-foreground shadow-soft transition-colors focus-ring hover:bg-muted aria-expanded:bg-primary aria-expanded:text-primary-foreground aria-expanded:border-primary";
 
+  if (drivingMode) return null;
+
   return (
     <div
       ref={rootRef}
       className="md:hidden fixed z-50 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
-      style={{ bottom: "calc(env(safe-area-inset-bottom) + 4.75rem)" }}
+      style={{ bottom: "var(--mobile-chrome-bottom, calc(env(safe-area-inset-bottom) + 4.75rem))" }}
     >
       <AnimatePresence>
         {menu && (

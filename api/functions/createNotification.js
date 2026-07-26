@@ -2,7 +2,7 @@ import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
-import { captureApiException } from "../_lib/sentry.js";
+import { sanitizeAppPath, isUuid } from "../_lib/safePath.js";
 
 async function canNotifyUser(admin, callerId, targetId, isAdmin) {
   if (callerId === targetId || isAdmin) return true;
@@ -84,6 +84,10 @@ export default async function handler(req, res) {
     if (!userId || !title) {
       return res.status(400).json({ error: "user_id and title required" });
     }
+    if (!isUuid(userId)) {
+      return res.status(400).json({ error: "user_id must be a valid UUID" });
+    }
+    const link = sanitizeAppPath(body.link);
 
     const { admin, user } = auth;
     const { data: profile } = await admin.from("profiles").select("role").eq("id", user.id).maybeSingle();
@@ -106,17 +110,29 @@ export default async function handler(req, res) {
         type,
         title,
         body: String(body.body || "").slice(0, 2000),
-        link: String(body.link || "").slice(0, 500),
+        link,
         meta: body.meta && typeof body.meta === "object" ? body.meta : {},
         created_by_id: user.id,
       })
       .select("*")
       .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      const { sendDbClientError } = await import("../_lib/apiError.js");
+      return sendDbClientError(res, error, {
+        route: "createNotification",
+        category: "notifications",
+        publicMessage: "Could not create notification",
+      });
+    }
     return res.status(200).json({ notification: data });
   } catch (error) {
-    captureApiException(error, { tags: { route: "createNotification" } });
-    return res.status(500).json({ error: "Failed to create notification" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "createNotification",
+      category: "notifications",
+      publicMessage: "Failed to create notification",
+      publicCode: "NOTIFICATION_CREATE_FAILED",
+    });
   }
 }

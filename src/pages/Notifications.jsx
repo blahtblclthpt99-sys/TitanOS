@@ -202,13 +202,13 @@ export default function Notifications() {
         </FeatureHonestyBanner>
 
         {betaBadgeLabel() && (
-          <div className="glass rounded-2xl mb-4 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">
+          <div className="titan-surface mb-4 px-4 py-2 border border-titan-cyan/20 text-xs font-semibold text-titan-cyan">
             {betaBadgeLabel()}
           </div>
         )}
 
         {digest?.title && digest.top?.length > 0 && (
-          <div className="glass rounded-2xl border border-titan-cyan/25 bg-titan-cyan/[0.04] px-4 py-3 mb-4" role="status" aria-live="polite">
+          <div className="titan-surface border border-titan-cyan/25 bg-titan-cyan/[0.04] px-4 py-3 mb-4" role="status" aria-live="polite">
             <p className="text-xs font-semibold text-titan-cyan">{digest.title}</p>
             <p className="text-sm text-foreground mt-0.5">{digest.body}</p>
           </div>
@@ -257,7 +257,7 @@ export default function Notifications() {
         {loading ? (
           <PageLoader variant="list" label="Loading notifications" />
         ) : notifications.length ? (
-          <div className="glass rounded-2xl border border-border overflow-hidden">
+          <div className="titan-surface border border-border overflow-hidden">
             {notifications.map((notification) => {
               const cat = resolveNotificationCategory(notification);
               const Icon = categoryIcon(cat);
@@ -311,7 +311,7 @@ export default function Notifications() {
             })}
           </div>
         ) : (
-          <div className="glass rounded-3xl border border-border">
+          <div className="titan-surface border border-border">
             <EmptyState
               icon={Bell}
               title={unreadOnly ? "No unread notifications" : "You're all caught up"}

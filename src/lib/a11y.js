@@ -26,8 +26,17 @@ let liveRegion;
 
 function ensureLiveRegion() {
   if (typeof document === "undefined") return null;
+  const existing = document.getElementById("a11y-status");
+  if (existing) {
+    liveRegion = existing;
+    if (!existing.getAttribute("role")) existing.setAttribute("role", "status");
+    if (!existing.getAttribute("aria-live")) existing.setAttribute("aria-live", "polite");
+    if (!existing.getAttribute("aria-atomic")) existing.setAttribute("aria-atomic", "true");
+    return existing;
+  }
   if (liveRegion && document.body.contains(liveRegion)) return liveRegion;
   liveRegion = document.createElement("div");
+  liveRegion.id = "a11y-status";
   liveRegion.setAttribute("role", "status");
   liveRegion.setAttribute("aria-live", "polite");
   liveRegion.setAttribute("aria-atomic", "true");

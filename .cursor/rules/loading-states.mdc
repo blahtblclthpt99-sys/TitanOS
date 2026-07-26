@@ -1,0 +1,28 @@
+---
+description: TitanOS loading states — never leave users guessing
+alwaysApply: true
+---
+
+# Loading States
+
+Every asynchronous operation shows appropriate feedback.
+
+## Prefer
+
+- **Skeleton loaders** via `PageLoader` (`list` | `cards` | `detail` | `dashboard`) for full-page fetches
+- **Progress bars** inside PageLoader / long uploads
+- **Spinners** only for Suspense, inline buttons, or tiny slots
+- **Optimistic UI** when rollback is clear (e.g. mark-read) — revert + toast on failure
+- **Graceful retries** via `ErrorState` `onRetry`
+- **Offline** via global `OfflineIndicator` (+ page banners when cache matters)
+- **Sync status** via `SyncStatus` when `_source` is `local` / `stub`
+
+## Never
+
+- `return null` while auth/data is loading
+- Blank white/empty main content during fetch
+- Showing zeros/metrics as if loaded when queries are still pending
+
+## Definition of done
+
+Incomplete if a primary async path has no loader, no error path, or no recovery action.

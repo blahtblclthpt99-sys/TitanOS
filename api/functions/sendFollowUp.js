@@ -1,12 +1,14 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 10, windowMs: 60_000, key: "sendFollowUp" })) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;
@@ -99,7 +101,12 @@ export default async function handler(req, res) {
         : "Marked sent (no customer email on file)",
     });
   } catch (error) {
-    logError("sendFollowUp", error);
-    return res.status(500).json({ error: "Something went wrong" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "sendFollowUp",
+      category: "email",
+      publicMessage: "Follow-up could not be sent",
+      publicCode: "FOLLOW_UP_FAILED",
+    });
   }
 }

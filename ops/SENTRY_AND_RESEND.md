@@ -8,10 +8,16 @@ Code is wired for **Node.js API** (`api/instrument.mjs` + `api/_lib/sentry.js`) 
 |----------|---------|
 | `SENTRY_DSN` | Node.js / Vercel serverless (`api/instrument.mjs`) |
 | `VITE_SENTRY_DSN` | Browser (`src/lib/sentry.js`); also fallback for API if `SENTRY_DSN` unset |
+| `VITE_SENTRY_REPLAY=1` | Enable privacy-masked Session Replay (still requires user Privacy opt-in) |
 | `SENTRY_ENVIRONMENT` | Optional override (`production` / `preview`) |
 | `SENTRY_DEBUG_ROUTE=1` | Enables `GET /api/functions/sentryDebug` for setup verification |
+| `OPS_ALERT_WEBHOOK_URL` or `SLACK_WEBHOOK_URL` | Page ops on API 5xx |
+| `FEATURE_FLAGS_JSON` | Server-side boolean flag overlay for `/api/functions/featureFlags` |
+| `ANALYTICS_INGEST_ENABLED=1` | Accept first-party analytics batches |
+| `VITE_ANALYTICS_INGEST=1` | Client will flush analytics buffer to API |
 | `RESEND_API_KEY` / `RESEND_FROM` | Portal OTP email |
 | `PORTAL_OTP_PEPPER` | Portal OTP hashing |
+| `HEALTH_DEEP_SECRET` | Header `x-titanos-ops` for `?deep=1` health |
 
 ## Sentry Node.js setup (done in code)
 

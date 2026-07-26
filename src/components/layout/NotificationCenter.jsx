@@ -16,6 +16,9 @@ import { buildNotificationDigest, rankNotifications } from "@/lib/aiInsights";
 import { timeAgo } from "@/lib/platformConstants";
 import NavBadge from "@/components/shared/NavBadge";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { sanitizeAppPath } from "@/lib/safePath";
+import { reportError } from "@/lib/reportError";
+import { toast } from "@/components/ui/use-toast";
 
 const QUICK_FILTERS = [{ id: "all", label: "All" }, ...NOTIFICATION_CATEGORIES.map((c) => ({ id: c.id, label: c.label.split(" ")[0] }))];
 
@@ -45,8 +48,14 @@ export default function NotificationCenter() {
       setItems(ranked);
       await invalidateUnread();
       setDigest(buildNotificationDigest(rows));
-    } catch {
-      setItems([]);
+    } catch (error) {
+      reportError("NotificationCenter:load", error);
+      toast({
+        variant: "destructive",
+        title: "Couldn't load notifications",
+        description: "Pull to refresh or try again in a moment.",
+      });
+      // Keep prior items — never wipe inbox silently
     } finally {
       setLoading(false);
     }
@@ -83,12 +92,17 @@ export default function NotificationCenter() {
       setCount((c) => Math.max(0, c - 1));
       try {
         await markRead(user.id, notification.id);
-      } catch {
-        /* ignore */
+      } catch (error) {
+        reportError("NotificationCenter:markRead", error);
+        setItems((cur) =>
+          cur.map((n) => (n.id === notification.id ? { ...n, read_at: notification.read_at || null } : n))
+        );
+        setCount((c) => c + 1);
       }
     }
     setOpen(false);
-    if (notification.link) navigate(notification.link);
+    const path = sanitizeAppPath(notification.link);
+    if (path) navigate(path);
     else navigate("/notifications");
   };
 
@@ -100,8 +114,13 @@ export default function NotificationCenter() {
       setItems((cur) => cur.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
       setCount(0);
       await invalidateUnread();
-    } catch {
-      /* ignore */
+    } catch (error) {
+      reportError("NotificationCenter:markAll", error);
+      toast({
+        variant: "destructive",
+        title: "Couldn't mark all as read",
+        description: "Try again in a moment.",
+      });
     } finally {
       setMarking(false);
     }

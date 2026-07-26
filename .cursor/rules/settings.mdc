@@ -1,0 +1,33 @@
+---
+description: Settings — categorized, searchable, documented, defaults, reset
+alwaysApply: true
+---
+
+# SETTINGS
+
+Settings must be organized, searchable, documented, defaulted, and resettable.
+
+## Requirements
+
+| Area | Rule |
+|---|---|
+| Categories | Group panels under Account / Business / Communications / Safety / Appearance (`settingsCatalog.js`) |
+| Searchable | In-page search filters panels + options; global search indexes the same catalog |
+| Documented | Every panel and preference has `description` + `docs` (what it does / default) |
+| Defaults | Explicit defaults for notifications, privacy, marketing, appearance |
+| Reset | Preference panels expose **Restore defaults** (not profile/password/accounts) |
+
+## Architecture
+
+- Catalog: `src/lib/settingsCatalog.js`
+- UI: `src/pages/Settings.jsx`
+- Do not invent settings outside the catalog without documenting defaults
+
+## Honesty
+
+- Reset does not erase profile, company, password, or OAuth links  
+- Device appearance applies immediately; remote `theme_pref` saves on Save  
+
+## Definition of done
+
+Incomplete if Settings is a flat unsearchable list, options lack docs/defaults, or preference panels cannot restore defaults.

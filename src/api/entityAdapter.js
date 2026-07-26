@@ -34,13 +34,27 @@ function resolveSelect(columns) {
 
 /** Hard ceiling so accidental unbounded list/filter cannot pull PostgREST max rows. */
 export const DEFAULT_ENTITY_PAGE_SIZE = 100;
+/** Absolute max — prefer DEFAULT; use only for rare bulk tools, never as “load all”. */
 export const MAX_ENTITY_PAGE_SIZE = 500;
+/** Preferred working-set size for dashboards / finances (scale default). */
+export const PREFERRED_ENTITY_PAGE_SIZE = 100;
 
 function resolvePageSize(limit) {
   if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
     return DEFAULT_ENTITY_PAGE_SIZE;
   }
   return Math.min(Math.floor(limit), MAX_ENTITY_PAGE_SIZE);
+}
+
+/**
+ * Keyset cursor for descending time-ordered lists (created_at / scheduled_date / date).
+ * Pass the last row’s sort-column value as `before` to fetch the next older page.
+ * @param {string} sortColumn
+ * @param {unknown} beforeValue
+ */
+export function buildBeforeCursor(sortColumn, beforeValue) {
+  if (beforeValue == null || beforeValue === "") return {};
+  return { [sortColumn]: { lt: beforeValue } };
 }
 
 /**
@@ -154,6 +168,31 @@ function createEntityHandler(entityName) {
       let query = applyFilters(supabase.from(table).select(resolveSelect(columns)), filters)
         .order(column, { ascending })
         .range(from, from + pageSize - 1);
+      const { data, error } = await query;
+      throwIfError(error);
+      return (data || []).map(toEntityRow);
+    },
+
+    /**
+     * Keyset page — prefer over large `skip` for deep history.
+     * @param {Record<string, unknown>} filters
+     * @param {string} sort e.g. "-created_date"
+     * @param {number} limit
+     * @param {{ before?: unknown }} [cursor] `before` = last row's sort field (descending lists)
+     * @param {string|string[]} [columns]
+     */
+    async filterPage(filters, sort, limit, cursor = {}, columns) {
+      const { column, ascending } = parseSort(sort);
+      const pageSize = resolvePageSize(limit);
+      const merged = { ...(filters || {}) };
+      if (cursor?.before != null && cursor.before !== "") {
+        merged[column] = ascending
+          ? { gt: cursor.before }
+          : { lt: cursor.before };
+      }
+      let query = applyFilters(supabase.from(table).select(resolveSelect(columns)), merged)
+        .order(column, { ascending })
+        .limit(pageSize);
       const { data, error } = await query;
       throwIfError(error);
       return (data || []).map(toEntityRow);

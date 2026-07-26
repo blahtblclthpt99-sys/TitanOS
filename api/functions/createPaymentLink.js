@@ -1,8 +1,7 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
 import { calculateCategoryFees } from "../_lib/feeConfig.js";
-import { assertRateLimit } from "../_lib/rateLimit.js";
-import { captureApiException } from "../_lib/sentry.js";
+import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 
 function resolvePlanFromProfile(profile, authUser) {
   if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
@@ -30,7 +29,7 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!assertRateLimit(req, res, { limit: 20, windowMs: 60_000, key: "createPaymentLink" })) return;
+  if (!(await assertRateLimitAsync(req, res, { limit: 20, windowMs: 60_000, key: "createPaymentLink" }))) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -263,11 +262,16 @@ export default async function handler(req, res) {
           .from("payments")
           .update({
             status: "failed",
-            note: `${insertPayload.note} · Stripe error: ${session.error?.message || "unknown"}`,
+            note: `${insertPayload.note} · Stripe checkout failed`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", payment.id);
-        return res.status(400).json({ error: session.error?.message || "Stripe error" });
+        const { logError } = await import("../_lib/safeLog.js");
+        logError("createPaymentLink:stripe", session.error || session);
+        return res.status(502).json({
+          error: "Checkout could not be created. Please try again.",
+          code: "STRIPE_CHECKOUT_FAILED",
+        });
       }
       checkoutUrl = session.url;
       externalId = session.id;
@@ -307,9 +311,12 @@ export default async function handler(req, res) {
         : "Payment recorded as pending.",
     });
   } catch (error) {
-    const { logError } = await import("../_lib/safeLog.js");
-    logError("createPaymentLink", error);
-    captureApiException(error, { tags: { route: "createPaymentLink" } });
-    return res.status(500).json({ error: "Payment link failed" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "createPaymentLink",
+      category: "payments",
+      publicMessage: "Payment link failed",
+      publicCode: "PAYMENT_LINK_FAILED",
+    });
   }
 }

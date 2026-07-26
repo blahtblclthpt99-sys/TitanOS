@@ -1,0 +1,27 @@
+---
+description: TitanOS microinteractions — every action gets feedback
+alwaysApply: true
+---
+
+# Microinteractions
+
+Every action should provide feedback.
+
+## Surfaces
+
+Buttons, cards, forms, tabs, uploads, downloads, messages, voice, GPS, payments, jobs.
+
+## Motion rules
+
+- Subtle, fast, smooth, consistent  
+- Prefer ≤150–200ms (`duration-fast` / `--duration-fast`)  
+- Always honor reduce-motion (`usePrefersReducedMotion` + `html.reduce-motion`)  
+- Press: `.btn-press` / `PRESSABLE` — one scale language (`0.97`), no stacked scales  
+- Success: `toast.success` / `SuccessCheck` / `.success-pop`  
+- Errors: `toast.error`  
+- In-flight: disable control + label (“Saving…”)  
+- Haptics: `haptic()` for primary ops only (PTT, shift, delivery) — never under reduce-motion  
+
+## Definition of done
+
+Incomplete if a primary action has no press/disabled/toast feedback, or animations ignore reduce-motion / exceed ~200ms without reason.

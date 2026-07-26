@@ -1,11 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Inbox, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Meaningful empty state — calm, actionable, motion-aware.
+ * Meaningful empty state — why empty, what’s next, shortcut to create.
  */
 export default function EmptyState({
   icon: Icon = Inbox,
@@ -13,11 +14,15 @@ export default function EmptyState({
   description,
   onAction,
   actionLabel,
+  actionTo,
   secondaryAction,
   secondaryLabel,
+  secondaryTo,
   className,
 }) {
   const reduceMotion = useReducedMotion();
+  const hasPrimary = Boolean((onAction || actionTo) && actionLabel);
+  const hasSecondary = Boolean((secondaryAction || secondaryTo) && secondaryLabel);
 
   return (
     <motion.div
@@ -46,18 +51,33 @@ export default function EmptyState({
       {description ? (
         <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
       ) : null}
-      {(onAction || secondaryAction) && (
+      {(hasPrimary || hasSecondary) && (
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {onAction && actionLabel ? (
-            <Button type="button" onClick={onAction} className="gap-2">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              {actionLabel}
-            </Button>
+          {hasPrimary ? (
+            actionTo ? (
+              <Button asChild className="gap-2">
+                <Link to={actionTo}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {actionLabel}
+                </Link>
+              </Button>
+            ) : (
+              <Button type="button" onClick={onAction} className="gap-2">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {actionLabel}
+              </Button>
+            )
           ) : null}
-          {secondaryAction && secondaryLabel ? (
-            <Button type="button" variant="outline" onClick={secondaryAction}>
-              {secondaryLabel}
-            </Button>
+          {hasSecondary ? (
+            secondaryTo ? (
+              <Button asChild variant="outline">
+                <Link to={secondaryTo}>{secondaryLabel}</Link>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={secondaryAction}>
+                {secondaryLabel}
+              </Button>
+            )
           ) : null}
         </div>
       )}

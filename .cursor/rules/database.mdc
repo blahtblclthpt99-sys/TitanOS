@@ -1,0 +1,24 @@
+---
+description: TitanOS database — RLS, indexes, integrity, least privilege
+alwaysApply: true
+---
+
+# Database
+
+Treat schema, RLS, and migrations as product security. Prefer hardening over features that widen privilege.
+
+## Requirements
+
+- Review tables, relationships, FKs, indexes, policies, triggers, functions, migrations before calling work done
+- Normalize where practical; avoid duplicate sources of truth for money/entitlements
+- Prefer real FKs for new tables; document soft `TEXT` IDs when legacy forces them
+- Index ownership columns (`created_by_id`, `user_id`) and hot filters (`status`, `created_at`, join keys used in RLS)
+- Every public table: **RLS on**. Default deny. Policies use least privilege
+- Validate ownership on write (`auth.uid()` / `owner_id` / `seller_id` / membership EXISTS) — never `WITH CHECK (true)` for money or tenancy
+- Privileged columns (role, plan, `is_pro`, `verified_worker`, payment/escrow status, referral `is_paying`) are **server/admin only** via triggers or service_role
+- SECURITY DEFINER functions: fixed `search_path`, revoke EXECUTE from `PUBLIC`/`anon`/`authenticated` unless intentionally public RPC
+- No client-readable secrets (password hashes, OTPs, webhook payloads)
+
+## Definition of done
+
+A DB change is incomplete if it enables cross-tenant reads/writes, client entitlement escalation, or missing indexes on RLS filter columns. Apply migrations and run `npm run test:db-security` when credentials exist.

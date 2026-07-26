@@ -176,7 +176,7 @@ export default function MileTracker({ taxYear, onTotalsChange }) {
   const previewOk = previewMiles.ok && previewMiles.miles > 0;
 
   return (
-    <div className="glass rounded-2xl p-6">
+    <div className="titan-surface p-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3 min-w-0">
@@ -340,7 +340,7 @@ export default function MileTracker({ taxYear, onTotalsChange }) {
           }
         }}
       >
-        <DialogContent className="bg-card border-border text-foreground max-w-sm rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-sm ">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingId ? "Edit Business Trip" : "Log Business Trip"}

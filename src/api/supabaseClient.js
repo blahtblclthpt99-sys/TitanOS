@@ -1,16 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 import { Capacitor } from "@capacitor/core";
 import { createAuthStorage } from "@/lib/auth-storage";
+import { envString } from "@/lib/viteEnv";
 
 // Vite uses VITE_*; Supabase dashboard snippets often use NEXT_PUBLIC_* / PUBLISHABLE_KEY.
 const supabaseUrl =
-  import.meta.env.VITE_SUPABASE_URL ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
+  envString("VITE_SUPABASE_URL") ||
+  envString("NEXT_PUBLIC_SUPABASE_URL") ||
   "";
 const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  envString("VITE_SUPABASE_ANON_KEY") ||
+  envString("VITE_SUPABASE_PUBLISHABLE_KEY") ||
+  envString("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
   "";
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -32,7 +33,7 @@ export const SUPABASE_AUTH_STORAGE_KEY = Capacitor.isNativePlatform()
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: envString("MODE") !== "test",
     detectSessionInUrl: false,
     flowType: "pkce",
     storage: createAuthStorage(),

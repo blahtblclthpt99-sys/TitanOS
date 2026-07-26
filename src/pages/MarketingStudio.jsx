@@ -110,7 +110,7 @@ export default function MarketingStudio() {
       <FeatureHonestyBanner>
         Copy is generated from templates on this device — not a live AI copywriter. Review before posting.
       </FeatureHonestyBanner>
-      <div className="glass rounded-2xl p-5 mb-5 space-y-3">
+      <div className="titan-surface p-5 mb-5 space-y-3">
         <div className="flex flex-wrap gap-2">
           {CHANNELS.map((c) => (
             <Button key={c} type="button" variant="outline" onClick={() => setChannel(c)} className={channel === c ? "border-titan-cyan text-titan-cyan" : "border-border text-muted-foreground"}>
@@ -128,7 +128,7 @@ export default function MarketingStudio() {
       </div>
 
       {draft && (
-        <div className="glass rounded-2xl p-5 mb-5 border border-primary/20">
+        <div className="titan-surface p-5 mb-5 border border-primary/20">
           <div className="flex items-center gap-2 mb-3">
             <Megaphone className="w-5 h-5 text-primary" />
             <h2 className="font-semibold text-foreground">{draft.title}</h2>
@@ -154,7 +154,7 @@ export default function MarketingStudio() {
           />
         ) : (
           saved.map((row) => (
-            <article key={row.id} className="glass rounded-2xl p-4">
+            <article key={row.id} className="titan-surface p-4">
               <div className="flex justify-between gap-3 mb-2">
                 <p className="font-medium text-foreground capitalize">{row.channel} · {row.title}</p>
                 <span className="text-xs text-primary">{row.status}</span>

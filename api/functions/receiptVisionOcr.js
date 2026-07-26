@@ -1,6 +1,7 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
+import { assertRateLimit } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 
 /**
@@ -11,6 +12,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!assertRateLimit(req, res, { limit: 5, windowMs: 60_000, key: "receiptVisionOcr" })) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;
@@ -68,7 +70,12 @@ export default async function handler(req, res) {
       message: "Add OPENAI_API_KEY for live receipt vision. Paste receipt text for now.",
     });
   } catch (error) {
-    logError("receiptVisionOcr", error);
-    return res.status(500).json({ error: "Something went wrong" });
+    const { sendApiError } = await import("../_lib/apiError.js");
+    return sendApiError(res, error, {
+      route: "receiptVisionOcr",
+      category: "ocr",
+      publicMessage: "Receipt scan failed",
+      publicCode: "OCR_FAILED",
+    });
   }
 }

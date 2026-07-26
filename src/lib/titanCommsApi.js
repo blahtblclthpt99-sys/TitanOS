@@ -12,6 +12,8 @@ import { supabase, isSupabaseConfigured } from "@/api/supabaseClient";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { canPersistTitanComChannels, isPaidPlan } from "@/lib/plan";
 import { endOfLocalDayIso, isChannelAdmin, isChannelExpired } from "@/lib/titanComRules.js";
+import { pushNotification } from "@/lib/notificationsApi";
+import { showMessagePush } from "@/lib/messagePush";
 
 export { endOfLocalDayIso, isChannelAdmin, isChannelExpired } from "@/lib/titanComRules.js";
 
@@ -22,98 +24,98 @@ export const NETWORK_CHANNELS = Object.freeze([
   {
     id: "tc-general",
     name: "General",
-    description: "Company-wide push-to-talk",
+    description: "Open network radio — company-wide PTT",
     kind: "public",
     icon: "radio",
   },
   {
     id: "tc-dispatch",
     name: "Dispatch",
-    description: "Drivers and dispatchers",
+    description: "Open network radio — drivers and dispatch",
     kind: "public",
     icon: "truck",
   },
   {
     id: "tc-drivers",
     name: "Drivers",
-    description: "Field drivers only",
+    description: "Open network radio — field drivers",
     kind: "public",
     icon: "car",
   },
   {
     id: "tc-rideshare",
     name: "Rideshare",
-    description: "Uber / Lyft / passenger trips",
+    description: "Open network radio — rideshare trips",
     kind: "public",
     icon: "car",
   },
   {
     id: "tc-delivery",
     name: "Delivery",
-    description: "DoorDash / food / package runs",
+    description: "Open network radio — delivery runs",
     kind: "public",
     icon: "package",
   },
   {
     id: "tc-warehouse",
     name: "Warehouse",
-    description: "Dock, staging, and load-out",
+    description: "Open network radio — dock and load-out",
     kind: "public",
     icon: "warehouse",
   },
   {
     id: "tc-yard",
     name: "Yard",
-    description: "Lot, staging, and vehicle check-in",
+    description: "Open network radio — lot and check-in",
     kind: "public",
     icon: "map",
   },
   {
     id: "tc-site",
     name: "Site Ops",
-    description: "Job-site crews and supervisors",
+    description: "Open network radio — job-site crews",
     kind: "public",
     icon: "hardhat",
   },
   {
     id: "tc-night",
     name: "Night Shift",
-    description: "After-hours and overnight crews",
+    description: "Open network radio — overnight crews",
     kind: "public",
     icon: "moon",
   },
   {
     id: "tc-break",
     name: "Break Room",
-    description: "Casual chatter — keep work channels clean",
+    description: "Open network radio — casual chatter",
     kind: "public",
     icon: "coffee",
   },
   {
     id: "tc-training",
     name: "Training",
-    description: "Onboarding and how-to talk",
+    description: "Open network radio — onboarding talk",
     kind: "public",
     icon: "book",
   },
   {
     id: "tc-roadside",
     name: "Roadside",
-    description: "Tow, jump, and breakdown help",
+    description: "Open network radio — tow and breakdown",
     kind: "public",
     icon: "wrench",
   },
   {
     id: "tc-events",
     name: "Events",
-    description: "Concerts, venues, and temp gigs",
+    description: "Open network radio — venues and temp gigs",
     kind: "public",
     icon: "calendar",
   },
   {
     id: "tc-emergency",
     name: "Emergency",
-    description: "Urgent crew channel — switch here when needed",
+    description: "Open network radio — urgent crew only",
     kind: "emergency",
     icon: "siren",
   },
@@ -402,7 +404,98 @@ export function listChannelMessages(channelId) {
   return messagesLocal(channelId).slice(-100);
 }
 
+/**
+ * Gate Realtime / voice join. Network `tc-*` channels are open to signed-in users.
+ * Custom channels require local (or cloud) membership and must not be expired.
+ */
+export function assertCanJoinVoice(user, channelId) {
+  if (!user?.id) return { ok: false, reason: "Sign in required" };
+  if (!channelId) return { ok: false, reason: "No channel selected" };
+
+  if (String(channelId).startsWith("tc-")) {
+    const known = NETWORK_CHANNELS.some((c) => c.id === channelId);
+    if (!known) return { ok: false, reason: "Unknown network channel" };
+    return { ok: true, network: true };
+  }
+
+  const map = memberships(user.id);
+  if (!map[channelId]) {
+    return { ok: false, reason: "Join this channel before talking." };
+  }
+
+  const mine = customChannels(user.id);
+  const board = publicBoard();
+  const channel = mine.find((c) => c.id === channelId) || board.find((c) => c.id === channelId);
+  if (channel && isChannelExpired(channel)) {
+    return { ok: false, reason: "This channel expired — ask the creator to remake it." };
+  }
+  if (channel?.kind === "private" && channel.created_by_id !== user.id && !map[channelId]) {
+    return { ok: false, reason: "Private channel — ask the admin for access." };
+  }
+  return { ok: true, network: false };
+}
+
+async function notifyChannelMembers(user, channelId, row) {
+  const title = `TitanCom · ${row.channel_id}`;
+  const body = `${row.sender_name}: ${row.body}`.slice(0, 160);
+  const link = `/comms?channel=${encodeURIComponent(channelId)}`;
+
+  const recipientIds = new Set();
+  // Local membership map only knows this device's joins — also pull cloud members
+  if (isSupabaseConfigured() && !String(channelId).startsWith("tc-")) {
+    try {
+      const { data } = await supabase
+        .from("titan_comms_members")
+        .select("user_id")
+        .eq("channel_id", channelId);
+      for (const m of data || []) {
+        if (m.user_id && m.user_id !== user.id) recipientIds.add(m.user_id);
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // Presence peers on this session can't be listed from API; notify known cloud members
+  await Promise.all(
+    [...recipientIds].map((uid) =>
+      pushNotification(uid, {
+        type: "messages",
+        category: "messages",
+        title,
+        body,
+        link,
+        meta: { channelId, messageId: row.id, source: "titancom" },
+      }).catch(() => null)
+    )
+  );
+
+  // OS banner when another tab/device would care — skip if already on this channel
+  try {
+    const path = typeof window !== "undefined" ? window.location?.pathname || "" : "";
+    const onComms =
+      path.startsWith("/comms") &&
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("channel") === channelId;
+    if (!onComms || (typeof document !== "undefined" && document.hidden)) {
+      showMessagePush({
+        title,
+        body,
+        threadId: `comms-${channelId}`,
+        href: link,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function postChannelMessage(user, channelId, body, messageType = "text", metadata = {}) {
+  const access = assertCanJoinVoice(user, channelId);
+  if (!access.ok) {
+    throw new Error(access.reason || "No access to this channel");
+  }
+
   const row = {
     id: uid(),
     channel_id: channelId,
@@ -430,6 +523,8 @@ export async function postChannelMessage(user, channelId, body, messageType = "t
       /* local ok */
     }
   }
+
+  notifyChannelMembers(user, channelId, row).catch(() => {});
   return row;
 }
 

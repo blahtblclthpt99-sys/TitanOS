@@ -1,0 +1,34 @@
+---
+description: Observability — crash, perf, logs, health, analytics, audit, flags, replay, alerts
+alwaysApply: true
+---
+
+# OBSERVABILITY
+
+Production failures must be visible, attributable, and actionable — without leaking PII or secrets.
+
+## Stack
+
+| Capability | Source of truth |
+|---|---|
+| Crash reporting | Sentry client (`src/lib/sentry.js`) + API (`api/instrument.mjs`) |
+| Performance | Browser tracing + web vitals (Sentry); API traces; optional profiling |
+| Structured logging | `api/_lib/safeLog.js` JSON levels + `requestId`; client `reportError` |
+| Health checks | `GET /api/functions/health` (+ `?deep=1` with ops secret) |
+| Analytics | First-party allowlisted events (`productAnalytics.js`); opt-out in Privacy |
+| Audit trails | `audit_events` + `writeAuditEvent` (admin/money mutations) |
+| Feature flags | `featureFlags.js` defaults + `/api/functions/featureFlags` |
+| Session replay | Sentry Replay — masked, opt-in (`session_replay` + `VITE_SENTRY_REPLAY`) |
+| Alerting | `OPS_ALERT_WEBHOOK_URL` / Slack on 5xx + money-path captures |
+
+## Privacy rules
+
+- `sendDefaultPii: false`; opaque user id only
+- Replay: mask all text/inputs; block media; off until user opts in
+- Analytics: allowlisted event names; no emails, tokens, GPS coordinates, or free-text bodies
+- Logs: redact secrets via `safeLog.redactValue`
+- Audit metadata: no secrets; hash IPs when recorded
+
+## Definition of done
+
+Incomplete if money/auth failures are silent, if new admin mutations skip audit, if replay runs without consent, or if health/readiness no longer reflects money-path readiness.

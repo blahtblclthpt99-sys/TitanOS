@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
 import {
-  User, Building2, Bell, Shield, Palette, Lock, LogOut, ChevronRight, Check,
-  Trash2, Gift, Upload, ShieldAlert, Megaphone, BadgeCheck, Sparkles,
+  User, Building2, Bell, LogOut, ChevronRight, Check,
+  Trash2, Gift, Upload, ShieldAlert, Sparkles,
+  Search, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ import SuccessCheck from "@/components/shared/SuccessCheck";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
-import { betaBadgeLabel, getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
+import { getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
@@ -35,42 +36,24 @@ import {
   normalizeMarketingPrefs,
   writeLocalMarketingPrefs,
 } from "@/lib/marketingPrefs";
-
-const NOTIFICATION_OPTIONS = [
-  ["jobs", "Job updates", "Jobs, hires, estimates, and field activity"],
-  ["messages", "Messages", "New messages and replies"],
-  ["reviews", "Reviews", "Customer ratings and reputation"],
-  ["account", "Account alerts", "Payments, billing, security, and profile"],
-  ["system", "System updates", "Product news, maintenance, and tips"],
-];
-
-const PRIVACY_OPTIONS = [
-  ["show_in_community", "Show my profile in Community", "Let other professionals discover you."],
-  ["show_city", "Show my city", "Display your city on your community profile."],
-  ["share_completed_jobs", "Share completed jobs", "Allow completed work to appear in Community."],
-];
+import {
+  SETTINGS_CATEGORIES,
+  SETTINGS_PANELS,
+  NOTIFICATION_OPTIONS,
+  PRIVACY_OPTIONS,
+  defaultNotificationPrefs,
+  defaultPrivacyPrefs,
+  searchSettings,
+  panelsByCategory,
+  buildResetPayload,
+  resetAppearanceLocal,
+  resetMarketingLocal,
+} from "@/lib/settingsCatalog";
+import { syncObservabilityFromPrivacyPrefs } from "@/lib/observabilityPrefs";
+import { syncSentryReplayPreference } from "@/lib/sentry";
+import ToggleRow from "@/components/shared/ToggleRow";
 
 const inputClass = "bg-muted border-border text-foreground rounded-md";
-
-function ToggleRow({ checked, label, description, onChange }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="w-full flex min-h-[44px] items-center gap-3 text-left rounded-md p-3 hover:bg-muted/60 transition-colors focus-ring"
-    >
-      <span className="flex-1">
-        <span className="block text-sm font-medium text-foreground">{label}</span>
-        <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
-      </span>
-      <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${checked ? "bg-primary" : "bg-muted"}`}>
-        <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : ""}`} />
-      </span>
-    </button>
-  );
-}
 
 function StateSelect({ value, onChange }) {
   return (
@@ -84,6 +67,7 @@ function StateSelect({ value, onChange }) {
 export default function Settings() {
   const { user, isLoadingAuth, authChecked, authError, checkUserAuth, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activePanel, setPanel] = useState(null);
   const [profileForm, setProfile] = useState({});
   const [companyForm, setCompany] = useState({});
@@ -107,6 +91,20 @@ export default function Settings() {
   const [connectedProviders, setConnectedProviders] = useState([]);
 
   useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (!panel) return;
+    if (panel === "trust") {
+      navigate("/trust-safety", { replace: true });
+      return;
+    }
+    if (panel === "pro-profile") {
+      navigate("/profile", { replace: true });
+      return;
+    }
+    setPanel(panel);
+  }, [searchParams, navigate]);
+
+  useEffect(() => {
     if (user) {
       setProfile({
         full_name: user.full_name || "", username: user.username || "", phone: user.phone || "",
@@ -119,14 +117,22 @@ export default function Settings() {
         company_zip: user.company_zip || "", company_logo_url: user.company_logo_url || "",
       });
       setNotificationPrefs({
-        ...Object.fromEntries(NOTIFICATION_OPTIONS.map(([key]) => [key, true])),
+        ...defaultNotificationPrefs(),
         ...(user.notification_prefs || {}),
       });
       setMarketingPrefs(mergeMarketingPrefs(user));
       setPrivacy({
         community_opt_in: user.community_opt_in ?? false,
-        privacy_prefs: user.privacy_prefs || {},
+        privacy_prefs: {
+          ...defaultPrivacyPrefs().privacy_prefs,
+          ...(user.privacy_prefs || {}),
+        },
       });
+      syncObservabilityFromPrivacyPrefs({
+        ...defaultPrivacyPrefs().privacy_prefs,
+        ...(user.privacy_prefs || {}),
+      });
+      syncSentryReplayPreference();
       setThemePref(user.theme_pref || "system");
     }
   }, [user]);
@@ -161,6 +167,10 @@ export default function Settings() {
     try {
       await api.auth.updateMe(updates);
       await checkUserAuth();
+      if (panel === "privacy") {
+        syncObservabilityFromPrivacyPrefs(updates.privacy_prefs || updates);
+        syncSentryReplayPreference();
+      }
       setSavedPanel(panel);
       toast({ title: "Settings saved", description: successMessage });
       window.setTimeout(() => setSavedPanel((current) => current === panel ? null : current), 2000);
@@ -226,18 +236,68 @@ export default function Settings() {
       });
   };
 
-  const sections = [
-    { id: "profile",       icon: User,      title: "Profile",       description: "Name and account details" },
-    { id: "pro-profile",   icon: BadgeCheck, title: "Professional profile", description: "Public bio, portfolio, skills, and badges" },
-    { id: "company",       icon: Building2, title: "Company",       description: "Business name, address, branding" },
-    { id: "notifications", icon: Bell,      title: "Notifications", description: "Job, message, review, account, and system alerts" },
-    { id: "marketing",     icon: Megaphone, title: "Marketing preferences", description: "Email, SMS, push, frequency, and topics" },
-    { id: "trust",         icon: Shield,    title: "Trust & Safety", description: "Report & block live · identity verification in Labs" },
-    { id: "privacy",       icon: Lock,      title: "Privacy",       description: "Community visibility and sharing" },
-    { id: "security",      icon: Shield,    title: "Security",      description: "Password and login settings" },
-    { id: "accounts",      icon: Lock,      title: "Connected accounts", description: "Google and email sign-in methods" },
-    { id: "theme",         icon: Palette,   title: "Appearance",    description: "Theme, contrast, text size, and motion" },
-  ];
+  const [settingsQuery, setSettingsQuery] = useState("");
+
+  const settingsHits = searchSettings(settingsQuery);
+  const grouped = panelsByCategory(settingsQuery.trim() ? settingsHits.panels : SETTINGS_PANELS);
+  const categoryList =
+    settingsQuery.trim() && settingsHits.categories.length
+      ? settingsHits.categories
+      : SETTINGS_CATEGORIES;
+
+  const openSettingsPanel = (section) => {
+    if (section.href) {
+      navigate(section.href);
+      return;
+    }
+    if (section.id === "pro-profile") {
+      navigate("/profile");
+      return;
+    }
+    if (section.id === "trust") {
+      navigate("/trust-safety");
+      return;
+    }
+    setPanel(section.id);
+  };
+
+  const resetPanelDefaults = async (panelId) => {
+    if (panelId === "theme") {
+      const next = resetAppearanceLocal();
+      setThemePref(next.theme_pref);
+      setHighContrastState(next.high_contrast);
+      setTextScaleState(next.text_scale);
+      setReduceMotionState(next.reduce_motion);
+      await save("theme", { theme_pref: "system" }, "Appearance restored to defaults.");
+      return;
+    }
+    if (panelId === "marketing") {
+      const prefs = resetMarketingLocal(user?.id);
+      setMarketingPrefs(prefs);
+      await save("marketing", { marketing_prefs: prefs }, "Marketing preferences restored to defaults.");
+      return;
+    }
+    if (panelId === "notifications") {
+      const prefs = defaultNotificationPrefs();
+      setNotificationPrefs(prefs);
+      await save("notifications", { notification_prefs: prefs }, "Notification preferences restored to defaults.");
+      return;
+    }
+    if (panelId === "privacy") {
+      const prefs = defaultPrivacyPrefs();
+      setPrivacy(prefs);
+      await save(
+        "privacy",
+        { community_opt_in: prefs.community_opt_in, privacy_prefs: prefs.privacy_prefs },
+        "Privacy preferences restored to defaults."
+      );
+      return;
+    }
+    const payload = buildResetPayload(panelId);
+    if (!payload) {
+      toast({ title: "This section can’t be bulk-reset", description: "Edit fields individually." });
+    }
+  };
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading settings" />;
   if (authError) {
@@ -255,7 +315,7 @@ export default function Settings() {
       <PageHeader
         eyebrow="Account"
         title="Settings"
-        subtitle="Preferences, security, and how TitanOS looks on your devices."
+        subtitle="Organized by category — search any option, restore defaults where available."
       />
 
       {user && (
@@ -272,36 +332,83 @@ export default function Settings() {
         </motion.div>
       )}
 
-      <div className="space-y-2 mb-8">
-        {sections.map((section, i) => (
-          <motion.button
-            key={section.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            onClick={() => {
-              if (section.id === "pro-profile") {
-                navigate("/profile");
-                return;
-              }
-              if (section.id === "trust") {
-                navigate("/trust-safety");
-                return;
-              }
-              setPanel(section.id);
-            }}
-            className="w-full titan-surface p-4 glass-hover transition-all duration-200 text-left flex items-center gap-4 group"
-          >
-            <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-muted transition-colors">
-              <section.icon className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">{section.title}</p>
-              <p className="text-xs text-muted-foreground">{section.description}</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground/40 transition-colors flex-shrink-0" />
-          </motion.button>
-        ))}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden />
+        <Input
+          value={settingsQuery}
+          onChange={(e) => setSettingsQuery(e.target.value)}
+          placeholder="Search settings…"
+          aria-label="Search settings"
+          className="pl-10 bg-muted border-border h-12"
+        />
+      </div>
+
+      {settingsQuery.trim() && settingsHits.options.length > 0 ? (
+        <div className="titan-surface p-3 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1 mb-2">Matching options</p>
+          <ul className="space-y-1">
+            {settingsHits.options.slice(0, 12).map((opt) => (
+              <li key={opt.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsQuery("");
+                    openSettingsPanel({ id: opt.panelId, href: opt.path.startsWith("/settings") ? null : opt.path });
+                    if (opt.path.startsWith("/settings?panel=")) setPanel(opt.panelId);
+                    else if (!opt.path.startsWith("/settings")) navigate(opt.path);
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2.5 hover:bg-muted/60 min-h-[48px]"
+                >
+                  <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                  <p className="text-[11px] text-muted-foreground">{opt.hint}</p>
+                  {opt.docs ? <p className="text-[10px] text-muted-foreground/80 mt-0.5">{opt.docs}</p> : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="space-y-8 mb-8">
+        {categoryList.map((cat) => {
+          const items = grouped[cat.id] || [];
+          if (!items.length) return null;
+          return (
+            <section key={cat.id}>
+              <div className="px-1 mb-2">
+                <h2 className="text-sm font-semibold text-foreground">{cat.label}</h2>
+                <p className="text-xs text-muted-foreground">{cat.description}</p>
+              </div>
+              <div className="space-y-2">
+                {items.map((section, i) => {
+                  const Icon = section.icon || User;
+                  return (
+                    <motion.button
+                      key={section.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      onClick={() => openSettingsPanel(section)}
+                      className="w-full titan-surface p-4 titan-surface-interactive transition-all duration-200 text-left flex items-center gap-4 group"
+                    >
+                      <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-muted transition-colors">
+                        <Icon className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{section.title}</p>
+                        <p className="text-xs text-muted-foreground">{section.description}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground/40 transition-colors flex-shrink-0" />
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+        {settingsQuery.trim() && !categoryList.some((c) => (grouped[c.id] || []).length) && settingsHits.options.length === 0 ? (
+          <p className="text-sm text-muted-foreground px-1">No settings match “{settingsQuery.trim()}”.</p>
+        ) : null}
       </div>
 
       {/* Membership / PayPal upgrade */}
@@ -426,7 +533,7 @@ export default function Settings() {
       </motion.div>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="bg-card border-border text-foreground rounded-2xl max-w-md">
+        <AlertDialogContent className="bg-card border-border text-foreground  max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Delete your account?</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
@@ -458,7 +565,7 @@ export default function Settings() {
 
       {/* Profile Panel */}
       <Dialog open={activePanel === "profile"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md  max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Edit Profile</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
@@ -493,7 +600,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "company"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md  max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Company</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex items-center gap-3">
@@ -511,9 +618,25 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "notifications"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-foreground text-lg">Notifications</DialogTitle></DialogHeader>
-          <div className="space-y-1 mt-2">{NOTIFICATION_OPTIONS.map(([key, label, description]) => <ToggleRow key={key} checked={notificationPrefs[key] ?? true} label={label} description={description} onChange={(value) => setNotificationPrefs((prefs) => ({ ...prefs, [key]: value }))} />)}</div>
+        <DialogContent className="bg-card border-border text-foreground max-w-md  max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-lg">Notifications</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground mt-1 mb-2">
+            {SETTINGS_PANELS.find((p) => p.id === "notifications")?.docs}
+            {" "}Defaults: all categories on.
+          </p>
+          <div className="space-y-1 mt-2">
+            {NOTIFICATION_OPTIONS.map((opt) => (
+              <ToggleRow
+                key={opt.key}
+                checked={notificationPrefs[opt.key] ?? opt.default}
+                label={opt.label}
+                description={`${opt.description}${opt.docs ? ` — ${opt.docs}` : ""}`}
+                onChange={(value) => setNotificationPrefs((prefs) => ({ ...prefs, [opt.key]: value }))}
+              />
+            ))}
+          </div>
           <div className="mt-4 rounded-md border border-border bg-muted/40 p-3">
             <p className="text-sm font-medium text-foreground">Device push for messages</p>
             <p className="text-xs text-muted-foreground mt-1 mb-3">Allow browser notifications when a new message arrives while you&apos;re away from Messages.</p>
@@ -533,12 +656,17 @@ export default function Settings() {
               Enable message push
             </Button>
           </div>
-          <Button onClick={() => save("notifications", { notification_prefs: notificationPrefs }, "Your notification preferences have been updated.")} disabled={savingPanel === "notifications"} className="w-full gap-2">{savedPanel === "notifications" ? <SuccessCheck label="Saved" /> : savingPanel === "notifications" ? "Saving…" : "Save Changes"}</Button>
+          <div className="flex flex-col gap-2 mt-4">
+            <Button onClick={() => save("notifications", { notification_prefs: notificationPrefs }, "Your notification preferences have been updated.")} disabled={savingPanel === "notifications"} className="w-full gap-2">{savedPanel === "notifications" ? <SuccessCheck label="Saved" /> : savingPanel === "notifications" ? "Saving…" : "Save Changes"}</Button>
+            <Button type="button" variant="outline" className="w-full gap-2 min-h-[44px]" onClick={() => resetPanelDefaults("notifications")} disabled={savingPanel === "notifications"}>
+              <RotateCcw className="w-4 h-4" /> Restore defaults
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={activePanel === "marketing"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-foreground max-w-md  max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Marketing preferences</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground mt-1">Control promotional messages separately from job and account alerts.</p>
 
@@ -607,7 +735,6 @@ export default function Settings() {
               if (user?.id) writeLocalMarketingPrefs(user.id, next);
               const ok = await save("marketing", { marketing_prefs: next }, "Your marketing preferences have been updated.");
               if (!ok && user?.id) {
-                // Local save already written — still confirm UX
                 toast({ title: "Saved on this device", description: "Marketing preferences stored locally." });
               }
             }}
@@ -616,28 +743,50 @@ export default function Settings() {
           >
             {savedPanel === "marketing" ? <SuccessCheck label="Saved" /> : savingPanel === "marketing" ? "Saving…" : "Save Changes"}
           </Button>
+          <Button type="button" variant="outline" className="w-full gap-2 mt-2 min-h-[44px]" onClick={() => resetPanelDefaults("marketing")} disabled={savingPanel === "marketing"}>
+            <RotateCcw className="w-4 h-4" /> Restore defaults
+          </Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={activePanel === "privacy"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md ">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Privacy</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground mt-1 mb-2">
+            {SETTINGS_PANELS.find((p) => p.id === "privacy")?.docs} Defaults: community sharing off; session replay off; product analytics on (opt-out anytime).
+          </p>
           <div className="space-y-1 mt-2">
-            <ToggleRow checked={privacyForm.community_opt_in} label="Join the Community" description="Enable Community features for your account." onChange={(value) => setPrivacy((form) => ({ ...form, community_opt_in: value }))} />
+            <ToggleRow checked={privacyForm.community_opt_in} label="Join the Community" description="Enable Community features for your account. Default: off." onChange={(value) => setPrivacy((form) => ({ ...form, community_opt_in: value }))} />
             <ToggleRow
               checked={Boolean(user?.verified_worker)}
               label="Show Verified Worker badge"
               description="Display a verification badge on your booking page (admin may revoke)."
               onChange={(value) => save("privacy", { ...privacyForm, verified_worker: value }, value ? "Verified badge enabled." : "Verified badge hidden.")}
             />
-            {PRIVACY_OPTIONS.map(([key, label, description]) => <ToggleRow key={key} checked={privacyForm.privacy_prefs?.[key] ?? false} label={label} description={description} onChange={(value) => setPrivacy((form) => ({ ...form, privacy_prefs: { ...form.privacy_prefs, [key]: value } }))} />)}
+            {PRIVACY_OPTIONS.map((opt) => (
+              <ToggleRow
+                key={opt.key}
+                checked={privacyForm.privacy_prefs?.[opt.key] ?? opt.default}
+                label={opt.label}
+                description={`${opt.description}${opt.docs ? ` — ${opt.docs}` : ""}`}
+                onChange={(value) =>
+                  setPrivacy((form) => ({
+                    ...form,
+                    privacy_prefs: { ...form.privacy_prefs, [opt.key]: value },
+                  }))
+                }
+              />
+            ))}
           </div>
           <Button onClick={() => save("privacy", privacyForm, "Your privacy preferences have been updated.")} disabled={savingPanel === "privacy"} className="w-full gap-2">{savedPanel === "privacy" ? <SuccessCheck label="Saved" /> : savingPanel === "privacy" ? "Saving…" : "Save Changes"}</Button>
+          <Button type="button" variant="outline" className="w-full gap-2 mt-2 min-h-[44px]" onClick={() => resetPanelDefaults("privacy")} disabled={savingPanel === "privacy"}>
+            <RotateCcw className="w-4 h-4" /> Restore defaults
+          </Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={activePanel === "security"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md ">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Security</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <p className="text-xs text-muted-foreground">Choose a password with at least 8 characters.</p>
@@ -649,7 +798,7 @@ export default function Settings() {
       </Dialog>
 
       <Dialog open={activePanel === "accounts"} onOpenChange={closePanel}>
-        <DialogContent className="bg-card border-border text-foreground max-w-md rounded-2xl">
+        <DialogContent className="bg-card border-border text-foreground max-w-md ">
           <DialogHeader><DialogTitle className="text-foreground text-lg">Connected accounts</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="rounded-md border border-border p-4">
@@ -758,6 +907,9 @@ export default function Settings() {
             className="w-full mt-4 gap-2"
           >
             {savedPanel === "theme" ? <SuccessCheck label="Saved" /> : savingPanel === "theme" ? "Saving…" : "Save appearance"}
+          </Button>
+          <Button type="button" variant="outline" className="w-full gap-2 mt-2 min-h-[44px]" onClick={() => resetPanelDefaults("theme")} disabled={savingPanel === "theme"}>
+            <RotateCcw className="w-4 h-4" /> Restore defaults
           </Button>
         </DialogContent>
       </Dialog>

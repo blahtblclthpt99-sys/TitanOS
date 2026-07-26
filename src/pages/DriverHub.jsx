@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Car, Plus, Users } from "lucide-react";
+import { Car, Plus, Users, Radio } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
@@ -53,13 +53,20 @@ export default function DriverHub() {
         subtitle={subtitle}
         className="mb-0"
         actions={
-          tab === "directory" ? (
+          <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" className="min-h-[44px]">
-              <Link to="/hire?new=1">
-                <Plus className="h-4 w-4" aria-hidden="true" /> Post a haul
+              <Link to="/comms?channel=tc-dispatch">
+                <Radio className="h-4 w-4" aria-hidden="true" /> TitanComms
               </Link>
             </Button>
-          ) : null
+            {tab === "directory" ? (
+              <Button asChild variant="outline" className="min-h-[44px]">
+                <Link to="/hire?new=1">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Post a haul
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

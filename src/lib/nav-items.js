@@ -44,6 +44,7 @@ import {
   Palette,
   Percent,
   Landmark,
+  Radio,
 } from "lucide-react";
 
 /**
@@ -91,6 +92,7 @@ export const APP_NAV_ITEMS = [
 
   // Connect
   { icon: Bot, label: "Titan AI", path: "/assistant", group: "connect" },
+  { icon: Radio, label: "TitanComms", path: "/comms", group: "connect" },
   { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
   { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
 
@@ -174,7 +176,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Connect",
     description: "Talk to customers and your team",
-    paths: ["/assistant", "/community", "/notifications"],
+    paths: ["/assistant", "/comms", "/community", "/notifications"],
   },
   {
     title: "Account",

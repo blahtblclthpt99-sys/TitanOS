@@ -78,6 +78,7 @@ const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
+const TitanComms = lazy(() => import("@/pages/TitanComms"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -122,6 +123,7 @@ const NON_TAB_ROUTES = {
   "/settings": Settings,
   "/trust-safety": TrustSafety,
   "/design-system": DesignSystem,
+  "/comms": TitanComms,
 };
 
 function NonTabPage() {

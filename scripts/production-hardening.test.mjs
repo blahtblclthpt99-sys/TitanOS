@@ -134,6 +134,7 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/027_paypal_webhook_events.sql",
     "supabase/migrations/028_marketplace_free.sql",
     "supabase/migrations/029_marketplace_module_price.sql",
+    "supabase/migrations/030_titan_comms.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {
@@ -156,16 +157,21 @@ describe("Critical workflow surfaces (structural)", () => {
     assert.match(read("api/register.js"), /assertRateLimit|captureApiException/);
   });
 
-  it("Driver Hub, Dashboard, Estimates, Payments, Profile routes exist", () => {
+  it("Driver Hub, Dashboard, Estimates, Payments, Profile, TitanComms routes exist", () => {
     for (const f of [
       "src/pages/Dashboard.jsx",
       "src/pages/Estimates.jsx",
       "src/pages/Payments.jsx",
       "src/pages/Profile.jsx",
       "src/pages/DriverHub.jsx",
+      "src/pages/TitanComms.jsx",
+      "src/lib/titanCommsApi.js",
+      "src/lib/titanCommsPtt.js",
     ]) {
       assert.ok(existsSync(join(root, f)), `missing ${f}`);
     }
+    assert.match(read("src/components/layout/TabStack.jsx"), /\/comms/);
+    assert.match(read("src/lib/nav-items.js"), /TitanComms/);
   });
 
   it("AuthContext clears Sentry user on logout path", () => {

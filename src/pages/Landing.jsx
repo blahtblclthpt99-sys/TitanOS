@@ -58,7 +58,7 @@ const FEATURES = [
   { icon: "calc", title: "Expenses & tax", slug: "expenses", desc: "Receipts, mileage, and write-offs ready for tax season." },
   { icon: "calendar", title: "Schedule", slug: "schedule", desc: "A clear week view that keeps crews on time." },
   { icon: "truck", title: "Fleet", slug: "fleet", desc: "Vehicles, assignments, and service records in one place." },
-  { icon: "car", title: "Driver Hub", slug: "driver-hub", desc: "Hire help or run shifts with miles logged for tax." },
+  { icon: "car", title: "Driver Hub", slug: "driver-hub", desc: "Driver OS — Mission Control for live shifts, Explorer for analytics." },
 ];
 
 const AUDIENCES = [

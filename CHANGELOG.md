@@ -2,6 +2,13 @@
 
 All notable improvements from the production refactor. Functionality, routes, API contracts, and Base44 entities/server functions are preserved unless noted as a bug fix.
 
+## 1.5.5 (Play AAB 20) — Driver OS 4.0
+
+- Driver Hub redesign: Mission Control (live ops) + Driver Explorer (lazy folders)
+- All existing shift / DoorDash / coach / logbook stats retained in expandable folders
+- Folder state persistence, delivery search, offline banner, pull-to-refresh, error boundaries
+- Android versionCode 20 / versionName 1.5.5
+
 ## 1.5.4 (Play AAB 19) — Driver Hub primary + true cost
 
 - Driver Hub first in nav; money coach with all-in $/mi (fuel + maint + tires + vehicle)

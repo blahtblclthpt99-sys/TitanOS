@@ -1,182 +1,261 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpen, Brain, Car, Package, Plus, Users, Radio } from "lucide-react";
+import { Plus, Radio, RefreshCw, WifiOff } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
-import PremiumGate from "@/components/shared/PremiumGate";
 import { Button } from "@/components/ui/button";
-import DriverDirectory from "@/components/driver/DriverDirectory";
-import DriverShiftPanel from "@/components/driver/DriverShiftPanel";
-import DriverLocationPanel from "@/components/driver/DriverLocationPanel";
-import DriverIntelligencePanel from "@/components/driver/activity/DriverIntelligencePanel";
-import VehicleLogbookPanel from "@/components/driver/activity/VehicleLogbookPanel";
-import DoorDashWorkflowPanel from "@/components/driver/activity/DoorDashWorkflowPanel";
+import MissionControl from "@/components/driver/os/MissionControl";
+import DriverExplorer from "@/components/driver/os/DriverExplorer";
 import { useAuth } from "@/lib/AuthContext";
-import { canUseDriverAddons } from "@/lib/plan";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import {
-  readShiftHistory,
-  readSession,
-  readStops,
-  readPrefs,
-  estimateGasPriceUsd,
-} from "@/lib/driverHubApi";
+  readExplorerState,
+  writeExplorerState,
+  toggleFolderOpen,
+  setExplorerSearch,
+} from "@/lib/driverOs/explorerState.js";
+import { buildFolderSummaries, searchDeliveries } from "@/lib/driverOs/search.js";
+import { folderById } from "@/lib/driverOs/folders.js";
+import { cn } from "@/lib/utils";
 
-const TABS = [
-  { id: "shift", label: "My shift", icon: Car, short: "Shift", premium: false },
-  { id: "doordash", label: "DoorDash", icon: Package, short: "Dash", premium: true },
-  { id: "intel", label: "Coach", icon: Brain, short: "Coach", premium: true },
-  { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log", premium: true },
-  { id: "directory", label: "Find", icon: Users, short: "Find", premium: false },
-];
+/** Map legacy ?tab= links into Driver OS folders. */
+const TAB_TO_FOLDER = {
+  shift: "live-shift",
+  doordash: "doordash",
+  intel: "analytics",
+  logbook: "expenses",
+  directory: "directory",
+};
 
 export default function DriverHub() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
+  const folderParam = params.get("folder");
   const qParam = params.get("q") || "";
-  const addonsOk = canUseDriverAddons(user);
-  const allowed = new Set(TABS.map((t) => t.id));
-  const initialTab = allowed.has(tabParam) ? tabParam : "shift";
-  const [tab, setTab] = useState(initialTab);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [forceOpenId, setForceOpenId] = useState(null);
+  const [online, setOnline] = useState(
+    typeof navigator === "undefined" ? true : navigator.onLine !== false
+  );
+
+  const explorer = useMemo(() => {
+    void refreshTick;
+    return user?.id ? readExplorerState(user.id) : { open: { "live-shift": true }, search: "" };
+  }, [user?.id, refreshTick]);
+
+  const [openMap, setOpenMap] = useState(explorer.open);
+  const [search, setSearch] = useState(explorer.search || "");
 
   useEffect(() => {
-    if (allowed.has(tabParam)) setTab(tabParam);
-    else if (!tabParam) setTab("shift");
-  }, [tabParam]);
+    setOpenMap(explorer.open);
+    setSearch(explorer.search || "");
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per user
 
   useEffect(() => {
-    if (qParam && tab !== "directory") setTab("directory");
-  }, [qParam, tab]);
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  // Deep-link: ?folder= or legacy ?tab=
+  useEffect(() => {
+    const target =
+      (folderParam && folderById(folderParam)?.id) ||
+      (tabParam && TAB_TO_FOLDER[tabParam]) ||
+      null;
+    if (!target) return;
+    setForceOpenId(target);
+    setOpenMap((prev) => {
+      const next = { ...prev, [target]: true };
+      if (user?.id) writeExplorerState(user.id, { open: next, search });
+      return next;
+    });
+  }, [folderParam, tabParam, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (tab === "intel" || tab === "logbook") setRefreshTick((t) => t + 1);
-  }, [tab]);
+    if (!qParam) return;
+    setSearch(qParam);
+    if (user?.id) setExplorerSearch(user.id, qParam);
+    setForceOpenId("directory");
+    setOpenMap((prev) => ({ ...prev, directory: true }));
+  }, [qParam, user?.id]);
 
-  const selectTab = (id) => {
-    setTab(id);
-    const next = new URLSearchParams(params);
-    next.set("tab", id);
-    if (id !== "directory") next.delete("q");
-    setParams(next, { replace: true });
-  };
+  // Debounced persist of search text
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const id = window.setTimeout(() => setExplorerSearch(user.id, search), 350);
+    return () => window.clearTimeout(id);
+  }, [search, user?.id]);
 
-  const subtitle = useMemo(() => {
-    if (tab === "directory") return "Publish yourself or hire nearby drivers.";
-    if (tab === "doordash") return "Guided delivery stages · GPS · auto timers.";
-    if (tab === "intel") return "All-in $/mi floor · money coach · rush windows.";
-    if (tab === "logbook") return "Miles, fuel, expenses, Excel trip reports.";
-    return "Start and stop shifts free — Premium unlocks money autopilot, voice, and more.";
-  }, [tab]);
+  const summaries = useMemo(() => {
+    void refreshTick;
+    try {
+      return buildFolderSummaries(user?.id);
+    } catch {
+      return {};
+    }
+  }, [user?.id, refreshTick]);
 
-  const prefs = user?.id ? readPrefs(user.id) : {};
-  const history = user?.id ? readShiftHistory(user.id) : [];
-  const session = user?.id ? readSession(user.id) : null;
-  const stops = user?.id ? readStops(user.id) : [];
-  const gasUsd = estimateGasPriceUsd(prefs.zip || "");
-  const activeTabMeta = TABS.find((t) => t.id === tab);
-  const tabLocked = Boolean(activeTabMeta?.premium && !addonsOk);
+  const deliveryHits = useMemo(() => {
+    void refreshTick;
+    if (!user?.id || !search.trim() || search.trim().length < 2) return [];
+    try {
+      return searchDeliveries(user.id, search);
+    } catch {
+      return [];
+    }
+  }, [user?.id, search, refreshTick]);
+
+  const onToggle = useCallback(
+    (id) => {
+      if (!user?.id) {
+        setOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
+        setForceOpenId(null);
+        return;
+      }
+      const next = toggleFolderOpen(user.id, id);
+      setOpenMap(next.open);
+      setForceOpenId(null);
+      const p = new URLSearchParams(params);
+      if (next.open[id]) p.set("folder", id);
+      else p.delete("folder");
+      p.delete("tab");
+      setParams(p, { replace: true });
+    },
+    [user?.id, params, setParams]
+  );
+
+  const onSearchChange = useCallback((value) => {
+    setSearch(value);
+  }, []);
+
+  const onOpenFolder = useCallback(
+    (id) => {
+      setForceOpenId(id);
+      setOpenMap((prev) => {
+        const next = { ...prev, [id]: true };
+        if (user?.id) writeExplorerState(user.id, { open: next, search });
+        return next;
+      });
+      requestAnimationFrame(() => {
+        document.getElementById(`driver-os-folder-${id}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    },
+    [user?.id, search]
+  );
+
+  const refresh = useCallback(async () => {
+    setRefreshTick((t) => t + 1);
+  }, []);
+
+  const { containerRef, pullProgress, isRefreshing, pullDist } = usePullToRefresh(refresh);
 
   return (
-    <PageShell maxWidth="xl" className="space-y-4">
-      <PageHeader
-        eyebrow="Primary"
-        title="Driver Hub"
-        subtitle={subtitle}
-        className="mb-0"
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
-              <Link to="/comms?channel=tc-dispatch">
-                <Radio className="w-3.5 h-3.5" aria-hidden="true" /> TitanCom
-              </Link>
-            </Button>
-            {tab === "directory" ? (
-              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
-                <Link to="/hire?new=1">
-                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Post a haul
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
-                <Link to="/driver?tab=directory">
-                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Publish
-                </Link>
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      <div
-        className="grid grid-cols-5 gap-1 rounded-lg border border-border bg-muted p-1"
-        role="tablist"
-        aria-label="Driver Hub sections"
-      >
-        {TABS.map(({ id, label, icon: Icon, short, premium }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`driver-hub-tab-${id}`}
-              aria-controls={`driver-hub-panel-${id}`}
-              aria-selected={active}
-              tabIndex={active ? 0 : -1}
-              onClick={() => selectTab(id)}
-              className={`flex min-h-[48px] items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-fast focus-ring ${
-                active
-                  ? "bg-card text-foreground shadow-soft"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+    <PageShell maxWidth="xl" className="space-y-0 pb-8">
+      <div ref={containerRef} className="relative space-y-4 min-h-[40vh]">
+        {(pullDist > 8 || isRefreshing) && (
+          <div
+            className="pointer-events-none absolute left-0 right-0 top-0 z-30 flex justify-center"
+            style={{ transform: `translateY(${Math.min(pullDist, 56)}px)` }}
+            aria-hidden
+          >
+            <div
+              className={cn(
+                "rounded-full border border-border bg-card/95 px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-soft",
+                isRefreshing && "text-titan-cyan"
+              )}
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="hidden lg:inline">{label}</span>
-              <span className="lg:hidden text-[10px] sm:text-xs">{short}</span>
-              {premium && !addonsOk ? (
-                <span className="hidden sm:inline text-[9px] uppercase text-titan-amber">Pro</span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      <div role="tabpanel" id={`driver-hub-panel-${tab}`} aria-labelledby={`driver-hub-tab-${tab}`}>
-        {tabLocked ? (
-          <PremiumGate
-            title={`${activeTabMeta?.label || "This add-on"} is Premium`}
-            description="Start and stop shifts stay free. DoorDash workflow, Coach, Logbook, money autopilot, and voice are Premium add-ons."
-          />
-        ) : tab === "directory" ? (
-          <DriverDirectory initialQuery={qParam} />
-        ) : tab === "doordash" ? (
-          <DoorDashWorkflowPanel />
-        ) : tab === "logbook" ? (
-          <VehicleLogbookPanel
-            key={refreshTick}
-            userId={user?.id}
-            history={history}
-            liveSession={session?.active ? session : null}
-            stops={stops}
-          />
-        ) : tab === "intel" ? (
-          <DriverIntelligencePanel
-            key={refreshTick}
-            userId={user?.id}
-            history={history}
-            liveSession={session?.active ? session : null}
-            stops={stops}
-            mpg={Number(prefs.mpg) || 22}
-            gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
-            defaultZip={prefs.zip || ""}
-          />
-        ) : (
-          <div className="space-y-4">
-            <DriverLocationPanel />
-            <DriverShiftPanel />
+              {isRefreshing ? "Refreshing…" : pullProgress >= 1 ? "Release" : "Pull to refresh"}
+            </div>
           </div>
         )}
+
+        <PageHeader
+          eyebrow="Driver OS 4.0"
+          title="Driver Hub"
+          subtitle="Mission Control for live work · Explorer for analytics"
+          className="mb-0"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1.5 min-h-[44px]"
+                onClick={refresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} aria-hidden />
+                Refresh
+              </Button>
+              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
+                <Link to="/comms?channel=tc-dispatch">
+                  <Radio className="w-3.5 h-3.5" aria-hidden /> TitanCom
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
+                <Link to="/driver?folder=directory">
+                  <Plus className="w-3.5 h-3.5" aria-hidden /> Publish
+                </Link>
+              </Button>
+            </div>
+          }
+        />
+
+        {!online ? (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100"
+          >
+            <WifiOff className="w-4 h-4 shrink-0" aria-hidden />
+            Offline — cached shift data still works. Sync resumes when you're back online.
+          </div>
+        ) : null}
+
+        <MissionControl userId={user?.id} onOpenFolder={onOpenFolder} />
+
+        {deliveryHits.length > 0 ? (
+          <div className="rounded-2xl border border-border bg-card/60 p-3 space-y-2 shadow-soft">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Delivery search · {deliveryHits.length} hits
+            </p>
+            <ul className="divide-y divide-border max-h-48 overflow-y-auto">
+              {deliveryHits.map((hit) => (
+                <li key={`${hit.kind}-${hit.id}`}>
+                  <button
+                    type="button"
+                    className="w-full text-left py-2.5 min-h-[44px] hover:bg-muted/40 px-1 rounded-lg focus-ring"
+                    onClick={() => onOpenFolder(hit.folder)}
+                  >
+                    <p className="text-sm font-medium text-foreground">{hit.title}</p>
+                    <p className="text-xs text-muted-foreground">{hit.subtitle}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <DriverExplorer
+          user={user}
+          openMap={openMap}
+          search={search}
+          onToggle={onToggle}
+          onSearchChange={onSearchChange}
+          summaries={summaries}
+          forceOpenId={forceOpenId}
+          directoryQuery={qParam}
+          refreshTick={refreshTick}
+        />
       </div>
     </PageShell>
   );

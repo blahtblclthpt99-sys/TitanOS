@@ -131,5 +131,10 @@ export function createDoorDashTracker(handlers = {}, options = {}) {
     getSpeedMph() {
       return Math.round(smoothedSpeed * 10) / 10;
     },
+    getLastPoint() {
+      return prev
+        ? { lat: prev.lat, lng: prev.lng, accuracy: prev.accuracy, at: new Date(prev.ts).toISOString() }
+        : null;
+    },
   };
 }

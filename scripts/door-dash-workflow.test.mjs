@@ -17,6 +17,7 @@ import {
   timerElapsedMs,
   pauseTimer,
   resumeTimer,
+  summarizeDoorDashPerformance,
 } from "../src/lib/driverActivity/doorDashWorkflow.js";
 
 const GPS = { lat: 41.88, lng: -87.63 };
@@ -128,5 +129,36 @@ describe("DoorDash workflow", () => {
     assert.equal(timer.accumulatedMs, 5000);
     timer = resumeTimer(timer, t0 + 8000);
     assert.equal(timerElapsedMs(timer, t0 + 10000), 7000);
+  });
+
+  it("summarizes performance for start-screen strip", () => {
+    const history = [
+      {
+        status: "completed",
+        acceptedAddons: 1,
+        rejectedAddons: 0,
+        analytics: { restaurantWaitSec: 100, totalMiles: 4, totalDurationSec: 600, acceptedAddons: 1, rejectedAddons: 0 },
+      },
+      {
+        status: "cancelled",
+        acceptedAddons: 0,
+        rejectedAddons: 1,
+        analytics: { restaurantWaitSec: 20, totalMiles: 1, totalDurationSec: 120, acceptedAddons: 0, rejectedAddons: 1 },
+      },
+      {
+        status: "completed",
+        acceptedAddons: 0,
+        rejectedAddons: 0,
+        analytics: { restaurantWaitSec: 200, totalMiles: 6, totalDurationSec: 800, acceptedAddons: 0, rejectedAddons: 0 },
+      },
+    ];
+    const s = summarizeDoorDashPerformance(history);
+    assert.equal(s.totalRuns, 3);
+    assert.equal(s.completed, 2);
+    assert.equal(s.completionRate, 67);
+    assert.equal(s.avgRestaurantWaitSec, 150);
+    assert.equal(s.avgMiles, 5);
+    assert.equal(s.acceptedAddons, 1);
+    assert.equal(s.rejectedAddons, 1);
   });
 });

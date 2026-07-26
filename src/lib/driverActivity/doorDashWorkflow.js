@@ -32,7 +32,18 @@ export const DD_DEPART_SPEED_MPH = 15;
 export const DD_DEPART_HOLD_SEC = 10;
 export const DD_HISTORY_MAX = 200;
 
+export const DD_STAGE_META = Object.freeze({
+  [DD_SCREENS.START]: { step: 0, label: "Ready", short: "Start" },
+  [DD_SCREENS.TO_RESTAURANT]: { step: 1, label: "Driving to restaurant", short: "Pickup" },
+  [DD_SCREENS.AT_RESTAURANT]: { step: 2, label: "Waiting at restaurant", short: "Wait" },
+  [DD_SCREENS.TO_CUSTOMER]: { step: 3, label: "Driving to customer", short: "Dropoff" },
+  [DD_SCREENS.AT_CUSTOMER]: { step: 4, label: "Completing delivery", short: "Hand off" },
+});
+
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** In-memory last GPS for instant taps (no getCurrentPosition wait). */
+let _lastGps = null;
 
 export function formatTimerHms(ms, now = Date.now()) {
   const totalSec = Math.max(0, Math.floor(timerElapsedMs(ms, now) / 1000));
@@ -92,6 +103,16 @@ function point(gps) {
   };
 }
 
+export function rememberGps(gps) {
+  const p = point(gps);
+  if (p) _lastGps = p;
+  return _lastGps;
+}
+
+export function lastKnownGps() {
+  return _lastGps;
+}
+
 function pushEvent(delivery, type, extras = {}) {
   const events = Array.isArray(delivery.events) ? delivery.events.slice() : [];
   events.push({
@@ -108,6 +129,7 @@ export function createDelivery({ orderTypeId, gps, now = Date.now() }) {
   const ot = orderTypeById(orderTypeId);
   if (!ot) throw new Error("Unknown order type");
   const started = new Date(now);
+  rememberGps(gps);
   return {
     id: uid(),
     platform: "DoorDash",
@@ -401,19 +423,20 @@ export function readActiveDelivery(userId) {
   return readLocal(DD_PREFIX, userId, DD_ACTIVE_SUFFIX, null);
 }
 
-export function writeActiveDelivery(userId, delivery) {
+export function writeActiveDelivery(userId, delivery, opts = {}) {
+  const { soft = false, silent = false, departed = false } = opts;
   if (!delivery || delivery.status !== "active") {
     writeLocal(DD_PREFIX, userId, DD_ACTIVE_SUFFIX, null);
   } else {
     writeLocal(DD_PREFIX, userId, DD_ACTIVE_SUFFIX, delivery);
   }
-  emitDoorDashChanged(userId);
+  if (!silent) emitDoorDashChanged(userId, { soft, departed });
   return delivery;
 }
 
-export function clearActiveDelivery(userId) {
+export function clearActiveDelivery(userId, opts = {}) {
   writeLocal(DD_PREFIX, userId, DD_ACTIVE_SUFFIX, null);
-  emitDoorDashChanged(userId);
+  if (!opts.silent) emitDoorDashChanged(userId, opts);
 }
 
 export function readDoorDashHistory(userId) {
@@ -430,37 +453,83 @@ export function appendDoorDashHistory(userId, delivery) {
   return next;
 }
 
-export function saveDeliverySnapshot(userId, delivery) {
+export function saveDeliverySnapshot(userId, delivery, opts = {}) {
   if (!delivery) {
-    clearActiveDelivery(userId);
+    clearActiveDelivery(userId, opts);
     return null;
   }
   if (delivery.status === "active") {
-    writeActiveDelivery(userId, delivery);
+    writeActiveDelivery(userId, delivery, opts);
     return delivery;
   }
-  clearActiveDelivery(userId);
+  clearActiveDelivery(userId, { silent: true });
   appendDoorDashHistory(userId, delivery);
   return delivery;
 }
 
-export function emitDoorDashChanged(userId) {
+export function emitDoorDashChanged(userId, detail = {}) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent(DD_EVENT, {
-      detail: { userId, at: Date.now() },
+      detail: { userId, at: Date.now(), ...detail },
     })
   );
+}
+
+/** Roll-up for start-screen performance strip. */
+export function summarizeDoorDashPerformance(history = []) {
+  const list = Array.isArray(history) ? history : [];
+  const completed = list.filter((d) => d.status === "completed");
+  const cancelled = list.filter((d) => d.status === "cancelled");
+  const n = list.length;
+  const waits = completed
+    .map((d) => Number(d.analytics?.restaurantWaitSec))
+    .filter((v) => Number.isFinite(v));
+  const miles = completed
+    .map((d) => Number(d.analytics?.totalMiles ?? d.miles))
+    .filter((v) => Number.isFinite(v) && v >= 0);
+  const durations = completed
+    .map((d) => Number(d.analytics?.totalDurationSec))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  const accepted = list.reduce((s, d) => s + Number(d.analytics?.acceptedAddons ?? d.acceptedAddons ?? 0), 0);
+  const rejected = list.reduce((s, d) => s + Number(d.analytics?.rejectedAddons ?? d.rejectedAddons ?? 0), 0);
+  const avg = (arr) =>
+    arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
+  return {
+    totalRuns: n,
+    completed: completed.length,
+    cancelled: cancelled.length,
+    completionRate: n ? Math.round((completed.length / n) * 100) : null,
+    avgRestaurantWaitSec: avg(waits),
+    avgMiles: avg(miles),
+    avgDurationSec: avg(durations) != null ? Math.round(avg(durations)) : null,
+    acceptedAddons: accepted,
+    rejectedAddons: rejected,
+    stackSelectivity:
+      accepted + rejected > 0 ? Math.round((accepted / (accepted + rejected)) * 100) : null,
+  };
+}
+
+export function formatCompactDuration(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m < 60) return r ? `${m}m ${r}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
 }
 
 /** Live display snapshot for UI (timers as H:M:S). */
 export function liveSnapshot(delivery, now = Date.now()) {
   if (!delivery) {
-    return { screen: DD_SCREENS.START, delivery: null };
+    return { screen: DD_SCREENS.START, delivery: null, stage: DD_STAGE_META[DD_SCREENS.START] };
   }
+  const stage = DD_STAGE_META[delivery.screen] || DD_STAGE_META[DD_SCREENS.START];
   return {
     screen: delivery.screen,
     delivery,
+    stage,
     primaryHms: formatTimerHms(delivery.primaryTimer, now),
     secondaryHms: formatTimerHms(delivery.secondaryTimer, now),
     completionHms: formatTimerHms(delivery.completionTimer, now),
@@ -468,5 +537,6 @@ export function liveSnapshot(delivery, now = Date.now()) {
     gpsAvailable: delivery.gpsAvailable !== false,
     orderTypeLabel: delivery.orderTypeLabel,
     activeOrderCount: delivery.activeOrderCount,
+    highSpeedStreakSec: Number(delivery.highSpeedStreakSec || 0),
   };
 }

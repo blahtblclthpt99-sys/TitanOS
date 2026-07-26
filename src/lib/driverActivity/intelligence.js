@@ -394,7 +394,7 @@ export function buildCoachInsights(trips = [], { todayISO } = {}) {
     return [
       {
         id: "start",
-        text: "Start Auto GPS on your next shift — TitanOS will classify rush windows and coach from your real history.",
+        text: "Start Auto GPS and turn on money autopilot — TitanOS denies cheap trips so your $/hr goes up, not just your trip count.",
       },
     ];
   }

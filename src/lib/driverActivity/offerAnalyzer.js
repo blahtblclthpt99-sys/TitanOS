@@ -4,8 +4,13 @@
  * Decision aid only: TitanOS does not auto-tap third-party gig apps (ToS-safe).
  */
 
-import { estimateFuelCost, estimateWearCost, DEFAULT_WORTH_THRESHOLDS } from "./intelligence.js";
+import { DEFAULT_WORTH_THRESHOLDS } from "./intelligence.js";
 import { getZipBenchmark, normalizeZip } from "./zipBenchmarks.js";
+import {
+  estimateTrueOperatingCost,
+  ultimateWorthPerMile,
+  readVehicleEconomics,
+} from "./trueCostPerMile.js";
 import { readLocal, writeLocal } from "../localStore.js";
 
 const PREFIX = "titanos_driver";
@@ -143,10 +148,9 @@ export function resolveEffectiveThresholds(thresholds = {}, benchmark = null) {
 }
 
 /**
- * Full profitability formula + ACCEPT / MARGINAL / DENY verdict.
- * @param {object} input — pay, tip, miles, minutes, zip, stack, parking, …
- * @param {object} thresholds — deny floors
- * @param {object} [context] — { benchmarks } from buildZipBenchmarks
+ * Full profitability formula + ACCEPT / MARGINAL / DENY.
+ * Main worth signal: gross $/mi vs true all-in cost/mi
+ * (fuel + 10-13c maint + tires + vehicle) + accept/deny history + ZIP.
  */
 export function analyzeOffer(input = {}, thresholds = DEFAULT_OFFER_THRESHOLDS, context = {}) {
   const zip = normalizeZip(input.zip || context.zip || "");
@@ -156,14 +160,34 @@ export function analyzeOffer(input = {}, thresholds = DEFAULT_OFFER_THRESHOLDS, 
   const mpg = num(input.mpg, t.defaultMpg);
   const gas = num(input.gasUsd, t.fuelUsdPerGallon);
 
-  const fuel = estimateFuelCost(n.totalMiles, { mpg, gasUsd: gas });
-  const wear = estimateWearCost(n.totalMiles);
-  const costs = Math.round((fuel + wear + n.parking) * 100) / 100;
+  const economics =
+    context.economics ||
+    (context.userId ? readVehicleEconomics(context.userId) : null) ||
+    {};
+
+  const trueOp = estimateTrueOperatingCost(n.totalMiles, economics, { mpg, gasUsd: gas });
+  const worth = ultimateWorthPerMile({
+    economics,
+    mpg,
+    gasUsd: gas,
+    parking: n.parking,
+    totalMiles: n.totalMiles,
+    userId: context.userId || null,
+  });
+
+  const fuel = trueOp.fuel_cost;
+  const wear =
+    Math.round((trueOp.maintenance_cost + trueOp.tire_cost + trueOp.depreciation_cost) * 100) / 100;
+  const operating = trueOp.operating_cost;
+  const costs = Math.round((operating + n.parking) * 100) / 100;
   const netProfit = Math.round((n.gross - costs) * 100) / 100;
   const hourlyGross = n.totalMin > 0 ? (n.gross / n.totalMin) * 60 : 0;
   const hourlyNet = n.totalMin > 0 ? (netProfit / n.totalMin) * 60 : 0;
   const perMileGross = n.totalMiles > 0 ? n.gross / n.totalMiles : 0;
   const perMileNet = n.totalMiles > 0 ? netProfit / n.totalMiles : 0;
+
+  const beatsTrueCost =
+    n.totalMiles <= 0 || perMileGross >= num(worth.recommended_min_gross_per_mile, 0);
 
   const beatFactor = num(t.zipBeatFactor, 0.95);
   const hasZipData = benchmark.trips >= num(t.zipMinSamples, 2);
@@ -177,96 +201,184 @@ export function analyzeOffer(input = {}, thresholds = DEFAULT_OFFER_THRESHOLDS, 
     perMileGross >= benchmark.avg_per_mile * beatFactor;
   const zipBeat = !hasZipData || beatsZipHourly || beatsZipMile;
 
+  const histFloor = worth.accept_deny?.personal_floor_per_mile;
+  const beatsAcceptHistory = histFloor == null || perMileGross >= histFloor;
+
   const gates = {
     hourly: hourlyNet >= t.minHourlyAccept,
     profit: netProfit >= t.minProfitAccept,
-    perMile: perMileNet >= t.minPerMileAccept,
+    perMile: perMileNet >= t.minPerMileAccept && beatsTrueCost,
     zipBeat,
+    trueCost: beatsTrueCost,
+    acceptHistory: beatsAcceptHistory,
   };
-  const coreGates = [gates.hourly, gates.profit, gates.perMile];
+  const coreGates = [gates.hourly, gates.profit, gates.perMile, gates.trueCost];
   const corePass = coreGates.filter(Boolean).length;
-  const allPass = corePass === 3 && gates.zipBeat;
+  const allPass = corePass === 4 && gates.zipBeat && gates.acceptHistory;
   const anyPass = corePass > 0;
 
   let verdict = "MARGINAL";
   let action = "Think twice — only take if you can stay in zone.";
-  if (t.requireAllGates ? allPass : corePass >= 2 && gates.hourly && gates.zipBeat) {
+  if (!gates.trueCost) {
+    verdict = "DENY";
+    action =
+      "Not worth it — $" +
+      perMileGross.toFixed(2) +
+      "/mi gross under your $" +
+      worth.recommended_min_gross_per_mile.toFixed(2) +
+      "/mi true-cost floor (fuel + maint + tires + vehicle).";
+  } else if (!gates.acceptHistory) {
+    verdict = "DENY";
+    action = "Below what you usually accept (~$" + histFloor + "/mi). Protect your average.";
+  } else if (
+    t.requireAllGates ? allPass : corePass >= 3 && gates.hourly && gates.trueCost && gates.zipBeat
+  ) {
     verdict = "ACCEPT";
     action = hasZipData
-      ? `Profitable vs your ${benchmark.zip || "area"} average — take this offer.`
-      : "Profitable — take this offer.";
+      ? "Worth it — clears true cost/mi and your " + (benchmark.zip || "area") + " average."
+      : "Worth it — clears fuel, maintenance, tires, and vehicle cost per mile.";
   } else if (!gates.zipBeat && corePass >= 2) {
     verdict = "DENY";
-    action = `Below your ${benchmark.zip || "ZIP"} average — decline unless repositioning.`;
+    action =
+      "Below your " + (benchmark.zip || "ZIP") + " average — decline unless repositioning.";
   } else if (!anyPass || (!gates.hourly && !gates.profit)) {
     verdict = "DENY";
     action = "Not beneficial — skip / decline this offer.";
   } else if (!gates.hourly) {
     verdict = "DENY";
-    action = "Hourly too low after fuel, wear, and parking — decline.";
+    action = "Hourly too low after true operating costs — decline.";
   }
 
   const reasons = [];
+  reasons.push(
+    "True cost ~$" +
+      worth.true_cost_per_mile.toFixed(3) +
+      "/mi (fuel $" +
+      worth.fuel_per_mile.toFixed(3) +
+      " + maint " +
+      worth.maintenance_cents +
+      "c + tires $" +
+      worth.tires_per_mile.toFixed(3) +
+      " + vehicle $" +
+      worth.depreciation_per_mile.toFixed(3) +
+      ")" +
+      (n.parking > 0 ? " + park $" + worth.parking_per_mile.toFixed(3) + "/mi" : "") +
+      ". Need >= $" +
+      worth.recommended_min_gross_per_mile.toFixed(2) +
+      "/mi gross."
+  );
+  if (worth.accept_deny?.accepted_count >= 3) {
+    reasons.push(
+      "Your accepts avg $" +
+        worth.accept_deny.avg_accepted_per_mile +
+        "/mi · denies avg $" +
+        (worth.accept_deny.avg_denied_per_mile ?? "—") +
+        "/mi."
+    );
+  }
   if (n.stackCount > 1) {
     reasons.push(
       n.sameRestaurant
-        ? `Double/stack ×${n.stackCount} from same restaurant (+${n.extraMiles} mi, +${n.extraMin} min).`
-        : `Stacked orders ×${n.stackCount} (+${n.extraMiles} mi, +${n.extraMin} min for extra drops).`
+        ? "Double/stack x" +
+          n.stackCount +
+          " from same restaurant (+" +
+          n.extraMiles +
+          " mi, +" +
+          n.extraMin +
+          " min)."
+        : "Stacked orders x" +
+          n.stackCount +
+          " (+" +
+          n.extraMiles +
+          " mi, +" +
+          n.extraMin +
+          " min for extra drops)."
     );
   }
-  if (n.parking > 0) reasons.push(`Parking −$${n.parking.toFixed(2)}.`);
-  if (n.deadhead > 0) reasons.push(`Deadhead / return ${n.deadhead} mi included.`);
+  if (n.parking > 0) reasons.push("Parking -$" + n.parking.toFixed(2) + ".");
+  if (n.deadhead > 0) reasons.push("Deadhead / return " + n.deadhead + " mi included.");
   if (hasZipData) {
     const where =
       benchmark.source === "zip"
-        ? `ZIP ${benchmark.zip}`
+        ? "ZIP " + benchmark.zip
         : benchmark.source === "region"
-          ? `region ${benchmark.zip}`
+          ? "region " + benchmark.zip
           : "your overall logged average";
     reasons.push(
-      `${where}: avg $${benchmark.avg_per_mile ?? "—"}/mi · $${benchmark.avg_per_hour ?? "—"}/hr` +
-        ` across ${benchmark.trips} paid trip${benchmark.trips === 1 ? "" : "s"}.`
+      where +
+        ": avg $" +
+        (benchmark.avg_per_mile ?? "—") +
+        "/mi · $" +
+        (benchmark.avg_per_hour ?? "—") +
+        "/hr across " +
+        benchmark.trips +
+        " paid trip" +
+        (benchmark.trips === 1 ? "" : "s") +
+        "."
     );
-    if (t.calibratedFromZip) {
-      reasons.push(
-        `Deny floors raised to $${t.minHourlyAccept}/hr and $${t.minPerMileAccept}/mi from your history.`
-      );
-    }
     if (!gates.zipBeat) {
       reasons.push(
-        `This offer ($${perMileGross.toFixed(2)}/mi · $${hourlyGross.toFixed(0)}/hr gross) is under that ZIP average.`
+        "This offer ($" +
+          perMileGross.toFixed(2) +
+          "/mi · $" +
+          hourlyGross.toFixed(0) +
+          "/hr gross) is under that ZIP average."
       );
     }
   } else if (zip) {
-    reasons.push(`No paid trips logged yet for ZIP ${zip} — using your base floors only.`);
+    reasons.push("No paid trips logged yet for ZIP " + zip + " — using true cost + base floors.");
   }
   if (verdict === "ACCEPT") {
-    reasons.push(`Net ~$${hourlyNet.toFixed(0)}/hr and $${perMileNet.toFixed(2)}/mi after costs.`);
+    reasons.push(
+      "Net ~$" + hourlyNet.toFixed(0) + "/hr and $" + perMileNet.toFixed(2) + "/mi after all-in costs."
+    );
   } else if (verdict === "DENY") {
-    if (!gates.hourly) reasons.push(`Net hourly $${hourlyNet.toFixed(2)} below your $${t.minHourlyAccept} floor.`);
-    if (!gates.profit) reasons.push(`Net profit $${netProfit.toFixed(2)} below $${t.minProfitAccept} floor.`);
-    if (!gates.perMile) reasons.push(`Net $/mi $${perMileNet.toFixed(2)} below $${t.minPerMileAccept} floor.`);
+    if (!gates.trueCost) {
+      reasons.push(
+        "Gross $" +
+          perMileGross.toFixed(2) +
+          "/mi < required $" +
+          worth.recommended_min_gross_per_mile.toFixed(2) +
+          "/mi."
+      );
+    }
+    if (!gates.hourly) {
+      reasons.push(
+        "Net hourly $" + hourlyNet.toFixed(2) + " below your $" + t.minHourlyAccept + " floor."
+      );
+    }
+    if (!gates.profit) {
+      reasons.push(
+        "Net profit $" + netProfit.toFixed(2) + " below $" + t.minProfitAccept + " floor."
+      );
+    }
   } else {
-    reasons.push("Mixed signals — meets some gates but not a clear win.");
+    reasons.push("Mixed signals — meets some gates but not a clear money win.");
   }
 
   return {
-    verdict, // ACCEPT | MARGINAL | DENY
+    verdict,
     action,
     reasons,
     gates,
     zip,
     zipBenchmark: hasZipData || benchmark.trips > 0 ? benchmark : null,
+    trueCost: worth,
     thresholds: {
       minHourlyAccept: t.minHourlyAccept,
       minProfitAccept: t.minProfitAccept,
       minPerMileAccept: t.minPerMileAccept,
+      recommendedMinGrossPerMile: worth.recommended_min_gross_per_mile,
       calibratedFromZip: t.calibratedFromZip,
     },
     breakdown: {
       ...n,
       fuel,
       wear,
+      maintenance: trueOp.maintenance_cost,
+      tires: trueOp.tire_cost,
+      depreciation: trueOp.depreciation_cost,
+      operating,
       costs,
       netProfit,
       hourlyGross: Math.round(hourlyGross * 100) / 100,
@@ -277,9 +389,7 @@ export function analyzeOffer(input = {}, thresholds = DEFAULT_OFFER_THRESHOLDS, 
       gas,
     },
     formula:
-      "Net = (pay + tip) − fuel − wear − parking; " +
-      "Hourly = net ÷ total minutes × 60; " +
-      "$/mi = net ÷ total miles; " +
-      "ZIP avg from your logged paid trips raises floors and must be beaten for ACCEPT.",
+      "Worth it when gross $/mi >= fuel/mi + maint(10-13c) + tires/mi + vehicle/mi + parking/mi + buffer; " +
+      "also respect accept/deny history and ZIP averages. Net = gross - those costs.",
   };
 }

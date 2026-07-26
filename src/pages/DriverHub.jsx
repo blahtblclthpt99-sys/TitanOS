@@ -62,7 +62,7 @@ export default function DriverHub() {
       return "Trip intelligence, rush windows, goals, and coaching from your real driving history.";
     if (tab === "logbook")
       return "Classify miles, log fuel and expenses, download Excel trip reports with every timer.";
-    return "Track miles, stops, fuel, and sync to Tax Center.";
+    return "Track miles, protect your $/hr, and sync to Tax Center.";
   }, [tab]);
 
   const prefs = user?.id ? readPrefs(user.id) : {};

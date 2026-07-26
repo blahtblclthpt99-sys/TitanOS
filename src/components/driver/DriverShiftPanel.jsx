@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import HotspotMap from "@/components/driver/HotspotMap";
 import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
+import SetForgetOfferPanel from "@/components/driver/activity/SetForgetOfferPanel";
+import DriverVoiceCoach from "@/components/driver/activity/DriverVoiceCoach";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import { useDriverActivityTracker } from "@/components/driver/activity/useDriverActivityTracker";
@@ -68,6 +70,7 @@ export default function DriverShiftPanel() {
   const [history, setHistory] = useState(() => (user?.id ? readShiftHistory(user.id) : []));
   const [vehicles, setVehicles] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [voiceSeed, setVoiceSeed] = useState(null);
   const [milesDraft, setMilesDraft] = useState("");
   const [tick, setTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
@@ -686,6 +689,40 @@ export default function DriverShiftPanel() {
                 />
               </ErrorBoundary>
             )}
+
+            <ErrorBoundary message="Offer autopilot couldn't load.">
+              <SetForgetOfferPanel
+                userId={user?.id}
+                mpg={Number(prefs.mpg) || 22}
+                gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
+                defaultZip={prefs.zip || ""}
+                history={history}
+                drivingActive={drivingActive}
+                voiceSeed={voiceSeed}
+              />
+            </ErrorBoundary>
+
+            <ErrorBoundary message="Voice coach couldn't load.">
+              <DriverVoiceCoach
+                userId={user?.id}
+                mpg={Number(prefs.mpg) || mpg || 22}
+                gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
+                defaultZip={prefs.zip || ""}
+                history={history}
+                drivingActive={drivingActive}
+                sessionPaused={sessionPaused}
+                dash={dash}
+                onStartDriving={async () => {
+                  if (!drivingActive) await toggleDriving();
+                }}
+                onStopDriving={async () => {
+                  if (drivingActive) await toggleDriving();
+                }}
+                onPause={handlePauseSession}
+                onResume={handleResumeSession}
+                onDecision={(decision, input) => setVoiceSeed({ decision, input, at: Date.now() })}
+              />
+            </ErrorBoundary>
 
             {drivingActive && gpsError && (
               <p className="mt-2 text-xs text-titan-amber" role="status">

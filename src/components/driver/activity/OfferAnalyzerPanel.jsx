@@ -93,9 +93,9 @@ export default function OfferAnalyzerPanel({
     <section className="titan-surface p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Offer decision formula</h3>
+          <h3 className="text-sm font-semibold text-foreground">Offer decision · make more money</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Uses your logged trips — stacks, parking, and ZIP averages — then ACCEPT or DENY.
+            Built to raise take-home — stacks, parking, and your ZIP averages decide ACCEPT or DENY.
             Titan does not auto-tap other apps; use this before you accept.
           </p>
         </div>

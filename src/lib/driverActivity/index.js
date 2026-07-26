@@ -16,6 +16,9 @@ export * from "./tripJournal.js";
 export * from "./offerAnalyzer.js";
 export * from "./zipBenchmarks.js";
 export * from "./excelExport.js";
+export * from "./autopilot.js";
+export * from "./trueCostPerMile.js";
+export * from "./voiceCommands.js";
 export { createBrowserTracker } from "./tracker.js";
 
 /** Feature modules reserved for expansion (no-ops / stubs). */
@@ -40,4 +43,6 @@ export const ACTIVITY_MODULES = {
   offerAnalyzer: true,
   zipBenchmarks: true,
   excelExport: true,
+  offerAutopilot: true,
+  voiceCommands: true,
 };

@@ -1,6 +1,6 @@
 /**
  * Machine Payments Protocol (MPP) paid endpoint.
- * Accepts Tempo crypto (pathUSD) + Stripe SPT (card/Link) via mppx.
+ * Accepts Tempo crypto (pathUSD) + optional Stripe SPT (card/Link) via mppx.
  *
  * GET/POST /api/functions/mppPaid
  * - Unpaid → 402 + WWW-Authenticate Payment challenges
@@ -9,7 +9,7 @@
  *
  * Env:
  * - STRIPE_SECRET_KEY (required)
- * - STRIPE_PROFILE_ID (required for SPT / networkId = profile_…)
+ * - STRIPE_PROFILE_ID (optional; auto-discovered via Profiles "me" when unset/invalid)
  * - MPP_SECRET_KEY (optional; derived from Stripe key if unset)
  * - MPP_TESTNET=1 (default) for Tempo testnet token
  * - MPP_TEMPO_AMOUNT / MPP_STRIPE_AMOUNT (optional USD strings)
@@ -29,15 +29,14 @@ import {
   getMppSecretKey,
   getMppStripeClient,
   isMppConfigured,
-  isValidStripeProfileId,
   publicMppError,
+  resolveStripeProfileId,
 } from "../_lib/mppStripe.js";
 
 function applyMppHeaders(res) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("X-Content-Type-Options", "nosniff");
-  // Browsers need to read Payment challenges on cross-origin XHR/fetch.
   res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Payment-Receipt");
 }
 
@@ -48,7 +47,6 @@ function toWebRequest(req) {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers || {})) {
     if (value == null) continue;
-    // Drop hop-by-hop / body-length headers that break Fetch Request construction.
     const lower = key.toLowerCase();
     if (lower === "host" || lower === "connection" || lower === "content-length" || lower === "transfer-encoding") {
       continue;
@@ -90,12 +88,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Creating crypto PaymentIntents is costly — tighter than generic API routes.
   if (!assertRateLimit(req, res, { limit: 20, windowMs: 60_000, key: "mppPaid" })) return;
 
   const configured = isMppConfigured();
 
-  // HEAD = readiness probe only (no Stripe side effects).
   if (req.method === "HEAD") {
     res.statusCode = configured ? 204 : 503;
     return res.end();
@@ -104,8 +100,7 @@ export default async function handler(req, res) {
   if (!configured) {
     return res.status(503).json({
       error: "MPP not configured",
-      detail:
-        "Set STRIPE_SECRET_KEY and STRIPE_PROFILE_ID (Dashboard → Profile ID). Optional: MPP_SECRET_KEY.",
+      detail: "Set STRIPE_SECRET_KEY. Optional: STRIPE_PROFILE_ID (or create a Stripe Profile for SPT).",
     });
   }
 
@@ -113,39 +108,51 @@ export default async function handler(req, res) {
     const { Mppx, stripe: mppStripe, tempo } = await import("mppx/server");
     const stripeClient = getMppStripeClient();
     const mppSecretKey = getMppSecretKey();
-    const profileId = String(process.env.STRIPE_PROFILE_ID || "").trim();
-    if (!stripeClient || !mppSecretKey || !isValidStripeProfileId(profileId)) {
+    if (!stripeClient || !mppSecretKey) {
       return res.status(503).json({ error: "MPP not configured" });
     }
 
     const testnet = String(process.env.MPP_TESTNET || "1") !== "0";
     const pathUsd = testnet ? PATH_USD_TESTNET : PATH_USD_MAINNET;
     const amounts = getMppChargeAmounts();
+    const profileId = await resolveStripeProfileId();
 
     const request = toWebRequest(req);
     const recipientAddress = await createPayToAddress(request, { amountUsd: amounts.tempoUsd });
 
-    const mppx = Mppx.create({
-      methods: [
-        tempo.charge({
-          currency: pathUsd,
-          recipient: recipientAddress,
-          testnet,
-        }),
+    const methods = [
+      tempo.charge({
+        currency: pathUsd,
+        recipient: recipientAddress,
+        testnet,
+      }),
+    ];
+
+    if (profileId) {
+      methods.push(
         mppStripe.charge({
           client: stripeClient,
           networkId: profileId,
           paymentMethodTypes: ["card", "link"],
           decimals: 2,
-        }),
-      ],
+        })
+      );
+    }
+
+    const mppx = Mppx.create({
+      methods,
       secretKey: mppSecretKey,
     });
 
-    const response = await Mppx.compose(
-      mppx.tempo.charge({ amount: amounts.tempoUsd, recipient: recipientAddress }),
-      mppx.stripe.charge({ amount: amounts.stripeUsd, currency: "usd" })
-    )(request);
+    const handlers = [mppx.tempo.charge({ amount: amounts.tempoUsd, recipient: recipientAddress })];
+    if (profileId) {
+      handlers.push(mppx.stripe.charge({ amount: amounts.stripeUsd, currency: "usd" }));
+    }
+
+    const response =
+      handlers.length === 1
+        ? await handlers[0](request)
+        : await Mppx.compose(...handlers)(request);
 
     if (response.status === 402) {
       return sendWebResponse(res, response.challenge);
@@ -156,7 +163,8 @@ export default async function handler(req, res) {
         ok: true,
         service: "titanos-mpp",
         message: "Payment accepted",
-        methods: ["tempo", "stripe"],
+        methods: profileId ? ["tempo", "stripe"] : ["tempo"],
+        spt: Boolean(profileId),
         ts: new Date().toISOString(),
       })
     );

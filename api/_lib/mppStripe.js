@@ -104,12 +104,41 @@ export function getMppStripeClient() {
 }
 
 export function isMppConfigured() {
-  const profileId = process.env.STRIPE_PROFILE_ID;
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-      isValidStripeProfileId(profileId) &&
-      getMppSecretKey()
-  );
+  // Tempo crypto needs the secret key; SPT needs a profile_ network id (env or auto-discover).
+  return Boolean(process.env.STRIPE_SECRET_KEY && getMppSecretKey());
+}
+
+/** True when env already has a well-formed profile_ id (SPT ready without discovery). */
+export function hasEnvStripeProfileId() {
+  return isValidStripeProfileId(process.env.STRIPE_PROFILE_ID);
+}
+
+/**
+ * Resolve SPT networkId: prefer STRIPE_PROFILE_ID, else Stripe Profiles "me" API.
+ * @returns {Promise<string | null>}
+ */
+export async function resolveStripeProfileId() {
+  const fromEnv = String(process.env.STRIPE_PROFILE_ID || "").trim();
+  if (isValidStripeProfileId(fromEnv)) return fromEnv;
+
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+
+  try {
+    const res = await fetch("https://api.stripe.com/v2/network/business_profiles/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Stripe-Version": "2026-04-22.preview",
+      },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const id = typeof body?.id === "string" ? body.id.trim() : "";
+    return isValidStripeProfileId(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getMppChargeAmounts() {

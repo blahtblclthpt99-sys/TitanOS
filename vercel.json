@@ -6,8 +6,7 @@
   "installCommand": "npm ci",
   "functions": {
     "api/functions/mppPaid.js": {
-      "maxDuration": 30,
-      "memory": 1024
+      "maxDuration": 30
     }
   },
   "rewrites": [

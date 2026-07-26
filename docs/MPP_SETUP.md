@@ -12,7 +12,7 @@ Accepts agent / machine payments via:
 | Variable | Required | Notes |
 |----------|----------|--------|
 | `STRIPE_SECRET_KEY` | Yes | Same live/test key you already use |
-| `STRIPE_PROFILE_ID` | Yes | Dashboard profile id (`profile_…`) for SPT `networkId` |
+| `STRIPE_PROFILE_ID` | No* | `profile_…` for SPT; auto-discovered via Profiles `me` if unset |
 | `MPP_SECRET_KEY` | No | ≥32 bytes base64; derived from Stripe key if unset |
 | `MPP_TESTNET` | No | Default `1` (testnet). Set `0` for mainnet Tempo token |
 | `MPP_TEMPO_AMOUNT` | No | USD string, default `0.01` (capped) |

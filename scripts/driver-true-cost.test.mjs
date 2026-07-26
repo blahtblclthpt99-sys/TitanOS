@@ -5,6 +5,7 @@ import {
   estimateTrueOperatingCost,
   ultimateWorthPerMile,
   clampMaintenanceCents,
+  mileMarginVsFloor,
   MAINTENANCE_CENTS_MIN,
   MAINTENANCE_CENTS_MAX,
 } from "../src/lib/driverActivity/trueCostPerMile.js";
@@ -141,5 +142,59 @@ describe("True cost per mile", () => {
       totalMiles: 5,
     });
     assert.ok(w.recommended_min_gross_per_mile > w.all_in_cost_per_mile);
+  });
+
+  it("raises depreciation when odometer leaves less life", () => {
+    const early = computeTrueCostPerMile({
+      purchase_price: 20000,
+      vehicle_life_miles: 100000,
+      odometer: 0,
+      tire_set_cost: 0,
+      maintenance_cents_per_mile: 11,
+    });
+    const late = computeTrueCostPerMile({
+      purchase_price: 20000,
+      vehicle_life_miles: 100000,
+      odometer: 80000,
+      tire_set_cost: 0,
+      maintenance_cents_per_mile: 11,
+    });
+    assert.ok(late.depreciation_per_mile > early.depreciation_per_mile);
+  });
+
+  it("mileMarginVsFloor reports surplus and shortfall", () => {
+    const up = mileMarginVsFloor(2.5, { recommended_min_gross_per_mile: 2.0 });
+    assert.equal(up.clears, true);
+    assert.ok(Math.abs(up.margin - 0.5) < 0.001);
+    const down = mileMarginVsFloor(1.2, 1.8);
+    assert.equal(down.clears, false);
+    assert.ok(down.margin < 0);
+  });
+
+  it("includes parking in all-in floor", () => {
+    const bare = ultimateWorthPerMile({
+      economics: {
+        purchase_price: 0,
+        tire_set_cost: 0,
+        maintenance_cents_per_mile: 10,
+      },
+      mpg: 25,
+      gasUsd: 2.5,
+      parking: 0,
+      totalMiles: 5,
+    });
+    const parked = ultimateWorthPerMile({
+      economics: {
+        purchase_price: 0,
+        tire_set_cost: 0,
+        maintenance_cents_per_mile: 10,
+      },
+      mpg: 25,
+      gasUsd: 2.5,
+      parking: 5,
+      totalMiles: 5,
+    });
+    assert.ok(parked.recommended_min_gross_per_mile > bare.recommended_min_gross_per_mile);
+    assert.ok(Math.abs(parked.parking_per_mile - 1) < 0.001);
   });
 });

@@ -82,6 +82,7 @@ describe("Driver Intelligence", () => {
 
   it("returns coach insights", () => {
     const tips = buildCoachInsights([]);
-    assert.ok(tips[0].text.includes("Auto GPS") || tips[0].text.length > 10);
+    assert.ok(tips.length >= 1);
+    assert.ok(tips.some((t) => /Auto GPS|all-in|floor|vehicle|autopilot/i.test(t.text)));
   });
 });

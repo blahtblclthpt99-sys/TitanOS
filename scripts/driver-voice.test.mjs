@@ -66,10 +66,12 @@ describe("Driver voice commands", () => {
     const line = formatDecisionSpeech({
       verdict: "ACCEPT",
       action: "Take it.",
-      breakdown: { hourlyNet: 32.4 },
+      breakdown: { hourlyNet: 32.4, perMileGross: 3.1 },
       money: { delta_per_hour: 5 },
+      trueCost: { recommended_min_gross_per_mile: 1.85 },
     });
     assert.match(line, /ACCEPT/);
     assert.match(line, /32/);
+    assert.match(line, /3\.10|1\.85/);
   });
 });

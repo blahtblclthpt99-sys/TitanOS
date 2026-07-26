@@ -47,8 +47,38 @@ describe("Set-&-forget autopilot", () => {
     );
     assert.ok(decision.spectrum.overall >= 0 && decision.spectrum.overall <= 100);
     assert.ok("hourly" in decision.spectrum);
+    assert.ok("true_cost" in decision.spectrum);
     assert.ok("zip" in decision.spectrum);
     assert.ok("rush" in decision.spectrum);
+  });
+
+  it("never ACCEPTs when true-cost floor fails", () => {
+    const d = decideOfferSetForget(
+      { pay: 5, tip: 0, miles: 12, minutes: 20, parking: 0, deadhead_miles: 0 },
+      {
+        settings: {
+          enabled: true,
+          profileId: "chill",
+          useZipAverages: false,
+          autoParking: true,
+          assumeDeadheadMiles: 0,
+          defaultStackCount: 1,
+          rushAware: false,
+          protectHourlyAverage: false,
+        },
+        economics: {
+          purchase_price: 28000,
+          vehicle_life_miles: 120000,
+          tire_set_cost: 800,
+          tire_life_miles: 35000,
+          tire_miles_used: 0,
+          maintenance_cents_per_mile: 12,
+        },
+      }
+    );
+    assert.equal(d.gates.trueCost, false);
+    assert.equal(d.verdict, "DENY");
+    assert.match(d.action, /all-in|floor|Skip/i);
   });
 
   it("ACCEPT a strong offer under balanced set-&-forget", () => {

@@ -52,7 +52,9 @@ import {
  * Items with adminOnly are filtered in Sidebar / MoreMenu.
  */
 export const APP_NAV_ITEMS = [
-  // Daily work — always visible
+  // Daily work — Driver Hub is #1
+  { icon: Car, label: "Driver Hub", path: "/driver", group: "daily" },
+  { icon: Radio, label: "TitanComms", path: "/comms", group: "daily" },
   { icon: LayoutDashboard, label: "Command Center", path: "/", group: "daily" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "daily" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "daily" },
@@ -78,7 +80,6 @@ export const APP_NAV_ITEMS = [
   { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "field" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "field" },
   { icon: FileSignature, label: "Contracts", path: "/contracts", group: "field" },
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "field" },
 
   // Growth — live customer / revenue tools
   { icon: Store, label: "Marketplace", path: "/marketplace", group: "growth" },
@@ -92,7 +93,6 @@ export const APP_NAV_ITEMS = [
 
   // Connect
   { icon: Bot, label: "Titan AI", path: "/assistant", group: "connect" },
-  { icon: Radio, label: "TitanComms", path: "/comms", group: "connect" },
   { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
   { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
 
@@ -127,17 +127,17 @@ export const NAV_GROUP_META = {
 
 export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", "account", "labs"];
 
-/** Mobile bottom tabs — Profile opens /profile (settings live under More). */
+/** Mobile bottom tabs — Driver Hub is #1. */
 export const MOBILE_TAB_ITEMS = [
-  { icon: LayoutDashboard, label: "Home", path: "/" },
+  { icon: Car, label: "Driver", path: "/driver" },
+  { icon: Radio, label: "Comms", path: "/comms" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Store, label: "Marketplace", path: "/marketplace" },
   { icon: MessageSquare, label: "Messages", path: "/messages" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
 
 /** Paths that keep the bottom tab bar “selected root” chrome (no Back). */
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
 
 /**
  * More menu — essentials first; Labs holds partner-dependent tools.
@@ -146,7 +146,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Daily work",
     description: "Run today’s jobs",
-    paths: ["/schedule", "/customers", "/estimates", "/invoices", "/messages"],
+    paths: ["/driver", "/comms", "/", "/schedule", "/customers", "/estimates", "/invoices", "/messages"],
   },
   {
     title: "Money",
@@ -155,7 +155,7 @@ export const MORE_MENU_GROUPS = [
   },
   {
     title: "Field & team",
-    description: "Crew, routes, fleet, drivers",
+    description: "Crew, routes, fleet",
     paths: [
       "/job-estimator",
       "/routes",
@@ -165,7 +165,6 @@ export const MORE_MENU_GROUPS = [
       "/credentials",
       "/booking",
       "/contracts",
-      "/driver",
     ],
   },
   {
@@ -176,7 +175,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Connect",
     description: "Talk to customers and your team",
-    paths: ["/assistant", "/comms", "/community", "/notifications"],
+    paths: ["/assistant", "/community", "/notifications"],
   },
   {
     title: "Account",

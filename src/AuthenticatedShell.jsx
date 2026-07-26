@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
+import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
 
 function PrefetchOnMount() {
   usePrefetchDashboard(true);
@@ -14,6 +15,7 @@ export default function AuthenticatedShell() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <PrefetchOnMount />
+      <DriverSessionKeepAlive />
       <AppLayout />
     </QueryClientProvider>
   );

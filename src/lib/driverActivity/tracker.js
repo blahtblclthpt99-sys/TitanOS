@@ -156,7 +156,41 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       };
     },
     seedMiles(n) {
-      miles = round1(n);
+      miles = round1(Math.max(0, Number(n) || 0));
+    },
+    /**
+     * Restore counters after page refresh so GPS continues from last saved totals.
+     */
+    seedTelemetry({
+      miles: seedMi,
+      driveSec: seedDrive,
+      idleSec: seedIdle,
+      maxSpeedMph: seedMax,
+      lat,
+      lng,
+      openStopId,
+      stopPhase,
+    } = {}) {
+      if (seedMi != null) miles = round1(Math.max(0, Number(seedMi) || 0));
+      if (seedDrive != null) driveSec = Math.max(0, Number(seedDrive) || 0);
+      if (seedIdle != null) idleSec = Math.max(0, Number(seedIdle) || 0);
+      if (seedMax != null) maxSpeed = Math.max(0, Number(seedMax) || 0);
+      if (lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+        prev = {
+          lat: Number(lat),
+          lng: Number(lng),
+          ts: Date.now(),
+          accuracy: null,
+        };
+      }
+      if (openStopId || stopPhase === "stopped" || stopPhase === "potential") {
+        stopState = {
+          phase: stopPhase === "potential" ? "potential" : "stopped",
+          stationarySec: stopPhase === "potential" ? Math.max(1, cfg.confirmStopSec * 0.5) : cfg.confirmStopSec + 1,
+          origin: prev ? { lat: prev.lat, lng: prev.lng } : null,
+          openStopId: openStopId || stopState.openStopId,
+        };
+      }
     },
   };
 }

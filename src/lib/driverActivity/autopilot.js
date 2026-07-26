@@ -174,6 +174,18 @@ export function buildSpectrumScores(analysis, { rush = null, rushAware = true } 
       ? 0
       : clampScore(100 - (num(b.costs) / Math.max(0.01, num(b.gross))) * 100);
 
+  // Main worth signal: gross $/mi vs recommended all-in floor
+  const need = num(analysis?.trueCost?.recommended_min_gross_per_mile || t.recommendedMinGrossPerMile);
+  const grossMi = num(b.perMileGross);
+  let trueCost = 50;
+  if (need > 0 && grossMi > 0) {
+    trueCost = clampScore((grossMi / need) * 70);
+  } else if (gates.trueCost) {
+    trueCost = 80;
+  } else if (gates.trueCost === false) {
+    trueCost = 20;
+  }
+
   let rushScore = 70;
   if (rushAware && rush?.id) {
     if (["lunch", "dinner", "breakfast"].includes(rush.id)) rushScore = 85;
@@ -186,6 +198,7 @@ export function buildSpectrumScores(analysis, { rush = null, rushAware = true } 
     hourly,
     profit,
     per_mile: perMile,
+    true_cost: trueCost,
     zip,
     stack,
     parking,
@@ -193,14 +206,15 @@ export function buildSpectrumScores(analysis, { rush = null, rushAware = true } 
     rush: rushScore,
   };
   const overall = clampScore(
-    hourly * 0.22 +
-      profit * 0.18 +
-      perMile * 0.18 +
-      zip * 0.16 +
-      costs * 0.1 +
-      stack * 0.06 +
-      parking * 0.05 +
-      rushScore * 0.05
+    trueCost * 0.22 +
+      hourly * 0.18 +
+      profit * 0.14 +
+      perMile * 0.14 +
+      zip * 0.12 +
+      costs * 0.08 +
+      stack * 0.05 +
+      parking * 0.04 +
+      rushScore * 0.03
   );
   return { ...dims, overall };
 }
@@ -226,20 +240,29 @@ export function estimateMoneyDelta(analysis) {
   };
 }
 
-function moneyFirstAction(verdict, money, rush) {
+function moneyFirstAction(verdict, money, rush, analysis) {
+  const need = num(analysis?.trueCost?.recommended_min_gross_per_mile);
+  const offerMi = num(analysis?.breakdown?.perMileGross);
+  const trueCostFail = analysis?.gates?.trueCost === false;
+
   if (verdict === "ACCEPT") {
     if (money.delta_per_hour > 0) {
-      return `Take it — ~$${Math.abs(money.delta_per_hour).toFixed(0)}/hr above your usual. More money.`;
+      return `Take it — ~$${Math.abs(money.delta_per_hour).toFixed(0)}/hr above your usual. Clears all-in $${need.toFixed(2)}/mi.`;
     }
-    return "Take it — clears your money floors after fuel, wear, and parking.";
+    return need
+      ? `Take it — clears your $${need.toFixed(2)}/mi true-cost floor (fuel + maint + tires + vehicle).`
+      : "Take it — clears fuel, maintenance, tires, and vehicle cost per mile.";
   }
   if (verdict === "DENY") {
+    if (trueCostFail && need > 0) {
+      return `Skip — $${offerMi.toFixed(2)}/mi under your $${need.toFixed(2)}/mi all-in floor. Not worth the miles.`;
+    }
     if (money.delta_per_hour < 0 && money.baseline_hourly > 0) {
       return `Skip — would drag you ~$${Math.abs(money.delta_per_hour).toFixed(0)}/hr below your average. Protect the bag.`;
     }
     return rush?.id === "afternoon"
       ? "Skip — wait for a better-paying rush. Don’t work for scraps."
-      : "Skip — not worth your time or miles after costs.";
+      : "Skip — not worth your time or miles after true costs.";
   }
   return "Borderline — only take if it positions you for a better-paying zone.";
 }
@@ -290,6 +313,11 @@ export function decideOfferSetForget(input = {}, context = {}) {
 
   let verdict = analysis.verdict;
 
+  // Hard rule: never ACCEPT if all-in $/mi floor fails (fuel+maint+tires+vehicle)
+  if (analysis.gates?.trueCost === false) {
+    verdict = "DENY";
+  }
+
   // Money protection: never let a trip pull your $/hr below your proven average
   if (
     settings.protectHourlyAverage !== false &&
@@ -314,6 +342,7 @@ export function decideOfferSetForget(input = {}, context = {}) {
     ["lunch", "dinner"].includes(rush?.id) &&
     spectrum.overall >= 65 &&
     analysis.gates.hourly &&
+    analysis.gates.trueCost &&
     money.protects_average
   ) {
     verdict = "ACCEPT";
@@ -324,6 +353,7 @@ export function decideOfferSetForget(input = {}, context = {}) {
     verdict !== "ACCEPT" &&
     analysis.gates.hourly &&
     analysis.gates.profit &&
+    analysis.gates.trueCost &&
     money.protects_average
   ) {
     verdict = "ACCEPT";
@@ -331,7 +361,10 @@ export function decideOfferSetForget(input = {}, context = {}) {
     verdict = "DENY";
   }
 
-  const action = moneyFirstAction(verdict, money, rush);
+  // Re-assert true-cost veto after any upgrades
+  if (analysis.gates?.trueCost === false) verdict = "DENY";
+
+  const action = moneyFirstAction(verdict, money, rush, analysis);
 
   return {
     ...analysis,

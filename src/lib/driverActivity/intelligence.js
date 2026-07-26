@@ -4,6 +4,35 @@
  */
 
 import { IRS_MILEAGE_RATE_USD } from "../driverHubMath.js";
+import { readLocal } from "../localStore.js";
+import {
+  estimateTrueOperatingCost,
+  ultimateWorthPerMile,
+  readVehicleEconomics,
+} from "./trueCostPerMile.js";
+
+const AUTOPILOT_LOG_KEY = "offer_autopilot_log";
+const DRIVER_PREFIX = "titanos_driver";
+
+function moneyProtectedFromLog(userId) {
+  if (!userId) return null;
+  const raw = readLocal(DRIVER_PREFIX, userId, AUTOPILOT_LOG_KEY, []);
+  const rows = Array.isArray(raw) ? raw.slice(0, 50) : [];
+  if (!rows.length) return null;
+  let protectedUsd = 0;
+  let capturedUsd = 0;
+  for (const r of rows) {
+    const pay = num(r.pay);
+    if (r.verdict === "DENY" && pay > 0) protectedUsd += pay * 0.35;
+    if (r.verdict === "ACCEPT" && pay > 0) capturedUsd += pay;
+  }
+  return {
+    decisions: rows.length,
+    estimated_protected_usd: Math.round(protectedUsd * 100) / 100,
+    estimated_captured_usd: Math.round(capturedUsd * 100) / 100,
+    deny_count: rows.filter((r) => r.verdict === "DENY").length,
+  };
+}
 
 /** Configurable rush windows (local time). */
 export const DEFAULT_RUSH_WINDOWS = Object.freeze([
@@ -63,14 +92,34 @@ export function estimateFuelCost(miles, { mpg = 22, gasUsd = 3.5 } = {}) {
   return Math.round((m / g) * num(gasUsd, 3.5) * 100) / 100;
 }
 
+/** @deprecated Prefer estimateTrueOperatingCost — kept for light fuel-only math */
 export function estimateWearCost(miles, perMile = 0.08) {
   return Math.round(Math.max(0, num(miles)) * num(perMile, 0.08) * 100) / 100;
+}
+
+function resolveEconomics(opts = {}) {
+  if (opts.economics && typeof opts.economics === "object") return opts.economics;
+  if (opts.userId) return readVehicleEconomics(opts.userId);
+  return {};
+}
+
+function operatingForMiles(miles, opts = {}) {
+  const mpg = num(opts.mpg, 22);
+  const gasUsd = num(opts.gasUsd, 3.5);
+  const economics = resolveEconomics(opts);
+  const op = estimateTrueOperatingCost(miles, economics, { mpg, gasUsd });
+  return {
+    fuel: op.fuel_cost,
+    wear: Math.round((op.maintenance_cost + op.tire_cost + op.depreciation_cost) * 100) / 100,
+    operating: op.operating_cost,
+    true_cost_per_mile: op.true_cost_per_mile,
+  };
 }
 
 /**
  * Normalize a Hub session into a Trip intelligence record.
  */
-export function sessionToTrip(session, { mpg, gasUsd, windows } = {}) {
+export function sessionToTrip(session, { mpg, gasUsd, windows, economics, userId } = {}) {
   if (!session?.id) return null;
   const started = session.started_at ? new Date(session.started_at) : null;
   const ended = session.ended_at ? new Date(session.ended_at) : session.active ? new Date() : null;
@@ -82,9 +131,10 @@ export function sessionToTrip(session, { mpg, gasUsd, windows } = {}) {
     (started && ended ? Math.max(0, Math.round((ended - started) / 1000) - num(session.pause_accum_sec)) : 0);
   const earnings = num(session.earnings_gross);
   const tips = num(session.tips);
-  const fuel = num(session.fuel_cost) || estimateFuelCost(miles, { mpg, gasUsd });
-  const wear = estimateWearCost(miles);
-  const expenses = Math.round((fuel + wear) * 100) / 100;
+  const op = operatingForMiles(miles, { mpg, gasUsd, economics, userId });
+  const fuel = num(session.fuel_cost) || op.fuel;
+  const wear = op.wear;
+  const expenses = Math.round((num(session.fuel_cost) ? fuel + wear : op.operating) * 100) / 100;
   const profit =
     earnings > 0 ? Math.round((earnings + tips - expenses) * 100) / 100 : Math.round(-expenses * 100) / 100;
   const driveHours = hoursFromSec(driveSec || elapsedSec);
@@ -133,6 +183,7 @@ export function sessionToTrip(session, { mpg, gasUsd, windows } = {}) {
     expenses,
     fuel_cost: fuel,
     wear_cost: wear,
+    true_cost_per_mile: op.true_cost_per_mile,
     profit,
     dollars_per_mile: dollarsPerMile,
     dollars_per_hour: dollarsPerHour,
@@ -151,7 +202,7 @@ export function sessionToTrip(session, { mpg, gasUsd, windows } = {}) {
 }
 
 /** Expand stop-to-stop legs as individual trip records (never merged). */
-export function legsFromSession(session, { mpg, gasUsd, windows } = {}) {
+export function legsFromSession(session, { mpg, gasUsd, windows, economics, userId } = {}) {
   const stops = Array.isArray(session?.stops_detail) ? [...session.stops_detail] : [];
   if (!stops.length) return [];
   stops.sort((a, b) => new Date(a.started_at || 0) - new Date(b.started_at || 0));
@@ -164,8 +215,9 @@ export function legsFromSession(session, { mpg, gasUsd, windows } = {}) {
       ? new Date(new Date(stop.started_at).getTime() - driveSec * 1000)
       : null;
     const ended = stop.started_at ? new Date(stop.started_at) : null;
-    const fuel = estimateFuelCost(miles, { mpg, gasUsd });
-    const wear = estimateWearCost(miles);
+    const op = operatingForMiles(miles, { mpg, gasUsd, economics, userId });
+    const fuel = op.fuel;
+    const wear = op.wear;
     const rush = started ? classifyRushWindow(started, windows || DEFAULT_RUSH_WINDOWS) : null;
     const dow = started ? started.getDay() : null;
     trips.push({
@@ -189,10 +241,11 @@ export function legsFromSession(session, { mpg, gasUsd, windows } = {}) {
       stop_count: 1,
       earnings: 0,
       tips: 0,
-      expenses: Math.round((fuel + wear) * 100) / 100,
+      expenses: op.operating,
       fuel_cost: fuel,
       wear_cost: wear,
-      profit: Math.round(-(fuel + wear) * 100) / 100,
+      true_cost_per_mile: op.true_cost_per_mile,
+      profit: Math.round(-op.operating * 100) / 100,
       dollars_per_mile: null,
       dollars_per_hour: null,
       platform: stop.app || (session.apps && session.apps[0]) || "General",
@@ -334,6 +387,7 @@ export function rushPeriodStats(trips = [], windows = DEFAULT_RUSH_WINDOWS) {
 
 /**
  * Rate a trip opportunity (or completed trip) ★–★★★★★
+ * Uses true all-in operating cost (fuel + maint + tires + vehicle) when economics provided.
  */
 export function rateTripWorth(input = {}, thresholds = DEFAULT_WORTH_THRESHOLDS) {
   const miles = Math.max(0, num(input.miles, num(input.estimated_miles)));
@@ -342,34 +396,55 @@ export function rateTripWorth(input = {}, thresholds = DEFAULT_WORTH_THRESHOLDS)
   const tips = Math.max(0, num(input.tips));
   const mpg = num(input.mpg, thresholds.defaultMpg);
   const gas = num(input.gasUsd, thresholds.fuelUsdPerGallon);
-  const fuel = estimateFuelCost(miles, { mpg, gasUsd: gas });
-  const wear = estimateWearCost(miles);
+  const economics = input.economics || (input.userId ? readVehicleEconomics(input.userId) : {});
+  const op = estimateTrueOperatingCost(miles, economics, { mpg, gasUsd: gas });
+  const fuel = op.fuel_cost;
+  const wear = Math.round((op.maintenance_cost + op.tire_cost + op.depreciation_cost) * 100) / 100;
   const totalEarn = earnings + tips;
-  const profit = Math.round((totalEarn - fuel - wear) * 100) / 100;
+  const profit = Math.round((totalEarn - op.operating_cost) * 100) / 100;
   const hourly = minutes > 0 ? (totalEarn / minutes) * 60 : 0;
   const perMile = miles > 0 ? totalEarn / miles : 0;
+  const worth = ultimateWorthPerMile({
+    economics,
+    mpg,
+    gasUsd: gas,
+    parking: num(input.parking),
+    totalMiles: Math.max(0.1, miles || 1),
+    userId: input.userId || null,
+  });
+  const clearsFloor = miles <= 0 || perMile >= worth.recommended_min_gross_per_mile;
 
   let stars = 3;
-  let reason = "Fair return for distance and time.";
-  if (hourly >= thresholds.excellentHourly && miles <= thresholds.maxMilesForExcellent) {
+  let reason = "Fair return for distance and time after true costs.";
+  if (!clearsFloor && totalEarn > 0) {
+    stars = Math.min(2, stars);
+    reason = `Under your $${worth.recommended_min_gross_per_mile.toFixed(2)}/mi all-in floor (offer $${perMile.toFixed(2)}/mi).`;
+  }
+  if (hourly >= thresholds.excellentHourly && miles <= thresholds.maxMilesForExcellent && clearsFloor) {
     stars = 5;
-    reason = "Excellent hourly return with controlled mileage.";
-  } else if (hourly >= thresholds.goodHourly) {
+    reason = "Excellent hourly return that clears fuel, maint, tires, and vehicle cost.";
+  } else if (hourly >= thresholds.goodHourly && clearsFloor) {
     stars = 4;
-    reason = "Strong hourly return — worth taking.";
-  } else if (hourly >= thresholds.fairHourly) {
+    reason = "Strong hourly return — worth taking after all-in costs.";
+  } else if (hourly >= thresholds.fairHourly && clearsFloor) {
     stars = 3;
-    reason = "Fair — acceptable if you stay in the zone.";
+    reason = "Fair — clears true cost/mi if you stay in the zone.";
   } else if (hourly >= thresholds.poorHourly) {
-    stars = 2;
-    reason = miles > 12 ? "Low pay for distance." : "Below your usual hourly target.";
+    stars = Math.min(stars, 2);
+    reason = miles > 12 ? "Low pay for distance after true costs." : "Below your usual hourly target.";
+  } else if (totalEarn <= 0) {
+    stars = 1;
+    reason = "No earnings data — track payout to score accurately.";
+  } else if (!clearsFloor) {
+    stars = 1;
+    reason = `Avoid — $${perMile.toFixed(2)}/mi gross under $${worth.recommended_min_gross_per_mile.toFixed(2)}/mi need.`;
   } else {
     stars = 1;
-    reason = totalEarn <= 0 ? "No earnings data — track payout to score accurately." : "Avoid — weak hourly and thin profit.";
+    reason = "Avoid — weak hourly and thin profit after true costs.";
   }
   if (miles > 15 && hourly < thresholds.goodHourly && stars > 2) {
     stars = Math.min(stars, 2);
-    reason = "High mileage reduces profit per mile.";
+    reason = "High mileage reduces profit after all-in costs.";
   }
 
   const labels = { 5: "Excellent", 4: "Good", 3: "Fair", 2: "Poor", 1: "Avoid" };
@@ -381,22 +456,111 @@ export function rateTripWorth(input = {}, thresholds = DEFAULT_WORTH_THRESHOLDS)
     estimated_miles: Math.round(miles * 10) / 10,
     estimated_drive_min: Math.round(minutes),
     estimated_fuel: fuel,
+    estimated_wear: wear,
+    estimated_operating: op.operating_cost,
     estimated_hourly: Math.round(hourly * 100) / 100,
     estimated_per_mile: Math.round(perMile * 100) / 100,
     estimated_profit: profit,
+    true_cost_per_mile: worth.true_cost_per_mile,
+    recommended_min_gross_per_mile: worth.recommended_min_gross_per_mile,
+    clears_true_cost: clearsFloor,
   };
 }
 
-export function buildCoachInsights(trips = [], { todayISO } = {}) {
+export function buildCoachInsights(trips = [], opts = {}) {
+  const {
+    todayISO,
+    userId = null,
+    mpg = 22,
+    gasUsd = 3.5,
+    economics = null,
+  } = opts;
   const list = Array.isArray(trips) ? trips : [];
   const insights = [];
+  const push = (id, text, tone = "info", priority = 50) => {
+    if (!text) return;
+    insights.push({ id, text, tone, priority });
+  };
+
+  const econ = economics || (userId ? readVehicleEconomics(userId) : {});
+  const floor = ultimateWorthPerMile({
+    economics: econ,
+    mpg,
+    gasUsd,
+    parking: 0,
+    totalMiles: 5,
+    userId,
+  });
+  const need = floor.recommended_min_gross_per_mile;
+  const configured = num(econ.purchase_price) > 0 || num(econ.tire_set_cost) > 0;
+
   if (list.length < 1) {
     return [
       {
         id: "start",
+        tone: "action",
+        priority: 100,
         text: "Start Auto GPS and turn on money autopilot — TitanOS denies cheap trips so your $/hr goes up, not just your trip count.",
       },
+      {
+        id: "floor",
+        tone: configured ? "info" : "warn",
+        priority: 90,
+        text: configured
+          ? `Your all-in floor is ~$${need.toFixed(2)}/mi (fuel + ${floor.maintenance_cents}¢ maint + tires + vehicle). Skip anything under that.`
+          : "Set vehicle paid $ and tire set under Money autopilot so ACCEPT/DENY uses your real cost per mile.",
+      },
     ];
+  }
+
+  push(
+    "floor",
+    configured
+      ? `All-in cost ~$${floor.true_cost_per_mile.toFixed(3)}/mi · need ≥ $${need.toFixed(2)}/mi gross before an offer is worth it.`
+      : "Vehicle costs aren’t set yet — Titan is using fuel + 10–13¢ maint + tires only. Add purchase price for a real floor.",
+    configured ? "info" : "warn",
+    95
+  );
+
+  const paid = list.filter((t) => num(t.earnings) > 0 && num(t.miles) > 0);
+  if (paid.length >= 2) {
+    const under = paid.filter((t) => num(t.dollars_per_mile) < need);
+    if (under.length) {
+      const pct = Math.round((under.length / paid.length) * 100);
+      push(
+        "under-floor",
+        `${under.length} of ${paid.length} paid trips (${pct}%) logged under your $${need.toFixed(2)}/mi floor — tighten deny habits.`,
+        "warn",
+        88
+      );
+    } else {
+      push(
+        "above-floor",
+        `Nice — logged paid trips are clearing your $${need.toFixed(2)}/mi floor. Keep protecting that average.`,
+        "good",
+        70
+      );
+    }
+  }
+
+  if (userId) {
+    const moneyStats = moneyProtectedFromLog(userId);
+    if (moneyStats?.decisions >= 2) {
+      push(
+        "autopilot",
+        `Money autopilot: ${moneyStats.decisions} decisions · ~$${moneyStats.estimated_protected_usd} protected by skips · ~$${moneyStats.estimated_captured_usd} on accepts.`,
+        "good",
+        80
+      );
+    }
+    if (moneyStats?.decisions >= 5 && moneyStats.deny_count / moneyStats.decisions >= 0.6) {
+      push(
+        "selective",
+        "You’re denying most offers lately — that’s how $/hr rises. Stay selective in the afternoon slow.",
+        "info",
+        55
+      );
+    }
   }
 
   const weekly = weeklyByWeekday(list);
@@ -405,10 +569,12 @@ export function buildCoachInsights(trips = [], { todayISO } = {}) {
     const worstEarn = Math.max(0.01, weekly.worst_day.earnings);
     if (bestEarn > worstEarn * 1.15) {
       const pct = Math.round(((bestEarn - worstEarn) / worstEarn) * 100);
-      insights.push({
-        id: "best-day",
-        text: `${weekly.best_day.name} earns about ${pct}% more than ${weekly.worst_day.name} in your history.`,
-      });
+      push(
+        "best-day",
+        `${weekly.best_day.name} earns about ${pct}% more than ${weekly.worst_day.name} in your history — schedule more hours on ${weekly.best_day.name}.`,
+        "info",
+        65
+      );
     }
   }
 
@@ -416,10 +582,12 @@ export function buildCoachInsights(trips = [], { todayISO } = {}) {
   if (rush.length >= 2) {
     const ranked = rush.slice().sort((a, b) => (b.avg_dollars_per_hour || 0) - (a.avg_dollars_per_hour || 0));
     if (ranked[0].avg_dollars_per_hour) {
-      insights.push({
-        id: "rush",
-        text: `Your strongest window is ${ranked[0].label} (~$${ranked[0].avg_dollars_per_hour}/hr when earnings are logged).`,
-      });
+      push(
+        "rush",
+        `Strongest window: ${ranked[0].label} (~$${ranked[0].avg_dollars_per_hour}/hr when earnings are logged). Be ready before it starts.`,
+        "info",
+        75
+      );
     }
   }
 
@@ -429,10 +597,12 @@ export function buildCoachInsights(trips = [], { todayISO } = {}) {
     const longPm = avg(long.map((t) => num(t.dollars_per_mile)).filter((n) => n > 0));
     const shortPm = avg(short.map((t) => num(t.dollars_per_mile)).filter((n) => n > 0));
     if (shortPm > longPm * 1.15 && shortPm > 0) {
-      insights.push({
-        id: "miles",
-        text: "Trips over 10 miles usually reduce your dollars-per-mile — favor shorter stacks when possible.",
-      });
+      push(
+        "miles",
+        `Trips over 10 miles usually cut your $/mi (short ~$${shortPm.toFixed(2)} vs long ~$${longPm.toFixed(2)}). Favor short stacks.`,
+        "warn",
+        60
+      );
     }
   }
 
@@ -443,24 +613,34 @@ export function buildCoachInsights(trips = [], { todayISO } = {}) {
   });
   const avgIdle = avg(idleRatio);
   if (avgIdle > 0.35) {
-    insights.push({
-      id: "idle",
-      text: `You idle about ${Math.round(avgIdle * 100)}% of session time — reposition during slow windows to cut dead time.`,
-    });
+    push(
+      "idle",
+      `You idle about ${Math.round(avgIdle * 100)}% of session time — reposition during slow windows instead of waiting in place.`,
+      "warn",
+      58
+    );
   }
 
   const ww = weekdayWeekendCompare(list);
-  if (ww.recommendation) insights.push({ id: "ww", text: ww.recommendation });
+  if (ww.recommendation) push("ww", ww.recommendation, "info", 50);
 
   const today = dailySummary(list, todayISO || new Date().toISOString().slice(0, 10));
   if (today.trips > 0) {
-    insights.push({
-      id: "today",
-      text: `Today: ${today.trips} trip${today.trips === 1 ? "" : "s"}, ${today.miles} mi, ${Math.round(today.drive_sec / 60)} min drive.`,
-    });
+    push(
+      "today",
+      `Today: ${today.trips} trip${today.trips === 1 ? "" : "s"}, ${today.miles} mi, ${Math.round(today.drive_sec / 60)} min drive` +
+        (today.earnings > 0 ? `, $${today.earnings.toFixed(0)} logged` : "") +
+        (today.profit !== 0 ? `, ~$${today.profit.toFixed(0)} after true costs` : "") +
+        ".",
+      "info",
+      45
+    );
   }
 
-  return insights.slice(0, 6);
+  return insights
+    .slice()
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    .slice(0, 8);
 }
 
 export function goalsProgress(goals = {}, summary = {}) {

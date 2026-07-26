@@ -22,11 +22,17 @@ import SetForgetOfferPanel from "@/components/driver/activity/SetForgetOfferPane
 import DriverVoiceCoach from "@/components/driver/activity/DriverVoiceCoach";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
-import { useDriverActivityTracker } from "@/components/driver/activity/useDriverActivityTracker";
-import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { toast } from "@/components/ui/use-toast";
+import {
+  classifyRushWindow,
+  collectTrips,
+  filterTripsByPeriod,
+  summarizeTrips,
+} from "@/lib/driverActivity/intelligence";
+import { composeSmartCoachTip } from "@/lib/driverActivity/driverCoach";
+import { DRIVER_SESSION_EVENT } from "@/components/driver/activity/DriverSessionKeepAlive";
 import {
   addStop,
   buildHotspots,
@@ -87,28 +93,6 @@ export default function DriverShiftPanel() {
   const drivingActive = Boolean(session?.active);
   const sessionPaused = Boolean(session?.paused);
 
-  useDriverActivityTracker({
-    userId: user?.id,
-    active: drivingActive,
-    paused: sessionPaused,
-    autoTrack: prefs.autoTrack !== false,
-    stopConfirmSec: Number(prefs.stopConfirmSec) || 90,
-    enabled: Boolean(prefs.locationPrivacyAck),
-    onUpdate: (nextSession, nextStops, err) => {
-      if (err) {
-        setGpsError(
-          err.code === 1
-            ? "Location permission denied. Enable location for TitanOS or enter miles manually."
-            : err.message || "GPS unavailable — enter miles manually."
-        );
-        return;
-      }
-      setGpsError("");
-      if (nextSession) setSession(nextSession);
-      if (nextStops) setStops(nextStops);
-    },
-  });
-
   const refresh = useCallback(() => {
     if (!user?.id) return;
     setPrefs(readPrefs(user.id));
@@ -120,6 +104,18 @@ export default function DriverShiftPanel() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Live session/telemetry from KeepAlive (survives refresh + other tabs/pages)
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const onChange = () => refresh();
+    window.addEventListener(DRIVER_SESSION_EVENT, onChange);
+    window.addEventListener("focus", onChange);
+    return () => {
+      window.removeEventListener(DRIVER_SESSION_EVENT, onChange);
+      window.removeEventListener("focus", onChange);
+    };
+  }, [user?.id, refresh]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -179,7 +175,30 @@ export default function DriverShiftPanel() {
 
   const bestNow = useMemo(() => topHotspotsNow(hotspots, 3), [hotspots]);
   const dayPart = previewPart || getDayPart(now);
-  const tip = coachTip(mode, getDayPart(now));
+  const tip = useMemo(() => {
+    const week = user?.id
+      ? summarizeTrips(
+          filterTripsByPeriod(
+            collectTrips(history, null, [], {
+              mpg,
+              gasUsd: typeof gasUsd === "number" ? gasUsd : 3.5,
+              userId: user.id,
+            }).sessions,
+            "week"
+          )
+        )
+      : null;
+    const smart = composeSmartCoachTip({
+      mode,
+      dayPart: getDayPart(now),
+      rush: classifyRushWindow(now),
+      mpg,
+      gasUsd: typeof gasUsd === "number" ? gasUsd : 3.5,
+      userId: user?.id || null,
+      weekSummary: week,
+    });
+    return smart.full || coachTip(mode, getDayPart(now));
+  }, [mode, now, user?.id, history, mpg, gasUsd]);
 
   const mapLat = Number(prefs.lat) || hotspots[0]?.lat || 32.7767;
   const mapLng = Number(prefs.lng) || hotspots[0]?.lng || -96.797;

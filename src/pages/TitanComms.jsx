@@ -54,9 +54,7 @@ export default function TitanComms() {
   const [draft, setDraft] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [sosHold, setSosHold] = useState(0);
   const sessionRef = useRef(null);
-  const sosTimerRef = useRef(null);
   const pttActive = useRef(false);
 
   const activeChannel = useMemo(
@@ -197,59 +195,6 @@ export default function TitanComms() {
     }
   };
 
-  const startSosHold = () => {
-    setSosHold(0);
-    const started = Date.now();
-    sosTimerRef.current = setInterval(() => {
-      const elapsed = (Date.now() - started) / 1000;
-      setSosHold(Math.min(3, elapsed));
-      if (elapsed >= 3) {
-        clearInterval(sosTimerRef.current);
-        sosTimerRef.current = null;
-        triggerSos();
-      }
-    }, 50);
-  };
-
-  const cancelSosHold = () => {
-    if (sosTimerRef.current) {
-      clearInterval(sosTimerRef.current);
-      sosTimerRef.current = null;
-    }
-    setSosHold(0);
-  };
-
-  const triggerSos = async () => {
-    setSosHold(0);
-    setChannelId("tc-emergency");
-    await onStatusChange("emergency");
-    let lat = null;
-    let lng = null;
-    if (navigator.geolocation) {
-      try {
-        const pos = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-        );
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-      } catch {
-        /* optional */
-      }
-    }
-    // Wait a tick for emergency channel session
-    setTimeout(async () => {
-      await sessionRef.current?.sendSos({ lat, lng, note: "SOS — need assistance" });
-      if (user?.id) {
-        const row = await postChannelMessage(user, "tc-emergency", "SOS — need assistance", "sos", {
-          lat,
-          lng,
-        });
-        setMessages((m) => [...m, row]);
-      }
-      toast({ variant: "destructive", title: "SOS sent", description: "Emergency channel notified" });
-    }, 400);
-  };
-
   if (!authChecked || loading) return <PageLoader variant="list" label="Loading TitanComms" />;
 
   if (!user?.id) {
@@ -302,9 +247,9 @@ export default function TitanComms() {
       />
 
       <FeatureHonestyBanner tone="info">
-        MVP: hold-to-talk WebRTC over Supabase Realtime, public network channels, presence, SOS, and
-        channel text. Mesh audio works best on the same Wi‑Fi/network; TURN servers, CarPlay, and
-        wake-phrase hands-free come later.
+        Hold-to-talk over Supabase Realtime across many field channels (dispatch, rideshare, delivery,
+        yard, night shift, and more). Create private channels for your crew. Mesh audio works best on
+        the same Wi‑Fi; TURN and CarPlay come later.
       </FeatureHonestyBanner>
 
       <div className="grid lg:grid-cols-[240px_1fr] gap-4">
@@ -365,7 +310,7 @@ export default function TitanComms() {
                     {activeChannel?.name || "Channel"}
                     {activeChannel?.kind === "emergency" && (
                       <span className="text-[10px] font-bold uppercase text-red-400 border border-red-500/40 px-1.5 py-0.5 rounded">
-                        SOS
+                        Urgent
                       </span>
                     )}
                   </h2>
@@ -448,24 +393,6 @@ export default function TitanComms() {
                 >
                   <Mic className={cn("w-10 h-10", sessionState.talking && "animate-pulse")} />
                   {sessionState.talking ? "RELEASE" : "HOLD TO TALK"}
-                </button>
-
-                <button
-                  type="button"
-                  onPointerDown={startSosHold}
-                  onPointerUp={cancelSosHold}
-                  onPointerLeave={cancelSosHold}
-                  onPointerCancel={cancelSosHold}
-                  className="relative w-full max-w-xs h-12 rounded-xl bg-red-600/90 hover:bg-red-600 text-white font-semibold text-sm overflow-hidden"
-                >
-                  <span
-                    className="absolute inset-y-0 left-0 bg-red-400/50 transition-[width] duration-75"
-                    style={{ width: `${(sosHold / 3) * 100}%` }}
-                  />
-                  <span className="relative flex items-center justify-center gap-2">
-                    <Siren className="w-4 h-4" />
-                    {sosHold > 0 ? `SOS ${sosHold.toFixed(1)}s…` : "Hold 3s — SOS"}
-                  </span>
                 </button>
               </div>
             </div>

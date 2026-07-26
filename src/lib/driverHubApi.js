@@ -24,6 +24,16 @@ const SESSION_KEY = "session";
 const STOPS_KEY = "stops";
 const PREFS_KEY = "prefs";
 
+/** Notify UI / keep-alive that session or telemetry changed (survives refresh via localStorage). */
+export function emitDriverSessionChanged() {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event("titanos-driver-session"));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Approximate USD/gal by US ZIP first digit (fallback when no live API). */
 const ZIP_GAS_USD = {
   0: 3.45,
@@ -72,6 +82,7 @@ export function readPrefs(userId) {
 
 export function savePrefs(userId, prefs) {
   writeLocal(PREFIX, userId, PREFS_KEY, prefs);
+  emitDriverSessionChanged();
   return prefs;
 }
 
@@ -492,6 +503,7 @@ export async function startDrivingSession(user, prefs) {
   };
   writeLocal(PREFIX, user.id, SESSION_KEY, session);
   writeLocal(PREFIX, user.id, STOPS_KEY, []);
+  emitDriverSessionChanged();
   return session;
 }
 
@@ -504,6 +516,7 @@ export function pauseDrivingSession(userId) {
     paused_at: new Date().toISOString(),
   };
   writeLocal(PREFIX, userId, SESSION_KEY, next);
+  emitDriverSessionChanged();
   return next;
 }
 
@@ -520,6 +533,7 @@ export function resumeDrivingSession(userId) {
     pause_accum_sec: Number(session.pause_accum_sec || 0) + Math.round(pausedMs / 1000),
   };
   writeLocal(PREFIX, userId, SESSION_KEY, next);
+  emitDriverSessionChanged();
   return next;
 }
 
@@ -532,14 +546,33 @@ export function patchSessionTelemetry(userId, patch = {}) {
   const miles = manualOverride
     ? Number(session.miles || 0)
     : Math.max(Number(session.miles || 0), autoMiles);
+
+  // Never let a remounted tracker (starting at 0) wipe saved drive/idle totals
+  const driveSec =
+    patch.drive_sec != null
+      ? Math.max(Number(session.drive_sec || 0), Number(patch.drive_sec) || 0)
+      : Number(session.drive_sec || 0);
+  const idleSec =
+    patch.idle_sec != null
+      ? Math.max(Number(session.idle_sec || 0), Number(patch.idle_sec) || 0)
+      : Number(session.idle_sec || 0);
+
   const next = {
     ...session,
     ...patch,
     auto_miles: autoMiles,
     miles,
+    drive_sec: driveSec,
+    idle_sec: idleSec,
+    max_speed_mph: Math.max(
+      Number(session.max_speed_mph || 0),
+      Number(patch.max_speed_mph != null ? patch.max_speed_mph : session.max_speed_mph || 0)
+    ),
     miles_source: manualOverride ? "manual" : patch.miles_source || session.miles_source || "gps",
+    telemetry_at: new Date().toISOString(),
   };
   writeLocal(PREFIX, userId, SESSION_KEY, next);
+  emitDriverSessionChanged();
   return next;
 }
 
@@ -598,6 +631,7 @@ export async function stopDrivingSession(userId, snapshot = {}) {
   } catch {
     /* journal is best-effort */
   }
+  emitDriverSessionChanged();
   return ended;
 }
 
@@ -608,11 +642,11 @@ export function readShiftHistory(userId) {
 
 export function coachTip(mode, dayPart) {
   const driving = {
-    morning: "Airport + hotel corridors first — early flight banks pay.",
-    lunch: "Restaurant row + downtown offices for stacked short trips.",
-    afternoon: "Position near hospitals and strip malls before the dinner rush.",
-    dinner: "Stay in food corridors 5–9pm — highest stack potential.",
-    late: "Nightlife and late grocery runs; keep gas topped off.",
+    morning: "Airport + hotel corridors first — early flight banks pay. Deny anything under your all-in $/mi floor.",
+    lunch: "Restaurant row + downtown offices for stacked short trips that clear true cost per mile.",
+    afternoon: "Position near hospitals and strip malls before dinner — skip scrap offers that drag your average.",
+    dinner: "Food corridors 5–9pm — highest stack potential. Protect fuel + maint + tires + vehicle cost/mi.",
+    late: "Nightlife and late grocery runs; keep gas topped off and deny long deadheads.",
   };
   const riding = {
     morning: "Hotel curb or transit hub for fastest morning matches.",

@@ -67,7 +67,7 @@ export default function AuthCallback() {
         }
 
         await checkUserAuth();
-        const dest = consumeReturnTo("/");
+        const dest = consumeReturnTo("/driver");
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

@@ -3,6 +3,8 @@ import { Ban, CheckCircle2, AlertTriangle, Settings2, MapPin } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import VehicleTrueCostPanel from "@/components/driver/activity/VehicleTrueCostPanel";
+import { formatOfferCoachCard } from "@/lib/driverActivity/driverCoach";
 import {
   analyzeOffer,
   readOfferThresholds,
@@ -24,6 +26,7 @@ export default function OfferAnalyzerPanel({
 }) {
   const [thresholds, setThresholds] = useState(() => readOfferThresholds(userId));
   const [showSettings, setShowSettings] = useState(false);
+  const [econTick, setEconTick] = useState(0);
   const [form, setForm] = useState({
     pay: "8.50",
     tip: "3.00",
@@ -64,10 +67,12 @@ export default function OfferAnalyzerPanel({
           gasUsd,
         },
         thresholds,
-        { benchmarks }
+        { benchmarks, userId }
       ),
-    [form, thresholds, mpg, gasUsd, benchmarks]
+    [form, thresholds, mpg, gasUsd, benchmarks, userId, econTick]
   );
+
+  const coachCard = useMemo(() => formatOfferCoachCard(result), [result]);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -95,8 +100,8 @@ export default function OfferAnalyzerPanel({
         <div>
           <h3 className="text-sm font-semibold text-foreground">Offer decision · make more money</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Built to raise take-home — stacks, parking, and your ZIP averages decide ACCEPT or DENY.
-            Titan does not auto-tap other apps; use this before you accept.
+            Built to raise take-home — all-in $/mi (fuel + maint + tires + vehicle), stacks, parking,
+            and your ZIP averages decide ACCEPT or DENY. Titan does not auto-tap other apps.
           </p>
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={() => setShowSettings((v) => !v)}>
@@ -151,6 +156,12 @@ export default function OfferAnalyzerPanel({
           <Button type="button" size="sm" onClick={saveThresh}>
             Save thresholds
           </Button>
+          <VehicleTrueCostPanel
+            userId={userId}
+            mpg={mpg}
+            gasUsd={gasUsd}
+            onSaved={() => setEconTick((n) => n + 1)}
+          />
         </div>
       ) : null}
 
@@ -316,7 +327,9 @@ export default function OfferAnalyzerPanel({
           <VerdictIcon className="w-8 h-8 shrink-0" />
           <div>
             <p className="text-xl font-bold tracking-tight">{result.verdict}</p>
-            <p className="text-sm opacity-90">{result.action}</p>
+            <p className="text-sm font-semibold opacity-95">{coachCard.headline}</p>
+            <p className="text-sm opacity-90 mt-0.5">{result.action}</p>
+            <p className="text-[11px] opacity-80 tabular-nums mt-1">{coachCard.glance}</p>
           </div>
         </div>
         <div className="text-right text-xs tabular-nums space-y-0.5">
@@ -325,8 +338,14 @@ export default function OfferAnalyzerPanel({
             ${result.breakdown.hourlyNet}/hr · ${result.breakdown.perMileNet}/mi
           </p>
           <p className="opacity-80">
-            Costs ${result.breakdown.costs.toFixed(2)} (fuel+wear+park)
+            Costs ${result.breakdown.costs.toFixed(2)} (fuel+maint+tires+vehicle+park)
           </p>
+          {result.trueCost ? (
+            <p className="opacity-90">
+              Need ≥ ${Number(result.trueCost.recommended_min_gross_per_mile).toFixed(2)}/mi · offer $
+              {Number(result.breakdown.perMileGross).toFixed(2)}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -336,8 +355,14 @@ export default function OfferAnalyzerPanel({
         ))}
       </ul>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
         {[
+          {
+            ok: result.gates.trueCost,
+            label: result.trueCost
+              ? `≥ $${Number(result.trueCost.recommended_min_gross_per_mile).toFixed(2)}/mi all-in`
+              : "All-in $/mi",
+          },
           { ok: result.gates.hourly, label: `≥ $${result.thresholds.minHourlyAccept}/hr` },
           { ok: result.gates.profit, label: `≥ $${result.thresholds.minProfitAccept} profit` },
           { ok: result.gates.perMile, label: `≥ $${result.thresholds.minPerMileAccept}/mi` },

@@ -7,11 +7,14 @@ import {
   Calendar,
   ChevronRight,
   Sparkles,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import OfferAnalyzerPanel from "@/components/driver/activity/OfferAnalyzerPanel";
+import VehicleTrueCostPanel from "@/components/driver/activity/VehicleTrueCostPanel";
 import { formatDuration } from "@/lib/driverHubApi";
 import {
   collectTrips,
@@ -24,6 +27,7 @@ import {
   summarizeTrips,
   goalsProgress,
 } from "@/lib/driverActivity/intelligence";
+import { buildCoachMoneySnapshot } from "@/lib/driverActivity/driverCoach";
 import { readDriverGoals, saveDriverGoals } from "@/lib/driverActivity/goals";
 
 function ProgressBar({ pct, label, current, target, prefix = "" }) {
@@ -49,6 +53,14 @@ function ProgressBar({ pct, label, current, target, prefix = "" }) {
   );
 }
 
+const TONE_STYLES = {
+  good: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  warn: "border-titan-amber/40 bg-titan-amber/10 text-titan-amber",
+  bad: "border-red-500/30 bg-red-500/10 text-red-200",
+  action: "border-titan-cyan/40 bg-titan-cyan/10 text-foreground",
+  info: "border-border bg-muted/30 text-foreground/90",
+};
+
 /**
  * Driver Hub V2 — AI Driver Intelligence panel (read-only over Hub history).
  */
@@ -65,8 +77,8 @@ export default function DriverIntelligencePanel({
   const [editingGoals, setEditingGoals] = useState(false);
 
   const { sessions } = useMemo(
-    () => collectTrips(history, liveSession, stops, { mpg, gasUsd }),
-    [history, liveSession, stops, mpg, gasUsd]
+    () => collectTrips(history, liveSession, stops, { mpg, gasUsd, userId }),
+    [history, liveSession, stops, mpg, gasUsd, userId]
   );
 
   const today = useMemo(() => dailySummary(sessions), [sessions]);
@@ -75,7 +87,21 @@ export default function DriverIntelligencePanel({
   const byDay = useMemo(() => weeklyByWeekday(sessions), [sessions]);
   const ww = useMemo(() => weekdayWeekendCompare(sessions), [sessions]);
   const rush = useMemo(() => rushPeriodStats(sessions), [sessions]);
-  const coach = useMemo(() => buildCoachInsights(sessions), [sessions]);
+  const coach = useMemo(
+    () => buildCoachInsights(sessions, { userId, mpg, gasUsd }),
+    [sessions, userId, mpg, gasUsd]
+  );
+  const moneySnap = useMemo(
+    () =>
+      buildCoachMoneySnapshot({
+        userId,
+        mpg,
+        gasUsd,
+        weekSummary: week,
+        todaySummary: today,
+      }),
+    [userId, mpg, gasUsd, week, today]
+  );
   const progress = useMemo(
     () => goalsProgress(goals, { today, week, month }),
     [goals, today, week, month]
@@ -96,9 +122,8 @@ export default function DriverIntelligencePanel({
   return (
     <div className="space-y-4">
       <FeatureHonestyBanner tone="info">
-        Driver Intelligence V2 analyzes your recorded work sessions and auto-detected stops on this
-        device. Platform APIs (Uber, DoorDash, etc.) are not connected yet — log payouts on a trip to
-        unlock earnings scoring. Background GPS still requires an active foreground session.
+        Driver Coach analyzes sessions on this device with your all-in $/mi (fuel + 10–13¢ maint +
+        tires + vehicle). Platforms aren’t connected — log payouts on trips to unlock earnings scoring.
       </FeatureHonestyBanner>
 
       {/* Hero KPIs */}
@@ -111,6 +136,40 @@ export default function DriverIntelligencePanel({
             {currentRush?.label || "Off-peak"}
           </span>
         </div>
+
+        <div
+          className={cn(
+            "rounded-xl border px-3 py-2.5 flex flex-wrap items-center justify-between gap-2",
+            moneySnap.configured
+              ? "border-titan-cyan/40 bg-titan-cyan/10"
+              : "border-titan-amber/40 bg-titan-amber/10"
+          )}
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <Gauge className="w-4 h-4 text-titan-cyan mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold tabular-nums">
+                Need ≥ ${moneySnap.need_per_mile.toFixed(2)}/mi · all-in $
+                {moneySnap.true_cost_per_mile.toFixed(3)}/mi
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-snug">{moneySnap.tip}</p>
+            </div>
+          </div>
+          {moneySnap.week_avg_per_mile != null ? (
+            <p
+              className={cn(
+                "text-[11px] font-semibold tabular-nums shrink-0",
+                moneySnap.week_clears_floor ? "text-emerald-400" : "text-titan-amber"
+              )}
+            >
+              Week avg ${moneySnap.week_avg_per_mile}/mi
+              {moneySnap.week_margin != null
+                ? ` (${moneySnap.week_margin >= 0 ? "+" : ""}${moneySnap.week_margin.toFixed(2)})`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { label: "Today trips", value: today.trips },
@@ -151,13 +210,16 @@ export default function DriverIntelligencePanel({
       {/* Coach */}
       <section className="titan-surface p-4 space-y-3">
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-titan-cyan" /> AI Driver Coach
+          <Sparkles className="w-4 h-4 text-titan-cyan" /> Money Coach
         </h3>
         <ul className="space-y-2">
           {coach.map((c) => (
             <li
               key={c.id}
-              className="text-sm text-foreground/90 rounded-xl border border-border bg-muted/30 px-3 py-2"
+              className={cn(
+                "text-sm rounded-xl border px-3 py-2 leading-snug",
+                TONE_STYLES[c.tone] || TONE_STYLES.info
+              )}
             >
               {c.text}
             </li>
@@ -174,6 +236,9 @@ export default function DriverIntelligencePanel({
         defaultZip={defaultZip}
       />
 
+      <section className="titan-surface p-4">
+        <VehicleTrueCostPanel userId={userId} mpg={mpg} gasUsd={gasUsd} />
+      </section>
       {/* Goals */}
       <section className="titan-surface p-4 space-y-3">
         <div className="flex items-center justify-between">

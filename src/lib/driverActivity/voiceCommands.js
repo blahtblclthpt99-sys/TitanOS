@@ -283,13 +283,22 @@ export function formatDecisionSpeech(decision) {
   const v = decision.verdict;
   const money = decision.money;
   const net = decision.breakdown?.hourlyNet;
-  let line = `${v}. ${decision.action || ""}`;
+  const offerMi = decision.breakdown?.perMileGross;
+  const needMi = decision.trueCost?.recommended_min_gross_per_mile;
+  const action = decision.action || "";
+  let line = `${v}. ${action}`;
+  if (offerMi != null && needMi != null) {
+    line += ` Offer ${Number(offerMi).toFixed(2)} per mile versus need ${Number(needMi).toFixed(2)}.`;
+  }
   if (net != null) line += ` About ${Math.round(net)} dollars per hour net.`;
   if (money?.delta_per_hour != null && money.delta_per_hour !== 0) {
     line +=
       money.delta_per_hour > 0
         ? ` That's ${Math.abs(Math.round(money.delta_per_hour))} above your usual.`
         : ` That's ${Math.abs(Math.round(money.delta_per_hour))} below your usual.`;
+  }
+  if (decision.gates?.trueCost === false) {
+    line += " Protect your all-in cost per mile.";
   }
   return line.replace(/\s+/g, " ").trim();
 }

@@ -19,6 +19,7 @@ export * from "./excelExport.js";
 export * from "./autopilot.js";
 export * from "./trueCostPerMile.js";
 export * from "./voiceCommands.js";
+export * from "./driverCoach.js";
 export { createBrowserTracker } from "./tracker.js";
 
 /** Feature modules reserved for expansion (no-ops / stubs). */

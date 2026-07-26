@@ -13,7 +13,7 @@ import PageNotFound from "@/lib/PageNotFound";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
-const TAB_PATHS = ["/", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
+const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
 /** Home always warm + last N tab visits (including active). */
 const TAB_LRU_SIZE = 3;
 
@@ -26,9 +26,13 @@ const MarketplaceTab = lazy(() => import("@/pages/Marketplace"));
 const MessagesTab = lazy(() => import("@/pages/Messages"));
 const ProfileTab = lazy(() => import("@/pages/Profile"));
 const Community = lazy(() => import("@/pages/Community"));
+const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
+const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
 
 const TAB_COMPONENTS = {
   "/": Dashboard,
+  "/driver": DriverHubTab,
+  "/comms": TitanCommsTab,
   "/jobs": Jobs,
   "/marketplace": MarketplaceTab,
   "/messages": MessagesTab,
@@ -73,13 +77,11 @@ const LocalDeals = lazy(() => import("@/pages/LocalDeals"));
 const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
 const Escrow = lazy(() => import("@/pages/Escrow"));
 const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
-const DriverHub = lazy(() => import("@/pages/DriverHub"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
-const TitanComms = lazy(() => import("@/pages/TitanComms"));
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
@@ -120,11 +122,9 @@ const NON_TAB_ROUTES = {
   "/emergency": EmergencyJobs,
   "/escrow": Escrow,
   "/phone": PhoneReceptionist,
-  "/driver": DriverHub,
   "/settings": Settings,
   "/trust-safety": TrustSafety,
   "/design-system": DesignSystem,
-  "/comms": TitanComms,
 };
 
 function NonTabPage() {

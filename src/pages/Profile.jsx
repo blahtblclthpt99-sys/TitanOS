@@ -140,7 +140,7 @@ export default function Profile() {
             title="Professional profile"
             subtitle={
               isOwnerAccount(user)
-                ? "Founder account · ∞ authority · public reviews & portfolio"
+                ? "Founder account · public reviews & portfolio"
                 : "Bio, portfolio, skills, verification, and public reviews"
             }
           />
@@ -204,10 +204,12 @@ export default function Profile() {
               <BadgeCheck className="w-4 h-4 text-titan-cyan" /> Show verified badge
             </label>
             <span className="text-xs text-muted-foreground tabular-nums">
-              {isOwnerAccount(user)
-                ? "∞★ · ∞ reviews · ∞ jobs"
-                : reviewsMeta.count
-                  ? `${reviewsMeta.average.toFixed(1)}★ · ${reviewsMeta.count} reviews`
+              {reviewsMeta.count
+                ? `${reviewsMeta.average.toFixed(1)}★ · ${reviewsMeta.count} reviews${
+                    profile.jobs_completed != null ? ` · ${profile.jobs_completed} jobs` : ""
+                  }`
+                : profile.jobs_completed
+                  ? `${profile.jobs_completed} jobs logged`
                   : "No reviews yet"}
             </span>
           </div>

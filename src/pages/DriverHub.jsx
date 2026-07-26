@@ -20,9 +20,9 @@ import {
 
 const TABS = [
   { id: "shift", label: "My shift", icon: Car, short: "Shift" },
+  { id: "intel", label: "Coach", icon: Brain, short: "Coach" },
   { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log" },
-  { id: "intel", label: "Intelligence", icon: Brain, short: "AI" },
-  { id: "directory", label: "Find drivers", icon: Users, short: "Find" },
+  { id: "directory", label: "Find", icon: Users, short: "Find" },
 ];
 
 export default function DriverHub() {
@@ -57,12 +57,10 @@ export default function DriverHub() {
   };
 
   const subtitle = useMemo(() => {
-    if (tab === "directory") return "Browse published drivers nearby — or publish yourself to get hired.";
-    if (tab === "intel")
-      return "Trip intelligence, rush windows, goals, and coaching from your real driving history.";
-    if (tab === "logbook")
-      return "Classify miles, log fuel and expenses, download Excel trip reports with every timer.";
-    return "Track miles, protect your $/hr, and sync to Tax Center.";
+    if (tab === "directory") return "Publish yourself or hire nearby drivers.";
+    if (tab === "intel") return "All-in $/mi floor · money coach · rush windows.";
+    if (tab === "logbook") return "Miles, fuel, expenses, Excel trip reports.";
+    return "Miles · money autopilot · voice · Tax Center sync.";
   }, [tab]);
 
   const prefs = user?.id ? readPrefs(user.id) : {};
@@ -72,26 +70,32 @@ export default function DriverHub() {
   const gasUsd = estimateGasPriceUsd(prefs.zip || "");
 
   return (
-    <PageShell maxWidth="xl" className="space-y-5">
+    <PageShell maxWidth="xl" className="space-y-4">
       <PageHeader
-        eyebrow="Field"
+        eyebrow="Primary"
         title="Driver Hub"
         subtitle={subtitle}
         className="mb-0"
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" className="min-h-[44px]">
+            <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
               <Link to="/comms?channel=tc-dispatch">
-                <Radio className="h-4 w-4" aria-hidden="true" /> TitanComms
+                <Radio className="w-3.5 h-3.5" aria-hidden="true" /> Comms
               </Link>
             </Button>
             {tab === "directory" ? (
-              <Button asChild variant="outline" className="min-h-[44px]">
+              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
                 <Link to="/hire?new=1">
-                  <Plus className="h-4 w-4" aria-hidden="true" /> Post a haul
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Post a haul
                 </Link>
               </Button>
-            ) : null}
+            ) : (
+              <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
+                <Link to="/driver?tab=directory">
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Publish
+                </Link>
+              </Button>
+            )}
           </div>
         }
       />

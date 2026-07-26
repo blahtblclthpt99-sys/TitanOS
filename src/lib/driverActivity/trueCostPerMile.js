@@ -223,3 +223,24 @@ export function ultimateWorthPerMile({
     accept_deny: hist,
   };
 }
+
+/**
+ * How far an offer's gross $/mi sits above/below the recommended floor.
+ */
+export function mileMarginVsFloor(grossPerMile, worthOrMin) {
+  const offer = num(grossPerMile);
+  const need =
+    typeof worthOrMin === "object" && worthOrMin
+      ? num(worthOrMin.recommended_min_gross_per_mile)
+      : num(worthOrMin);
+  if (!(offer > 0) || !(need > 0)) {
+    return { offer_per_mile: offer || null, need_per_mile: need || null, margin: null, clears: null };
+  }
+  const margin = round4(offer - need);
+  return {
+    offer_per_mile: round4(offer),
+    need_per_mile: round4(need),
+    margin,
+    clears: margin >= 0,
+  };
+}

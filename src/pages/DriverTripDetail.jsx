@@ -132,6 +132,7 @@ export default function DriverTripDetail() {
     drive_sec: trip.drive_sec,
     mpg,
     gasUsd,
+    userId: user?.id,
   });
 
   const mapUrl =
@@ -224,6 +225,13 @@ export default function DriverTripDetail() {
           {"☆".repeat(5 - worth.stars)} · {worth.label}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{worth.reason}</p>
+        {worth.recommended_min_gross_per_mile != null ? (
+          <p className="text-[11px] tabular-nums text-muted-foreground mt-1">
+            Need ≥ ${Number(worth.recommended_min_gross_per_mile).toFixed(2)}/mi · all-in $
+            {Number(worth.true_cost_per_mile).toFixed(3)}/mi · offer $
+            {Number(worth.estimated_per_mile).toFixed(2)}/mi
+          </p>
+        ) : null}
       </section>
 
       {mapUrl ? (

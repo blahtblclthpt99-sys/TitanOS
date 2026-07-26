@@ -68,7 +68,7 @@ export function rememberReturnTo(raw) {
   return path;
 }
 
-export function consumeReturnTo(fallback = "/") {
+export function consumeReturnTo(fallback = "/driver") {
   let stored = null;
   try {
     stored = sessionStorage.getItem(STORAGE_KEY);
@@ -76,7 +76,7 @@ export function consumeReturnTo(fallback = "/") {
   } catch {
     /* ignore */
   }
-  return sanitizeReturnPath(stored) || sanitizeReturnPath(fallback) || "/";
+  return sanitizeReturnPath(stored) || sanitizeReturnPath(fallback) || "/driver";
 }
 
 export function peekReturnTo() {
@@ -101,7 +101,7 @@ export function resolveReturnTo(location) {
     sanitizeReturnPath(fromState) ||
     sanitizeReturnPath(fromQuery) ||
     peekReturnTo() ||
-    "/";
+    "/driver";
 
   if (candidate && candidate !== "/") {
     rememberReturnTo(candidate);

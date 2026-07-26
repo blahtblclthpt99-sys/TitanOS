@@ -323,7 +323,7 @@ export default function DriverVoiceCoach({
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Decide offers, start/end drive, pause, money mode, open logbook — just talk. I speak
-            ACCEPT or DENY; you still tap the gig app.
+            ACCEPT or DENY with $/mi vs your all-in floor; you still tap the gig app.
           </p>
         </div>
       </div>

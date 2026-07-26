@@ -22,9 +22,12 @@ import {
 import { buildZipBenchmarks } from "@/lib/driverActivity/zipBenchmarks";
 import { listTripJournal } from "@/lib/driverActivity/tripJournal";
 import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
+import { formatOfferCoachCard } from "@/lib/driverActivity/driverCoach";
 import VehicleTrueCostPanel from "@/components/driver/activity/VehicleTrueCostPanel";
+import { mileMarginVsFloor } from "@/lib/driverActivity/trueCostPerMile";
 
 const SPECTRUM_LABELS = [
+  ["true_cost", "All-in"],
   ["hourly", "$/hr"],
   ["profit", "Profit"],
   ["per_mile", "$/mi"],
@@ -79,6 +82,7 @@ export default function SetForgetOfferPanel({
   });
   const [lastDecision, setLastDecision] = useState(null);
   const [recent, setRecent] = useState(() => (userId ? listAutopilotDecisions(userId, 5) : []));
+  const [econTick, setEconTick] = useState(0);
   const moneyStats = useMemo(
     () => (userId ? summarizeMoneyProtected(userId) : null),
     [userId, recent]
@@ -194,9 +198,13 @@ export default function SetForgetOfferPanel({
       { userId, settings, benchmarks, zip: defaultZip, mpg, gasUsd, rush }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, settings, benchmarks, mpg, gasUsd, defaultZip, rush.id]);
+  }, [form, settings, benchmarks, mpg, gasUsd, defaultZip, rush.id, econTick]);
 
   const decision = live || lastDecision;
+  const mileGap = decision?.trueCost
+    ? mileMarginVsFloor(decision.breakdown?.perMileGross, decision.trueCost)
+    : null;
+  const coachCard = useMemo(() => formatOfferCoachCard(decision), [decision]);
   const verdictStyle =
     decision?.verdict === "ACCEPT"
       ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
@@ -230,8 +238,8 @@ export default function SetForgetOfferPanel({
               : "Set & forget · built to raise your take-home"}
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Protects your $/hr with ZIP averages, costs, stacks, parking &amp; rush. Titan tells you
-            ACCEPT or DENY — you still tap the gig app.
+            Main floor is all-in $/mi (fuel + 10–13¢ maint + tires + vehicle). ZIP averages, stacks,
+            parking &amp; rush refine it. Titan says ACCEPT or DENY — you still tap the gig app.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -326,7 +334,12 @@ export default function SetForgetOfferPanel({
               />
             </div>
           </div>
-          <VehicleTrueCostPanel userId={userId} mpg={mpg} gasUsd={gasUsd} />
+          <VehicleTrueCostPanel
+            userId={userId}
+            mpg={mpg}
+            gasUsd={gasUsd}
+            onSaved={() => setEconTick((n) => n + 1)}
+          />
         </div>
       ) : null}
 
@@ -340,17 +353,24 @@ export default function SetForgetOfferPanel({
               value={paste}
               onChange={(e) => setPaste(e.target.value)}
               onBlur={onPasteBlur}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onPasteBlur();
+                }
+              }}
               placeholder="$12 · 5 mi · 20 min · 75201"
               className="h-10 mt-1 bg-muted border-border text-base"
             />
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
             {[
               ["pay", "Pay $", "0.01"],
               ["tip", "Tip $", "0.01"],
               ["miles", "Miles", "0.1"],
               ["minutes", "Min", "1"],
+              ["parking", "Park $", "0.5"],
               ["stack_count", "Stack", "1"],
               ["zip", "ZIP", null],
             ].map(([key, label, step]) => (
@@ -400,7 +420,8 @@ export default function SetForgetOfferPanel({
                 <VerdictIcon className="w-10 h-10 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-3xl font-black tracking-tight">{decision.verdict}</p>
-                  <p className="text-sm opacity-90 leading-snug">{decision.action}</p>
+                  <p className="text-sm font-semibold leading-snug opacity-95">{coachCard.headline}</p>
+                  <p className="text-sm opacity-90 leading-snug mt-0.5">{decision.action}</p>
                 </div>
                 <div className="ml-auto text-right shrink-0">
                   <p className="text-[10px] uppercase opacity-70">Money score</p>
@@ -416,22 +437,34 @@ export default function SetForgetOfferPanel({
                     : ""}
                 </p>
               ) : null}
-              {decision.trueCost ? (
-                <p className="text-[11px] opacity-90 tabular-nums">
-                  All-in cost ${decision.trueCost.true_cost_per_mile.toFixed(3)}/mi · need ≥ $
-                  {decision.trueCost.recommended_min_gross_per_mile.toFixed(2)}/mi · offer $
-                  {decision.breakdown.perMileGross}/mi gross
-                </p>
+              {mileGap?.margin != null ? (
+                <div className="flex flex-wrap gap-2 text-[11px] tabular-nums">
+                  <span
+                    className={cn(
+                      "rounded-md border px-2 py-0.5 font-semibold",
+                      mileGap.clears
+                        ? "border-emerald-400/40 bg-emerald-500/10"
+                        : "border-red-400/40 bg-red-500/10"
+                    )}
+                  >
+                    {mileGap.clears ? "+" : ""}
+                    ${mileGap.margin.toFixed(2)}/mi vs floor
+                  </span>
+                  <span className="opacity-90">
+                    All-in ${Number(decision.trueCost.true_cost_per_mile).toFixed(3)} · need ≥ $
+                    {mileGap.need_per_mile.toFixed(2)} · offer ${mileGap.offer_per_mile.toFixed(2)}
+                  </span>
+                </div>
               ) : null}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {SPECTRUM_LABELS.map(([id, label]) => (
                   <SpectrumBar key={id} id={id} label={label} value={decision.spectrum[id] ?? 0} />
                 ))}
               </div>
               <p className="text-[11px] opacity-80 tabular-nums">
-                Net ${decision.breakdown.netProfit.toFixed(2)} · ${decision.breakdown.hourlyNet}/hr · $
-                {decision.breakdown.perMileNet}/mi · {rush.label} ·{" "}
-                {AUTOPILOT_PROFILES[settings.profileId]?.label || "Balanced"}
+                Net ${Number(decision.breakdown.netProfit).toFixed(2)} · $
+                {decision.breakdown.hourlyNet}/hr · ${decision.breakdown.perMileNet}/mi · {rush.label}{" "}
+                · {AUTOPILOT_PROFILES[settings.profileId]?.label || "Balanced"}
               </p>
             </div>
           ) : settings.enabled ? (

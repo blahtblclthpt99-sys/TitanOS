@@ -1,0 +1,30 @@
+---
+description: TitanOS information architecture — OS domains, not random pages
+alwaysApply: true
+---
+
+# Information architecture
+
+TitanOS is an **operating system** for field work and driving careers — not a pile of unrelated pages.
+
+## Domains (keep every feature in one)
+
+| Domain | Purpose | Examples |
+|--------|---------|----------|
+| **Live** | What is happening now | Driver Hub, Command Center, Jobs, Schedule, Marketplace, Hire |
+| **History** | Records of past work / people | Customers, Estimates, Invoices, Leads, Contracts |
+| **Analytics** | Understanding performance | Analytics, Reputation, Titan Score |
+| **Reports** | Exportable / money summaries | Reports, Finances, Payments, Tax, Receipts |
+| **Communication** | Talk to people / team | TitanCom, Messages, Community, Notifications, Follow-ups |
+| **AI** | Assistants and coaching | Titan AI, AI Marketing, Growth Coach |
+| **Configuration** | Setup of self / business / assets | Settings, Profile, Companies, Fleet, Credentials, Inventory |
+| **Administration** | Platform admin only | Moderation, Fees, Tax Rules |
+| **Labs** | Unfinished / partner-dependent | Escrow, Deals, Design System, Phone, Emergency |
+
+## Rules
+
+- Prefer placing new screens into an existing domain over inventing a new nav group.
+- Live stays ≤3 taps from tabs; History/Analytics/Reports live under More or Explorer folders.
+- Driver Hub Explorer mirrors the same split: Live Shift vs History vs Analytics vs Settings.
+- Never dump analytics onto Live surfaces.
+- Sidebar + MoreMenu must share the same `group` IDs from `nav-items.js`.

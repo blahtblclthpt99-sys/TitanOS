@@ -19,7 +19,7 @@ export default function MoreMenu() {
     <PageShell maxWidth="md">
       <PageHeader
         title="More"
-        subtitle="Daily tools first — Labs holds demos and early experiments."
+        subtitle="TitanOS domains — Live, History, Analytics, Reports, Communication, AI, Configuration."
       />
 
       <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">

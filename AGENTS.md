@@ -24,3 +24,4 @@ Package ID for Google Play: `com.titanos.myapp`.
 - Play AAB: `npm run android:sign` → `release/TitanOS.aab`
 - UI rule: every screen answers **What’s happening? / What’s next? / Where for more?** (see `.cursor/rules/three-question-ui.mdc`)
 - Nav rule: **≤3 taps**, clear title, Back, breadcrumbs when nested, no dead ends (see `.cursor/rules/navigation.mdc`)
+- IA rule: domains **Live / History / Analytics / Reports / Communication / AI / Configuration / Administration / Labs** (see `.cursor/rules/information-architecture.mdc`)

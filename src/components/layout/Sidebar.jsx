@@ -88,7 +88,7 @@ export default function Sidebar() {
   const grouped = useMemo(() => {
     const map = {};
     for (const item of navItems) {
-      const g = item.group || "daily";
+      const g = item.group || "live";
       if (!map[g]) map[g] = [];
       map[g].push(item);
     }
@@ -177,7 +177,7 @@ export default function Sidebar() {
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3" aria-label="Main navigation">
         {grouped.map((group) => {
           const isOpen = !group.collapsible || openGroups[group.id] || group.hasActive;
-          const showItems = expanded ? isOpen : group.id === "daily" || group.hasActive;
+          const showItems = expanded ? isOpen : group.id === "live" || group.hasActive;
 
           return (
             <div key={group.id} className="mb-1">

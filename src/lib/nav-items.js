@@ -48,86 +48,103 @@ import {
 } from "lucide-react";
 
 /**
- * Sidebar IA — daily work first; Labs holds demos / early tools (collapsed).
- * Items with adminOnly are filtered in Sidebar / MoreMenu.
+ * OS information architecture — domains, not a flat page list.
+ * Groups: live | history | analytics | reports | communication | ai | configuration | administration | labs
+ * Admin-only items filtered in Sidebar / MoreMenu.
  */
 export const APP_NAV_ITEMS = [
-  // Daily work — Driver Hub is #1
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "daily" },
-  { icon: Radio, label: "TitanCom", path: "/comms", group: "daily" },
-  { icon: LayoutDashboard, label: "Command Center", path: "/", group: "daily" },
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "daily" },
-  { icon: Calendar, label: "Schedule", path: "/schedule", group: "daily" },
-  { icon: Users, label: "Customers", path: "/customers", group: "daily" },
-  { icon: FileText, label: "Estimates", path: "/estimates", group: "daily" },
-  { icon: Receipt, label: "Invoices", path: "/invoices", group: "daily" },
-  { icon: MessageSquare, label: "Messages", path: "/messages", group: "daily" },
+  // —— Live — what is happening now
+  { icon: Car, label: "Driver Hub", path: "/driver", group: "live" },
+  { icon: LayoutDashboard, label: "Command Center", path: "/", group: "live" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "live" },
+  { icon: Calendar, label: "Schedule", path: "/schedule", group: "live" },
+  { icon: Store, label: "Marketplace", path: "/marketplace", group: "live" },
+  { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "live" },
+  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "live" },
 
-  // Money
-  { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
-  { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
-  { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "money" },
-  { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "money" },
-  { icon: LineChart, label: "Analytics", path: "/analytics", group: "money" },
-  { icon: BarChart3, label: "Reports", path: "/reports", group: "money" },
+  // —— History — records
+  { icon: Users, label: "Customers", path: "/customers", group: "history" },
+  { icon: FileText, label: "Estimates", path: "/estimates", group: "history" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "history" },
+  { icon: ContactRound, label: "Leads", path: "/leads", group: "history" },
+  { icon: FileSignature, label: "Contracts", path: "/contracts", group: "history" },
+  { icon: Shield, label: "Insurance", path: "/insurance", group: "history" },
 
-  // Field & team
-  { icon: Calculator, label: "Price Estimator", path: "/job-estimator", group: "field" },
-  { icon: Route, label: "Route Planner", path: "/routes", group: "field" },
-  { icon: Truck, label: "Fleet", path: "/fleet", group: "field" },
-  { icon: UserCog, label: "Employees", path: "/employees", group: "field" },
-  { icon: Package, label: "Inventory", path: "/inventory", group: "field" },
-  { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "field" },
-  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "field" },
-  { icon: FileSignature, label: "Contracts", path: "/contracts", group: "field" },
+  // —— Analytics — understand performance
+  { icon: LineChart, label: "Analytics", path: "/analytics", group: "analytics" },
+  { icon: Star, label: "Reputation", path: "/reputation", group: "analytics" },
+  { icon: Award, label: "Titan Score", path: "/titan-score", group: "analytics" },
 
-  // Growth — live customer / revenue tools
-  { icon: Store, label: "Marketplace", path: "/marketplace", group: "growth" },
-  { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "growth" },
-  { icon: ContactRound, label: "Leads", path: "/leads", group: "growth" },
-  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "growth" },
-  { icon: Star, label: "Reputation", path: "/reputation", group: "growth" },
-  { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "growth" },
-  { icon: Award, label: "Titan Score", path: "/titan-score", group: "growth" },
-  { icon: Gift, label: "Referrals", path: "/referral", group: "growth" },
+  // —— Reports — money summaries & exports
+  { icon: BarChart3, label: "Reports", path: "/reports", group: "reports" },
+  { icon: DollarSign, label: "Finances", path: "/finances", group: "reports" },
+  { icon: CreditCard, label: "Payments", path: "/payments", group: "reports" },
+  { icon: ClipboardList, label: "1099 Tax Center", path: "/tax-center", group: "reports" },
+  { icon: ScanLine, label: "Receipt Scanner", path: "/receipts", group: "reports" },
+  { icon: Gift, label: "Referrals", path: "/referral", group: "reports" },
 
-  // Connect
-  { icon: Bot, label: "Titan AI", path: "/assistant", group: "connect" },
-  { icon: UsersRound, label: "Community", path: "/community", group: "connect" },
-  { icon: Bell, label: "Notifications", path: "/notifications", group: "connect" },
+  // —— Communication
+  { icon: Radio, label: "TitanCom", path: "/comms", group: "communication" },
+  { icon: MessageSquare, label: "Messages", path: "/messages", group: "communication" },
+  { icon: UsersRound, label: "Community", path: "/community", group: "communication" },
+  { icon: Bell, label: "Notifications", path: "/notifications", group: "communication" },
+  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "communication" },
 
-  // Account
-  { icon: User, label: "Professional Profile", path: "/profile", group: "account" },
-  { icon: Building2, label: "Companies", path: "/companies", group: "account" },
-  { icon: Settings, label: "Settings", path: "/settings", group: "account" },
-  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "account" },
-  { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "account", adminOnly: true },
-  { icon: Percent, label: "Fee management", path: "/admin/fees", group: "account", adminOnly: true },
-  { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "account", adminOnly: true },
+  // —— AI
+  { icon: Bot, label: "Titan AI", path: "/assistant", group: "ai" },
+  { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "ai" },
+  { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "ai" },
 
-  // Labs — needs external providers (Stripe Connect, Twilio, partner feeds)
+  // —— Configuration — setup self / business / assets
+  { icon: Settings, label: "Settings", path: "/settings", group: "configuration" },
+  { icon: User, label: "Professional Profile", path: "/profile", group: "configuration" },
+  { icon: Building2, label: "Companies", path: "/companies", group: "configuration" },
+  { icon: Truck, label: "Fleet", path: "/fleet", group: "configuration" },
+  { icon: UserCog, label: "Employees", path: "/employees", group: "configuration" },
+  { icon: Package, label: "Inventory", path: "/inventory", group: "configuration" },
+  { icon: BadgeCheck, label: "Credentials", path: "/credentials", group: "configuration" },
+  { icon: Calculator, label: "Price Estimator", path: "/job-estimator", group: "configuration" },
+  { icon: Route, label: "Route Planner", path: "/routes", group: "configuration" },
+  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "configuration" },
+
+  // —— Administration
+  { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "administration", adminOnly: true },
+  { icon: Percent, label: "Fee management", path: "/admin/fees", group: "administration", adminOnly: true },
+  { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
+
+  // —— Labs — unfinished / partner-dependent (honest · Soon)
   { icon: ShieldCheck, label: "Job Holds · Soon", path: "/escrow", group: "labs", beta: true },
-  { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "labs" },
   { icon: Tag, label: "Local Deals · Soon", path: "/deals", group: "labs", beta: true },
   { icon: Siren, label: "Emergency Board", path: "/emergency", group: "labs" },
   { icon: PhoneCall, label: "Phone Scripts", path: "/phone", group: "labs" },
-  { icon: Shield, label: "Insurance", path: "/insurance", group: "labs" },
   { icon: Palette, label: "Design System", path: "/design-system", group: "labs" },
 ];
 
 export const NAV_GROUP_META = {
-  daily: { label: "Daily work", collapsible: false, defaultOpen: true },
-  money: { label: "Money", collapsible: true, defaultOpen: true },
-  field: { label: "Field & team", collapsible: true, defaultOpen: false },
-  growth: { label: "Grow business", collapsible: true, defaultOpen: false },
-  connect: { label: "Connect", collapsible: true, defaultOpen: false },
-  account: { label: "Account", collapsible: true, defaultOpen: false },
+  live: { label: "Live", collapsible: false, defaultOpen: true },
+  history: { label: "History", collapsible: true, defaultOpen: true },
+  analytics: { label: "Analytics", collapsible: true, defaultOpen: false },
+  reports: { label: "Reports", collapsible: true, defaultOpen: false },
+  communication: { label: "Communication", collapsible: true, defaultOpen: true },
+  ai: { label: "AI", collapsible: true, defaultOpen: false },
+  configuration: { label: "Configuration", collapsible: true, defaultOpen: false },
+  administration: { label: "Administration", collapsible: true, defaultOpen: false },
   labs: { label: "Labs", collapsible: true, defaultOpen: false },
 };
 
-export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", "account", "labs"];
+export const NAV_GROUP_ORDER = [
+  "live",
+  "history",
+  "analytics",
+  "reports",
+  "communication",
+  "ai",
+  "configuration",
+  "administration",
+  "labs",
+];
 
-/** Mobile bottom tabs — Driver Hub is #1. */
+/** Mobile bottom tabs — Live + Communication roots. */
 export const MOBILE_TAB_ITEMS = [
   { icon: Car, label: "Driver", path: "/driver" },
   { icon: Radio, label: "TitanCom", path: "/comms" },
@@ -140,60 +157,64 @@ export const MOBILE_TAB_ITEMS = [
 export const MOBILE_ROOT_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
 
 /**
- * More menu — essentials first; Labs holds partner-dependent tools.
+ * More menu — OS domains. Tabs cover primary Live + Communication; More holds the rest.
  */
 export const MORE_MENU_GROUPS = [
   {
-    title: "Daily work",
-    description: "Run today’s jobs",
-    paths: ["/driver", "/comms", "/", "/schedule", "/customers", "/estimates", "/invoices", "/messages"],
+    title: "Live",
+    description: "What is happening now",
+    paths: ["/driver", "/", "/jobs", "/schedule", "/marketplace", "/hire", "/booking"],
   },
   {
-    title: "Money",
-    description: "Get paid and stay organized",
-    paths: ["/finances", "/payments", "/tax-center", "/receipts", "/analytics", "/reports"],
+    title: "History",
+    description: "People and past work records",
+    paths: ["/customers", "/estimates", "/invoices", "/leads", "/contracts", "/insurance"],
   },
   {
-    title: "Field & team",
-    description: "Crew, routes, fleet",
+    title: "Analytics",
+    description: "Understand performance",
+    paths: ["/analytics", "/reputation", "/titan-score"],
+  },
+  {
+    title: "Reports",
+    description: "Money, tax, and exports",
+    paths: ["/reports", "/finances", "/payments", "/tax-center", "/receipts", "/referral"],
+  },
+  {
+    title: "Communication",
+    description: "Talk to customers and your team",
+    paths: ["/comms", "/messages", "/community", "/notifications", "/follow-ups"],
+  },
+  {
+    title: "AI",
+    description: "Assistants and coaching",
+    paths: ["/assistant", "/marketing", "/growth-coach"],
+  },
+  {
+    title: "Configuration",
+    description: "Setup for you, your business, and assets",
     paths: [
-      "/job-estimator",
-      "/routes",
+      "/settings",
+      "/profile",
+      "/companies",
       "/fleet",
       "/employees",
       "/inventory",
       "/credentials",
-      "/booking",
-      "/contracts",
+      "/job-estimator",
+      "/routes",
+      "/trust-safety",
     ],
   },
   {
-    title: "Grow",
-    description: "Find work and customers",
-    paths: ["/marketplace", "/hire", "/leads", "/follow-ups", "/reputation", "/referral", "/marketing", "/titan-score"],
-  },
-  {
-    title: "Connect",
-    description: "Talk to customers and your team",
-    paths: ["/assistant", "/community", "/notifications"],
-  },
-  {
-    title: "Account",
-    description: "You and your business",
-    paths: ["/profile", "/companies", "/settings", "/trust-safety", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
+    title: "Administration",
+    description: "Platform controls",
+    paths: ["/admin/moderation", "/admin/fees", "/admin/tax-rules"],
   },
   {
     title: "Labs",
-    description: "Tools that need partner APIs (Stripe Connect, telephony, deals)",
-    paths: [
-      "/escrow",
-      "/growth-coach",
-      "/deals",
-      "/emergency",
-      "/phone",
-      "/insurance",
-      "/design-system",
-    ],
+    description: "Early tools — not production-complete",
+    paths: ["/escrow", "/deals", "/emergency", "/phone", "/design-system"],
   },
 ];
 
@@ -204,6 +225,15 @@ export const QUICK_CREATE_ACTIONS = [
   { label: "Customer", path: "/customers?new=1", icon: Users },
   { label: "Post a haul", path: "/hire?new=1", icon: UserPlus },
 ];
+
+/** Map path → OS domain id for chrome / breadcrumbs. */
+export function resolveNavDomain(pathname = "/") {
+  const path = String(pathname || "/").split("?")[0] || "/";
+  const item =
+    APP_NAV_ITEMS.find((n) => n.path === path) ||
+    APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
+  return item?.group || "live";
+}
 
 export function navItemsByPaths(paths) {
   return paths
@@ -251,7 +281,7 @@ export function resolvePageTitle(pathname = "/") {
   return "TitanOS";
 }
 
-/** Parent crumb for nested routes — More or section list. */
+/** Parent crumb for nested routes — domain list or section root. */
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
   if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
@@ -261,11 +291,14 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
   if (path.startsWith("/marketplace")) return { label: "Marketplace", path: "/marketplace" };
   if (path.startsWith("/messages")) return { label: "Messages", path: "/messages" };
+  if (path.startsWith("/comms")) return { label: "TitanCom", path: "/comms" };
+  if (path.startsWith("/assistant")) return { label: "AI", path: "/assistant" };
   if (path.startsWith("/settings") || path.startsWith("/trust-safety")) {
     return { label: "More", path: "/more" };
   }
   if (path.startsWith("/profile") || path.startsWith("/titan-score")) {
     return { label: "Profile", path: "/profile" };
   }
+  if (path.startsWith("/admin")) return { label: "More", path: "/more" };
   return { label: "More", path: "/more" };
 }

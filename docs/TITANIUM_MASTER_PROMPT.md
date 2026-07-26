@@ -68,6 +68,31 @@ Rules:
 
 ---
 
+## INFORMATION ARCHITECTURE
+
+TitanOS is an **operating system**, not a collection of unrelated pages.
+
+Separate every feature into one domain:
+
+| Domain | Meaning |
+|--------|---------|
+| **Live** | What is happening now |
+| **History** | Records of people and past work |
+| **Analytics** | Understand performance |
+| **Reports** | Money summaries and exports |
+| **Communication** | Talk to customers and team |
+| **AI** | Assistants and coaching |
+| **Configuration** | Setup for self, business, assets |
+| **Administration** | Platform admin only |
+| **Labs** | Unfinished / partner-dependent |
+
+Source of truth: `src/lib/nav-items.js` (`group` on each item + `MORE_MENU_GROUPS` + Sidebar).  
+Cursor rule: `.cursor/rules/information-architecture.mdc`.
+
+Driver Hub Explorer must mirror this split (Live Shift vs History vs Analytics vs Settings) — never dump analytics onto Live Mission Control.
+
+---
+
 ## NAVIGATION
 
 Every destination must be reachable in **three taps or fewer** from a mobile root (bottom tabs or More).

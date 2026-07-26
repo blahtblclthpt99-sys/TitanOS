@@ -20,7 +20,9 @@ export * from "./autopilot.js";
 export * from "./trueCostPerMile.js";
 export * from "./voiceCommands.js";
 export * from "./driverCoach.js";
+export * from "./doorDashWorkflow.js";
 export { createBrowserTracker } from "./tracker.js";
+export { createDoorDashTracker } from "./doorDashTracker.js";
 
 /** Feature modules reserved for expansion (no-ops / stubs). */
 export const ACTIVITY_MODULES = {
@@ -46,4 +48,5 @@ export const ACTIVITY_MODULES = {
   excelExport: true,
   offerAutopilot: true,
   voiceCommands: true,
+  doorDashWorkflow: true,
 };

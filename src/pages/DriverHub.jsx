@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpen, Brain, Car, Plus, Users, Radio } from "lucide-react";
+import { BookOpen, Brain, Car, Package, Plus, Users, Radio } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import DriverShiftPanel from "@/components/driver/DriverShiftPanel";
 import DriverLocationPanel from "@/components/driver/DriverLocationPanel";
 import DriverIntelligencePanel from "@/components/driver/activity/DriverIntelligencePanel";
 import VehicleLogbookPanel from "@/components/driver/activity/VehicleLogbookPanel";
+import DoorDashWorkflowPanel from "@/components/driver/activity/DoorDashWorkflowPanel";
 import { useAuth } from "@/lib/AuthContext";
 import {
   readShiftHistory,
@@ -20,6 +21,7 @@ import {
 
 const TABS = [
   { id: "shift", label: "My shift", icon: Car, short: "Shift" },
+  { id: "doordash", label: "DoorDash", icon: Package, short: "Dash" },
   { id: "intel", label: "Coach", icon: Brain, short: "Coach" },
   { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log" },
   { id: "directory", label: "Find", icon: Users, short: "Find" },
@@ -58,6 +60,7 @@ export default function DriverHub() {
 
   const subtitle = useMemo(() => {
     if (tab === "directory") return "Publish yourself or hire nearby drivers.";
+    if (tab === "doordash") return "Guided delivery stages · GPS · auto timers.";
     if (tab === "intel") return "All-in $/mi floor · money coach · rush windows.";
     if (tab === "logbook") return "Miles, fuel, expenses, Excel trip reports.";
     return "Miles · money autopilot · voice · Tax Center sync.";
@@ -101,7 +104,7 @@ export default function DriverHub() {
       />
 
       <div
-        className="grid grid-cols-4 gap-1 rounded-lg border border-border bg-muted p-1"
+        className="grid grid-cols-5 gap-1 rounded-lg border border-border bg-muted p-1"
         role="tablist"
         aria-label="Driver Hub sections"
       >
@@ -124,8 +127,8 @@ export default function DriverHub() {
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="hidden md:inline">{label}</span>
-              <span className="md:hidden text-xs">{short}</span>
+              <span className="hidden lg:inline">{label}</span>
+              <span className="lg:hidden text-[10px] sm:text-xs">{short}</span>
             </button>
           );
         })}
@@ -134,6 +137,8 @@ export default function DriverHub() {
       <div role="tabpanel" id={`driver-hub-panel-${tab}`} aria-labelledby={`driver-hub-tab-${tab}`}>
         {tab === "directory" ? (
           <DriverDirectory initialQuery={qParam} />
+        ) : tab === "doordash" ? (
+          <DoorDashWorkflowPanel />
         ) : tab === "logbook" ? (
           <VehicleLogbookPanel
             key={refreshTick}

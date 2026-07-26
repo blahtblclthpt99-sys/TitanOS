@@ -4,6 +4,7 @@ import { queryClientInstance } from "@/lib/query-client";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
 import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
+import DoorDashKeepAlive from "@/components/driver/activity/DoorDashKeepAlive";
 
 function PrefetchOnMount() {
   usePrefetchDashboard(true);
@@ -16,6 +17,7 @@ export default function AuthenticatedShell() {
     <QueryClientProvider client={queryClientInstance}>
       <PrefetchOnMount />
       <DriverSessionKeepAlive />
+      <DoorDashKeepAlive />
       <AppLayout />
     </QueryClientProvider>
   );

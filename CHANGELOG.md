@@ -2,6 +2,13 @@
 
 All notable improvements from the production refactor. Functionality, routes, API contracts, and Base44 entities/server functions are preserved unless noted as a bug fix.
 
+## 1.5.4 (Play AAB 19) — Driver Hub primary + true cost
+
+- Driver Hub first in nav; money coach with all-in $/mi (fuel + maint + tires + vehicle)
+- Set-and-forget autopilot + voice; session timers survive refresh / keep-alive GPS
+- TitanComms: more channels, SOS removed; fake founder seed purge
+- Android versionCode 19 / versionName 1.5.4
+
 ## 1.5.1 (Play AAB 16) — Security hardening
 
 - Payment status webhook-only; invoice paid locked from client

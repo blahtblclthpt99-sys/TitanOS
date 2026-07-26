@@ -1,6 +1,6 @@
-/** Default one-time install price for every marketplace module. */
-export const MODULE_PRICE = 0;
-export const MODULE_PRICE_LABEL = "Free beta perk";
+/** Default one-time install price for every marketplace module (PayPal NCP $1.99). */
+export const MODULE_PRICE = 1.99;
+export const MODULE_PRICE_LABEL = "";
 
 export const MARKETPLACE_CATEGORIES = [
   "All",
@@ -478,11 +478,13 @@ export function formatInstallCount(count) {
 export function formatModulePrice(module) {
   const price = Number(module?.price);
   if (!Number.isFinite(price) || price <= 0) {
-    return module?.price_label || MODULE_PRICE_LABEL || "Free";
+    return module?.price_label || "Free";
   }
   const cents = Math.round(price * 100) / 100;
-  const label = module?.price_label || "";
-  return `$${cents.toFixed(2)}${label}`;
+  const label = String(module?.price_label || "").trim();
+  // Avoid "$1.99$1.99" when price_label already includes currency
+  if (label.startsWith("$")) return label;
+  return label ? `$${cents.toFixed(2)} · ${label}` : `$${cents.toFixed(2)}`;
 }
 
 export function normalizeModule(record) {

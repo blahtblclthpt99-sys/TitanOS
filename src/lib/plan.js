@@ -8,7 +8,7 @@
  */
 import { isOwnerAccount } from "@/lib/ownerAccount";
 
-export const FREE_DURING_BETA = true;
+export const FREE_DURING_BETA = false;
 
 /** @deprecated Use FREE_DURING_BETA */
 export const FREE_LAUNCH = FREE_DURING_BETA;

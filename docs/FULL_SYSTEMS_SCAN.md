@@ -70,7 +70,7 @@
 | M1 | Hire jobs board world-readable (`USING true`) — intentional but PII risk |
 | M2 | PayPal membership path not configured (optional) |
 | M3 | Android `minifyEnabled false` |
-| M4 | `FREE_DURING_BETA` unlocks features |
+| M4 | ~~`FREE_DURING_BETA` unlocks features~~ — **ended 2026-07-26**; paid PayPal checkouts live |
 | M5 | Dual fee preview surfaces vs server Fee Engine |
 | M6 | npm audit endpoint flaky this scan — re-run when registry healthy |
 

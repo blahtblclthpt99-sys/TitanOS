@@ -1,0 +1,37 @@
+---
+description: TitanOS navigation — three taps, no dead ends, never surprise
+alwaysApply: true
+---
+
+# Navigation
+
+Every destination must be reachable in **three taps or fewer** from a mobile root (bottom tabs or More).
+
+## Every page must include
+
+1. **Clear title** — what this screen is (header and/or MobileHeader).
+2. **Back button** — on non-root screens; cold deep-links fall back to the section parent, never a blank stack.
+3. **Breadcrumb** — when nested (e.g. Customers → Acme → Invoice).
+4. **Search** — when the page is a list, archive, or explorer (or an obvious link to search).
+5. **Quick actions** — primary next step(s) for this context, not a random button pile.
+6. **Consistent patterns** — same header chrome, same More grouping, same tab roots.
+
+## Rules
+
+- Never create navigation **dead ends** (Coming Soon with no escape, missing Back, or CTAs that go nowhere).
+- Never surprise the user (no unlabeled icon jumps, no silent redirects without feedback).
+- Prefer: Tab → list → detail (≤3). Avoid Tab → More → Lab → nested → nested.
+- Labs / Soon items must still offer Back + honesty + escape to a real tool.
+- Desktop and mobile must agree on parent routes (`getTabRoot` / nav parents).
+
+## Bad vs good
+
+```text
+❌ Non-root MobileHeader shows only "Back" with no page title
+❌ /deals Coming Soon with no path back to useful work (beyond system Back)
+❌ Primary CTA that only opens another mystery screen with no label
+
+✅ Back + title "Invoice #1042"
+✅ Customers / Acme Co / Invoice #1042
+✅ Explorer search + one primary action on Driver Hub
+```

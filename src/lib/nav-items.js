@@ -215,3 +215,57 @@ export function navItemsByPaths(paths) {
 export function filterNavItems(items, { isAdmin = false } = {}) {
   return items.filter((item) => !item.adminOnly || isAdmin);
 }
+
+/**
+ * Resolve a human page title for chrome (MobileHeader, breadcrumbs).
+ * Prefer specific nested titles over generic section labels.
+ */
+export function resolvePageTitle(pathname = "/") {
+  const path = String(pathname || "/").split("?")[0] || "/";
+
+  if (path === "/") return "Command Center";
+  if (path === "/more") return "More";
+  if (path.startsWith("/driver/trip")) return "Trip detail";
+  if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
+  if (path.startsWith("/customers/") && path !== "/customers") return "Customer";
+  if (path.startsWith("/invoices/") && path !== "/invoices") return "Invoice";
+  if (path.startsWith("/features/")) return "Feature";
+  if (path.startsWith("/admin/moderation")) return "Moderation";
+  if (path.startsWith("/admin/fees")) return "Fee management";
+  if (path.startsWith("/admin/tax-rules")) return "Tax Rules";
+  if (path.startsWith("/book/")) return "Booking";
+  if (path.startsWith("/u/")) return "Public profile";
+  if (path.startsWith("/sign/")) return "Sign document";
+
+  const exact = APP_NAV_ITEMS.find((item) => item.path === path);
+  if (exact) return exact.label.replace(/\s·\sSoon$/, "");
+
+  const tab = MOBILE_TAB_ITEMS.find((item) => item.path === path);
+  if (tab) return tab.label === "Driver" ? "Driver Hub" : tab.label;
+
+  const prefix = APP_NAV_ITEMS.find(
+    (item) => item.path !== "/" && path.startsWith(`${item.path}/`)
+  );
+  if (prefix) return prefix.label.replace(/\s·\sSoon$/, "");
+
+  return "TitanOS";
+}
+
+/** Parent crumb for nested routes — More or section list. */
+export function resolveNavParent(pathname = "/") {
+  const path = String(pathname || "/").split("?")[0] || "/";
+  if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
+  if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
+  if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
+  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
+  if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
+  if (path.startsWith("/marketplace")) return { label: "Marketplace", path: "/marketplace" };
+  if (path.startsWith("/messages")) return { label: "Messages", path: "/messages" };
+  if (path.startsWith("/settings") || path.startsWith("/trust-safety")) {
+    return { label: "More", path: "/more" };
+  }
+  if (path.startsWith("/profile") || path.startsWith("/titan-score")) {
+    return { label: "Profile", path: "/profile" };
+  }
+  return { label: "More", path: "/more" };
+}

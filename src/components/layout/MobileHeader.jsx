@@ -1,7 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { MOBILE_ROOT_PATHS } from "@/lib/nav-items";
+import { MOBILE_ROOT_PATHS, resolvePageTitle } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 import NotificationBell from "@/components/shared/NotificationBell";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
@@ -23,10 +23,15 @@ function getTabRoot(pathname) {
   if (pathname.startsWith("/assistant")) return "/assistant";
   if (pathname.startsWith("/settings") || pathname.startsWith("/trust-safety")) return "/more";
   if (pathname.startsWith("/profile") || pathname.startsWith("/titan-score")) return "/profile";
-  if (pathname.startsWith("/schedule")) return "/schedule";
+  if (pathname.startsWith("/schedule")) return "/more";
   if (pathname.startsWith("/finances") || pathname.startsWith("/payments")) return "/more";
   if (pathname.startsWith("/fleet") || pathname.startsWith("/hire")) return "/more";
-  return "/";
+  if (pathname.startsWith("/admin")) return "/more";
+  if (pathname.startsWith("/comms")) return "/comms";
+  if (pathname.startsWith("/escrow") || pathname.startsWith("/deals") || pathname.startsWith("/emergency") || pathname.startsWith("/phone") || pathname.startsWith("/insurance") || pathname.startsWith("/design-system") || pathname.startsWith("/growth-coach")) {
+    return "/more";
+  }
+  return "/more";
 }
 
 export default function MobileHeader() {
@@ -34,6 +39,7 @@ export default function MobileHeader() {
   const navigate = useNavigate();
   const pathname = normalizeAppPath(location.pathname);
   const isRoot = MOBILE_ROOT_PATHS.includes(pathname);
+  const title = resolvePageTitle(pathname);
 
   const handleBack = () => {
     const parent = getTabRoot(pathname);
@@ -62,15 +68,17 @@ export default function MobileHeader() {
         {isRoot ? (
           <TitanBrandLogo to="/" className="flex-1 min-w-0" markClassName="h-8 w-8" />
         ) : (
-          <button
-            type="button"
-            onClick={handleBack}
-            aria-label="Go back"
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] -ml-1 flex-1"
-          >
-            <ArrowLeft className="w-5 h-5" aria-hidden="true" />
-            <span className="text-sm font-medium">Back</span>
-          </button>
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label={`Back from ${title}`}
+              className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] -ml-1 shrink-0 focus-ring rounded-lg"
+            >
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+            </button>
+            <h1 className="text-sm font-semibold text-foreground truncate pr-1">{title}</h1>
+          </div>
         )}
         <ThemeToggle className="shrink-0" />
         <NotificationBell />

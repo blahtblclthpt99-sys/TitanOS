@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import StatusBadge from "@/components/shared/StatusBadge";
+import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import FormField from "@/components/shared/FormField";
@@ -254,31 +255,38 @@ export default function CustomerDetail() {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
+      <PageHeader
+        title={fullName}
+        breadcrumbs={[
+          { label: "Customers", to: "/customers" },
+          { label: fullName },
+        ]}
+        className="mb-4"
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={customer.status} />
+            <Button onClick={() => setEditing(!editing)} variant="outline"
+              className="border-border text-muted-foreground hover:text-foreground rounded-xl min-h-[44px] min-w-[44px] p-2"
+              aria-label={editing ? "Cancel editing" : "Edit customer"}>
+              <Edit2 className="w-4 h-4" aria-hidden />
+            </Button>
+            <Button onClick={handleDelete} disabled={deleting} variant="outline"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-xl min-h-[44px] min-w-[44px] p-2"
+              aria-label="Delete contact">
+              <Trash2 className="w-4 h-4" aria-hidden />
+            </Button>
+          </div>
+        }
+      />
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0">
             <span className="text-2xl font-bold text-titan-cyan">{customer.first_name?.[0]}{customer.last_name?.[0]}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">{fullName}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <StatusBadge status={customer.status} />
-              {customer.lifetime_value > 0 && (
-                <span className="text-sm font-semibold text-emerald-400">${customer.lifetime_value.toLocaleString()} lifetime</span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setEditing(!editing)} variant="outline"
-              className="border-border text-muted-foreground hover:text-foreground rounded-xl min-h-[44px] min-w-[44px] p-2"
-              aria-label={editing ? "Cancel editing" : "Edit customer"}>
-              <Edit2 className="w-4 h-4" />
-            </Button>
-            <Button onClick={handleDelete} disabled={deleting} variant="outline"
-              className="border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-xl min-h-[44px] min-w-[44px] p-2"
-              aria-label="Delete contact">
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {customer.lifetime_value > 0 && (
+              <p className="text-sm font-semibold text-emerald-400">${customer.lifetime_value.toLocaleString()} lifetime</p>
+            )}
           </div>
         </div>
       </motion.div>

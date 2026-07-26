@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/shared/StatusBadge";
+import PageHeader from "@/components/shared/PageHeader";
+import PageShell from "@/components/shared/PageShell";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import DeleteButton from "@/components/shared/DeleteButton";
@@ -62,29 +64,31 @@ export default function InvoiceDetail() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-        {/* Invoice header */}
-        <div className="glass rounded-2xl p-6 mb-4">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Invoice</p>
-              <h1 className="text-2xl font-bold text-foreground">{invoice.invoice_number || "Draft"}</h1>
-              <p className="text-sm text-muted-foreground mt-1">{invoice.customer_name}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={invoice.status} />
-              <DeleteButton
-                label={invoice.invoice_number || "this invoice"}
-                onDelete={async () => {
-                  await api.entities.Invoice.delete(id);
-                  toast({ title: "Invoice deleted" });
-                  navigate("/invoices", { replace: true });
-                }}
-              />
-            </div>
+    <PageShell maxWidth="md">
+      <PageHeader
+        title={invoice.invoice_number || "Draft invoice"}
+        subtitle={invoice.customer_name || "Customer"}
+        breadcrumbs={[
+          { label: "Invoices", to: "/invoices" },
+          { label: invoice.invoice_number || "Draft" },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={invoice.status} />
+            <DeleteButton
+              label={invoice.invoice_number || "this invoice"}
+              onDelete={async () => {
+                await api.entities.Invoice.delete(id);
+                toast({ title: "Invoice deleted" });
+                navigate("/invoices", { replace: true });
+              }}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
+        }
+      />
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="glass rounded-2xl p-6 mb-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground text-xs mb-1">Due Date</p>
               <p className="text-foreground font-medium">{invoice.due_date ? formatMonthDayYear(invoice.due_date) : "—"}</p>
@@ -196,6 +200,6 @@ export default function InvoiceDetail() {
           </div>
         )}
       </motion.div>
-    </div>
+    </PageShell>
   );
 }

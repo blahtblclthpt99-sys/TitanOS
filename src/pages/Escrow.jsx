@@ -81,9 +81,13 @@ export default function Escrow() {
   return (
     <PageShell maxWidth="md">
       <PageHeader
-        eyebrow="Money · Coming soon"
         title="Job holds"
         subtitle="Status tracking only — TitanOS does not move or hold real funds yet."
+        breadcrumbs={[
+          { label: "More", to: "/more" },
+          { label: "Labs" },
+          { label: "Job holds" },
+        ]}
       />
       <FeatureHonestyBanner>
         Practice hold records only. Confirms do not charge cards or release money. Real escrow needs Stripe

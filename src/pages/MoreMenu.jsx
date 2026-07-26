@@ -18,7 +18,6 @@ export default function MoreMenu() {
   return (
     <PageShell maxWidth="md">
       <PageHeader
-        eyebrow="Navigate"
         title="More"
         subtitle="Daily tools first — Labs holds demos and early experiments."
       />

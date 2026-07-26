@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Gauge,
   MapPin,
-  Navigation,
   Radio,
   Signal,
   Sparkles,
@@ -21,28 +20,28 @@ import { buildMissionSnapshot } from "@/lib/driverOs/missionSnapshot.js";
 
 function McCard({ icon: Icon, label, value, sub, accent = "cyan", className }) {
   const accents = {
-    cyan: "border-titan-cyan/25 text-titan-cyan",
-    amber: "border-titan-amber/30 text-titan-amber",
-    emerald: "border-emerald-500/30 text-emerald-400",
-    rose: "border-rose-500/30 text-rose-400",
-    slate: "border-border text-muted-foreground",
+    cyan: "border-titan-cyan/30",
+    amber: "border-titan-amber/35",
+    emerald: "border-emerald-500/35",
+    rose: "border-rose-500/35",
+    slate: "border-border",
   };
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card/85 backdrop-blur-sm px-2.5 py-2 min-h-[68px] flex flex-col justify-center shadow-soft",
+        "rounded-xl border bg-card/90 px-3 py-2.5 min-h-[72px] flex flex-col justify-center",
         accents[accent] || accents.cyan,
         className
       )}
     >
-      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-        {Icon ? <Icon className="w-3 h-3 shrink-0" aria-hidden /> : null}
-        {label}
+      <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+        {Icon ? <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden /> : null}
+        <span className="truncate">{label}</span>
       </p>
-      <p className="text-base sm:text-lg font-bold tabular-nums text-foreground leading-tight mt-0.5 truncate">
+      <p className="text-lg font-semibold tabular-nums text-foreground leading-snug mt-1 truncate">
         {value}
       </p>
-      {sub ? <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">{sub}</p> : null}
+      {sub ? <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{sub}</p> : null}
     </div>
   );
 }
@@ -57,7 +56,7 @@ function safeSnapshot(userId, extra) {
 }
 
 /**
- * Pinned Mission Control — live ops first. Secondary telemetry is one tap away.
+ * Compact Mission Control — primary ops only; systems tucked away.
  */
 export default function MissionControl({ userId, onOpenFolder }) {
   const [snap, setSnap] = useState(() => (userId ? safeSnapshot(userId) : null));
@@ -66,13 +65,11 @@ export default function MissionControl({ userId, onOpenFolder }) {
 
   useEffect(() => {
     let cancelled = false;
-    let bat = null;
     if (typeof navigator !== "undefined" && navigator.getBattery) {
       navigator
         .getBattery()
         .then((b) => {
           if (cancelled) return;
-          bat = b;
           const sync = () => setBattery({ level: b.level, charging: b.charging });
           sync();
           b.addEventListener("levelchange", sync);
@@ -82,13 +79,6 @@ export default function MissionControl({ userId, onOpenFolder }) {
     }
     return () => {
       cancelled = true;
-      if (bat) {
-        try {
-          bat.removeEventListener("levelchange", () => {});
-        } catch {
-          /* ignore */
-        }
-      }
     };
   }, []);
 
@@ -124,7 +114,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
   if (!snap) {
     return (
       <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 text-sm text-rose-200">
-        Mission Control couldn't load live data. Pull to refresh or reopen Live Shift.
+        Mission Control couldn't load. Pull to refresh.
       </div>
     );
   }
@@ -138,59 +128,61 @@ export default function MissionControl({ userId, onOpenFolder }) {
   return (
     <section
       aria-label="Mission Control"
-      className="sticky top-0 z-20 -mx-1 px-1 pb-3 pt-1 bg-background/95 backdrop-blur-md border-b border-border/60"
+      className="sticky top-0 z-20 pb-3 pt-0.5 bg-background/95 backdrop-blur-md border-b border-border/50"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-titan-cyan">Mission Control</p>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold",
-                statusAccent
-              )}
-            >
-              {snap.active ? (
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                </span>
-              ) : null}
-              {snap.driverStatus}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground truncate">What you need right now</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-foreground shrink-0">Live</span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium truncate",
+              statusAccent
+            )}
+          >
+            {snap.active ? (
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              </span>
+            ) : null}
+            {snap.driverStatus}
+            {snap.platform && snap.platform !== "Idle" ? ` · ${snap.platform}` : ""}
+          </span>
         </div>
-        <div className="flex flex-wrap gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="min-h-[40px] text-xs"
+            className="h-9 px-3 text-xs"
             onClick={() => onOpenFolder?.("live-shift")}
           >
             Controls
           </Button>
-          <Button asChild size="sm" variant="outline" className="min-h-[40px] text-xs gap-1">
+          <Button asChild size="icon" variant="ghost" className="h-9 w-9" aria-label="TitanCom">
             <Link to="/comms?channel=tc-dispatch">
-              <Radio className="w-3 h-3" aria-hidden /> TitanCom
+              <Radio className="w-4 h-4" aria-hidden />
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Primary ops — always visible, drive-readable */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2">
-        <McCard icon={Navigation} label="Platform" value={snap.platform} accent="cyan" />
+      {/* 2×2 on phone — room to breathe; 4 across on tablet+ */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <McCard icon={Activity} label="Stage" value={snap.stage} accent="amber" />
-        <McCard icon={Wallet} label="Earn" value={snap.earningsLabel} sub={snap.profitLabel} accent="emerald" />
+        <McCard
+          icon={Wallet}
+          label="Earnings"
+          value={snap.earningsLabel}
+          sub={snap.profitLabel}
+          accent="emerald"
+        />
         <McCard icon={Timer} label="Shift" value={snap.shiftTimeLabel} accent="cyan" />
-        <McCard icon={Timer} label="Trip" value={snap.tripTimerLabel} accent="cyan" />
         <McCard
           icon={Gauge}
           label="Miles"
-          value={`${Number(snap.miles || 0).toFixed(1)}`}
-          sub={`${Number(snap.speedMph || 0)} mph`}
+          value={`${Number(snap.miles || 0).toFixed(1)} mi`}
+          sub={`${Number(snap.speedMph || 0)} mph · trip ${snap.tripTimerLabel}`}
           accent="slate"
         />
       </div>
@@ -199,26 +191,29 @@ export default function MissionControl({ userId, onOpenFolder }) {
         type="button"
         aria-expanded={systemsOpen}
         onClick={() => setSystemsOpen((v) => !v)}
-        className="mt-2 w-full flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/30 px-3 py-2 min-h-[40px] text-left transition-colors duration-150 hover:bg-muted/50"
+        className="mt-2 w-full flex items-center justify-between gap-2 rounded-xl bg-muted/25 px-3 py-2 min-h-[40px] text-left hover:bg-muted/40 transition-colors duration-150"
       >
-        <span className="text-xs font-semibold text-muted-foreground">
-          Systems · {snap.rushLabel} · {snap.gpsLabel} · {snap.netLabel}
-          {snap.goalPct != null ? ` · Goal ${snap.goalPct}%` : ""}
+        <span className="text-xs text-muted-foreground truncate">
+          {snap.rushLabel} · {snap.gpsLabel} · {snap.netLabel}
+          {snap.goalPct != null ? ` · ${snap.goalPct}% goal` : ""}
         </span>
         <ChevronDown
-          className={cn("w-4 h-4 text-muted-foreground transition-transform duration-150", systemsOpen && "rotate-180")}
+          className={cn(
+            "w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-150",
+            systemsOpen && "rotate-180"
+          )}
           aria-hidden
         />
       </button>
 
       {systemsOpen ? (
-        <div className="mt-1.5 grid grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 animate-in fade-in duration-150">
+        <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
           <McCard icon={Zap} label="Rush" value={snap.rushLabel} accent="amber" />
           <McCard icon={MapPin} label="GPS" value={snap.gpsLabel} accent={snap.gpsOk ? "emerald" : "rose"} />
           <McCard icon={Battery} label="Battery" value={snap.batteryLabel} accent="slate" />
           <McCard
             icon={Signal}
-            label="Net"
+            label="Network"
             value={snap.netLabel}
             accent={snap.net?.online ? "emerald" : "rose"}
           />
@@ -229,17 +224,18 @@ export default function MissionControl({ userId, onOpenFolder }) {
             sub={snap.goalLabel}
             accent="cyan"
           />
+          <McCard icon={Timer} label="Trip timer" value={snap.tripTimerLabel} accent="cyan" />
           <McCard
             icon={Sparkles}
             label="Titan AI"
-            value="Tip"
+            value="Recommendation"
             sub={snap.aiTip}
             accent="cyan"
-            className="col-span-3 lg:col-span-1"
+            className="col-span-2 md:col-span-3"
           />
         </div>
       ) : (
-        <p className="mt-1.5 text-[11px] text-muted-foreground line-clamp-2 px-0.5">
+        <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
           <Sparkles className="inline w-3 h-3 text-titan-cyan mr-1 align-text-bottom" aria-hidden />
           {snap.aiTip}
         </p>

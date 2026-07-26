@@ -54,7 +54,7 @@ import {
 export const APP_NAV_ITEMS = [
   // Daily work — Driver Hub is #1
   { icon: Car, label: "Driver Hub", path: "/driver", group: "daily" },
-  { icon: Radio, label: "TitanComms", path: "/comms", group: "daily" },
+  { icon: Radio, label: "TitanCom", path: "/comms", group: "daily" },
   { icon: LayoutDashboard, label: "Command Center", path: "/", group: "daily" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "daily" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "daily" },
@@ -130,7 +130,7 @@ export const NAV_GROUP_ORDER = ["daily", "money", "field", "growth", "connect", 
 /** Mobile bottom tabs — Driver Hub is #1. */
 export const MOBILE_TAB_ITEMS = [
   { icon: Car, label: "Driver", path: "/driver" },
-  { icon: Radio, label: "Comms", path: "/comms" },
+  { icon: Radio, label: "TitanCom", path: "/comms" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
   { icon: MessageSquare, label: "Messages", path: "/messages" },
   { icon: User, label: "Profile", path: "/profile" },

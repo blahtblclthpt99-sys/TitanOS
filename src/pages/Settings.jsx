@@ -377,16 +377,16 @@ export default function Settings() {
         </motion.div>
       </Link>}
 
-      {/* Beta Program Banner */}
-      <Link to="/beta">
+      {/* Plans */}
+      <Link to="/pricing">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="titan-surface p-4 mb-4 border border-primary/20 bg-titan-cyan/5 flex items-center gap-4 hover:bg-titan-cyan/10 transition-colors cursor-pointer">
           <div className="w-10 h-10 rounded-md bg-titan-cyan/20 flex items-center justify-center flex-shrink-0">
             <Bell className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">{betaBadgeLabel() || "Public Beta"}</p>
-            <p className="text-xs text-muted-foreground">Free During Beta — core tools unlocked. Labs features stay labeled.</p>
+            <p className="text-sm font-semibold text-foreground">Plans & pricing</p>
+            <p className="text-xs text-muted-foreground">Free shifts · Premium add-ons · PayPal checkout</p>
           </div>
           <ChevronRight className="w-4 h-4 text-primary/50" />
         </motion.div>

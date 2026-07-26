@@ -13,7 +13,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { listItemMotion, hoverLiftMotion } from "@/lib/listMotion";
 import { SERVICE_CATEGORIES, US_STATES, timeAgo } from "@/lib/platformConstants";
-import { betaBadgeLabel, isMarketplaceFree } from "@/lib/plan";
+import { isMarketplaceFree, canUseMarketplaceApps } from "@/lib/plan";
+import PremiumGate from "@/components/shared/PremiumGate";
 import { archiveListing, createListing, createSellerReview, deleteListing, fetchFavoriteIds, getListing, listListingMessages, listMarketplaceListings, listSellerReviews, PAGE_SIZE, reportListing, sendListingMessage, toggleFavorite, updateListing } from "@/lib/listingsApi";
 import { api } from "@/api/apiClient";
 
@@ -141,16 +142,24 @@ export default function Marketplace() {
   const submitReport = async () => { const reason = window.prompt("What should we review about this listing?"); if (!reason?.trim()) return; try { await reportListing(user, selected.id, reason); toast({ title: "Report received", description: "Thank you for helping keep the marketplace safe." }); } catch { toast({ variant: "destructive", title: "Couldn't submit report" }); } };
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading marketplace" />;
+  const appsUnlocked = canUseMarketplaceApps(user);
   return <div className="relative p-4 md:p-8 max-w-7xl mx-auto min-h-full">
     <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-titan-cyan/8 blur-[100px]" /><div className="absolute top-1/2 -left-24 w-72 h-72 rounded-full bg-titan-indigo/10 blur-[90px]" /></div>
     <div className="relative"><PageHeader title="Marketplace" subtitle="Find trusted local services and share your expertise" onAdd={() => { setListingForm(blankListing); setFormOpen(true); }} addLabel="Post a Service" />
       <div className="flex gap-2 mb-6 border-b border-border">{[["listings", "Listings"], ["mine", "My Listings"], ["apps", "Apps"]].map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab === id ? "border-titan-cyan text-titan-cyan" : "border-transparent text-muted-foreground hover:text-foreground/90"}`}>{label}</button>)}</div>
       {tab === "apps" ? (
-        <Suspense fallback={<PageLoader variant="list" label="Loading apps" />}>
-          <MarketplaceApps />
-        </Suspense>
+        appsUnlocked ? (
+          <Suspense fallback={<PageLoader variant="list" label="Loading apps" />}>
+            <MarketplaceApps />
+          </Suspense>
+        ) : (
+          <PremiumGate
+            title="Marketplace Apps require Premium"
+            description="Install industry modules and add-ons with Worker Premium or Business. Service listings stay available on Free."
+          />
+        )
       ) : <>
-        {betaBadgeLabel() && <div className="titan-surface mb-5 p-4 border border-primary/20 flex items-center justify-between gap-4"><div><p className="font-semibold text-foreground">{betaBadgeLabel()}</p><p className="text-xs text-muted-foreground mt-1">Marketplace is free — post, browse, and message with no listing fees.</p></div><span className="text-xs font-medium text-primary">{isMarketplaceFree(user) ? "Free · No fees" : ""}</span></div>}
+        <div className="titan-surface mb-5 p-4 border border-primary/20 flex items-center justify-between gap-4"><div><p className="font-semibold text-foreground">Service listings</p><p className="text-xs text-muted-foreground mt-1">Post, browse, and message locally. Apps modules are a Premium unlock.</p></div><span className="text-xs font-medium text-primary">{isMarketplaceFree(user) ? "Listings free" : ""}</span></div>
         <div className="titan-surface p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"><div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" /><Input value={filters.search} onChange={e => updateFilter("search", e.target.value)} placeholder="Search services" className={`${fieldClass} pl-9`} /></div><select value={filters.category} onChange={e => updateFilter("category", e.target.value)} className={fieldClass}><option value="All">All categories</option>{SERVICE_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select><select value={filters.state} onChange={e => updateFilter("state", e.target.value)} className={fieldClass}><option value="">All states</option>{US_STATES.map(value => <option key={value}>{value}</option>)}</select><Input value={filters.city} onChange={e => updateFilter("city", e.target.value)} placeholder="City" className={fieldClass} /></div>
         {loading ? <PageLoader variant="list" label="Loading listings" /> : listings.length ? <><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">{listings.map((listing, index) => <ListingCard key={listing.id} listing={listing} index={index} reduceMotion={reduceMotion} favorite={favorites.has(listing.id)} onFavorite={handleFavorite} onOpen={openDetail} />)}</div>{hasMore && <div className="text-center mt-8"><Button onClick={() => loadListings(page + 1, true)} disabled={loading} variant="outline" className="border-border text-foreground hover:bg-muted rounded-xl">Load more</Button></div>}</> : <div className="titan-surface p-12 text-center"><Store className="w-8 h-8 text-primary mx-auto mb-3" /><p className="font-semibold text-foreground">{myListings ? "No listings yet" : "No services found"}</p><p className="text-sm text-muted-foreground mt-1">{myListings ? "Post your first service to start reaching local customers." : "Try broadening your search or filters."}</p>{myListings && <Button onClick={() => setFormOpen(true)} className="mt-4">Post a Service</Button>}</div>}
       </>}

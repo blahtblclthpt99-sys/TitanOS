@@ -24,7 +24,9 @@ import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel"
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
+import PremiumGate from "@/components/shared/PremiumGate";
 import { toast } from "@/components/ui/use-toast";
+import { canUseDriverAddons } from "@/lib/plan";
 import {
   classifyRushWindow,
   collectTrips,
@@ -710,37 +712,53 @@ export default function DriverShiftPanel() {
             )}
 
             <ErrorBoundary message="Offer autopilot couldn't load.">
-              <SetForgetOfferPanel
-                userId={user?.id}
-                mpg={Number(prefs.mpg) || 22}
-                gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
-                defaultZip={prefs.zip || ""}
-                history={history}
-                drivingActive={drivingActive}
-                voiceSeed={voiceSeed}
-              />
+              {canUseDriverAddons(user) ? (
+                <SetForgetOfferPanel
+                  userId={user?.id}
+                  mpg={Number(prefs.mpg) || 22}
+                  gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
+                  defaultZip={prefs.zip || ""}
+                  history={history}
+                  drivingActive={drivingActive}
+                  voiceSeed={voiceSeed}
+                />
+              ) : (
+                <PremiumGate
+                  compact
+                  title="Money autopilot is Premium"
+                  description="Set-and-forget offer guidance unlocks with Worker Premium. You can still start and stop shifts on Free."
+                />
+              )}
             </ErrorBoundary>
 
             <ErrorBoundary message="Voice coach couldn't load.">
-              <DriverVoiceCoach
-                userId={user?.id}
-                mpg={Number(prefs.mpg) || mpg || 22}
-                gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
-                defaultZip={prefs.zip || ""}
-                history={history}
-                drivingActive={drivingActive}
-                sessionPaused={sessionPaused}
-                dash={dash}
-                onStartDriving={async () => {
-                  if (!drivingActive) await toggleDriving();
-                }}
-                onStopDriving={async () => {
-                  if (drivingActive) await toggleDriving();
-                }}
-                onPause={handlePauseSession}
-                onResume={handleResumeSession}
-                onDecision={(decision, input) => setVoiceSeed({ decision, input, at: Date.now() })}
-              />
+              {canUseDriverAddons(user) ? (
+                <DriverVoiceCoach
+                  userId={user?.id}
+                  mpg={Number(prefs.mpg) || mpg || 22}
+                  gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
+                  defaultZip={prefs.zip || ""}
+                  history={history}
+                  drivingActive={drivingActive}
+                  sessionPaused={sessionPaused}
+                  dash={dash}
+                  onStartDriving={async () => {
+                    if (!drivingActive) await toggleDriving();
+                  }}
+                  onStopDriving={async () => {
+                    if (drivingActive) await toggleDriving();
+                  }}
+                  onPause={handlePauseSession}
+                  onResume={handleResumeSession}
+                  onDecision={(decision, input) => setVoiceSeed({ decision, input, at: Date.now() })}
+                />
+              ) : (
+                <PremiumGate
+                  compact
+                  title="Voice coach is Premium"
+                  description="Hands-free coach commands are a Premium add-on. Shift start/stop stays free."
+                />
+              )}
             </ErrorBoundary>
 
             {drivingActive && gpsError && (

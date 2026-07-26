@@ -95,14 +95,14 @@ const WHY = [
   },
   {
     icon: "shield",
-    title: "Free while we grow",
-    desc: "Public beta unlocks the full product. Early users get founder pricing later.",
+    title: "Plans that scale with you",
+    desc: "Start free for shifts and listings. Upgrade when you need Driver Hub add-ons, apps, and lower fees.",
   },
 ];
 
 const TRUST = [
-  { label: "Public beta", detail: "Core product access" },
-  { label: "No credit card", detail: "Start in minutes" },
+  { label: "Free to start", detail: "Shift tracking included" },
+  { label: "PayPal checkout", detail: "Premium & Business" },
   { label: "Android app", detail: "Install the APK" },
   { label: "Field-ready", detail: "Mobile-first design" },
 ];
@@ -409,7 +409,7 @@ export default function Landing() {
                 <TitanBrandLogo layout="stacked" imgClassName="h-16 sm:h-20" />
                 <ThemeToggle variant="segmented" className="max-w-xs w-full sm:w-auto" />
               </div>
-              <p className="mb-4 text-caption font-semibold text-primary">Public beta · Free to start</p>
+              <p className="mb-4 text-caption font-semibold text-primary">Free to start · Premium when you need it</p>
               <h1 className="landing-display max-w-xl text-3xl text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.12]">
                 The operating system for service businesses.
               </h1>
@@ -426,7 +426,7 @@ export default function Landing() {
                 </button>
               </div>
               <p className="mt-5 text-caption text-muted-foreground">
-                No credit card · Core product during public beta
+                Free shift tracking · Upgrade for add-ons
               </p>
             </div>
 
@@ -520,7 +520,7 @@ export default function Landing() {
               Everything you need to run the day — included.
             </h2>
             <p className="mt-3 max-w-xl text-muted-foreground">
-              No add-ons or paywalls during public beta. Tap a feature to learn more.
+              Core tools free to start. Premium unlocks Driver Hub add-ons, Marketplace Apps, and lower fees.
             </p>
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map(({ icon, title, desc, slug }) => (
@@ -577,7 +577,7 @@ export default function Landing() {
               Start free. Run your next job on TitanOS.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Create an account in minutes. Core product free during public beta — Labs tools are labeled Beta/Soon. No card required.
+              Create an account in minutes. Start free for shifts and listings — upgrade for Premium add-ons.
             </p>
           </div>
           <div className="titan-surface mx-auto mt-10 max-w-lg p-6 sm:p-8">
@@ -624,7 +624,7 @@ export default function Landing() {
               Ready when you are.
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Join service businesses running jobs on TitanOS — free during public beta.
+              Join service businesses running jobs on TitanOS — free to start, Premium when you scale.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link to="/register" className={btnPrimary}>

@@ -170,7 +170,7 @@ export function parseVoiceCommand(utterance = "") {
     return { intent: "navigate", payload: { tab: "directory" }, reply: "Opening find drivers." };
   }
   if (/\b(open|go to)\b.*\bcomms\b/.test(text) || /\btitan ?comms\b/.test(text)) {
-    return { intent: "navigate_path", payload: { path: "/comms" }, reply: "Opening TitanComms." };
+    return { intent: "navigate_path", payload: { path: "/comms" }, reply: "Opening TitanCom." };
   }
 
   // Status / timers

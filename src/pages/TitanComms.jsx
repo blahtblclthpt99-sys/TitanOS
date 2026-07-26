@@ -9,6 +9,9 @@ import {
   MapPin,
   MessageSquare,
   Circle,
+  Crown,
+  UserPlus,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -18,19 +21,22 @@ import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import PageLoader from "@/components/shared/PageLoader";
 import EmptyState from "@/components/shared/EmptyState";
-import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import { cn } from "@/lib/utils";
 import {
   VOICE_STATUSES,
   createChannel,
+  deleteChannel,
+  freeChannelHint,
   getShareLocation,
   getVoiceStatus,
+  joinChannel,
   listChannelMessages,
   listChannels,
   postChannelMessage,
   setShareLocation,
   setVoiceStatus,
 } from "@/lib/titanCommsApi";
+import { canPersistTitanComChannels } from "@/lib/plan";
 import { TitanCommsSession } from "@/lib/titanCommsPtt";
 import { isSupabaseConfigured } from "@/api/supabaseClient";
 
@@ -54,6 +60,7 @@ export default function TitanComms() {
   const [draft, setDraft] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState("public");
   const sessionRef = useRef(null);
   const pttActive = useRef(false);
 
@@ -89,7 +96,6 @@ export default function TitanComms() {
     }, { replace: true });
   }, [channelId, setSearchParams]);
 
-  // Connect / reconnect session when channel or user changes
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -114,13 +120,6 @@ export default function TitanComms() {
         onState: (state) => {
           if (cancelled) return;
           setSessionState(state);
-          if (state.sos) {
-            toast({
-              variant: "destructive",
-              title: `SOS from ${state.sos.name}`,
-              description: state.sos.note || "Emergency alert on this channel",
-            });
-          }
         },
       });
       sessionRef.current = session;
@@ -149,6 +148,11 @@ export default function TitanComms() {
   const beginPtt = async () => {
     if (pttActive.current) return;
     pttActive.current = true;
+    try {
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(12);
+    } catch {
+      /* ignore */
+    }
     const result = await sessionRef.current?.startTalk();
     if (!result?.ok) {
       pttActive.current = false;
@@ -183,11 +187,16 @@ export default function TitanComms() {
     if (!user?.id || !newName.trim() || creating) return;
     setCreating(true);
     try {
-      const row = await createChannel(user, { name: newName.trim(), kind: "private" });
+      const row = await createChannel(user, { name: newName.trim(), kind: newKind });
       setNewName("");
       refreshChannels();
       setChannelId(row.id);
-      toast({ title: "Channel created" });
+      toast({
+        title: "Channel created",
+        description: row.expires_at
+          ? `You're the only admin. Free channels expire tonight (${new Date(row.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}).`
+          : "You're the only admin. Coworkers and friends can join if it's public.",
+      });
     } catch (err) {
       toast({ variant: "destructive", title: "Couldn't create channel", description: err?.message });
     } finally {
@@ -195,18 +204,37 @@ export default function TitanComms() {
     }
   };
 
-  if (!authChecked || loading) return <PageLoader variant="list" label="Loading TitanComms" />;
+  const onJoin = async (id) => {
+    try {
+      await joinChannel(user, id);
+      refreshChannels();
+      setChannelId(id);
+      toast({ title: "Joined channel" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Couldn't join", description: err?.message });
+    }
+  };
+
+  const onDelete = async (id) => {
+    if (!window.confirm("Delete this channel? There is no admin transfer — others will lose access.")) return;
+    try {
+      await deleteChannel(user, id);
+      refreshChannels();
+      setChannelId("tc-dispatch");
+      toast({ title: "Channel deleted" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Couldn't delete", description: err?.message });
+    }
+  };
+
+  if (!authChecked || loading) return <PageLoader variant="list" label="Loading TitanCom" />;
 
   if (!user?.id) {
     return (
       <PageShell maxWidth="lg">
-        <PageHeader
-          eyebrow="Connect · Preview"
-          title="TitanComms"
-          subtitle="Instant push-to-talk for your field crew."
-        />
+        <PageHeader eyebrow="Connect" title="TitanCom" subtitle="Instant push-to-talk for your crew." />
         <EmptyState
-          title="Sign in to use TitanComms"
+          title="Sign in to use TitanCom"
           description="Channels and live push-to-talk require an account."
           actionLabel="Sign in"
           onAction={() => {
@@ -217,16 +245,15 @@ export default function TitanComms() {
     );
   }
 
-  const speakingNow = sessionState.talking
-    ? "You"
-    : sessionState.floorName;
+  const speakingNow = sessionState.talking ? "You" : sessionState.floorName;
+  const persistOk = canPersistTitanComChannels(user);
 
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Connect · Preview"
-        title="TitanComms"
-        subtitle="Instant push-to-talk communication"
+        eyebrow="Connect"
+        title="TitanCom"
+        subtitle="Push-to-talk for coworkers and friends"
         actions={
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span
@@ -238,7 +265,10 @@ export default function TitanComms() {
               )}
             >
               <Circle
-                className={cn("w-2 h-2 fill-current", sessionState.connected ? "text-emerald-400" : "text-muted-foreground")}
+                className={cn(
+                  "w-2 h-2 fill-current",
+                  sessionState.connected ? "text-emerald-400" : "text-muted-foreground"
+                )}
               />
               {sessionState.connected ? "Live" : "Offline"}
             </span>
@@ -246,59 +276,113 @@ export default function TitanComms() {
         }
       />
 
-      <FeatureHonestyBanner tone="info">
-        Hold-to-talk over Supabase Realtime across many field channels (dispatch, rideshare, delivery,
-        yard, night shift, and more). Create private channels for your crew. Mesh audio works best on
-        the same Wi‑Fi; TURN and CarPlay come later.
-      </FeatureHonestyBanner>
+      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+        Create public channels your crew can find and join. You are the only admin — no transfers.{" "}
+        {freeChannelHint(user)}
+      </p>
 
-      <div className="grid lg:grid-cols-[240px_1fr] gap-4">
-        {/* Channel list */}
+      <div className="grid lg:grid-cols-[260px_1fr] gap-4">
         <aside className="titan-surface p-3 space-y-2 h-fit">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">
             Channels
           </p>
-          <div className="space-y-1 max-h-[40vh] overflow-y-auto">
+          <div className="space-y-1 max-h-[42vh] overflow-y-auto">
             {channels.map((c) => (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                onClick={() => setChannelId(c.id)}
                 className={cn(
-                  "w-full text-left rounded-xl px-3 py-2.5 transition-colors",
-                  c.id === channelId
-                    ? "bg-primary/15 text-foreground border border-primary/30"
-                    : "hover:bg-muted/60 text-foreground/85"
+                  "rounded-xl border transition-colors",
+                  c.id === channelId ? "border-primary/40 bg-primary/10" : "border-transparent"
                 )}
               >
-                <p className="text-sm font-medium flex items-center gap-2">
-                  {c.kind === "emergency" ? (
-                    <Siren className="w-3.5 h-3.5 text-red-400" />
-                  ) : (
-                    <Radio className="w-3.5 h-3.5 text-titan-cyan" />
-                  )}
-                  {c.name}
-                </p>
-                {c.description && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{c.description}</p>
-                )}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setChannelId(c.id)}
+                  className="w-full text-left rounded-xl px-3 py-3 min-h-[52px] hover:bg-muted/40"
+                >
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    {c.kind === "emergency" ? (
+                      <Siren className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    ) : (
+                      <Radio className="w-3.5 h-3.5 text-titan-cyan shrink-0" />
+                    )}
+                    <span className="truncate">{c.name}</span>
+                    {c.isAdmin ? <Crown className="w-3 h-3 text-titan-amber shrink-0" aria-label="Admin" /> : null}
+                  </p>
+                  {c.description ? (
+                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1 pl-5">{c.description}</p>
+                  ) : null}
+                  {c.custom && c.expires_at ? (
+                    <p className="text-[10px] text-titan-amber mt-1 pl-5">
+                      Expires {new Date(c.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  ) : null}
+                </button>
+                {c.custom && !c.joined ? (
+                  <div className="px-3 pb-2">
+                    <Button type="button" size="sm" variant="outline" className="w-full min-h-[40px] gap-1" onClick={() => onJoin(c.id)}>
+                      <UserPlus className="w-3.5 h-3.5" /> Join
+                    </Button>
+                  </div>
+                ) : null}
+                {c.isAdmin ? (
+                  <div className="px-3 pb-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="w-full min-h-[36px] text-red-400 hover:text-red-300 gap-1"
+                      onClick={() => onDelete(c.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             ))}
           </div>
+
           <form onSubmit={addChannel} className="pt-2 border-t border-border space-y-2">
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="New private channel"
-              className="bg-muted border-border h-9 text-sm"
+              placeholder="Channel name"
+              maxLength={48}
+              className="bg-muted border-border h-11 text-sm"
             />
-            <Button type="submit" size="sm" disabled={creating || !newName.trim()} className="w-full gap-1">
-              <Plus className="w-3.5 h-3.5" /> Create
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => setNewKind("public")}
+                className={cn(
+                  "rounded-lg border px-2 py-2 text-xs font-semibold min-h-[40px]",
+                  newKind === "public" ? "border-titan-cyan/50 bg-titan-cyan/10 text-titan-cyan" : "border-border text-muted-foreground"
+                )}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewKind("private")}
+                className={cn(
+                  "rounded-lg border px-2 py-2 text-xs font-semibold min-h-[40px]",
+                  newKind === "private" ? "border-titan-cyan/50 bg-titan-cyan/10 text-titan-cyan" : "border-border text-muted-foreground"
+                )}
+              >
+                Private
+              </button>
+            </div>
+            <Button type="submit" disabled={creating || !newName.trim()} className="w-full gap-1 min-h-[44px]">
+              <Plus className="w-4 h-4" /> Create channel
             </Button>
+            {!persistOk ? (
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Free: expires tonight. Upgrade to keep channels.
+              </p>
+            ) : null}
           </form>
         </aside>
 
-        {/* Main radio panel */}
         <section className="space-y-4">
           <div className="titan-surface p-5 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-cyan-500/5 pointer-events-none" />
@@ -308,21 +392,24 @@ export default function TitanComms() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Active channel</p>
                   <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                     {activeChannel?.name || "Channel"}
+                    {activeChannel?.isAdmin ? (
+                      <span className="text-[10px] font-bold uppercase text-titan-amber border border-titan-amber/40 px-1.5 py-0.5 rounded">
+                        Admin
+                      </span>
+                    ) : null}
                     {activeChannel?.kind === "emergency" && (
                       <span className="text-[10px] font-bold uppercase text-red-400 border border-red-500/40 px-1.5 py-0.5 rounded">
                         Urgent
                       </span>
                     )}
                   </h2>
-                  {sessionState.error && (
-                    <p className="text-xs text-titan-amber mt-1">{sessionState.error}</p>
-                  )}
+                  {sessionState.error && <p className="text-xs text-titan-amber mt-1">{sessionState.error}</p>}
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
                   <select
                     value={voiceStatus}
                     onChange={(e) => onStatusChange(e.target.value)}
-                    className="h-9 rounded-lg bg-muted border border-border text-sm px-2 text-foreground"
+                    className="h-11 rounded-lg bg-muted border border-border text-sm px-2 text-foreground min-w-[140px]"
                     aria-label="Voice status"
                   >
                     {VOICE_STATUSES.map((s) => (
@@ -333,18 +420,16 @@ export default function TitanComms() {
                   </select>
                   <Button
                     type="button"
-                    size="sm"
                     variant="outline"
                     onClick={onShareToggle}
-                    className={cn("gap-1", shareLoc && "border-sky-500/50 text-sky-300")}
+                    className={cn("gap-1 min-h-[44px]", shareLoc && "border-sky-500/50 text-sky-300")}
                   >
-                    <MapPin className="w-3.5 h-3.5" />
+                    <MapPin className="w-4 h-4" />
                     {shareLoc ? "GPS on" : "GPS off"}
                   </Button>
                 </div>
               </div>
 
-              {/* Live speaking indicator */}
               <div className="flex items-center justify-center gap-3 mb-4 min-h-[28px]">
                 {speakingNow ? (
                   <>
@@ -369,47 +454,49 @@ export default function TitanComms() {
                 )}
               </div>
 
-              {/* PTT button */}
-              <div className="flex flex-col items-center gap-4 py-4">
+              <div className="flex flex-col items-center gap-3 py-2">
                 <button
                   type="button"
-                  aria-label="Push to talk"
+                  aria-label="Push to talk — hold to speak"
                   onPointerDown={(e) => {
                     e.preventDefault();
+                    e.currentTarget.setPointerCapture?.(e.pointerId);
                     beginPtt();
                   }}
                   onPointerUp={endPtt}
                   onPointerLeave={endPtt}
                   onPointerCancel={endPtt}
+                  onLostPointerCapture={endPtt}
                   onContextMenu={(e) => e.preventDefault()}
                   className={cn(
-                    "relative w-36 h-36 rounded-full select-none touch-none",
-                    "flex flex-col items-center justify-center gap-1",
-                    "font-semibold text-sm transition-transform active:scale-95",
+                    "relative w-44 h-44 sm:w-52 sm:h-52 rounded-full select-none touch-manipulation",
+                    "flex flex-col items-center justify-center gap-2",
+                    "font-bold text-base tracking-wide transition-transform active:scale-[0.97]",
+                    "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-titan-cyan/40",
                     sessionState.talking
-                      ? "bg-titan-cyan text-black shadow-[0_0_40px_rgba(34,211,238,0.55)]"
-                      : "bg-gradient-to-b from-slate-700 to-slate-900 text-foreground border border-sky-500/30 shadow-[0_0_28px_rgba(14,165,233,0.25)]"
+                      ? "bg-titan-cyan text-black shadow-[0_0_48px_rgba(34,211,238,0.6)]"
+                      : "bg-gradient-to-b from-slate-600 to-slate-900 text-foreground border-2 border-sky-400/40 shadow-[0_0_36px_rgba(14,165,233,0.35)]"
                   )}
                 >
-                  <Mic className={cn("w-10 h-10", sessionState.talking && "animate-pulse")} />
+                  <Mic className={cn("w-14 h-14", sessionState.talking && "animate-pulse")} />
                   {sessionState.talking ? "RELEASE" : "HOLD TO TALK"}
                 </button>
+                <p className="text-xs text-muted-foreground text-center max-w-xs">
+                  Large hold target — press and hold anywhere on the circle. Release to stop.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Presence + chat */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="titan-surface p-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
                 <Users className="w-4 h-4 text-titan-cyan" /> On channel
-                <span className="text-xs text-muted-foreground font-normal">
-                  ({sessionState.members.length})
-                </span>
+                <span className="text-xs text-muted-foreground font-normal">({sessionState.members.length})</span>
               </h3>
               {sessionState.members.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No one else live yet. Open TitanComms on another signed-in device to test PTT.
+                  No one else live yet. Open TitanCom on another signed-in device to talk.
                 </p>
               ) : (
                 <ul className="space-y-2 max-h-48 overflow-y-auto">
@@ -451,14 +538,7 @@ export default function TitanComms() {
                         {m.sender_name || "User"} ·{" "}
                         {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
-                      <p
-                        className={cn(
-                          "text-foreground/90",
-                          m.message_type === "sos" && "text-red-300 font-medium"
-                        )}
-                      >
-                        {m.body}
-                      </p>
+                      <p className="text-foreground/90">{m.body}</p>
                     </div>
                   ))
                 )}
@@ -468,9 +548,9 @@ export default function TitanComms() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="Message this channel…"
-                  className="bg-muted border-border h-9"
+                  className="bg-muted border-border h-11"
                 />
-                <Button type="submit" size="sm" disabled={!draft.trim()}>
+                <Button type="submit" disabled={!draft.trim()} className="min-h-[44px] px-4">
                   Send
                 </Button>
               </form>

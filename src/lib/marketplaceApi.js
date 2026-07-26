@@ -120,10 +120,17 @@ export async function installModule(user, module) {
 }
 
 /**
- * Install a module. During beta (price $0) unlocks immediately with no checkout.
- * Paid modules prefer live PayPal NCP ($1.99), then Stripe payment link.
+ * Install a module. Requires Premium/Business membership (Marketplace Apps).
+ * Paid modules still use live PayPal NCP ($1.99) or Stripe after membership unlock.
  */
 export async function purchaseAndInstallModule(user, module) {
+  const { canUseMarketplaceApps } = await import("@/lib/plan");
+  if (!canUseMarketplaceApps(user)) {
+    const err = new Error("Marketplace Apps require Worker Premium or Business.");
+    err.code = "MARKETPLACE_APPS_LOCKED";
+    throw err;
+  }
+
   const existing = await fetchUserInstalls(user.id);
   if (existing.some((i) => i.module_slug === module.slug && i.status !== "uninstalled")) {
     return { payment: null, installed: existing.find((i) => i.module_slug === module.slug), alreadyOwned: true };
@@ -132,7 +139,6 @@ export async function purchaseAndInstallModule(user, module) {
   const amount = Number(module.price);
   const charge = Number.isFinite(amount) && amount > 0 ? amount : MODULE_PRICE;
 
-  // Free beta / $0 modules — install without checkout
   if (!(charge > 0)) {
     const installed = await installModule(user, module);
     return { payment: null, installed, alreadyOwned: false, free: true };

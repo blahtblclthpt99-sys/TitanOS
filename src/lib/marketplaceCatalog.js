@@ -36,7 +36,8 @@ function mod(partial) {
 }
 
 /**
- * Marketplace app catalog — every module is free during public beta.
+ * Marketplace app catalog — modules priced via PayPal NCP ($1.99).
+ * Membership (Premium/Business) required to access Apps tab.
  * Static catalog is the product source of truth (DB seed syncs from here).
  */
 export const MARKETPLACE_MODULES = [

@@ -3,8 +3,7 @@
  * Transaction fee *rates* are owned by the Fee Engine (`shared/feeEngine.js` + DB).
  * plan.feeRate values seed / display defaults and must stay aligned with fee seed rules.
  *
- * During FREE_DURING_BETA: memberships show $0 / "Free beta perk" (no PayPal checkout).
- * Post-beta launch prices stay in `launchPriceMonthly` for when we flip the flag.
+ * FREE_DURING_BETA must stay false for paid launch. PayPal NCP links remain the checkout path.
  */
 import { isOwnerAccount } from "@/lib/ownerAccount";
 
@@ -13,7 +12,7 @@ export const FREE_DURING_BETA = false;
 /** @deprecated Use FREE_DURING_BETA */
 export const FREE_LAUNCH = FREE_DURING_BETA;
 
-export const BETA_PERK_LABEL = "Free beta perk";
+export const BETA_PERK_LABEL = "Launch perk";
 
 /** Live PayPal No-Code Payment links (memberships + marketplace modules). */
 export const PAYPAL_CHECKOUT = Object.freeze({
@@ -25,7 +24,7 @@ export const PAYPAL_CHECKOUT = Object.freeze({
   module: "https://www.paypal.com/ncp/payment/76HUUNKTX9RSW",
 });
 
-/** Post-beta module sticker price (matches PayPal NCP). */
+/** Post-launch module sticker price (matches PayPal NCP). */
 export const PAYPAL_MODULE_PRICE = 1.99;
 export const PLANS = Object.freeze({
   customer: Object.freeze({
@@ -62,8 +61,8 @@ export const PLANS = Object.freeze({
     searchPriority: false,
     storageLabel: "Standard photo & document storage",
     blurb: FREE_DURING_BETA
-      ? "Free beta perk — full worker tools while we launch."
-      : "Try TitanOS with no monthly fee — 8% on payments you collect.",
+      ? "Full worker tools while we launch."
+      : "Try TitanOS with no monthly fee — 8% on payments you collect. Shift tracking included; premium Driver Hub add-ons require Premium.",
     checkoutUrl: null,
   }),
   worker_premium: Object.freeze({
@@ -82,8 +81,8 @@ export const PLANS = Object.freeze({
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
     blurb: FREE_DURING_BETA
-      ? "Free beta perk — Premium unlocked for early users."
-      : "$29.99/mo with a lower 2.5% fee as you book more work.",
+      ? "Premium unlocked for early users."
+      : "$29.99/mo — lower 2.5% fee, Driver Hub add-ons, Marketplace Apps, lasting TitanCom channels.",
     checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.worker_premium,
   }),
   business: Object.freeze({
@@ -102,8 +101,8 @@ export const PLANS = Object.freeze({
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
     blurb: FREE_DURING_BETA
-      ? "Free beta perk — Business tools unlocked for early teams."
-      : "$49.99/mo for teams — lowest 1.5% transaction fee.",
+      ? "Business tools unlocked for early teams."
+      : "$49.99/mo for teams — lowest 1.5% fee plus every Premium unlock.",
     checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.business,
   }),
 });
@@ -125,6 +124,7 @@ export const PRO_FEATURES = Object.freeze({
   aiAssistant: "ai_assistant",
   fleet: "fleet",
   marketplace: "marketplace",
+  marketplaceApps: "marketplace_apps",
   marketplacePremium: "marketplace_premium",
   routeOptimization: "route_optimization",
   gpsCheckIn: "gps_check_in",
@@ -136,11 +136,14 @@ export const PRO_FEATURES = Object.freeze({
   featuredProfile: "featured_profile",
   unlimitedEstimates: "unlimited_estimates",
   unlimitedInvoices: "unlimited_invoices",
+  driverAddons: "driver_addons",
+  titanComPersist: "titancom_persist",
 });
 
 const PAID_WORKER_FEATURES = new Set([
   PRO_FEATURES.reports,
   PRO_FEATURES.aiAssistant,
+  PRO_FEATURES.marketplaceApps,
   PRO_FEATURES.marketplacePremium,
   PRO_FEATURES.bookingPages,
   PRO_FEATURES.advancedAnalytics,
@@ -152,6 +155,8 @@ const PAID_WORKER_FEATURES = new Set([
   PRO_FEATURES.digitalContracts,
   PRO_FEATURES.multiCompany,
   PRO_FEATURES.fleet,
+  PRO_FEATURES.driverAddons,
+  PRO_FEATURES.titanComPersist,
 ]);
 
 const PLAN_ALIASES = Object.freeze({
@@ -218,21 +223,37 @@ export function canAccessFeature(user, featureKey) {
 
   const plan = resolvePlan(user);
   if (plan === "customer") {
-    // Customers hire / browse — not the full pro CRM suite
-    return featureKey === PRO_FEATURES.marketplace || !PAID_WORKER_FEATURES.has(featureKey);
+    // Customers hire / browse listings — not Marketplace Apps or Driver Hub add-ons
+    if (featureKey === PRO_FEATURES.marketplace) return true;
+    return !PAID_WORKER_FEATURES.has(featureKey);
   }
   if (plan === "worker_premium" || plan === "business") return true;
   if (!PAID_WORKER_FEATURES.has(featureKey)) return true;
-  if (featureKey === PRO_FEATURES.marketplace) return true;
   return false;
 }
 
+/** Driver Hub add-ons (DoorDash, coach, logbook, autopilot, voice, etc.). Shift start/stop stays free. */
+export function canUseDriverAddons(user) {
+  return canAccessFeature(user, PRO_FEATURES.driverAddons);
+}
+
+/** Marketplace Apps / modules catalog. Service listings stay available on free. */
+export function canUseMarketplaceApps(user) {
+  return canAccessFeature(user, PRO_FEATURES.marketplaceApps);
+}
+
+/** Persistent TitanCom channels (free users must remake daily). */
+export function canPersistTitanComChannels(user) {
+  return canAccessFeature(user, PRO_FEATURES.titanComPersist);
+}
+
 export function isMarketplaceFree(_user) {
+  // Service listings remain free to browse/post within plan limits.
   return true;
 }
 
 export function betaBadgeLabel() {
-  return FREE_DURING_BETA ? "Public Beta" : null;
+  return null;
 }
 
 export function assertWithinFreeLimit(user, kind, currentCount) {

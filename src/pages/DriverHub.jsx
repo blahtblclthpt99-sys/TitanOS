@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { BookOpen, Brain, Car, Package, Plus, Users, Radio } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
+import PremiumGate from "@/components/shared/PremiumGate";
 import { Button } from "@/components/ui/button";
 import DriverDirectory from "@/components/driver/DriverDirectory";
 import DriverShiftPanel from "@/components/driver/DriverShiftPanel";
@@ -11,6 +12,7 @@ import DriverIntelligencePanel from "@/components/driver/activity/DriverIntellig
 import VehicleLogbookPanel from "@/components/driver/activity/VehicleLogbookPanel";
 import DoorDashWorkflowPanel from "@/components/driver/activity/DoorDashWorkflowPanel";
 import { useAuth } from "@/lib/AuthContext";
+import { canUseDriverAddons } from "@/lib/plan";
 import {
   readShiftHistory,
   readSession,
@@ -20,11 +22,11 @@ import {
 } from "@/lib/driverHubApi";
 
 const TABS = [
-  { id: "shift", label: "My shift", icon: Car, short: "Shift" },
-  { id: "doordash", label: "DoorDash", icon: Package, short: "Dash" },
-  { id: "intel", label: "Coach", icon: Brain, short: "Coach" },
-  { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log" },
-  { id: "directory", label: "Find", icon: Users, short: "Find" },
+  { id: "shift", label: "My shift", icon: Car, short: "Shift", premium: false },
+  { id: "doordash", label: "DoorDash", icon: Package, short: "Dash", premium: true },
+  { id: "intel", label: "Coach", icon: Brain, short: "Coach", premium: true },
+  { id: "logbook", label: "Logbook", icon: BookOpen, short: "Log", premium: true },
+  { id: "directory", label: "Find", icon: Users, short: "Find", premium: false },
 ];
 
 export default function DriverHub() {
@@ -32,6 +34,7 @@ export default function DriverHub() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const qParam = params.get("q") || "";
+  const addonsOk = canUseDriverAddons(user);
   const allowed = new Set(TABS.map((t) => t.id));
   const initialTab = allowed.has(tabParam) ? tabParam : "shift";
   const [tab, setTab] = useState(initialTab);
@@ -63,7 +66,7 @@ export default function DriverHub() {
     if (tab === "doordash") return "Guided delivery stages · GPS · auto timers.";
     if (tab === "intel") return "All-in $/mi floor · money coach · rush windows.";
     if (tab === "logbook") return "Miles, fuel, expenses, Excel trip reports.";
-    return "Miles · money autopilot · voice · Tax Center sync.";
+    return "Start and stop shifts free — Premium unlocks money autopilot, voice, and more.";
   }, [tab]);
 
   const prefs = user?.id ? readPrefs(user.id) : {};
@@ -71,6 +74,8 @@ export default function DriverHub() {
   const session = user?.id ? readSession(user.id) : null;
   const stops = user?.id ? readStops(user.id) : [];
   const gasUsd = estimateGasPriceUsd(prefs.zip || "");
+  const activeTabMeta = TABS.find((t) => t.id === tab);
+  const tabLocked = Boolean(activeTabMeta?.premium && !addonsOk);
 
   return (
     <PageShell maxWidth="xl" className="space-y-4">
@@ -83,7 +88,7 @@ export default function DriverHub() {
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline" className="gap-1.5 min-h-[44px]">
               <Link to="/comms?channel=tc-dispatch">
-                <Radio className="w-3.5 h-3.5" aria-hidden="true" /> Comms
+                <Radio className="w-3.5 h-3.5" aria-hidden="true" /> TitanCom
               </Link>
             </Button>
             {tab === "directory" ? (
@@ -108,7 +113,7 @@ export default function DriverHub() {
         role="tablist"
         aria-label="Driver Hub sections"
       >
-        {TABS.map(({ id, label, icon: Icon, short }) => {
+        {TABS.map(({ id, label, icon: Icon, short, premium }) => {
           const active = tab === id;
           return (
             <button
@@ -129,13 +134,21 @@ export default function DriverHub() {
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="hidden lg:inline">{label}</span>
               <span className="lg:hidden text-[10px] sm:text-xs">{short}</span>
+              {premium && !addonsOk ? (
+                <span className="hidden sm:inline text-[9px] uppercase text-titan-amber">Pro</span>
+              ) : null}
             </button>
           );
         })}
       </div>
 
       <div role="tabpanel" id={`driver-hub-panel-${tab}`} aria-labelledby={`driver-hub-tab-${tab}`}>
-        {tab === "directory" ? (
+        {tabLocked ? (
+          <PremiumGate
+            title={`${activeTabMeta?.label || "This add-on"} is Premium`}
+            description="Start and stop shifts stay free. DoorDash workflow, Coach, Logbook, money autopilot, and voice are Premium add-ons."
+          />
+        ) : tab === "directory" ? (
           <DriverDirectory initialQuery={qParam} />
         ) : tab === "doordash" ? (
           <DoorDashWorkflowPanel />

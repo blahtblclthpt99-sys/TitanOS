@@ -114,7 +114,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
       <DialogContent className="sm:max-w-md rounded-lg">
         <DialogHeader>
           <DialogTitle>Send feedback</DialogTitle>
-          <DialogDescription>Help us improve TitanOS during public beta.</DialogDescription>
+          <DialogDescription>Help us improve TitanOS.</DialogDescription>
         </DialogHeader>
 
         {submitted ? (

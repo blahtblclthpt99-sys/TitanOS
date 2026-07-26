@@ -1,5 +1,5 @@
 /**
- * TitanComms PTT session — Supabase Realtime presence/signaling + WebRTC audio.
+ * TitanCom PTT session — Supabase Realtime presence/signaling + WebRTC audio.
  * Mesh topology (good for small crews). Uses public STUN; TURN is a later add-on.
  */
 import { supabase, isSupabaseConfigured } from "@/api/supabaseClient";
@@ -79,7 +79,7 @@ export class TitanCommsSession {
 
     this.rt.on("broadcast", { event: "signal" }, ({ payload }) => {
       this._onSignal(payload).catch((err) => {
-        console.warn("[TitanComms] signal error", err);
+        console.warn("[TitanCom] signal error", err);
       });
     });
 

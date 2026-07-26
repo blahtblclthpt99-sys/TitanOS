@@ -18,13 +18,14 @@ North star: [`FINAL_OBJECTIVE.md`](./FINAL_OBJECTIVE.md) — OS feel + ship gate
 
 - [x] Nav paths ↔ `TabStack` route map
 - [x] ExportMenu on Estimates, Leads, Payments, Tax Center, Contracts (+ existing Jobs/Invoices/Customers/Finances/Reports/Analytics)
-- [x] Migrations 031–034 on disk; hardening requires 031+032
+- [x] Migrations 031–036 on disk; hardening requires 031+032
 - [x] `autoTripStart` stops watch when DoorDash owns GPS
 - [x] Escrow honesty banner + 032 escrow protect present
+- [x] Referrals paused (off nav; `referrals: false`); modules subscription-only
 
 ### Manual / ops (owner)
 
-- [ ] Apply migrations **031–034** on production Supabase (esp. **032**)
+- [ ] Apply migrations **031–036** on production Supabase (esp. **032**, **035**, **036**)
 - [ ] `npm run test:db-security` against that project
 - [ ] One real Stripe Checkout → webhook marks payment succeeded
 - [ ] Signed-in pass: every nav screen, primary buttons, menus, permission gates
@@ -44,13 +45,15 @@ North star: [`FINAL_OBJECTIVE.md`](./FINAL_OBJECTIVE.md) — OS feel + ship gate
 | Export / search / AI / offline | Node packs | Spot-check UI |
 | Notifications / uploads / animations | Partial structural | Device QA |
 | Background / interrupted sessions | Session persist tests | Capacitor device |
+| Founding 100 / marketplace / referrals | Structural gates | Apply 035–036 + live flag check |
 
 ## Residual risk (do not erase)
 
-1. Migrations **031–034** may not be applied on the live Supabase project yet.
+1. Migrations **031–036** may not be applied on the live Supabase project yet (Founding 100 needs **035**; subscription-only modules need **036**).
 2. No authenticated Playwright suite for Checkout → settle.
 3. Windows local Playwright can hang; prefer CI Chromium.
 4. Labs items (Job Holds, Local Deals) are intentionally incomplete — labeled Soon.
+5. Referral program is paused by design — do not market referral rewards until `referrals` is re-enabled.
 
 ## Commands
 

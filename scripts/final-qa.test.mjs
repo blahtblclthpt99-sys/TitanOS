@@ -76,11 +76,11 @@ describe("final-qa: export coverage on history/reports money lists", () => {
   }
 });
 
-describe("final-qa: critical migrations 031–034", () => {
-  it("migrations 031–034 exist on disk", () => {
+describe("final-qa: critical migrations 031–036", () => {
+  it("migrations 031–036 exist on disk", () => {
     const dir = join(root, "supabase/migrations");
     const files = readdirSync(dir);
-    for (const prefix of ["031_", "032_", "033_", "034_"]) {
+    for (const prefix of ["031_", "032_", "033_", "034_", "035_", "036_"]) {
       assert.ok(
         files.some((f) => f.startsWith(prefix)),
         `missing migration starting with ${prefix}`
@@ -92,6 +92,21 @@ describe("final-qa: critical migrations 031–034", () => {
     const src = read("scripts/production-hardening.test.mjs");
     assert.match(src, /031_/);
     assert.match(src, /032_/);
+  });
+});
+
+describe("final-qa: launch stack honesty", () => {
+  it("referrals stay off nav and behind feature flag", () => {
+    assert.doesNotMatch(read("src/lib/nav-items.js"), /path:\s*["']\/referral["']/);
+    assert.match(read("src/lib/featureFlags.js"), /referrals:\s*false/);
+    assert.match(read("api/functions/featureFlags.js"), /referrals:\s*false/);
+    assert.match(read("src/pages/Referral.jsx"), /Referral program is paused|isFeatureEnabled\(["']referrals["']\)/);
+    assert.doesNotMatch(read("src/pages/Settings.jsx"), /to=["']\/referral["']/);
+  });
+
+  it("marketplace modules are subscription-only (no per-module price)", () => {
+    assert.match(read("src/lib/marketplaceCatalog.js"), /MODULE_PRICE\s*=\s*0/);
+    assert.match(read("src/lib/marketplaceCatalog.js"), /Included with Premium/);
   });
 });
 

@@ -316,25 +316,33 @@ export default function Settings() {
               <Sparkles className="w-5 h-5 text-titan-cyan" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Upgrade your plan</p>
+              <p className="text-sm font-semibold text-foreground">
+                {FREE_DURING_BETA ? "Plan perks during beta" : "Upgrade your plan"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Current: {getPlanConfig(user).name}. Pay securely with PayPal — Premium ${PLANS.worker_premium.priceMonthly}/mo or Business ${PLANS.business.priceMonthly}/mo.
+                {FREE_DURING_BETA
+                  ? `Current: ${getPlanConfig(user).name}. Premium and Business tools are a ${BETA_PERK_LABEL} at $0 while we launch.`
+                  : `Current: ${getPlanConfig(user).name}. Pay securely with PayPal — Premium $${PLANS.worker_premium.priceMonthly}/mo or Business $${PLANS.business.priceMonthly}/mo.`}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold">
-              <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
-                Premium ${PLANS.worker_premium.priceMonthly}
-              </a>
-            </Button>
-            <Button asChild size="sm" variant="outline" className="border-border">
-              <a href={getPlanCheckoutUrl("business")} target="_blank" rel="noopener noreferrer">
-                Business ${PLANS.business.priceMonthly}
-              </a>
-            </Button>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/pricing">Compare plans</Link>
+            {!FREE_DURING_BETA && (
+              <>
+                <Button asChild size="sm" className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold">
+                  <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
+                    Premium ${PLANS.worker_premium.priceMonthly}
+                  </a>
+                </Button>
+                <Button asChild size="sm" variant="outline" className="border-border">
+                  <a href={getPlanCheckoutUrl("business")} target="_blank" rel="noopener noreferrer">
+                    Business ${PLANS.business.priceMonthly}
+                  </a>
+                </Button>
+              </>
+            )}
+            <Button asChild size="sm" variant={FREE_DURING_BETA ? "default" : "ghost"} className={FREE_DURING_BETA ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold" : ""}>
+              <Link to="/pricing">{FREE_DURING_BETA ? "See free beta plans" : "Compare plans"}</Link>
             </Button>
           </div>
         </motion.div>

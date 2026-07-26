@@ -11,12 +11,13 @@ The block you pasted is PayPal’s **public** `live_api` certificate (CN=`live_a
 
 ## Live checkout links (already in app)
 
-| Plan | Amount | Link |
-|------|--------|------|
+| Product | Amount | Link |
+|---------|--------|------|
 | Worker Premium | $29.99 | `https://www.paypal.com/ncp/payment/Q63SUKNY5AK58` |
 | Business | $49.99 | `https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4` |
+| Marketplace module | $1.99 | `https://www.paypal.com/ncp/payment/76HUUNKTX9RSW` |
 
-Shown on `/pricing` and Settings → Upgrade.
+Shown on `/pricing`, Settings → Upgrade, and Marketplace module install (post-beta / paid modules).
 
 ## Auto-upgrade after payment (webhook)
 
@@ -44,6 +45,7 @@ PAYPAL_MODE=live
 ### How we match the buyer to a TitanOS account
 
 Payer **email** on the PayPal payment must match `profiles.email` (case-insensitive).  
-Amount maps: **$29.99 → worker_premium**, **$49.99 → business**.
+Amount maps: **$29.99 → worker_premium**, **$49.99 → business**.  
+**$1.99** is a marketplace module purchase (does not change plan tier).
 
 If emails don’t match, payment succeeds but the account won’t auto-upgrade — an admin can set `plan_tier` / `paying_subscriber` manually.

@@ -15,12 +15,18 @@ export const FREE_LAUNCH = FREE_DURING_BETA;
 
 export const BETA_PERK_LABEL = "Free beta perk";
 
-/** Live PayPal No-Code Payment links for paid memberships (post-beta). */
+/** Live PayPal No-Code Payment links (memberships + marketplace modules). */
 export const PAYPAL_CHECKOUT = Object.freeze({
+  /** Worker Premium — $29.99 */
   worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
+  /** Business — $49.99 */
   business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
+  /** Marketplace module — $1.99 */
+  module: "https://www.paypal.com/ncp/payment/76HUUNKTX9RSW",
 });
 
+/** Post-beta module sticker price (matches PayPal NCP). */
+export const PAYPAL_MODULE_PRICE = 1.99;
 export const PLANS = Object.freeze({
   customer: Object.freeze({
     id: "customer",

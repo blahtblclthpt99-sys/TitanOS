@@ -7,6 +7,7 @@ import {
 } from "@/lib/marketplaceCatalog";
 import { createPaymentLink } from "@/lib/paymentsApi";
 import { isLocalOrStub } from "@/lib/dataSource";
+import { PAYPAL_CHECKOUT, PAYPAL_MODULE_PRICE } from "@/lib/plan";
 
 const STORAGE_PREFIX = "titanos_marketplace";
 
@@ -119,8 +120,8 @@ export async function installModule(user, module) {
 }
 
 /**
- * Install a module. During beta (price $0) unlocks immediately with no Stripe.
- * Paid modules charge via Stripe, then unlock.
+ * Install a module. During beta (price $0) unlocks immediately with no checkout.
+ * Paid modules prefer live PayPal NCP ($1.99), then Stripe payment link.
  */
 export async function purchaseAndInstallModule(user, module) {
   const existing = await fetchUserInstalls(user.id);
@@ -137,6 +138,20 @@ export async function purchaseAndInstallModule(user, module) {
     return { payment: null, installed, alreadyOwned: false, free: true };
   }
 
+  // Prefer PayPal No-Code Payment link (live $1.99 module button)
+  if (PAYPAL_CHECKOUT.module) {
+    const installed = await installModule(user, module);
+    return {
+      payment: {
+        checkout_url: PAYPAL_CHECKOUT.module,
+        provider: "paypal_ncp",
+        amount: Number(charge) || PAYPAL_MODULE_PRICE,
+      },
+      installed,
+      alreadyOwned: false,
+    };
+  }
+
   const payment = await createPaymentLink(user, {
     amount: charge,
     customer_name: `Module: ${module.name}`,
@@ -146,7 +161,7 @@ export async function purchaseAndInstallModule(user, module) {
 
   if (isLocalOrStub(payment) || !payment.checkout_url) {
     const err = new Error(
-      payment?.message || "Checkout isn't available. Configure Stripe to purchase modules."
+      payment?.message || "Checkout isn't available. Configure PayPal or Stripe to purchase modules."
     );
     err.code = "MODULE_CHECKOUT_UNAVAILABLE";
     throw err;

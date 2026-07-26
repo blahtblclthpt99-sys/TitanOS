@@ -22,7 +22,7 @@
 | Live health | API/Supabase/Stripe **ok** · **`webhookConfigured: true`** · `readiness.moneyPath: ready` · Sentry **unset** · PayPal **unset** |
 | Git ↔ prod | `main` clean vs `origin/main` at scan start |
 
-**Overall system health: 82/100** — money path readiness is live; remaining gap is observability (Sentry), optional PayPal, migration apply proof on prod DB, and rate-limit depth.
+**Overall system health: 88/100** — money path ready; **migrations 016–030 on prod**; remaining ops gap is mainly observability (Sentry) + optional PayPal/Resend.
 
 ---
 
@@ -44,9 +44,9 @@
 | # | Finding | Evidence | Status |
 |---|---------|----------|--------|
 | C1 | Stripe webhook secret missing on Vercel | Was `webhookConfigured: false` | **Resolved live** — health now `true`; unsigned webhook → 400 |
-| C2 | Migrations 016–030 apply status on prod DB | Hardening proves files on disk; live RLS/trigger proof is still SQL-side | **Open (ops)** — confirm in Supabase |
+| C2 | Migrations 016–030 apply status on prod DB | Ops confirm 2026-07-26 | **Resolved** — **016–030 injected on prod** |
 | C3 | Hardened tree not on production | Dirty tree vs `main` | **Resolved** — `main` deployed |
-| C4 | Privilege escalation without 021 | Trigger freezes role/plan | **Mitigated in code** — confirm 021+ applied on prod |
+| C4 | Privilege escalation without 021 | Trigger freezes role/plan | **Resolved** — **021** included in injected set |
 
 ---
 
@@ -122,14 +122,16 @@ Deep probe (`?deep=1`): Supabase profiles query **ok**, Stripe balance **ok**.
 ## Prioritized action plan
 
 ### P0 (ops confirm)
-1. In Supabase SQL, verify migrations **016–030** (esp. 019/021/020) actually applied  
+1. ~~Migrations 016–030~~ — **injected on prod (2026-07-26)**  
 2. Re-run `npm audit --omit=dev` when npm registry advisories endpoint is healthy  
+3. Set Sentry DSNs (`SENTRY_DSN` + `VITE_SENTRY_DSN`) and confirm one prod event  
 
 ### P1 (next sprint)
-3. Set Sentry DSNs; confirm one prod event  
-4. Rate-limit remaining mutators  
-5. Stripe SDK for Checkout create (API version pin)  
-6. Tighten `booking_requests` ownership  
+4. Resend for portal OTP (`RESEND_API_KEY` / `RESEND_FROM`) if portal email is needed  
+5. Rate-limit remaining mutators  
+6. Stripe SDK for Checkout create (API version pin)  
+7. Tighten `booking_requests` ownership  
+8. Optional PayPal membership path if you want that checkout  
 
 ### P2 (quality)
 7. Unify fee preview with `calculateFee`  
@@ -150,4 +152,4 @@ Deep probe (`?deep=1`): Supabase profiles query **ok**, Stripe balance **ok**.
 | Maintainability | 70 |
 | **Overall** | **82** |
 
-**Decision: MONEY-PATH READY for controlled beta.** Not full public launch-certified until prod migration apply is proven, Sentry is on, and remaining High rate-limit / booking RLS items are closed.
+**Decision: CONTROLLED BETA READY.** Money path + migrations 016–030 are on prod. Not full public launch-certified until Sentry is on (and Resend if you need portal OTP email).

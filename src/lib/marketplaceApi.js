@@ -119,8 +119,8 @@ export async function installModule(user, module) {
 }
 
 /**
- * Charge MODULE_PRICE via Stripe, then unlock install.
- * Skips checkout if already installed. Returns { payment, installed, alreadyOwned }.
+ * Install a module. During beta (price $0) unlocks immediately with no Stripe.
+ * Paid modules charge via Stripe, then unlock.
  */
 export async function purchaseAndInstallModule(user, module) {
   const existing = await fetchUserInstalls(user.id);
@@ -128,9 +128,17 @@ export async function purchaseAndInstallModule(user, module) {
     return { payment: null, installed: existing.find((i) => i.module_slug === module.slug), alreadyOwned: true };
   }
 
-  const amount = Number(module.price) > 0 ? Number(module.price) : MODULE_PRICE;
+  const amount = Number(module.price);
+  const charge = Number.isFinite(amount) && amount > 0 ? amount : MODULE_PRICE;
+
+  // Free beta / $0 modules — install without checkout
+  if (!(charge > 0)) {
+    const installed = await installModule(user, module);
+    return { payment: null, installed, alreadyOwned: false, free: true };
+  }
+
   const payment = await createPaymentLink(user, {
-    amount,
+    amount: charge,
     customer_name: `Module: ${module.name}`,
     note: `module:${module.slug}`,
     purpose: "module",

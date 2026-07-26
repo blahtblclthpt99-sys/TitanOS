@@ -1,6 +1,6 @@
 /** Default one-time install price for every marketplace module. */
-export const MODULE_PRICE = 1.99;
-export const MODULE_PRICE_LABEL = "";
+export const MODULE_PRICE = 0;
+export const MODULE_PRICE_LABEL = "Free beta perk";
 
 export const MARKETPLACE_CATEGORIES = [
   "All",
@@ -36,7 +36,7 @@ function mod(partial) {
 }
 
 /**
- * Marketplace app catalog — every module is $1.99 to install.
+ * Marketplace app catalog — every module is free during public beta.
  * Static catalog is the product source of truth (DB seed syncs from here).
  */
 export const MARKETPLACE_MODULES = [
@@ -477,7 +477,9 @@ export function formatInstallCount(count) {
 
 export function formatModulePrice(module) {
   const price = Number(module?.price);
-  if (!Number.isFinite(price) || price <= 0) return "Free";
+  if (!Number.isFinite(price) || price <= 0) {
+    return module?.price_label || MODULE_PRICE_LABEL || "Free";
+  }
   const cents = Math.round(price * 100) / 100;
   const label = module?.price_label || "";
   return `$${cents.toFixed(2)}${label}`;

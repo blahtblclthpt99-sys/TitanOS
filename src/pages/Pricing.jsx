@@ -15,7 +15,7 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
-import { PLANS, betaBadgeLabel, getPlanCheckoutUrl } from "@/lib/plan";
+import { PLANS, betaBadgeLabel, getPlanCheckoutUrl, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
@@ -58,7 +58,8 @@ const CARDS = [
     ],
     cta: {
       href: getPlanCheckoutUrl("worker_premium"),
-      label: "Go Premium — $29.99",
+      to: "/register",
+      label: FREE_DURING_BETA ? `Unlock Premium — ${BETA_PERK_LABEL}` : "Go Premium — $29.99",
     },
     highlighted: true,
   },
@@ -74,7 +75,8 @@ const CARDS = [
     ],
     cta: {
       href: getPlanCheckoutUrl("business"),
-      label: "Get Business — $49.99",
+      to: "/register",
+      label: FREE_DURING_BETA ? `Unlock Business — ${BETA_PERK_LABEL}` : "Get Business — $49.99",
     },
     highlighted: false,
   },
@@ -104,7 +106,13 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
           <span className="text-2xl font-bold text-titan-cyan">
             {plan.priceMonthly === 0 ? "$0" : formatMoney(plan.priceMonthly)}
           </span>
-          <p className="text-xs text-muted-foreground mt-0.5">{plan.priceMonthly === 0 ? "to start" : "/ month"}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {plan.priceMonthly === 0
+              ? FREE_DURING_BETA
+                ? BETA_PERK_LABEL
+                : "to start"
+              : "/ month"}
+          </p>
           <p className="text-[11px] text-muted-foreground mt-1">{plan.feeLabel} fee</p>
         </div>
       </div>
@@ -157,11 +165,22 @@ export default function Pricing() {
           </div>
         )}
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
-          Launch pricing that<br />
-          <span className="gradient-text">grows with you</span>
+          {FREE_DURING_BETA ? (
+            <>
+              Public beta — everything is<br />
+              <span className="gradient-text">a free perk</span>
+            </>
+          ) : (
+            <>
+              Launch pricing that<br />
+              <span className="gradient-text">grows with you</span>
+            </>
+          )}
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-          Customers hire free. Workers start at $0 with an {PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.
+          {FREE_DURING_BETA
+            ? "Customers hire free. Workers and businesses unlock Premium tools at $0 while we launch — Free beta perks."
+            : `Customers hire free. Workers start at $0 with an ${PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.`}
         </p>
       </motion.div>
 
@@ -183,7 +202,9 @@ export default function Pricing() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground mb-0.5">TitanOS for Android</p>
-            <p className="text-xs text-muted-foreground">Same launch pricing on mobile via Google Play</p>
+            <p className="text-xs text-muted-foreground">
+              {FREE_DURING_BETA ? "Same free beta access on mobile via Google Play" : "Same launch pricing on mobile via Google Play"}
+            </p>
           </div>
           <Button
             onClick={openPlayStore}

@@ -3,19 +3,17 @@
  * Transaction fee *rates* are owned by the Fee Engine (`shared/feeEngine.js` + DB).
  * plan.feeRate values seed / display defaults and must stay aligned with fee seed rules.
  *
- * Customers — Free to join and hire (no platform fee)
- * Workers (Free) — 8% transaction fee
- * Workers (Premium) — $29.99/mo + 2.5% fee
- * Businesses — $49.99/mo + 1.5% fee
- *
- * FREE_DURING_BETA: premium features stay unlocked; fees & free-worker limits still apply.
+ * During FREE_DURING_BETA: memberships show $0 / "Free beta perk" (no PayPal checkout).
+ * Post-beta launch prices stay in `launchPriceMonthly` for when we flip the flag.
  */
 export const FREE_DURING_BETA = true;
 
 /** @deprecated Use FREE_DURING_BETA */
 export const FREE_LAUNCH = FREE_DURING_BETA;
 
-/** Live PayPal No-Code Payment links for paid memberships. */
+export const BETA_PERK_LABEL = "Free beta perk";
+
+/** Live PayPal No-Code Payment links for paid memberships (post-beta). */
 export const PAYPAL_CHECKOUT = Object.freeze({
   worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
   business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
@@ -26,6 +24,7 @@ export const PLANS = Object.freeze({
     id: "customer",
     name: "Customer",
     audience: "Customers",
+    launchPriceMonthly: 0,
     priceMonthly: 0,
     feeRate: 0,
     feeLabel: "0%",
@@ -43,6 +42,7 @@ export const PLANS = Object.freeze({
     id: "worker_free",
     name: "Worker Free",
     audience: "Workers",
+    launchPriceMonthly: 0,
     priceMonthly: 0,
     feeRate: 0.08,
     feeLabel: "8%",
@@ -53,14 +53,17 @@ export const PLANS = Object.freeze({
     featuredProfile: false,
     searchPriority: false,
     storageLabel: "Standard photo & document storage",
-    blurb: "Try TitanOS with no monthly fee — 8% on payments you collect.",
+    blurb: FREE_DURING_BETA
+      ? "Free beta perk — full worker tools while we launch."
+      : "Try TitanOS with no monthly fee — 8% on payments you collect.",
     checkoutUrl: null,
   }),
   worker_premium: Object.freeze({
     id: "worker_premium",
     name: "Worker Premium",
     audience: "Workers",
-    priceMonthly: 29.99,
+    launchPriceMonthly: 29.99,
+    priceMonthly: FREE_DURING_BETA ? 0 : 29.99,
     feeRate: 0.025,
     feeLabel: "2.5%",
     maxActiveListings: Infinity,
@@ -70,14 +73,17 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
-    blurb: "$29.99/mo with a lower 2.5% fee as you book more work.",
-    checkoutUrl: PAYPAL_CHECKOUT.worker_premium,
+    blurb: FREE_DURING_BETA
+      ? "Free beta perk — Premium unlocked for early users."
+      : "$29.99/mo with a lower 2.5% fee as you book more work.",
+    checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.worker_premium,
   }),
   business: Object.freeze({
     id: "business",
     name: "Business",
     audience: "Businesses",
-    priceMonthly: 49.99,
+    launchPriceMonthly: 49.99,
+    priceMonthly: FREE_DURING_BETA ? 0 : 49.99,
     feeRate: 0.015,
     feeLabel: "1.5%",
     maxActiveListings: Infinity,
@@ -87,8 +93,10 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
-    blurb: "$49.99/mo for teams — lowest 1.5% transaction fee.",
-    checkoutUrl: PAYPAL_CHECKOUT.business,
+    blurb: FREE_DURING_BETA
+      ? "Free beta perk — Business tools unlocked for early teams."
+      : "$49.99/mo for teams — lowest 1.5% transaction fee.",
+    checkoutUrl: FREE_DURING_BETA ? null : PAYPAL_CHECKOUT.business,
   }),
 });
 
@@ -241,13 +249,16 @@ export function assertWithinFreeLimit(user, kind, currentCount) {
           ? "hire job posts"
           : kind;
     throw new Error(
-      `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($29.99/mo) for unlimited.`
+      FREE_DURING_BETA
+        ? `You've hit the ${label} limit on Worker Free. Premium is a free beta perk — contact support or switch plan in Settings.`
+        : `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($29.99/mo) for unlimited.`
     );
   }
 }
 
-/** PayPal / external checkout URL for a plan id, or null for free tiers. */
+/** PayPal / external checkout URL for a plan id, or null for free tiers / beta. */
 export function getPlanCheckoutUrl(planId) {
+  if (FREE_DURING_BETA) return null;
   const id = PLAN_ALIASES[planId] || planId;
   return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

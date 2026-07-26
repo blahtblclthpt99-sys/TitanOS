@@ -118,16 +118,36 @@ export default async function handler(req, res) {
     const profileId = await resolveStripeProfileId();
 
     const request = toWebRequest(req);
-    const recipientAddress = await createPayToAddress(request, { amountUsd: amounts.tempoUsd });
 
-    const methods = [
-      tempo.charge({
-        currency: pathUsd,
-        recipient: recipientAddress,
-        testnet,
-      }),
-    ];
+    /** @type {`0x${string}` | null} */
+    let recipientAddress = null;
+    /** @type {string | null} */
+    let cryptoSkipReason = null;
+    try {
+      recipientAddress = await createPayToAddress(request, { amountUsd: amounts.tempoUsd });
+    } catch (cryptoErr) {
+      cryptoSkipReason = cryptoErr?.code || "crypto_unavailable";
+      captureApiException?.(cryptoErr, { route: "mppPaid", phase: "createPayToAddress" });
+      if (!profileId) {
+        const pub = publicMppError(cryptoErr);
+        return res.status(pub.status).json({
+          error: pub.error,
+          code: pub.code || undefined,
+          hint: "Enable Stablecoins/Crypto, or set a valid STRIPE_PROFILE_ID for SPT-only.",
+        });
+      }
+    }
 
+    const methods = [];
+    if (recipientAddress) {
+      methods.push(
+        tempo.charge({
+          currency: pathUsd,
+          recipient: recipientAddress,
+          testnet,
+        })
+      );
+    }
     if (profileId) {
       methods.push(
         mppStripe.charge({
@@ -139,12 +159,22 @@ export default async function handler(req, res) {
       );
     }
 
+    if (methods.length === 0) {
+      return res.status(503).json({
+        error: "MPP has no payment methods available",
+        code: cryptoSkipReason || "mpp_no_methods",
+      });
+    }
+
     const mppx = Mppx.create({
       methods,
       secretKey: mppSecretKey,
     });
 
-    const handlers = [mppx.tempo.charge({ amount: amounts.tempoUsd, recipient: recipientAddress })];
+    const handlers = [];
+    if (recipientAddress) {
+      handlers.push(mppx.tempo.charge({ amount: amounts.tempoUsd, recipient: recipientAddress }));
+    }
     if (profileId) {
       handlers.push(mppx.stripe.charge({ amount: amounts.stripeUsd, currency: "usd" }));
     }
@@ -158,12 +188,16 @@ export default async function handler(req, res) {
       return sendWebResponse(res, response.challenge);
     }
 
+    const methodNames = [];
+    if (recipientAddress) methodNames.push("tempo");
+    if (profileId) methodNames.push("stripe");
+
     const paid = response.withReceipt(
       Response.json({
         ok: true,
         service: "titanos-mpp",
         message: "Payment accepted",
-        methods: profileId ? ["tempo", "stripe"] : ["tempo"],
+        methods: methodNames,
         spt: Boolean(profileId),
         ts: new Date().toISOString(),
       })

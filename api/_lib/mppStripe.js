@@ -190,6 +190,14 @@ export function publicMppError(err) {
   if (code && map[code]) return map[code];
 
   // Stripe SDK style
+  if (code === "parameter_unknown" || code === "payment_method_type_invalid") {
+    return {
+      status: 502,
+      error:
+        "Crypto deposits unavailable. Request Stablecoins/Crypto in Stripe Dashboard → Payment methods.",
+      code: "crypto_unavailable",
+    };
+  }
   if (code === "rate_limit" || statusHint === 429) {
     return { status: 429, error: "Too many payment requests. Try again shortly.", code: "rate_limit" };
   }
@@ -239,30 +247,41 @@ export async function createPayToAddress(request, opts = {}) {
     fallbackCents: 1,
   });
 
-  const stripeClient = getMppStripeClient();
-  if (!stripeClient) {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
     const err = new Error("STRIPE_SECRET_KEY required");
     err.code = "MPP_NOT_CONFIGURED";
     throw err;
   }
 
-  const paymentIntent = await stripeClient.paymentIntents.create({
-    amount: amountInCents,
-    currency: "usd",
-    payment_method_types: ["crypto"],
-    payment_method_data: {
-      type: "crypto",
+  // Preview crypto deposit params — raw form POST so stripe-node can't strip fields.
+  const body = new URLSearchParams();
+  body.set("amount", String(amountInCents));
+  body.set("currency", "usd");
+  body.append("payment_method_types[]", "crypto");
+  body.set("payment_method_data[type]", "crypto");
+  body.set("payment_method_options[crypto][mode]", "deposit");
+  body.append("payment_method_options[crypto][deposit_options][networks][]", "tempo");
+  body.set("confirm", "true");
+
+  const res = await fetch("https://api.stripe.com/v1/payment_intents", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Stripe-Version": "2026-03-25.preview",
     },
-    payment_method_options: {
-      crypto: {
-        mode: "deposit",
-        deposit_options: {
-          networks: ["tempo"],
-        },
-      },
-    },
-    confirm: true,
+    body,
   });
+
+  const paymentIntent = await res.json();
+  if (!res.ok) {
+    const err = new Error(paymentIntent?.error?.message || "Crypto PaymentIntent failed");
+    err.code = paymentIntent?.error?.code || "MPP_CRYPTO_DISPLAY_MISSING";
+    err.statusCode = res.status;
+    err.param = paymentIntent?.error?.param;
+    throw err;
+  }
 
   if (!paymentIntent.next_action || !("crypto_display_details" in paymentIntent.next_action)) {
     const err = new Error("PaymentIntent did not return expected crypto deposit details");

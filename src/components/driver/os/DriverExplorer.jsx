@@ -170,9 +170,12 @@ export default function DriverExplorer({
 
   return (
     <section aria-label="Driver Explorer" className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="space-y-0.5">
+        <p className="text-[11px] font-medium text-muted-foreground">Need more info?</p>
         <h2 className="text-sm font-semibold text-foreground">Explorer</h2>
-        <p className="text-xs text-muted-foreground tabular-nums">{folders.length}</p>
+        <p className="text-xs text-muted-foreground">
+          History, analytics, platforms, and settings — open only what you need.
+        </p>
       </div>
 
       <label className="block">
@@ -180,7 +183,7 @@ export default function DriverExplorer({
         <input
           value={search}
           onChange={(e) => onSearchChange?.(e.target.value)}
-          placeholder="Search folders or deliveries…"
+          placeholder="Find a folder or delivery…"
           autoComplete="off"
           enterKeyHint="search"
           className="w-full h-11 rounded-xl border border-border bg-muted px-3 text-sm text-foreground placeholder:text-muted-foreground focus-ring"

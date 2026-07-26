@@ -22,3 +22,4 @@ Package ID for Google Play: `com.titanos.myapp`.
 - Free launch mode: `src/lib/plan.js` → `FREE_LAUNCH = true`
 - Lint/build before finishing significant changes: `npm run lint` && `npm run build`
 - Play AAB: `npm run android:sign` → `release/TitanOS.aab`
+- UI rule: every screen answers **What’s happening? / What’s next? / Where for more?** (see `.cursor/rules/three-question-ui.mdc`)

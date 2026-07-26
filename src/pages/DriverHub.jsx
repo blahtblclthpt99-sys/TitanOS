@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Radio, RefreshCw, WifiOff } from "lucide-react";
+import { RefreshCw, WifiOff } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
 import MissionControl from "@/components/driver/os/MissionControl";
@@ -178,15 +178,10 @@ export default function DriverHub() {
           </div>
         )}
 
-        <header className="flex items-center justify-between gap-3 mb-1">
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight truncate">
-              Driver Hub
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              Live ops · analytics on demand
-            </p>
-          </div>
+        <header className="flex items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight truncate">
+            Driver Hub
+          </h1>
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               type="button"
@@ -198,16 +193,6 @@ export default function DriverHub() {
               aria-label="Refresh"
             >
               <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} aria-hidden />
-            </Button>
-            <Button asChild size="icon" variant="outline" className="h-10 w-10" aria-label="TitanCom">
-              <Link to="/comms?channel=tc-dispatch">
-                <Radio className="w-4 h-4" aria-hidden />
-              </Link>
-            </Button>
-            <Button asChild size="icon" variant="outline" className="h-10 w-10" aria-label="Publish driver">
-              <Link to="/driver?folder=directory">
-                <Plus className="w-4 h-4" aria-hidden />
-              </Link>
             </Button>
           </div>
         </header>

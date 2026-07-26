@@ -23,7 +23,7 @@ import SuccessCheck from "@/components/shared/SuccessCheck";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
-import { betaBadgeLabel, getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS } from "@/lib/plan";
+import { betaBadgeLabel, getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, FREE_DURING_BETA, BETA_PERK_LABEL } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";

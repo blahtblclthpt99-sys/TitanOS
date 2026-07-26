@@ -4,6 +4,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm ci",
+  "functions": {
+    "api/functions/mppPaid.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/|assets/|fonts/|robots\\.txt|sitemap\\.xml|sw\\.js|manifest\\.webmanifest|favicon\\.svg|pwa-.*\\.png|downloads/).*)",

@@ -45,6 +45,11 @@ Project → Settings → Environment Variables (Production + Preview as needed):
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (API) | **Server only** |
 | `STRIPE_SECRET_KEY` | For live pay | Server only |
 | `STRIPE_WEBHOOK_SECRET` | For settle | Server only |
+| `STRIPE_PROFILE_ID` | MPP SPT (`mppPaid`) | `profile_…` from Stripe Profile |
+| `MPP_SECRET_KEY` | MPP challenges | Optional; derived if unset |
+| `MPP_TESTNET` | MPP Tempo network | Default `1` |
+| `MPP_TEMPO_AMOUNT` | MPP Tempo charge | Default `0.01` |
+| `MPP_STRIPE_AMOUNT` | MPP SPT charge | Default `0.50` |
 | `VITE_SENTRY_DSN` | Optional | Browser Sentry DSN (client) |
 | `SENTRY_DSN` | Optional | API Sentry DSN (server; falls back to `VITE_SENTRY_DSN`) |
 | `SENTRY_DEBUG_ROUTE` | Verify only | Set `1` temporarily; **must be off** in steady-state Production |

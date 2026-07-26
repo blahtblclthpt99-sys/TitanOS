@@ -30,6 +30,9 @@ export default async function handler(req, res) {
         process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
     sentryConfigured: Boolean(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN),
+    mppConfigured: Boolean(
+      process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PROFILE_ID
+    ),
   };
 
   const deep =

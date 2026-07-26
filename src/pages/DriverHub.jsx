@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw, WifiOff } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";

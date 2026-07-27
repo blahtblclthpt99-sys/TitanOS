@@ -4,6 +4,7 @@ import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
+import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 
 async function assertOwnedCustomer(admin, userId, customerId) {
   if (!customerId) return { ok: true, customerId: null };
@@ -162,6 +163,10 @@ export default async function handler(req, res) {
     const { data: userData, error: userError } = await admin.auth.getUser(token);
     if (userError || !userData.user) return res.status(401).json({ error: "Session expired" });
     const user = userData.user;
+
+    const entitled = await requireFeature(res, admin, user, FEATURES.aiAssistant);
+    if (!entitled) return;
+
     const { intent, params = {} } = readJson(req);
 
     const data = await executeAiOfficeAction(admin, user, intent, params);

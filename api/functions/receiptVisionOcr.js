@@ -3,6 +3,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
+import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 
 /**
  * Vision OCR for receipts. Uses OpenAI when OPENAI_API_KEY is set;
@@ -16,6 +17,9 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res);
   if (!auth) return;
+
+  const entitled = await requireFeature(res, auth.admin, auth.user, FEATURES.ocrReceipts);
+  if (!entitled) return;
 
   try {
     const { image_base64: imageBase64, mime_type: mimeType = "image/jpeg", pasted_text: pastedText } = readJson(req);

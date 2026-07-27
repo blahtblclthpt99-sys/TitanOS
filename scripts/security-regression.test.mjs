@@ -43,4 +43,11 @@ describe("security regression", () => {
     assert.doesNotMatch(envExample, /VITE_PORTAL_OTP/);
     assert.match(envExample, /PORTAL_OTP_PEPPER/);
   });
+
+  it("premium APIs assert server entitlements", () => {
+    assert.match(read("api/functions/titanAI.js"), /requireFeature/);
+    assert.match(read("api/functions/receiptVisionOcr.js"), /FEATURES\.ocrReceipts/);
+    assert.match(read("api/_lib/entitlements.js"), /loadEntitlementProfile/);
+    assert.match(read("src/lib/marketplaceApi.js"), /installMarketplaceModule/);
+  });
 });

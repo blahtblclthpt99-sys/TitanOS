@@ -49,7 +49,7 @@
     "test:gps": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/gps-owner.test.mjs",
     "test:offline": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/offline-local.test.mjs scripts/integration-offline.test.mjs",
     "test:a11y": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/a11y-smoke.test.mjs",
-    "test:security": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/security-regression.test.mjs",
+    "test:security": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/security-regression.test.mjs scripts/entitlements.test.mjs",
     "test:voice": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/voice-workflow.test.mjs scripts/driver-voice.test.mjs",
     "test:perf": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/perf-microbench.test.mjs",
     "test:maintainability": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/maintainability.test.mjs",

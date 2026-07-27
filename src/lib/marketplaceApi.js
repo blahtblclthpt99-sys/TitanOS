@@ -116,13 +116,13 @@ export async function installModule(user, module) {
 }
 
 /**
- * Install a module. Requires Premium/Business membership (Marketplace Apps).
- * Modules are included with the subscription — no per-module checkout.
+ * Install a module. Requires Pro/Business (Marketplace Apps).
+ * Prefers server entitlement check; falls back to client gate + local install offline.
  */
 export async function purchaseAndInstallModule(user, module) {
   const { canUseMarketplaceApps } = await import("@/lib/plan");
   if (!canUseMarketplaceApps(user)) {
-    const err = new Error("Marketplace Apps require Worker Premium or Business.");
+    const err = new Error("Marketplace Apps require Pro ($9.99) or Business ($19.99).");
     err.code = "MARKETPLACE_APPS_LOCKED";
     throw err;
   }
@@ -130,6 +130,29 @@ export async function purchaseAndInstallModule(user, module) {
   const existing = await fetchUserInstalls(user.id);
   if (existing.some((i) => i.module_slug === module.slug && i.status !== "uninstalled")) {
     return { payment: null, installed: existing.find((i) => i.module_slug === module.slug), alreadyOwned: true };
+  }
+
+  try {
+    const result = await api.functions.invoke("installMarketplaceModule", {
+      module_slug: module.slug,
+      module_name: module.name,
+    });
+    const data = result?.data || result;
+    if (data?.installed) {
+      return {
+        payment: null,
+        installed: data.installed,
+        alreadyOwned: Boolean(data.alreadyOwned),
+        free: true,
+      };
+    }
+  } catch (error) {
+    if (error?.status === 403 || error?.code === "PLAN_REQUIRED") {
+      const err = new Error(error.message || "Marketplace Apps require Pro or Business.");
+      err.code = "MARKETPLACE_APPS_LOCKED";
+      throw err;
+    }
+    // Offline / API gap — client install still requires canUseMarketplaceApps above
   }
 
   const installed = await installModule(user, module);

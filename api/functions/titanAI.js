@@ -5,6 +5,7 @@ import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.js";
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
+import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 
 function money(n) {
   return (Number(n) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -240,6 +241,9 @@ export default async function handler(req, res) {
     if (userError || !userData.user) {
       return res.status(401).json({ error: "Session expired. Please sign in again." });
     }
+
+    const entitled = await requireFeature(res, admin, userData.user, FEATURES.aiAssistant);
+    if (!entitled) return;
 
     const body = readJson(req);
     const { messages = [], confirmedAction = null, lawMastermind = false } = body;

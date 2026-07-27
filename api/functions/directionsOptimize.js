@@ -4,6 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { logError } from "../_lib/safeLog.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
+import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 
 function haversineMiles(a, b) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -58,6 +59,9 @@ export default async function handler(req, res) {
 
   const auth = await requireUser(req, res);
   if (!auth) return;
+
+  const entitled = await requireFeature(res, auth.admin, auth.user, FEATURES.routeOptimization);
+  if (!entitled) return;
 
   try {
     const { stops = [] } = readJson(req);

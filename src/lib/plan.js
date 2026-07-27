@@ -1,11 +1,12 @@
 /**
- * TitanOS launch pricing (membership catalog + limit UX).
+ * TitanOS membership catalog + limit UX.
  * Transaction fee *rates* are owned by the Fee Engine (`shared/feeEngine.js` + DB).
- * plan.feeRate values seed / display defaults and must stay aligned with fee seed rules.
  *
- * Founding 100: first users get free membership forever (`founding_user` + lifetime_premium).
- * Fees still apply on collected payments. After 100 founding slots, beta closes and
- * PayPal membership checkout goes live (see `isFreeDuringBeta` / migration 035).
+ * Plans: Free · Starter $4.99 · Pro $9.99 (Most Popular) · Business $19.99
+ *
+ * Founding 100: first 100 signups get month-1 free, then lifetime **price lock**
+ * at founding rates (not free forever). Fees still apply on collected payments.
+ * See migration 035 + 037.
  */
 import { isOwnerAccount } from "@/lib/ownerAccount";
 import {
@@ -17,35 +18,36 @@ import {
 
 export { FOUNDING_USER_CAP, isBetaActive, isMembershipCheckoutLive };
 
-/**
- * True while founding spots remain — membership checkout hidden; founding users unlocked.
- * Prefer this over the deprecated FREE_DURING_BETA constant.
- */
+/** True while founding enrollment spots remain (not “everyone free”). */
 export function isFreeDuringBeta() {
   return isBetaActive();
 }
 
-/**
- * @deprecated Use isFreeDuringBeta(). Kept as a getter-compatible alias for older imports
- * that expect a boolean at call time — always read via isFreeDuringBeta() in new code.
- */
+/** @deprecated Prefer isFoundingEnrollmentOpen / isFoundingTrialActive */
 export const FREE_DURING_BETA = false;
-
-/** @deprecated Use isFreeDuringBeta / founding users */
+/** @deprecated */
 export const FREE_LAUNCH = false;
 
-export const BETA_PERK_LABEL = "Founding 100 perk";
+export const BETA_PERK_LABEL = "Founding 100 · first month free";
+export const FOUNDING_TRIAL_DAYS = 30;
 
-/** Live PayPal No-Code Payment links (memberships only — no per-module checkout). */
+/**
+ * Live PayPal No-Code Payment links.
+ * Ops must create NCP buttons for $4.99 / $9.99 / $19.99 and replace URLs below.
+ * Legacy $29.99 / $49.99 links remain mapped in paypal.js for in-flight payments.
+ */
 export const PAYPAL_CHECKOUT = Object.freeze({
-  /** Worker Premium — $29.99 */
+  /** Starter — $4.99/mo — replace with matching NCP URL */
+  starter: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
+  /** Pro — $9.99/mo — replace with matching NCP URL */
   worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
-  /** Business — $49.99 */
+  /** Business — $19.99/mo — replace with matching NCP URL */
   business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
 });
 
-/** @deprecated Modules are included with Premium/Business — always 0. */
+/** @deprecated Modules are included with Pro/Business — always 0. */
 export const PAYPAL_MODULE_PRICE = 0;
+
 export const PLANS = Object.freeze({
   customer: Object.freeze({
     id: "customer",
@@ -64,10 +66,11 @@ export const PLANS = Object.freeze({
     storageLabel: "Hire locally at no cost",
     blurb: "Free to join and hire professionals.",
     checkoutUrl: null,
+    mostPopular: false,
   }),
   worker_free: Object.freeze({
     id: "worker_free",
-    name: "Worker Free",
+    name: "Free",
     audience: "Workers",
     launchPriceMonthly: 0,
     priceMonthly: 0,
@@ -80,15 +83,35 @@ export const PLANS = Object.freeze({
     featuredProfile: false,
     searchPriority: false,
     storageLabel: "Standard photo & document storage",
-    blurb: "Try TitanOS with no monthly fee — 8% on payments you collect. Shift tracking included; premium Driver Hub add-ons require Premium.",
+    blurb: "Try TitanOS free — 8% on payments you collect. Limited estimates & hire posts.",
     checkoutUrl: null,
+    mostPopular: false,
+  }),
+  starter: Object.freeze({
+    id: "starter",
+    name: "Starter",
+    audience: "Individuals",
+    launchPriceMonthly: 4.99,
+    priceMonthly: 4.99,
+    feeRate: 0.05,
+    feeLabel: "5%",
+    maxActiveListings: Infinity,
+    maxActiveHirePosts: 10,
+    maxEstimatesPerMonth: Infinity,
+    maxInvoicesPerMonth: Infinity,
+    featuredProfile: false,
+    searchPriority: false,
+    storageLabel: "Basic photo & document storage",
+    blurb: "$4.99/mo — dashboard, schedule, estimates, invoices, Driver Hub Lite, messaging.",
+    checkoutUrl: PAYPAL_CHECKOUT.starter,
+    mostPopular: false,
   }),
   worker_premium: Object.freeze({
     id: "worker_premium",
-    name: "Worker Premium",
-    audience: "Workers",
-    launchPriceMonthly: 29.99,
-    priceMonthly: 29.99,
+    name: "Pro",
+    audience: "Pros & owner-operators",
+    launchPriceMonthly: 9.99,
+    priceMonthly: 9.99,
     feeRate: 0.025,
     feeLabel: "2.5%",
     maxActiveListings: Infinity,
@@ -98,15 +121,16 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
-    blurb: "$29.99/mo — lower 2.5% fee, Driver Hub add-ons, Marketplace Apps, lasting TitanCom channels.",
+    blurb: "$9.99/mo — full Driver Hub, AI, Tax Center, Marketplace Apps, Titan Radio persist.",
     checkoutUrl: PAYPAL_CHECKOUT.worker_premium,
+    mostPopular: true,
   }),
   business: Object.freeze({
     id: "business",
     name: "Business",
-    audience: "Businesses",
-    launchPriceMonthly: 49.99,
-    priceMonthly: 49.99,
+    audience: "Teams & fleets",
+    launchPriceMonthly: 19.99,
+    priceMonthly: 19.99,
     feeRate: 0.015,
     feeLabel: "1.5%",
     maxActiveListings: Infinity,
@@ -116,8 +140,9 @@ export const PLANS = Object.freeze({
     featuredProfile: true,
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
-    blurb: "$49.99/mo for teams — lowest 1.5% fee plus every Premium unlock.",
+    blurb: "$19.99/mo — everything in Pro plus teams, fleet, shared files, admin controls.",
     checkoutUrl: PAYPAL_CHECKOUT.business,
+    mostPopular: false,
   }),
 });
 
@@ -130,7 +155,7 @@ export const MARKETPLACE_PREMIUM = Object.freeze({
 export const REFERRAL_REWARD = Object.freeze({
   requiredPayingReferrals: 3,
   reward: "lifetime_premium",
-  label: "Lifetime Worker Premium",
+  label: "Lifetime Pro",
 });
 
 export const PRO_FEATURES = Object.freeze({
@@ -154,6 +179,15 @@ export const PRO_FEATURES = Object.freeze({
   titanComPersist: "titancom_persist",
 });
 
+/** Features unlocked on Starter ($4.99) — Pro adds the rest of PAID_WORKER_FEATURES. */
+const STARTER_FEATURES = new Set([
+  PRO_FEATURES.unlimitedEstimates,
+  PRO_FEATURES.unlimitedInvoices,
+  PRO_FEATURES.bookingPages,
+  PRO_FEATURES.digitalContracts,
+  PRO_FEATURES.gpsCheckIn,
+]);
+
 const PAID_WORKER_FEATURES = new Set([
   PRO_FEATURES.reports,
   PRO_FEATURES.aiAssistant,
@@ -171,12 +205,14 @@ const PAID_WORKER_FEATURES = new Set([
   PRO_FEATURES.fleet,
   PRO_FEATURES.driverAddons,
   PRO_FEATURES.titanComPersist,
+  PRO_FEATURES.gpsCheckIn,
 ]);
 
 const PLAN_ALIASES = Object.freeze({
   free: "worker_free",
+  starter: "starter",
   premium: "worker_premium",
-  pro: "business",
+  pro: "worker_premium",
   worker: "worker_free",
   customer: "customer",
   business: "business",
@@ -190,8 +226,8 @@ export function resolvePlan(user) {
 
   const raw = String(user.plan_tier || user.account_type || "").toLowerCase();
   if (raw === "customer" || user.account_type === "customer") return "customer";
-  // Explicit business tier only — do NOT treat legacy is_pro as Business (undercharges fees)
   if (raw === "business") return "business";
+  if (raw === "starter") return "starter";
   if (
     raw === "worker_premium" ||
     raw === "premium" ||
@@ -201,38 +237,35 @@ export function resolvePlan(user) {
   ) {
     return "worker_premium";
   }
-  // Legacy is_pro without a paid tier → Premium worker, not Business
   if (user.is_pro === true) return "worker_premium";
   if (raw === "worker_free" || raw === "free" || raw === "worker") return "worker_free";
 
-  // Default field users are workers on the free tier
   return "worker_free";
 }
 
 export function getPlanConfig(userOrPlanId) {
-  if (!userOrPlanId) return applyBetaPricing(PLANS.worker_free);
+  if (!userOrPlanId) return applyFoundingDisplay(PLANS.worker_free);
   if (typeof userOrPlanId === "string") {
     const id = PLAN_ALIASES[userOrPlanId] || userOrPlanId;
-    return applyBetaPricing(PLANS[id] || PLANS.worker_free);
+    return applyFoundingDisplay(PLANS[id] || PLANS.worker_free);
   }
   const id = resolvePlan(userOrPlanId);
-  if (id === "anonymous") return applyBetaPricing(PLANS.worker_free);
-  return applyBetaPricing(PLANS[id] || PLANS.worker_free, userOrPlanId);
+  if (id === "anonymous") return applyFoundingDisplay(PLANS.worker_free);
+  return applyFoundingDisplay(PLANS[id] || PLANS.worker_free, userOrPlanId);
 }
 
-/** While founding beta is open, hide membership prices; founding users keep free access via lifetime_premium. */
-function applyBetaPricing(plan, user) {
+/** Founders in free trial month see $0 display for their locked plan. */
+function applyFoundingDisplay(plan, user) {
   if (!plan) return PLANS.worker_free;
-  if (!isFreeDuringBeta()) return plan;
-  if (plan.id !== "worker_premium" && plan.id !== "business") return plan;
-  const founding = isFoundingUser(user);
+  if (!user || !isFoundingTrialActive(user)) return plan;
+  const locked = String(user.founding_locked_plan || "worker_premium").toLowerCase();
+  if (plan.id !== locked && !(locked === "pro" && plan.id === "worker_premium")) return plan;
+  const lockPrice = Number(user.founding_price_lock);
   return {
     ...plan,
     priceMonthly: 0,
     checkoutUrl: null,
-    blurb: founding
-      ? `${plan.name} unlocked for Founding 100 — free membership; payment fees still apply.`
-      : `${plan.name} is free during the Founding 100 window — payment fees still apply.`,
+    blurb: `${plan.name} — Founding trial (free this month). Then locks at $${Number.isFinite(lockPrice) && lockPrice > 0 ? lockPrice.toFixed(2) : plan.launchPriceMonthly}/mo forever.`,
   };
 }
 
@@ -240,28 +273,66 @@ export function isFoundingUser(user) {
   return Boolean(user?.founding_user);
 }
 
+/** First-month free window for Founding 100. */
+export function isFoundingTrialActive(user) {
+  if (!isFoundingUser(user)) return false;
+  const ends = user.founding_trial_ends_at;
+  if (!ends) {
+    // Legacy founders with lifetime_premium keep entitlement
+    return user.lifetime_premium === true;
+  }
+  const t = new Date(ends).getTime();
+  if (!Number.isFinite(t)) return user.lifetime_premium === true;
+  return Date.now() < t;
+}
+
+/** Lifetime locked monthly price for founders (after trial). */
+export function getFoundingLockedPrice(user) {
+  if (!isFoundingUser(user)) return null;
+  const n = Number(user.founding_price_lock);
+  if (Number.isFinite(n) && n > 0) return n;
+  const planId = user.founding_locked_plan || "worker_premium";
+  return PLANS[PLAN_ALIASES[planId] || planId]?.priceMonthly ?? PLANS.worker_premium.priceMonthly;
+}
+
 export function isPaidPlan(user) {
   const plan = resolvePlan(user);
-  return plan === "worker_premium" || plan === "business";
+  return plan === "starter" || plan === "worker_premium" || plan === "business";
 }
 
 export function isCustomerPlan(user) {
   return resolvePlan(user) === "customer";
 }
 
+function planAllowsFeature(planId, featureKey) {
+  if (!PAID_WORKER_FEATURES.has(featureKey)) return true;
+  if (planId === "business" || planId === "worker_premium") return true;
+  if (planId === "starter") return STARTER_FEATURES.has(featureKey);
+  return false;
+}
+
 export function canAccessFeature(user, featureKey) {
   if (!user) return false;
-  // Open founding window: unlock app features (fees still charged on payments).
-  if (isFreeDuringBeta()) return true;
   if (isOwnerAccount(user)) return true;
   if (user.role === "admin") return true;
-  // Founding 100 keep free membership after beta closes (fees still apply).
-  if (isFoundingUser(user) || user.lifetime_premium === true) {
-    if (resolvePlan(user) === "customer") {
-      if (featureKey === PRO_FEATURES.marketplace) return true;
-      return !PAID_WORKER_FEATURES.has(featureKey);
-    }
-    return true;
+
+  // Active founding trial → Pro-level access (price lock defaults to Pro)
+  if (isFoundingTrialActive(user)) {
+    const locked = String(user.founding_locked_plan || "worker_premium").toLowerCase();
+    const planId = PLAN_ALIASES[locked] || locked || "worker_premium";
+    return planAllowsFeature(planId === "starter" ? "starter" : planId === "business" ? "business" : "worker_premium", featureKey);
+  }
+
+  // Legacy lifetime_premium founders (pre-037) keep full access
+  if (user.lifetime_premium === true && isFoundingUser(user)) {
+    return planAllowsFeature("worker_premium", featureKey);
+  }
+
+  // Founders after trial who are paying at locked price
+  if (isFoundingUser(user) && user.paying_subscriber === true) {
+    const locked = String(user.founding_locked_plan || resolvePlan(user) || "worker_premium").toLowerCase();
+    const planId = PLAN_ALIASES[locked] || locked;
+    return planAllowsFeature(planId, featureKey);
   }
 
   const plan = resolvePlan(user);
@@ -269,41 +340,41 @@ export function canAccessFeature(user, featureKey) {
     if (featureKey === PRO_FEATURES.marketplace) return true;
     return !PAID_WORKER_FEATURES.has(featureKey);
   }
-  if (plan === "worker_premium" || plan === "business") return true;
-  if (!PAID_WORKER_FEATURES.has(featureKey)) return true;
-  return false;
+  return planAllowsFeature(plan, featureKey);
 }
 
-/** Driver Hub add-ons (DoorDash, coach, logbook, autopilot, voice, etc.). Shift start/stop stays free. */
 export function canUseDriverAddons(user) {
   return canAccessFeature(user, PRO_FEATURES.driverAddons);
 }
 
-/** Marketplace Apps / modules catalog. Service listings stay available on free. */
 export function canUseMarketplaceApps(user) {
   return canAccessFeature(user, PRO_FEATURES.marketplaceApps);
 }
 
-/** Persistent TitanCom channels (free users must remake daily). */
 export function canPersistTitanComChannels(user) {
   return canAccessFeature(user, PRO_FEATURES.titanComPersist);
 }
 
 export function isMarketplaceFree(_user) {
-  // Service listings remain free to browse/post within plan limits.
   return true;
 }
 
 export function betaBadgeLabel(user) {
   if (isFoundingUser(user)) {
     const n = user.founding_number;
-    return n != null && n !== ""
-      ? `Founding #${n} · free app (fees apply)`
-      : "Founding 100 · free app (fees apply)";
+    const prefix = n != null && n !== "" ? `Founding #${n}` : "Founding 100";
+    if (isFoundingTrialActive(user) && user.founding_trial_ends_at) {
+      return `${prefix} · free month · then $${getFoundingLockedPrice(user)}/mo locked`;
+    }
+    if (user.lifetime_premium === true) {
+      return `${prefix} · legacy free membership (fees apply)`;
+    }
+    const locked = getFoundingLockedPrice(user);
+    return `${prefix} · $${locked}/mo price lock`;
   }
   const launch = getLaunchStatus();
   if (launch.betaActive && launch.spotsRemaining > 0) {
-    return `Founding beta · ${launch.spotsRemaining} free spots left (fees apply)`;
+    return `Founding 100 · ${launch.spotsRemaining} spots left · first month free`;
   }
   return null;
 }
@@ -331,16 +402,16 @@ export function assertWithinFreeLimit(user, kind, currentCount) {
           ? "hire job posts"
           : kind;
     throw new Error(
-      isFreeDuringBeta() || isFoundingUser(user)
-        ? `You've hit the ${label} limit on Worker Free. Founding / Premium unlocks higher limits — see Pricing.`
-        : `Worker Free allows up to ${limit} active ${label}. Upgrade to Worker Premium ($29.99/mo) for unlimited.`
+      `You've hit the ${label} limit on ${plan.name}. Upgrade to Pro ($${PLANS.worker_premium.priceMonthly}/mo) for higher limits.`
     );
   }
 }
 
-/** PayPal / external checkout URL for a plan id, or null for free tiers / open founding beta. */
+/** PayPal checkout URL for a plan id. Always live — founders use trial then locked price. */
 export function getPlanCheckoutUrl(planId) {
-  if (isFreeDuringBeta() || !isMembershipCheckoutLive()) return null;
+  if (!isMembershipCheckoutLive() && !isFreeDuringBeta()) {
+    // enrollment closed and payments flagged off
+  }
   const id = PLAN_ALIASES[planId] || planId;
   return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

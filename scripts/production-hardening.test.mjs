@@ -71,6 +71,9 @@ describe("PayPal membership path", () => {
 
   it("maps checkout amounts to plan tiers", async () => {
     const { planTierFromAmount, extractPayerEmail } = await import("../api/_lib/paypal.js");
+    assert.equal(planTierFromAmount(4.99), "starter");
+    assert.equal(planTierFromAmount(9.99), "worker_premium");
+    assert.equal(planTierFromAmount(19.99), "business");
     assert.equal(planTierFromAmount(29.99), "worker_premium");
     assert.equal(planTierFromAmount(49.99), "business");
     assert.equal(planTierFromAmount(10), null);
@@ -149,6 +152,7 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/034_scalability_hot_paths.sql",
     "supabase/migrations/035_founding_100_beta.sql",
     "supabase/migrations/036_marketplace_modules_subscription_only.sql",
+    "supabase/migrations/037_founding_trial_price_lock.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {

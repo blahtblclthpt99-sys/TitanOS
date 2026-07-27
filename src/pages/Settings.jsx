@@ -24,7 +24,7 @@ import SuccessCheck from "@/components/shared/SuccessCheck";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { US_STATES } from "@/lib/platformConstants";
-import { getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, isFreeDuringBeta, isFoundingUser } from "@/lib/plan";
+import { getPlanCheckoutUrl, getPlanConfig, isPaidPlan, PLANS, isFreeDuringBeta, isFoundingUser, isFoundingTrialActive, getFoundingLockedPrice, betaBadgeLabel } from "@/lib/plan";
 import { applyTheme, setStoredTheme, getHighContrast, setHighContrast, TEXT_SCALES, getTextScale, setTextScale, getReduceMotionPref, setReduceMotionPref } from "@/lib/theme";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
@@ -427,24 +427,31 @@ export default function Settings() {
                 {isFoundingUser(user)
                   ? "Founding 100 member"
                   : isFreeDuringBeta()
-                    ? "Plan perks during Founding 100"
+                    ? "Founding 100 enrollment open"
                     : "Upgrade your plan"}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isFoundingUser(user)
-                  ? `Current: ${getPlanConfig(user).name}. Free membership forever — payment fees still apply when you get paid.`
+                  ? isFoundingTrialActive(user)
+                    ? `Current: ${getPlanConfig(user).name}. Free founding month — then locks at $${getFoundingLockedPrice(user)}/mo. Fees still apply when you get paid.`
+                    : `Current: ${getPlanConfig(user).name}. ${betaBadgeLabel(user) || "Founding price lock active"}. Fees still apply when you get paid.`
                   : isFreeDuringBeta()
-                    ? `Current: ${getPlanConfig(user).name}. Premium tools are free for the first 100 members — fees still apply on collected payments.`
-                    : `Current: ${getPlanConfig(user).name}. Pay securely with PayPal — Premium $${PLANS.worker_premium.priceMonthly}/mo or Business $${PLANS.business.priceMonthly}/mo.`}
+                    ? `Current: ${getPlanConfig(user).name}. First 100 get month one free, then locked Pro pricing. Fees still apply on collected payments.`
+                    : `Current: ${getPlanConfig(user).name}. Starter $${PLANS.starter.priceMonthly} · Pro $${PLANS.worker_premium.priceMonthly} · Business $${PLANS.business.priceMonthly}.`}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!isFreeDuringBeta() && !isFoundingUser(user) && (
+            {(!isFoundingTrialActive(user)) && (
               <>
+                <Button asChild size="sm" variant="outline" className="border-border">
+                  <a href={getPlanCheckoutUrl("starter")} target="_blank" rel="noopener noreferrer">
+                    Starter ${PLANS.starter.priceMonthly}
+                  </a>
+                </Button>
                 <Button asChild size="sm" className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold">
                   <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
-                    Premium ${PLANS.worker_premium.priceMonthly}
+                    Pro ${PLANS.worker_premium.priceMonthly}
                   </a>
                 </Button>
                 <Button asChild size="sm" variant="outline" className="border-border">

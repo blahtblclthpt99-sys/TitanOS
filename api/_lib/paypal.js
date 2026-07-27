@@ -114,6 +114,11 @@ export async function verifyPayPalWebhook({ headers, event }) {
 /** Map paid amount → TitanOS plan tier (memberships only). */
 export function planTierFromAmount(amount) {
   const n = Math.round(Number(amount) * 100) / 100;
+  // Current catalog
+  if (n === 4.99 || n === 4.9) return "starter";
+  if (n === 9.99 || n === 9.9) return "worker_premium";
+  if (n === 19.99 || n === 19.9) return "business";
+  // Legacy NCP amounts (pre-reprice)
   if (n === 29.99 || n === 29.9) return "worker_premium";
   if (n === 49.99 || n === 49.9) return "business";
   // Legacy $1.99 module NCP (retired) — does not change plan_tier

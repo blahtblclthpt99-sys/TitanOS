@@ -8,6 +8,7 @@ function resolvePlanFromProfile(profile, authUser) {
   const raw = String(profile?.plan_tier || profile?.account_type || "").toLowerCase();
   if (raw === "customer" || profile?.account_type === "customer") return "customer";
   if (raw === "business") return "business";
+  if (raw === "starter") return "starter";
   if (
     raw === "worker_premium" ||
     raw === "premium" ||

@@ -9,94 +9,120 @@ import {
   Rocket,
   Smartphone,
   Sparkles,
+  Star,
   UserRound,
   Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
-import { PLANS, betaBadgeLabel, getPlanCheckoutUrl, isFreeDuringBeta, BETA_PERK_LABEL } from "@/lib/plan";
+import {
+  PLANS,
+  betaBadgeLabel,
+  getPlanCheckoutUrl,
+  isFreeDuringBeta,
+  BETA_PERK_LABEL,
+  getLaunchStatus,
+} from "@/lib/plan";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
 function buildCards() {
-  const freeBeta = isFreeDuringBeta();
+  const foundingOpen = isFreeDuringBeta();
+  const spots = getLaunchStatus().spotsRemaining;
   return [
-  {
-    plan: PLANS.customer,
-    icon: UserRound,
-    features: [
-      "Free to join",
-      "Hire local professionals",
-      "No monthly subscription",
-      "No platform fee to hire",
-      "Message & book workers",
-    ],
-    cta: { to: "/register", label: "Join free" },
-    highlighted: false,
-  },
-  {
-    plan: PLANS.worker_free,
-    icon: Briefcase,
-    features: [
-      `${PLANS.worker_free.feeLabel} fee on payments you collect`,
-      "No monthly cost to start",
-      "Free unlimited marketplace listings",
-      "Basic CRM, estimates & invoices",
-      "Upgrade anytime as you book more work",
-    ],
-    cta: { to: "/register", label: "Start as a worker" },
-    highlighted: false,
-  },
-  {
-    plan: PLANS.worker_premium,
-    icon: Sparkles,
-    features: [
-      `${PLANS.worker_premium.feeLabel} transaction fee`,
-      freeBeta ? "Free during Founding 100 (fees still apply)" : "$29.99/mo membership",
-      "Unlimited listings & hire visibility",
-      "Featured profile + search priority",
-      "AI assistant, booking page, analytics",
-      "Expanded photo & document storage",
-    ],
-    cta: {
-      href: getPlanCheckoutUrl("worker_premium"),
-      to: "/register",
-      label: freeBeta ? `Unlock Premium — ${BETA_PERK_LABEL}` : "Go Premium — $29.99",
+    {
+      plan: PLANS.customer,
+      icon: UserRound,
+      features: [
+        "Free to join",
+        "Hire local professionals",
+        "No monthly subscription",
+        "No platform fee to hire",
+        "Message & book workers",
+      ],
+      cta: { to: "/register", label: "Join free" },
+      highlighted: false,
     },
-    highlighted: true,
-  },
-  {
-    plan: PLANS.business,
-    icon: Building2,
-    features: [
-      `${PLANS.business.feeLabel} transaction fee (lowest)`,
-      "Built for crews & multi-company ops",
-      "Everything in Worker Premium",
-      "Priority placement & storage",
-      "Best value as volume grows",
-    ],
-    cta: {
-      href: getPlanCheckoutUrl("business"),
-      to: "/register",
-      label: freeBeta ? `Unlock Business — ${BETA_PERK_LABEL}` : "Get Business — $49.99",
+    {
+      plan: PLANS.starter,
+      icon: Briefcase,
+      features: [
+        `${PLANS.starter.feeLabel} fee on payments you collect`,
+        foundingOpen ? `Founding: first month free, then $${PLANS.starter.priceMonthly}/mo locked` : `$${PLANS.starter.priceMonthly}/mo`,
+        "Dashboard, schedule, estimates & invoices",
+        "Driver Hub Lite + messaging",
+        "Marketplace browsing",
+      ],
+      cta: {
+        href: getPlanCheckoutUrl("starter"),
+        to: "/register",
+        label: foundingOpen ? `Claim Founding Starter — ${BETA_PERK_LABEL}` : `Get Starter — $${PLANS.starter.priceMonthly}`,
+      },
+      highlighted: false,
     },
-    highlighted: false,
-  },
-];
+    {
+      plan: PLANS.worker_premium,
+      icon: Sparkles,
+      badge: "Most Popular",
+      features: [
+        `${PLANS.worker_premium.feeLabel} transaction fee`,
+        foundingOpen
+          ? `Founding: first month free, then $${PLANS.worker_premium.priceMonthly}/mo locked`
+          : `$${PLANS.worker_premium.priceMonthly}/mo membership`,
+        "Full Driver Hub + Driver AI",
+        "Titan Business Assistant + Titan Radio",
+        "Tax Center, Marketplace Apps, analytics",
+      ],
+      cta: {
+        href: getPlanCheckoutUrl("worker_premium"),
+        to: "/register",
+        label: foundingOpen
+          ? `Claim Founding Pro — ${spots} spots left`
+          : `Go Pro — $${PLANS.worker_premium.priceMonthly}`,
+      },
+      highlighted: true,
+    },
+    {
+      plan: PLANS.business,
+      icon: Building2,
+      features: [
+        `${PLANS.business.feeLabel} transaction fee (lowest)`,
+        foundingOpen
+          ? `Founding: first month free, then $${PLANS.business.priceMonthly}/mo locked`
+          : `$${PLANS.business.priceMonthly}/mo`,
+        "Everything in Pro",
+        "Teams, fleet, employee profiles",
+        "Admin controls + highest storage",
+      ],
+      cta: {
+        href: getPlanCheckoutUrl("business"),
+        to: "/register",
+        label: foundingOpen
+          ? `Claim Founding Business — ${BETA_PERK_LABEL}`
+          : `Get Business — $${PLANS.business.priceMonthly}`,
+      },
+      highlighted: false,
+    },
+  ];
 }
 
-function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
+function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }) {
   const checkoutHref = cta.href || plan.checkoutUrl || null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`w-full titan-surface p-6 border ${
+      className={`relative w-full titan-surface p-6 border ${
         highlighted ? "border-titan-cyan/40 titan-glow" : "border-border"
       }`}
     >
+      {(badge || plan.mostPopular) && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-titan-cyan px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+          <Star className="w-3 h-3" /> {badge || "Most Popular"}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{plan.audience}</p>
@@ -111,11 +137,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
             {plan.priceMonthly === 0 ? "$0" : formatMoney(plan.priceMonthly)}
           </span>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {plan.priceMonthly === 0
-              ? isFreeDuringBeta()
-                ? BETA_PERK_LABEL
-                : "to start"
-              : "/ month"}
+            {plan.priceMonthly === 0 ? "to hire" : "/ month"}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1">{plan.feeLabel} fee</p>
         </div>
@@ -158,8 +180,9 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay }) {
 }
 
 export default function Pricing() {
-  const freeBeta = isFreeDuringBeta();
+  const foundingOpen = isFreeDuringBeta();
   const cards = buildCards();
+  const spots = getLaunchStatus().spotsRemaining;
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
     <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
@@ -171,22 +194,22 @@ export default function Pricing() {
           </div>
         )}
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
-          {freeBeta ? (
+          {foundingOpen ? (
             <>
-              Founding 100 — free app<br />
-              <span className="gradient-text">fees still apply</span>
+              Founding 100 — first month free<br />
+              <span className="gradient-text">then locked pricing</span>
             </>
           ) : (
             <>
-              Launch pricing that<br />
-              <span className="gradient-text">grows with you</span>
+              Simple plans that<br />
+              <span className="gradient-text">scale with you</span>
             </>
           )}
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-          {freeBeta
-            ? "First 100 members get Premium tools free forever. Transaction fees still apply when you collect payment. After 100, membership checkout goes live."
-            : `Customers hire free. Workers start at $0 with an ${PLANS.worker_free.feeLabel} fee, then upgrade as they book more work.`}
+          {foundingOpen
+            ? `First ${spots} founder spots: month one free on Pro ($${PLANS.worker_premium.priceMonthly}/mo lock). Fees still apply when you collect payment.`
+            : `Starter $${PLANS.starter.priceMonthly} · Pro $${PLANS.worker_premium.priceMonthly} · Business $${PLANS.business.priceMonthly}. Transaction fees apply when you get paid.`}
         </p>
       </motion.div>
 
@@ -209,7 +232,7 @@ export default function Pricing() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground mb-0.5">TitanOS for Android</p>
             <p className="text-xs text-muted-foreground">
-              {freeBeta ? "Same Founding 100 access on mobile via Google Play" : "Same launch pricing on mobile via Google Play"}
+              Same plans on mobile via Google Play
             </p>
           </div>
           <Button
@@ -233,9 +256,9 @@ export default function Pricing() {
           <div>
             <p className="text-sm font-semibold text-foreground mb-1">Why this structure</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              New users can try the platform with no upfront cost. Professionals get a clear incentive to upgrade as they book more work.
-              Fees apply when you collect payment through TitanOS — Customer {PLANS.customer.feeLabel}, Worker Free {PLANS.worker_free.feeLabel},
-              Worker Premium {PLANS.worker_premium.feeLabel}, Business {PLANS.business.feeLabel}. Pricing can adjust as the network grows.
+              Founding members get month one free, then a lifetime price lock. Everyone else pays Starter / Pro / Business.
+              Fees apply when you collect payment — Customer {PLANS.customer.feeLabel}, Starter {PLANS.starter.feeLabel},
+              Pro {PLANS.worker_premium.feeLabel}, Business {PLANS.business.feeLabel}.
             </p>
           </div>
         </div>

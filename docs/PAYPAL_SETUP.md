@@ -13,12 +13,16 @@ The block you pasted is PayPal’s **public** `live_api` certificate (CN=`live_a
 
 | Product | Amount | Link |
 |---------|--------|------|
-| Worker Premium | $29.99 | `https://www.paypal.com/ncp/payment/Q63SUKNY5AK58` |
-| Business | $49.99 | `https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4` |
+| Starter | $4.99 | Update NCP URL in `PAYPAL_CHECKOUT.starter` |
+| Pro | $9.99 | Update NCP URL in `PAYPAL_CHECKOUT.worker_premium` |
+| Business | $19.99 | Update NCP URL in `PAYPAL_CHECKOUT.business` |
 
-Marketplace **modules are included** with Premium / Business — there is no $1.99 per-module checkout.
+Create matching PayPal No-Code Payment buttons for each amount, then paste the URLs into `src/lib/plan.js`.  
+Legacy $29.99 / $49.99 payments still map to Pro / Business for in-flight checkouts.
 
-Shown on `/pricing` and Settings → Upgrade (after Founding 100 beta closes).
+Marketplace **modules are included** with Pro / Business — there is no $1.99 per-module checkout.
+
+Shown on `/pricing` and Settings → Upgrade. Founding 100: first month free, then locked price.
 
 ## Auto-upgrade after payment (webhook)
 
@@ -46,6 +50,7 @@ PAYPAL_MODE=live
 ### How we match the buyer to a TitanOS account
 
 Payer **email** on the PayPal payment must match `profiles.email` (case-insensitive).  
-Amount maps: **$29.99 → worker_premium**, **$49.99 → business**.
+Amount maps: **$4.99 → starter**, **$9.99 → worker_premium (Pro)**, **$19.99 → business**  
+(also accepts legacy **$29.99 → Pro**, **$49.99 → business**).
 
 If emails don’t match, payment succeeds but the account won’t auto-upgrade — an admin can set `plan_tier` / `paying_subscriber` manually.

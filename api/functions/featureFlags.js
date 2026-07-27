@@ -41,7 +41,8 @@ async function loadLaunchStatus() {
     foundingClaimed: 0,
     spotsRemaining: FOUNDING_CAP_DEFAULT,
     betaActive: true,
-    membershipPaymentsLive: false,
+    /** Checkout always live — Founding 100 = first month free + price lock. */
+    membershipPaymentsLive: true,
   };
   try {
     const { getSupabaseAdmin } = await import("../_lib/supabase.js");
@@ -60,7 +61,7 @@ async function loadLaunchStatus() {
       foundingClaimed: claimed,
       spotsRemaining: Math.max(0, cap - claimed),
       betaActive,
-      membershipPaymentsLive: !betaActive,
+      membershipPaymentsLive: true,
     };
   } catch {
     return fallback;

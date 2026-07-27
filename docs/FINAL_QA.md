@@ -25,7 +25,7 @@ North star: [`FINAL_OBJECTIVE.md`](./FINAL_OBJECTIVE.md) — OS feel + ship gate
 
 ### Manual / ops (owner)
 
-- [ ] Apply migrations **031–036** on production Supabase (esp. **032**, **035**, **036**)
+- [ ] Apply migrations **031–037** on production Supabase (esp. **032**, **035**, **037**)
 - [ ] `npm run test:db-security` against that project
 - [ ] One real Stripe Checkout → webhook marks payment succeeded
 - [ ] Signed-in pass: every nav screen, primary buttons, menus, permission gates

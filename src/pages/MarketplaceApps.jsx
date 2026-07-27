@@ -435,7 +435,7 @@ export default function Marketplace() {
               Modules for <span className="gradient-text">Premium members</span>
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Install industry workflows, creative tools, legal agents, and more — included with Worker Premium ($29.99) or Business ($49.99).
+              Install industry workflows, creative tools, legal agents, and more — included with Pro ($9.99) or Business ($19.99).
             </p>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">

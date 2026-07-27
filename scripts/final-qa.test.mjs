@@ -76,11 +76,11 @@ describe("final-qa: export coverage on history/reports money lists", () => {
   }
 });
 
-describe("final-qa: critical migrations 031–036", () => {
-  it("migrations 031–036 exist on disk", () => {
+describe("final-qa: critical migrations 031–037", () => {
+  it("migrations 031–037 exist on disk", () => {
     const dir = join(root, "supabase/migrations");
     const files = readdirSync(dir);
-    for (const prefix of ["031_", "032_", "033_", "034_", "035_", "036_"]) {
+    for (const prefix of ["031_", "032_", "033_", "034_", "035_", "036_", "037_"]) {
       assert.ok(
         files.some((f) => f.startsWith(prefix)),
         `missing migration starting with ${prefix}`

@@ -76,11 +76,11 @@ describe("final-qa: export coverage on history/reports money lists", () => {
   }
 });
 
-describe("final-qa: critical migrations 031–037", () => {
-  it("migrations 031–037 exist on disk", () => {
+describe("final-qa: critical migrations 031–038", () => {
+  it("migrations 031–038 exist on disk", () => {
     const dir = join(root, "supabase/migrations");
     const files = readdirSync(dir);
-    for (const prefix of ["031_", "032_", "033_", "034_", "035_", "036_", "037_"]) {
+    for (const prefix of ["031_", "032_", "033_", "034_", "035_", "036_", "037_", "038_"]) {
       assert.ok(
         files.some((f) => f.startsWith(prefix)),
         `missing migration starting with ${prefix}`
@@ -104,9 +104,10 @@ describe("final-qa: launch stack honesty", () => {
     assert.doesNotMatch(read("src/pages/Settings.jsx"), /to=["']\/referral["']/);
   });
 
-  it("marketplace modules are subscription-only (no per-module price)", () => {
-    assert.match(read("src/lib/marketplaceCatalog.js"), /MODULE_PRICE\s*=\s*0/);
-    assert.match(read("src/lib/marketplaceCatalog.js"), /Included with Premium/);
+  it("marketplace modules are $0.99 pack (all modules)", () => {
+    assert.match(read("src/lib/marketplaceCatalog.js"), /MODULE_PRICE\s*=\s*0\.99/);
+    assert.match(read("src/lib/plan.js"), /USR42PN73VD9N/);
+    assert.match(read("src/lib/plan.js"), /modules:/);
   });
 });
 

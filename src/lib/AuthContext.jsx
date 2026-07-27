@@ -66,6 +66,7 @@ function userFromSession(session) {
     founding_trial_ends_at: null,
     founding_price_lock: null,
     founding_locked_plan: null,
+    marketplace_pack_unlocked: false,
     plan_tier: "",
     account_type: "",
     theme_pref: "system",

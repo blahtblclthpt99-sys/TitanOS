@@ -9,7 +9,7 @@ import { getPlanCheckoutUrl } from "@/lib/plan";
  */
 export default function PremiumGate({
   title = "Premium feature",
-  description = "Upgrade to Worker Premium to unlock this add-on.",
+  description = "Upgrade to Pro to unlock this feature.",
   compact = false,
   children,
 }) {
@@ -44,7 +44,7 @@ export default function PremiumGate({
             {checkout ? (
               <Button asChild className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold min-h-[44px]">
                 <a href={checkout} target="_blank" rel="noopener noreferrer">
-                  Upgrade · $29.99/mo
+                  Upgrade · $9.99/mo
                 </a>
               </Button>
             ) : null}

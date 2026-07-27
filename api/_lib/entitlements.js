@@ -25,6 +25,7 @@ const PROFILE_SELECT = [
   "founding_trial_ends_at",
   "founding_price_lock",
   "founding_locked_plan",
+  "marketplace_pack_unlocked",
 ].join(",");
 
 /**

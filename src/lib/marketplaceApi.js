@@ -2,6 +2,7 @@ import { api } from "@/api/apiClient";
 import {
   getCatalogModules,
   MARKETPLACE_MODULES,
+  MODULE_PRICE,
   normalizeModule,
 } from "@/lib/marketplaceCatalog";
 
@@ -116,14 +117,23 @@ export async function installModule(user, module) {
 }
 
 /**
- * Install a module. Requires Pro/Business (Marketplace Apps).
- * Prefers server entitlement check; falls back to client gate + local install offline.
+ * Install a module. Entitled via Pro/Business, founding trial, or $0.99 pack unlock.
+ * If locked, opens the Marketplace Modules PayPal NCP ($0.99 · all modules).
  */
 export async function purchaseAndInstallModule(user, module) {
-  const { canUseMarketplaceApps } = await import("@/lib/plan");
+  const { canUseMarketplaceApps, getModulesCheckoutUrl } = await import("@/lib/plan");
   if (!canUseMarketplaceApps(user)) {
-    const err = new Error("Marketplace Apps require Pro ($9.99) or Business ($19.99).");
+    const checkoutUrl = getModulesCheckoutUrl();
+    if (checkoutUrl && typeof window !== "undefined") {
+      window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+    }
+    const err = new Error(
+      checkoutUrl
+        ? "Unlock all Marketplace modules for $0.99 in PayPal (use the same email as TitanOS), then return and install. Or upgrade to Pro."
+        : "Unlock Marketplace modules for $0.99 or upgrade to Pro ($9.99)."
+    );
     err.code = "MARKETPLACE_APPS_LOCKED";
+    err.checkoutUrl = checkoutUrl || null;
     throw err;
   }
 
@@ -148,15 +158,23 @@ export async function purchaseAndInstallModule(user, module) {
     }
   } catch (error) {
     if (error?.status === 403 || error?.code === "PLAN_REQUIRED") {
-      const err = new Error(error.message || "Marketplace Apps require Pro or Business.");
+      const checkoutUrl = getModulesCheckoutUrl();
+      if (checkoutUrl && typeof window !== "undefined") {
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+      }
+      const err = new Error(
+        error.message ||
+          "Unlock Marketplace modules for $0.99 or upgrade to Pro ($9.99)."
+      );
       err.code = "MARKETPLACE_APPS_LOCKED";
+      err.checkoutUrl = checkoutUrl || null;
       throw err;
     }
     // Offline / API gap — client install still requires canUseMarketplaceApps above
   }
 
   const installed = await installModule(user, module);
-  return { payment: null, installed, alreadyOwned: false, free: true };
+  return { payment: null, installed, alreadyOwned: false, free: true, catalogPrice: MODULE_PRICE };
 }
 
 export async function uninstallModule(user, moduleSlug) {

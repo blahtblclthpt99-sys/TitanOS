@@ -41,6 +41,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import { useAuth } from "@/lib/AuthContext";
+import { canUseMarketplaceApps, getModulesCheckoutUrl } from "@/lib/plan";
 import {
   MARKETPLACE_CATEGORIES,
   formatInstallCount,
@@ -311,8 +312,15 @@ export default function Marketplace() {
         setActionSuccess(`${module.name} is already in your toolkit.`);
         return;
       }
-      setActionSuccess(`${module.name} installed — included with your Premium plan.`);
+      setActionSuccess(`${module.name} installed.`);
     } catch (error) {
+      if (error?.code === "MARKETPLACE_APPS_LOCKED") {
+        setActionError(
+          error.message ||
+            "Unlock all modules for $0.99 via PayPal, then return to install."
+        );
+        return;
+      }
       setActionError(error?.message || "Failed to purchase module. Please try again.");
     } finally {
       setActionLoading(false);
@@ -377,6 +385,8 @@ export default function Marketplace() {
 
   const selectedInstalled = selected ? installedSlugs.has(selected.slug) : false;
   const selectedOnWaitlist = selected ? waitlistSlugs.has(selected.slug) : false;
+  const modulesUnlocked = canUseMarketplaceApps(user);
+  const modulesCheckout = getModulesCheckoutUrl();
 
   return (
     <div className="relative p-4 md:p-8 max-w-7xl mx-auto min-h-full">
@@ -404,7 +414,7 @@ export default function Marketplace() {
                 TitanOS <span className="gradient-text">Marketplace</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {modules.length} modules · included with Premium · trades, care, AI &amp; more
+                {modules.length} modules · $0.99 unlock all · or included with Pro
               </p>
             </div>
           </div>
@@ -429,14 +439,22 @@ export default function Marketplace() {
           <div className="max-w-lg">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-4 h-4 text-titan-amber" />
-              <span className="text-xs font-semibold text-titan-amber uppercase tracking-wider">Premium Apps</span>
+              <span className="text-xs font-semibold text-titan-amber uppercase tracking-wider">Marketplace Apps</span>
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-              Modules for <span className="gradient-text">Premium members</span>
+              All modules · <span className="gradient-text">$0.99</span>
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Install industry workflows, creative tools, legal agents, and more — included with Pro ($9.99) or Business ($19.99).
+              One PayPal payment unlocks every industry workflow, creative tool, and AI agent.
+              Also included with Pro ($9.99) or Business ($19.99).
             </p>
+            {!modulesUnlocked && modulesCheckout ? (
+              <Button asChild className="mt-4 bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold min-h-[44px]">
+                <a href={modulesCheckout} target="_blank" rel="noopener noreferrer">
+                  Unlock all modules · $0.99
+                </a>
+              </Button>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
             {[

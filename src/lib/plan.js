@@ -32,21 +32,22 @@ export const BETA_PERK_LABEL = "Founding 100 · first month free";
 export const FOUNDING_TRIAL_DAYS = 30;
 
 /**
- * Live PayPal No-Code Payment links.
- * Ops must create NCP buttons for $4.99 / $9.99 / $19.99 and replace URLs below.
- * Legacy $29.99 / $49.99 links remain mapped in paypal.js for in-flight payments.
+ * Live PayPal No-Code Payment links (NCP button amounts must match).
+ * Legacy $29.99 / $49.99 membership amounts still map in paypal.js for in-flight payments.
  */
 export const PAYPAL_CHECKOUT = Object.freeze({
-  /** Starter — $4.99/mo — replace with matching NCP URL */
-  starter: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
-  /** Pro — $9.99/mo — replace with matching NCP URL */
+  /** Starter — $4.99/mo */
+  starter: "https://www.paypal.com/ncp/payment/TK7HZNKJWAKUL",
+  /** Pro — $9.99/mo */
   worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
-  /** Business — $19.99/mo — replace with matching NCP URL */
+  /** Business — $19.99/mo */
   business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
+  /** Marketplace Modules pack — $0.99 unlocks all catalog modules */
+  modules: "https://www.paypal.com/ncp/payment/USR42PN73VD9N",
 });
 
-/** @deprecated Modules are included with Pro/Business — always 0. */
-export const PAYPAL_MODULE_PRICE = 0;
+/** Marketplace module pack price (all modules). Also included with Pro/Business. */
+export const PAYPAL_MODULE_PRICE = 0.99;
 
 export const PLANS = Object.freeze({
   customer: Object.freeze({
@@ -203,7 +204,7 @@ const PAID_WORKER_FEATURES = new Set([
   PRO_FEATURES.digitalContracts,
   PRO_FEATURES.multiCompany,
   PRO_FEATURES.fleet,
-  PRO_FEATURES.driverAddons,
+  // driverAddons intentionally free — Driver Hub is not a paid add-on
   PRO_FEATURES.titanComPersist,
   PRO_FEATURES.gpsCheckIn,
 ]);
@@ -343,12 +344,19 @@ export function canAccessFeature(user, featureKey) {
   return planAllowsFeature(plan, featureKey);
 }
 
-export function canUseDriverAddons(user) {
-  return canAccessFeature(user, PRO_FEATURES.driverAddons);
+export function canUseDriverAddons(_user) {
+  // Driver Hub intelligence (autopilot, voice, Explorer folders) is free — no Premium sub.
+  return true;
 }
 
 export function canUseMarketplaceApps(user) {
+  if (user?.marketplace_pack_unlocked === true) return true;
   return canAccessFeature(user, PRO_FEATURES.marketplaceApps);
+}
+
+/** PayPal NCP URL for the $0.99 all-modules pack. */
+export function getModulesCheckoutUrl() {
+  return PAYPAL_CHECKOUT.modules || null;
 }
 
 export function canPersistTitanComChannels(user) {
@@ -413,5 +421,6 @@ export function getPlanCheckoutUrl(planId) {
     // enrollment closed and payments flagged off
   }
   const id = PLAN_ALIASES[planId] || planId;
+  if (id === "modules" || id === "marketplace_modules") return getModulesCheckoutUrl();
   return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

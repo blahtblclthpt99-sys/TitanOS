@@ -111,7 +111,7 @@ export async function verifyPayPalWebhook({ headers, event }) {
   return { ok: status === "SUCCESS", reason: status || "unknown", detail: data };
 }
 
-/** Map paid amount → TitanOS plan tier (memberships only). */
+/** Map paid amount → TitanOS plan tier (memberships only — not module pack). */
 export function planTierFromAmount(amount) {
   const n = Math.round(Number(amount) * 100) / 100;
   // Current catalog
@@ -121,14 +121,14 @@ export function planTierFromAmount(amount) {
   // Legacy NCP amounts (pre-reprice)
   if (n === 29.99 || n === 29.9) return "worker_premium";
   if (n === 49.99 || n === 49.9) return "business";
-  // Legacy $1.99 module NCP (retired) — does not change plan_tier
+  // $0.99 / legacy $1.99 = marketplace pack — see isMarketplaceModuleAmount
   return null;
 }
 
-/** @deprecated Legacy $1.99 module NCP — modules are now included with Premium/Business. */
+/** $0.99 Marketplace Modules pack (all catalog apps). Legacy $1.99 per-module NCP also maps here. */
 export function isMarketplaceModuleAmount(amount) {
   const n = Math.round(Number(amount) * 100) / 100;
-  return n === 1.99 || n === 1.9;
+  return n === 0.99 || n === 0.9 || n === 1.99 || n === 1.9;
 }
 
 export function extractPayerEmail(resource = {}) {

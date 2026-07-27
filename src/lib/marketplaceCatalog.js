@@ -1,6 +1,6 @@
-/** Marketplace modules are included with Premium / Business — no per-module fee. */
-export const MODULE_PRICE = 0;
-export const MODULE_PRICE_LABEL = "Included with Premium";
+/** All Marketplace modules: $0.99 pack (or included with Pro / Business). */
+export const MODULE_PRICE = 0.99;
+export const MODULE_PRICE_LABEL = "$0.99 · all modules";
 
 export const MARKETPLACE_CATEGORIES = [
   "All",
@@ -36,7 +36,7 @@ function mod(partial) {
 }
 
 /**
- * Marketplace app catalog — included with Worker Premium ($29.99) or Business ($49.99).
+ * Marketplace app catalog — $0.99 pack unlocks all, or included with Pro / Business.
  * No per-module checkout. Membership required to access Apps tab.
  * Static catalog is the product source of truth (DB seed syncs from here).
  */
@@ -479,7 +479,7 @@ export function formatInstallCount(count) {
 export function formatModulePrice(module) {
   const price = Number(module?.price);
   if (!Number.isFinite(price) || price <= 0) {
-    return module?.price_label || "Included with Premium";
+    return module?.price_label || "Included with Pro";
   }
   const cents = Math.round(price * 100) / 100;
   const label = String(module?.price_label || "").trim();

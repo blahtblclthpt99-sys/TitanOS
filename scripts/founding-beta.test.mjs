@@ -97,10 +97,13 @@ describe("founding launch status", () => {
       lifetime_premium: false,
     };
     assert.equal(isFoundingTrialActive(expired), false);
-    assert.equal(canAccessFeature(expired, PRO_FEATURES.driverAddons), false);
+    // Driver Hub add-ons are free; AI still requires Pro after trial ends
+    assert.equal(canAccessFeature(expired, PRO_FEATURES.driverAddons), true);
+    assert.equal(canAccessFeature(expired, PRO_FEATURES.aiAssistant), false);
 
     const late = { id: "u3", founding_user: false, plan_tier: "worker_free" };
-    assert.equal(canAccessFeature(late, PRO_FEATURES.driverAddons), false);
+    assert.equal(canAccessFeature(late, PRO_FEATURES.driverAddons), true);
+    assert.equal(canAccessFeature(late, PRO_FEATURES.aiAssistant), false);
   });
 
   it("migrations 035 + 037 ship founding claim and trial lock", () => {

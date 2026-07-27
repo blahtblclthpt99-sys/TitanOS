@@ -20,10 +20,8 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import PremiumGate from "@/components/shared/PremiumGate";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { canUseDriverAddons } from "@/lib/plan";
 import { DRIVER_OS_FOLDERS, FOLDER_GROUPS } from "@/lib/driverOs/folders.js";
 
 const LiveShiftFolder = lazy(() => import("./folders/LiveShiftFolder.jsx"));
@@ -86,7 +84,7 @@ const FOLDER_BODY = {
   doordash: DoorDashFolder,
 };
 
-function FolderRow({ folder, open, summary, locked, onToggle, children }) {
+function FolderRow({ folder, open, summary, onToggle, children }) {
   const Icon = ICONS[folder.icon] || Folder;
   return (
     <div className="rounded-2xl border border-border bg-card/70 overflow-hidden shadow-soft transition-shadow duration-150">
@@ -103,9 +101,6 @@ function FolderRow({ folder, open, summary, locked, onToggle, children }) {
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="text-sm font-semibold text-foreground truncate">{folder.label}</span>
-            {folder.premium ? (
-              <span className="text-[9px] uppercase font-bold tracking-wide text-titan-amber">Pro</span>
-            ) : null}
           </span>
           <span className="block text-xs text-muted-foreground truncate">
             {summary || folder.description}
@@ -126,15 +121,7 @@ function FolderRow({ folder, open, summary, locked, onToggle, children }) {
           aria-label={folder.label}
           className="border-t border-border px-3 py-3 bg-background/40"
         >
-          {locked ? (
-            <PremiumGate
-              compact
-              title={`${folder.label} is Premium`}
-              description="Upgrade to unlock this Driver OS intelligence folder. Shift start/stop stays free."
-            />
-          ) : (
-            children
-          )}
+          {children}
         </div>
       ) : null}
     </div>
@@ -155,7 +142,6 @@ export default function DriverExplorer({
   directoryQuery = "",
   refreshTick = 0,
 }) {
-  const addonsOk = canUseDriverAddons(user);
   const q = String(search || "").trim().toLowerCase();
 
   const folders = useMemo(() => {
@@ -209,7 +195,6 @@ export default function DriverExplorer({
             ) : null}
             {group.folders.map((folder) => {
               const open = Boolean(openMap?.[folder.id] || (forceOpenId && forceOpenId === folder.id));
-              const locked = Boolean(folder.premium && !addonsOk);
               const Body = FOLDER_BODY[folder.id];
               return (
                 <div key={folder.id} id={`driver-os-folder-${folder.id}`}>
@@ -217,10 +202,9 @@ export default function DriverExplorer({
                     folder={folder}
                     open={open}
                     summary={summaries[folder.id]}
-                    locked={locked}
                     onToggle={() => onToggle?.(folder.id)}
                   >
-                    {open && !locked && Body ? (
+                    {open && Body ? (
                       <ErrorBoundary message={`${folder.label} couldn't load. Try refresh.`}>
                         <Suspense fallback={<PageLoader variant="list" label={`Loading ${folder.label}`} />}>
                           <Body user={user} initialQuery={directoryQuery} refreshTick={refreshTick} />

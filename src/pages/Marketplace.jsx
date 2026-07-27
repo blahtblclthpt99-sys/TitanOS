@@ -155,8 +155,8 @@ export default function Marketplace() {
           </Suspense>
         ) : (
           <PremiumGate
-            title="Marketplace Apps require Premium"
-            description="Install industry modules and add-ons with Worker Premium or Business. Service listings stay available on Free."
+            title="Marketplace Apps"
+            description="Unlock all modules for $0.99, or with Pro / Business. Service listings stay available on Free."
           />
         )
       ) : <>

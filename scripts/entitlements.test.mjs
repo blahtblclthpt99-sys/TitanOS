@@ -29,7 +29,7 @@ describe("shared entitlements", () => {
     assert.equal(resolvePlanId(starter), "starter");
     assert.equal(profileAllowsFeature(starter, FEATURES.unlimitedEstimates), true);
     assert.equal(profileAllowsFeature(starter, FEATURES.aiAssistant), false);
-    assert.equal(profileAllowsFeature(starter, FEATURES.driverAddons), false);
+    assert.equal(profileAllowsFeature(starter, FEATURES.driverAddons), true);
   });
 
   it("pro unlocks AI apps OCR routes", () => {
@@ -37,6 +37,12 @@ describe("shared entitlements", () => {
     assert.equal(profileAllowsFeature(pro, FEATURES.aiAssistant), true);
     assert.equal(profileAllowsFeature(pro, FEATURES.marketplaceApps), true);
     assert.equal(profileAllowsFeature(pro, FEATURES.ocrReceipts), true);
+  });
+
+  it("$0.99 marketplace pack unlocks apps without Pro", () => {
+    const pack = { plan_tier: "worker_free", marketplace_pack_unlocked: true, role: "user" };
+    assert.equal(profileAllowsFeature(pack, FEATURES.marketplaceApps), true);
+    assert.equal(profileAllowsFeature(pack, FEATURES.aiAssistant), false);
   });
 
   it("founding trial unlocks pro; expired trial does not", () => {

@@ -48,7 +48,7 @@ const PAID_WORKER_FEATURES = new Set([
   FEATURES.digitalContracts,
   FEATURES.multiCompany,
   FEATURES.fleet,
-  FEATURES.driverAddons,
+  // driverAddons intentionally free — Driver Hub is not a paid add-on
   FEATURES.titanComPersist,
   FEATURES.gpsCheckIn,
 ]);
@@ -130,6 +130,14 @@ export function profileAllowsFeature(profile, featureKey, auth = {}) {
   if (isOwnerEmail(email)) return true;
   if (profile?.role === "admin") return true;
 
+  // $0.99 Marketplace Modules pack (all apps) — not a membership tier
+  if (
+    featureKey === FEATURES.marketplaceApps &&
+    profile?.marketplace_pack_unlocked === true
+  ) {
+    return true;
+  }
+
   if (isFoundingTrialActive(profile)) {
     const locked = String(profile.founding_locked_plan || "worker_premium").toLowerCase();
     const planId = PLAN_ALIASES[locked] || locked || "worker_premium";
@@ -158,7 +166,7 @@ export function profileAllowsFeature(profile, featureKey, auth = {}) {
 
 export function featureUpgradeHint(featureKey) {
   if (featureKey === FEATURES.marketplaceApps) {
-    return "Marketplace Apps require Pro ($9.99) or Business ($19.99).";
+    return "Unlock Marketplace modules for $0.99, or upgrade to Pro ($9.99) / Business ($19.99).";
   }
   if (featureKey === FEATURES.aiAssistant) {
     return "Titan AI requires Pro ($9.99) or Business ($19.99).";

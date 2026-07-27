@@ -6,6 +6,7 @@ import { logError } from "../_lib/safeLog.js";
 import {
   extractPaidAmount,
   extractPayerEmail,
+  isMarketplaceModuleAmount,
   paypalConfigured,
   planTierFromAmount,
   verifyPayPalWebhook,
@@ -57,6 +58,9 @@ async function upgradeProfileByEmail(admin, email, planTier, eventId) {
     patch.account_type = "business";
   } else if (planTier === "worker_premium") {
     patch.account_type = "worker";
+  } else if (planTier === "starter") {
+    patch.account_type = "worker";
+    patch.is_pro = false;
   }
 
   const ids = profiles.map((p) => p.id);
@@ -66,6 +70,36 @@ async function upgradeProfileByEmail(admin, email, planTier, eventId) {
   return {
     updated: true,
     planTier,
+    userIds: ids,
+    eventId,
+  };
+}
+
+/** $0.99 Marketplace Modules pack — unlocks all catalog apps (not a plan upgrade). */
+async function unlockMarketplacePackByEmail(admin, email, eventId) {
+  if (!email) return { updated: false, reason: "missing_email" };
+  const normalized = String(email).trim().toLowerCase();
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, email, marketplace_pack_unlocked")
+    .ilike("email", normalized)
+    .limit(5);
+  if (error) throw error;
+  if (!profiles?.length) return { updated: false, reason: "no_profile_for_email", email: normalized };
+
+  const ids = profiles.map((p) => p.id);
+  const { error: upErr } = await admin
+    .from("profiles")
+    .update({
+      marketplace_pack_unlocked: true,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", ids);
+  if (upErr) throw upErr;
+
+  return {
+    updated: true,
+    marketplacePack: true,
     userIds: ids,
     eventId,
   };
@@ -148,6 +182,19 @@ export default async function handler(req, res) {
       }
 
       const amount = extractPaidAmount(resource);
+      const email = extractPayerEmail(resource);
+
+      if (isMarketplaceModuleAmount(amount)) {
+        const result = await unlockMarketplacePackByEmail(admin, email, event.id);
+        return res.status(200).json({
+          received: true,
+          type,
+          amount,
+          product: "marketplace_modules",
+          ...result,
+        });
+      }
+
       const planTier = planTierFromAmount(amount);
       if (!planTier) {
         return res.status(200).json({
@@ -158,7 +205,6 @@ export default async function handler(req, res) {
         });
       }
 
-      const email = extractPayerEmail(resource);
       const result = await upgradeProfileByEmail(admin, email, planTier, event.id);
 
       return res.status(200).json({

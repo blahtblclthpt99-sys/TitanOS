@@ -9,7 +9,7 @@ import { secretsEqual } from "../_lib/secureCompare.js";
 
 /**
  * Admin-only marketplace catalog seed / sync.
- * Upserts all static catalog modules at MODULE_PRICE (0 — included with Premium).
+ * Upserts all static catalog modules at MODULE_PRICE ($0.99 · all modules pack).
  */
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     // Align any leftover rows to MODULE_PRICE
     await admin
       .from("marketplace_modules")
-      .update({ price: MODULE_PRICE, price_label: "" })
+      .update({ price: MODULE_PRICE, price_label: "$0.99 · all modules" })
       .not("slug", "is", null);
 
     return res.status(200).json({

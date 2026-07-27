@@ -70,13 +70,19 @@ describe("PayPal membership path", () => {
   });
 
   it("maps checkout amounts to plan tiers", async () => {
-    const { planTierFromAmount, extractPayerEmail } = await import("../api/_lib/paypal.js");
+    const { planTierFromAmount, isMarketplaceModuleAmount, extractPayerEmail } = await import(
+      "../api/_lib/paypal.js"
+    );
     assert.equal(planTierFromAmount(4.99), "starter");
     assert.equal(planTierFromAmount(9.99), "worker_premium");
     assert.equal(planTierFromAmount(19.99), "business");
     assert.equal(planTierFromAmount(29.99), "worker_premium");
     assert.equal(planTierFromAmount(49.99), "business");
+    assert.equal(planTierFromAmount(0.99), null);
     assert.equal(planTierFromAmount(10), null);
+    assert.equal(isMarketplaceModuleAmount(0.99), true);
+    assert.equal(isMarketplaceModuleAmount(1.99), true);
+    assert.equal(isMarketplaceModuleAmount(4.99), false);
     assert.equal(
       extractPayerEmail({ payer: { email_address: "a@b.com" } }),
       "a@b.com"
@@ -85,12 +91,12 @@ describe("PayPal membership path", () => {
 });
 
 describe("Marketplace free + payment fees", () => {
-  it("marketplace modules are included with Premium (no $1.99 fee)", async () => {
+  it("marketplace modules are $0.99 pack (all modules)", async () => {
     const { MODULE_PRICE, MODULE_PRICE_LABEL, MARKETPLACE_MODULES, formatModulePrice } = await import(
       "../src/lib/marketplaceCatalog.js"
     );
-    assert.equal(MODULE_PRICE, 0);
-    assert.match(MODULE_PRICE_LABEL, /Premium/i);
+    assert.equal(MODULE_PRICE, 0.99);
+    assert.match(MODULE_PRICE_LABEL, /0\.99/i);
     assert.ok(MARKETPLACE_MODULES.length >= 25);
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "law-mastermind-ai"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "babysitting-pro"));
@@ -102,11 +108,15 @@ describe("Marketplace free + payment fees", () => {
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-car-wash"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-mechanic"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "christmas-light-installer"));
-    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0));
-    assert.equal(formatModulePrice({ price: 0 }), "Included with Premium");
-    const { PAYPAL_CHECKOUT } = await import("../src/lib/plan.js");
-    assert.ok(PAYPAL_CHECKOUT.worker_premium);
-    assert.ok(PAYPAL_CHECKOUT.business);
+    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0.99));
+    assert.match(formatModulePrice({ price: 0.99, price_label: MODULE_PRICE_LABEL }), /0\.99/);
+    assert.equal(formatModulePrice({ price: 0 }), "Included with Pro");
+    const { PAYPAL_CHECKOUT, PAYPAL_MODULE_PRICE } = await import("../src/lib/plan.js");
+    assert.ok(PAYPAL_CHECKOUT.starter.includes("TK7HZNKJWAKUL"));
+    assert.ok(PAYPAL_CHECKOUT.worker_premium.includes("Q63SUKNY5AK58"));
+    assert.ok(PAYPAL_CHECKOUT.business.includes("5V47YYFZVCNZ4"));
+    assert.ok(PAYPAL_CHECKOUT.modules.includes("USR42PN73VD9N"));
+    assert.equal(PAYPAL_MODULE_PRICE, 0.99);
     assert.equal(PAYPAL_CHECKOUT.module, undefined);
   });
 
@@ -153,6 +163,7 @@ describe("Critical migrations on disk", () => {
     "supabase/migrations/035_founding_100_beta.sql",
     "supabase/migrations/036_marketplace_modules_subscription_only.sql",
     "supabase/migrations/037_founding_trial_price_lock.sql",
+    "supabase/migrations/038_marketplace_pack_unlocked.sql",
   ];
   for (const file of required) {
     it(`has ${file}`, () => {

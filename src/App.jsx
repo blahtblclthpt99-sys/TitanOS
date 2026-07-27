@@ -114,6 +114,7 @@ function AppShellGate() {
   const pathname = normalizeAppPath(location.pathname);
   const publicPath = isPublicPath(pathname);
   const isHome = pathname === "/";
+  const nativeRoot = shouldUseHashRouter() && isHome;
   // Re-check on every render so post-login navigation sees the new session immediately.
   const cachedSession = hasCachedAuthSession();
 
@@ -138,7 +139,8 @@ function AppShellGate() {
   const wantsAppShell =
     (isAuthenticated && !publicPath) ||
     (isAuthenticated && isHome) ||
-    (cachedSession && (isHome || !publicPath));
+    (cachedSession && (isHome || !publicPath)) ||
+    nativeRoot;
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {
@@ -157,8 +159,8 @@ function AppShellGate() {
   }
 
   // Public marketing / auth — paint immediately (no auth spinner)
-  // Home (`/`) is Landing only for truly anonymous visitors (no cached session).
-  if (isHome || publicPath) {
+  // Home (`/`) is Landing only on the web; native `/` should enter the app flow.
+  if ((!nativeRoot && isHome) || publicPath) {
     return <PublicRoutes />;
   }
 

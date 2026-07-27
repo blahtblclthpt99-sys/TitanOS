@@ -22,8 +22,8 @@ import {
   getPlanCheckoutUrl,
   isFreeDuringBeta,
   BETA_PERK_LABEL,
-  getLaunchStatus,
 } from "@/lib/plan";
+import { getLaunchStatus } from "@/lib/launchStatus";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
 

@@ -3,6 +3,7 @@
  * Not a full LaunchDarkly replacement; enough for gradual rollouts and incident kills.
  */
 import { envString } from "@/lib/viteEnv";
+import { getLaunchStatus } from './launchStatus.js';
 
 const LOCAL_KEY = "titanos_feature_flags_override_v1";
 const CACHE_KEY = "titanos_feature_flags_remote_v1";
@@ -112,11 +113,9 @@ export async function refreshFeatureFlagsFromServer() {
       memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));
     }
     if (data?.launch && typeof data.launch === "object") {
-      try {
-        const { applyLaunchStatus } = await import("@/lib/launchStatus");
-        applyLaunchStatus(data.launch);
-      } catch {
-        /* */
+      const status = await getLaunchStatus(data.launch);
+      if (status) {
+        memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));
       }
     }
   } catch {

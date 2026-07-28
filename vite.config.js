@@ -57,29 +57,11 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (!id.includes('node_modules')) return;
-            // Tiny shared utils must live in a dedicated chunk so they never
-            // get parked inside charts/radix islands (which would force the
-            // marketing entry to download those islands just for clsx/cva).
-            if (
-              id.includes('clsx') ||
-              id.includes('class-variance-authority') ||
-              id.includes('tailwind-merge') ||
-              id.includes(`${path.sep}tslib${path.sep}`) ||
-              id.includes('/tslib/')
-            ) {
-              return 'shared';
-            }
-            if (id.includes('@supabase')) return 'supabase';
-            if (id.includes('@tanstack')) return 'tanstack';
-            if (id.includes('framer-motion')) return 'motion';
-            // Do NOT force recharts into a named chunk — dynamic imports already
-            // split it, and a manual charts island pulls shared deps into entry.
-            if (id.includes('lucide-react')) return 'icons';
-            if (id.includes('@radix-ui')) return 'radix';
-            if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
-              return 'react-vendor';
-            }
+            if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) return "react-vendor";
+            if (id.includes("@supabase/supabase-js")) return "supabase";
+            if (id.includes("framer-motion")) return "motion";
+            if (id.includes("@radix-ui")) return "radix";
+            if (id.includes("recharts")) return "charts";
           },
         },
       },

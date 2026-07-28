@@ -1,0 +1,46 @@
+{
+  "name": "TitanOS",
+  "version": "1.0.0",
+  "description": "Enterprise-grade field operating system for workers, contractors, drivers, businesses, and teams.",
+  "main": "src/main.tsx",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "jest",
+    "test:e2e": "playwright test",
+    "android:sign": "capacitor build android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "supabase-js": "^1.28.0",
+    "capacitor": "^3.3.0",
+    "vite": "^2.6.4"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.3",
+    "eslint": "^7.32.0",
+    "jest": "^27.0.6",
+    "playwright": "^1.15.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blahtblclthpt99-sys/TitanOS.git"
+  },
+  "keywords": [
+    "TitanOS",
+    "field operating system",
+    "React",
+    "Vite",
+    "Supabase",
+    "Capacitor"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/blahtblclthpt99-sys/TitanOS/issues"
+  },
+  "homepage": "https://github.com/blahtblclthpt99-sys/TitanOS#readme"
+}

@@ -121,7 +121,7 @@ export default function DesktopTopBar() {
     >
       <TitanBrandLogo
         to="/"
-        className="mr-1 inline-flex"
+        className="mr-1 hidden lg:inline-flex"
         markClassName="h-7 w-7"
       />
       <div className="relative max-w-xl flex-1" ref={searchRef}>

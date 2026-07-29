@@ -291,9 +291,9 @@
 
 /* Skip link */
 .skip-link {
-  position: absolute;
-  left: var(--space-2);
-  top: -100px;
+  position: fixed;
+  left: 50%;
+  top: var(--space-2);
   z-index: 200;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
@@ -301,11 +301,16 @@
   color: hsl(var(--primary-foreground));
   font-size: 0.875rem;
   font-weight: 600;
-  transition: top var(--duration-fast) var(--ease-out);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -180%);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
 }
 .skip-link:focus,
 .skip-link:focus-visible {
-  top: var(--space-2);
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }

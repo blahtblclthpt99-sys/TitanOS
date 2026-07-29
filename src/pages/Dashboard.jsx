@@ -1096,7 +1096,7 @@ export default function Dashboard({ isActive = true }) {
 
   return (
     <PageShell
-      maxWidth="xl"
+      maxWidth="full"
       dense
       className="overflow-y-auto pb-36"
       style={{ overflowAnchor: "none" }}

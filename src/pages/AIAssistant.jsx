@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale } from "lucide-react";
+import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import ReactMarkdown from "react-markdown";
 import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 import ConfirmationCard from "@/components/ai/ConfirmationCard";
@@ -11,9 +13,17 @@ import ActionResult from "@/components/ai/ActionResult";
 import { buildBusinessSummary } from "@/lib/ai-business-summary";
 import { buildAiPageContext } from "@/lib/aiPageContext";
 import { useAuth } from "@/lib/AuthContext";
+import { isOwnerAccount } from "@/lib/ownerAccount";
 import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
 import { appendAiConversationTurn, listAiConversationDocs } from "@/lib/aiConversationStore";
 import { upsertSearchDocs } from "@/lib/searchIndex";
+import {
+  appendTitanActionLog,
+  clearTitanActionLogs,
+  getTitanOpsState,
+  setTitanKillSwitch,
+  setTitanRoutineEnabled,
+} from "@/lib/titanAiOpsMemory";
 
 const SUGGESTIONS = [
   { label: "Today's jobs", prompt: "What jobs do I have scheduled today?" },
@@ -35,8 +45,15 @@ const LAW_SUGGESTIONS = [
   { label: "Late payment", prompt: "What steps can I take when a client is late on payment?" },
 ];
 
+const WORKFLOW_PROMPTS = Object.freeze({
+  morning_ops: "Run morning ops workflow",
+  cash_recovery: "Run cash recovery sprint",
+  closeout: "Run daily closeout workflow",
+});
+
 export default function AIAssistant() {
   const { user } = useAuth();
+  const ownerMode = isOwnerAccount(user);
   const [params] = useSearchParams();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -46,9 +63,90 @@ export default function AIAssistant() {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
   const [lawMastermind, setLawMastermind] = useState(false);
+  const [ownerAutopilot, setOwnerAutopilot] = useState(false);
+  const [opsState, setOpsState] = useState({ killSwitch: false, routines: [], logs: [] });
+  const [rollbackingId, setRollbackingId] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const seededQ = useRef(false);
+
+  useEffect(() => {
+    if (!ownerMode) {
+      setOwnerAutopilot(false);
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem("titanai_owner_autopilot");
+      setOwnerAutopilot(saved === "1");
+    } catch {
+      setOwnerAutopilot(false);
+    }
+  }, [ownerMode]);
+
+  const setAutopilot = useCallback(
+    (enabled) => {
+      if (!ownerMode) return;
+      setOwnerAutopilot(Boolean(enabled));
+      try {
+        window.localStorage.setItem("titanai_owner_autopilot", enabled ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+    },
+    [ownerMode]
+  );
+
+  useEffect(() => {
+    if (!ownerMode || !user?.id) {
+      setOpsState({ killSwitch: false, routines: [], logs: [] });
+      return;
+    }
+    setOpsState(getTitanOpsState(user.id));
+  }, [ownerMode, user?.id]);
+
+  const refreshOpsState = useCallback(() => {
+    if (!user?.id || !ownerMode) return;
+    setOpsState(getTitanOpsState(user.id));
+  }, [ownerMode, user?.id]);
+
+  const setKillSwitch = useCallback(
+    (enabled) => {
+      if (!user?.id || !ownerMode) return;
+      setTitanKillSwitch(user.id, enabled);
+      appendTitanActionLog(user.id, {
+        status: enabled ? "warn" : "ok",
+        title: enabled ? "Kill switch enabled" : "Kill switch disabled",
+        detail: enabled
+          ? "All Titan AI write actions are blocked until disabled."
+          : "Titan AI write actions can run again.",
+      });
+      refreshOpsState();
+    },
+    [ownerMode, refreshOpsState, user?.id]
+  );
+
+  const setRoutineEnabled = useCallback(
+    (routineId, enabled) => {
+      if (!user?.id || !ownerMode) return;
+      setTitanRoutineEnabled(user.id, routineId, enabled);
+      appendTitanActionLog(user.id, {
+        status: "ok",
+        title: `${enabled ? "Enabled" : "Disabled"} routine`,
+        detail: routineId,
+      });
+      refreshOpsState();
+    },
+    [ownerMode, refreshOpsState, user?.id]
+  );
+
+  const runWorkflow = useCallback(
+    (workflowId) => {
+      const enabled = opsState.routines.find((r) => r.id === workflowId)?.enabled !== false;
+      if (!enabled || !WORKFLOW_PROMPTS[workflowId]) return;
+      sendMessage(WORKFLOW_PROMPTS[workflowId]);
+    },
+    [opsState.routines]
+  );
 
   const loadBusinessData = useCallback(async () => {
     setDataLoading(true);
@@ -131,6 +229,10 @@ export default function AIAssistant() {
         pageContext,
         offlineSnapshot: businessSummary || undefined,
         lawMastermind,
+        ownerAutopilot: ownerMode && ownerAutopilot,
+        guardrails: {
+          killSwitch: ownerMode && opsState.killSwitch,
+        },
       });
 
       const data = result.data;
@@ -161,6 +263,26 @@ export default function AIAssistant() {
           },
         });
         setConfirming(true);
+      } else if (data.type === "done" || data.type === "workflow_done") {
+        const workflowDetails =
+          data.type === "workflow_done" && Array.isArray(data.steps) && data.steps.length
+            ? `\n\n${data.steps.map((s, i) => `${i + 1}. ${s.message || s.intent}`).join("\n")}`
+            : "";
+        replaceLastMessage({
+          role: "assistant",
+          content: `${data.message || "Action completed."}${workflowDetails}`,
+          type: "done",
+          rollback: data.rollback || null,
+        });
+        if (user?.id && ownerMode) {
+          appendTitanActionLog(user.id, {
+            status: "ok",
+            title: data.type === "workflow_done" ? "Workflow completed" : "Action completed",
+            detail: data.message || "Titan AI action completed.",
+            rollback: data.rollback || null,
+          });
+          refreshOpsState();
+        }
       } else {
         replaceLastMessage({
           role: "assistant",
@@ -175,6 +297,14 @@ export default function AIAssistant() {
           ? "Please sign in again to use Titan AI."
           : e?.message || "Something went wrong. Please try again.";
       replaceLastMessage({ role: "assistant", content: msg, type: "error" });
+      if (user?.id && ownerMode) {
+        appendTitanActionLog(user.id, {
+          status: "error",
+          title: "Action failed",
+          detail: msg,
+        });
+        refreshOpsState();
+      }
     } finally {
       setLoading(false);
     }
@@ -199,16 +329,34 @@ export default function AIAssistant() {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant" }),
         confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params },
+        ownerAutopilot: ownerMode && ownerAutopilot,
+        guardrails: {
+          killSwitch: ownerMode && opsState.killSwitch,
+        },
       });
       const data = result.data;
       const isError = data.type === "error";
       setMessages((prev) =>
         prev.map((m, i) =>
           i === msgIndex
-            ? { role: "assistant", content: data.message, type: isError ? "error" : "done" }
+            ? {
+                role: "assistant",
+                content: data.message,
+                type: isError ? "error" : "done",
+                rollback: data.rollback || null,
+              }
             : m
         )
       );
+      if (user?.id && ownerMode) {
+        appendTitanActionLog(user.id, {
+          status: isError ? "error" : "ok",
+          title: isError ? "Confirmed action failed" : "Confirmed action completed",
+          detail: data.message || "Titan AI completed a confirmed action.",
+          rollback: data.rollback || null,
+        });
+        refreshOpsState();
+      }
       if (!isError) loadBusinessData();
     } catch {
       setMessages((prev) =>
@@ -222,8 +370,62 @@ export default function AIAssistant() {
             : m
         )
       );
+      if (user?.id && ownerMode) {
+        appendTitanActionLog(user.id, {
+          status: "error",
+          title: "Confirmed action failed",
+          detail: "Action failed. Please try again or use the app directly.",
+        });
+        refreshOpsState();
+      }
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const handleRollback = async (msgIndex) => {
+    const row = messages[msgIndex];
+    const rollback = row?.rollback;
+    if (!rollback || !user?.id || !ownerMode || rollbackingId) return;
+    setRollbackingId(row?.rollback?.id || `msg-${msgIndex}`);
+    try {
+      const result = await api.functions.invoke("titanAI", {
+        messages: [],
+        pageContext: buildAiPageContext({ pathname: "/assistant" }),
+        rollbackAction: rollback,
+        ownerAutopilot: ownerMode && ownerAutopilot,
+        guardrails: {
+          killSwitch: ownerMode && opsState.killSwitch,
+        },
+      });
+      const data = result.data || {};
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === msgIndex
+            ? {
+                ...m,
+                content: `${m.content}\n\nRollback: ${data.message || "completed."}`,
+                rollback: null,
+              }
+            : m
+        )
+      );
+      appendTitanActionLog(user.id, {
+        status: data.type === "error" ? "error" : "ok",
+        title: data.type === "error" ? "Rollback failed" : "Rollback completed",
+        detail: data.message || "Rollback result.",
+      });
+      refreshOpsState();
+      loadBusinessData();
+    } catch (e) {
+      appendTitanActionLog(user.id, {
+        status: "error",
+        title: "Rollback failed",
+        detail: e?.message || "Rollback request failed.",
+      });
+      refreshOpsState();
+    } finally {
+      setRollbackingId(null);
     }
   };
 
@@ -298,7 +500,12 @@ export default function AIAssistant() {
     if (msg.type === "done" || msg.type === "error") {
       return (
         <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <ActionResult message={msg.content} isError={msg.type === "error"} />
+          <ActionResult
+            message={msg.content}
+            isError={msg.type === "error"}
+            onRollback={msg.rollback ? () => handleRollback(i) : null}
+            rollbackLoading={rollbackingId === (msg?.rollback?.id || `msg-${i}`)}
+          />
         </motion.div>
       );
     }
@@ -373,6 +580,16 @@ export default function AIAssistant() {
                 </>
               )}
             </div>
+            {ownerMode && !lawMastermind ? (
+              <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  checked={ownerAutopilot}
+                  onCheckedChange={setAutopilot}
+                  aria-label="Owner autopilot"
+                />
+                Owner autopilot
+              </label>
+            ) : null}
           </div>
         </div>
         {messages.length > 0 && (
@@ -387,6 +604,93 @@ export default function AIAssistant() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4">
+        {ownerMode && !lawMastermind ? (
+          <div className="mb-4 rounded-2xl border border-border bg-card/70 p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Titan Command Guardrails
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kill switch blocks all Titan AI write actions until disabled.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                <ShieldAlert className={`w-3.5 h-3.5 ${opsState.killSwitch ? "text-red-400" : "text-emerald-400"}`} />
+                Kill switch
+                <Switch checked={Boolean(opsState.killSwitch)} onCheckedChange={setKillSwitch} />
+              </label>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
+                onClick={() => runWorkflow("morning_ops")}
+                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "morning_ops")?.enabled}
+              >
+                Run Morning Ops
+              </button>
+              <button
+                type="button"
+                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
+                onClick={() => runWorkflow("cash_recovery")}
+                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "cash_recovery")?.enabled}
+              >
+                Run Cash Recovery
+              </button>
+              <button
+                type="button"
+                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
+                onClick={() => runWorkflow("closeout")}
+                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "closeout")?.enabled}
+              >
+                Run Daily Closeout
+              </button>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              {opsState.routines.map((routine) => (
+                <label key={routine.id} className="inline-flex items-center gap-2 text-xs text-foreground">
+                  <Checkbox
+                    checked={routine.enabled !== false}
+                    onCheckedChange={(checked) => setRoutineEnabled(routine.id, checked === true)}
+                  />
+                  {routine.label}
+                </label>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-border/80 bg-background/40 p-2.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Action log</p>
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    if (!user?.id) return;
+                    clearTitanActionLogs(user.id);
+                    refreshOpsState();
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+              <ul className="space-y-1 max-h-32 overflow-y-auto">
+                {opsState.logs.slice(0, 6).map((log) => (
+                  <li key={log.id} className="text-[11px] text-muted-foreground">
+                    <span className="text-foreground font-semibold">{log.title}</span>
+                    {log.detail ? ` · ${log.detail}` : ""}
+                  </li>
+                ))}
+                {opsState.logs.length === 0 ? (
+                  <li className="text-[11px] text-muted-foreground">No actions yet.</li>
+                ) : null}
+              </ul>
+            </div>
+          </div>
+        ) : null}
+
         {messages.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 8 }}

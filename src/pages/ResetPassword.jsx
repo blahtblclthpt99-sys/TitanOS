@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
 import { Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";

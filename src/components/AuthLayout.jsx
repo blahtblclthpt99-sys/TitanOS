@@ -6,7 +6,7 @@ import { applyTheme, getStoredTheme } from "@/lib/theme";
  * Public auth shell: fixed light card for readability on Login/Register.
  * Restores the user's theme preference when leaving auth screens.
  */
-export default function AuthLayout({ title, subtitle, children, footer }) {
+export default function AuthLayout({ title, subtitle, children, footer = null }) {
   useEffect(() => {
     applyTheme(getStoredTheme());
   }, []);

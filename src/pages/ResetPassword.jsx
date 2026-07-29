@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
@@ -23,17 +21,21 @@ export default function ResetPassword() {
       setChecking(false);
     };
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+    /** @param {string} event */
+    function handleAuthStateChange(event) {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
         setChecking(false);
       }
-    });
+    }
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     checkSession();
     return () => subscription.subscription.unsubscribe();
   }, []);
 
+  /** @param {React.FormEvent<HTMLFormElement>} e */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -47,10 +49,10 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      await api.auth.resetPassword({ newPassword });
+      await supabase.auth.updateUser({ password: newPassword });
       navigate("/login", { replace: true });
     } catch (err) {
-      setError(err.message || "Failed to reset password");
+      setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ export default function ResetPassword() {
     return (
       <AuthLayout title="Loading" subtitle="Preparing password reset">
         <div className="flex justify-center py-6">
-          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       </AuthLayout>
     );
@@ -69,11 +71,11 @@ export default function ResetPassword() {
   if (!ready) {
     return (
       <AuthLayout title="Invalid reset link" subtitle="This link is missing or expired">
-        <p className="text-sm text-slate-600 text-center mb-4">
+        <p className="mb-4 text-center text-sm text-muted-foreground">
           Open the reset link from your email, or request a new password reset.
         </p>
         <p className="text-center text-sm">
-          <Link to="/forgot-password" className="font-semibold text-slate-800 hover:underline">
+          <Link to="/forgot-password" className="font-semibold text-foreground hover:underline">
             Request a new link
           </Link>
         </p>
@@ -84,18 +86,18 @@ export default function ResetPassword() {
   return (
     <AuthLayout title="New password" subtitle="Choose a new password for TitanOS">
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100" role="alert">
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="password" className="font-medium text-foreground">
+          <label htmlFor="password" className="font-medium text-foreground">
             New password
-          </Label>
+          </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
+            <input
               id="password"
               type="password"
               autoComplete="new-password"
@@ -103,25 +105,25 @@ export default function ResetPassword() {
               placeholder="••••••••"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-background border-border text-foreground"
+              className="h-12 w-full rounded-xl border border-border bg-background pl-10 text-foreground"
               required
             />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm" className="font-medium text-foreground">
+          <label htmlFor="confirm" className="font-medium text-foreground">
             Confirm password
-          </Label>
+          </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
+            <input
               id="confirm"
               type="password"
               autoComplete="new-password"
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-background border-border text-foreground"
+              className="h-12 w-full rounded-xl border border-border bg-background pl-10 text-foreground"
               required
             />
           </div>

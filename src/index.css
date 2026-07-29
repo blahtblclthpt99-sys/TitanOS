@@ -263,43 +263,13 @@
 
   /* Typography hierarchy */
   h1 {
-    font-family: var(--font-heading);
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-    color: hsl(var(--foreground));
-    font-size: 1.5rem;
-  }
-  @media (min-width: 768px) {
-    h1 {
-      font-size: 1.875rem;
-    }
+    @apply font-heading tracking-tight text-foreground text-2xl md:text-3xl font-bold;
   }
   h2 {
-    font-family: var(--font-heading);
-    font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-    color: hsl(var(--foreground));
-    font-size: 1.25rem;
-  }
-  @media (min-width: 768px) {
-    h2 {
-      font-size: 1.5rem;
-    }
+    @apply font-heading tracking-tight text-foreground text-xl md:text-2xl font-semibold;
   }
   h3 {
-    font-family: var(--font-heading);
-    font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-    color: hsl(var(--foreground));
-    font-size: 1rem;
-  }
-  @media (min-width: 768px) {
-    h3 {
-      font-size: 1.125rem;
-    }
+    @apply font-heading tracking-tight text-foreground text-base md:text-lg font-semibold;
   }
 
   /* Focus — keyboard accessibility */

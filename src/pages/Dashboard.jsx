@@ -1082,6 +1082,19 @@ export default function Dashboard({ isActive = true }) {
   };
 
   const unreadNotifs = notifs.filter((n) => !n.read_at).length;
+  const completedTodayCount = data.todayJobs.filter((j) =>
+    /done|complete|closed/i.test(String(j.status || ""))
+  ).length;
+  const completionPct = data.todayJobs.length
+    ? (completedTodayCount / data.todayJobs.length) * 100
+    : 0;
+  const overdueBalance = data.overdueInv.reduce((sum, inv) => {
+    const raw = Number(
+      inv?.balance_due ?? inv?.amount_due ?? inv?.total_amount ?? inv?.total ?? 0
+    );
+    return sum + (Number.isFinite(raw) ? raw : 0);
+  }, 0);
+  const quickActions = QUICK_CREATE_ACTIONS.slice(0, 4);
   const todayLabel = new Date().toLocaleDateString(undefined, {
     weekday: "long",
     month: "short",
@@ -1113,83 +1126,116 @@ export default function Dashboard({ isActive = true }) {
         </div>
       ) : null}
 
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="mb-1 text-caption font-bold uppercase tracking-widest text-primary">
-            Command Center · {todayLabel}
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            {greeting}, {name}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-            Your personalized cockpit — analytics, alerts, favorites, and next steps in one place.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <TitanScoreBadge score={health.score} grade={health.grade} size="md" />
-            {titanVerified ? <TitanVerifiedBadge size="sm" /> : null}
-            <button
-              type="button"
-              onClick={() => navigate("/jobs")}
-              className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-muted focus-ring"
-            >
-              {data.todayJobs.length} job{data.todayJobs.length !== 1 ? "s" : ""} today
-            </button>
-            {unreadNotifs > 0 ? (
-              <button
-                type="button"
-                onClick={() => navigate("/notifications")}
-                className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary focus-ring"
-              >
-                {unreadNotifs} unread
-              </button>
-            ) : null}
-            {data.overdueInv.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => navigate("/invoices")}
-                className="rounded-full border border-destructive/25 bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive focus-ring"
-              >
-                {data.overdueInv.length} overdue
-              </button>
-            ) : null}
+      <header className="mb-6">
+        <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-lift md:p-6">
+          <div className="pointer-events-none absolute -right-12 -top-10 h-36 w-36 rounded-full bg-primary/15 blur-2xl" />
+          <div className="pointer-events-none absolute -left-8 -bottom-12 h-32 w-32 rounded-full bg-titan-cyan/15 blur-2xl" />
+
+          <div className="relative grid gap-5 xl:grid-cols-[1fr_auto] xl:items-start">
+            <div className="min-w-0">
+              <p className="mb-1 text-caption font-bold uppercase tracking-widest text-primary">
+                Command Center · {todayLabel}
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+                {greeting}, {name}
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                Operate faster with one live cockpit for what&apos;s active, what&apos;s late, and what to do next.
+              </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <TitanScoreBadge score={health.score} grade={health.grade} size="md" />
+                {titanVerified ? <TitanVerifiedBadge size="sm" /> : null}
+                <button
+                  type="button"
+                  onClick={() => navigate("/jobs")}
+                  className="rounded-full border border-border bg-background/70 px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-muted/70 focus-ring"
+                >
+                  {data.todayJobs.length} job{data.todayJobs.length !== 1 ? "s" : ""} today
+                </button>
+                {unreadNotifs > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/notifications")}
+                    className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary focus-ring"
+                  >
+                    {unreadNotifs} unread
+                  </button>
+                ) : null}
+                {data.overdueInv.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/invoices")}
+                    className="rounded-full border border-destructive/25 bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive focus-ring"
+                  >
+                    {data.overdueInv.length} overdue
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.path}
+                    type="button"
+                    onClick={() => navigate(action.path)}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/5 focus-ring"
+                  >
+                    <action.icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                    <span className="truncate">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid min-w-[220px] grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-xl border border-border bg-background/70 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Completion</p>
+                <p className="mt-1 text-xl font-bold text-foreground">{Math.round(completionPct)}%</p>
+                <p className="text-xs text-muted-foreground">{completedTodayCount}/{data.todayJobs.length || 0} closed</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background/70 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Attention</p>
+                <p className="mt-1 text-xl font-bold text-destructive">{data.overdueInv.length}</p>
+                <p className="text-xs text-muted-foreground">overdue invoice{data.overdueInv.length === 1 ? "" : "s"}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background/70 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">At Risk</p>
+                <p className="mt-1 text-xl font-bold text-foreground">{formatCurrency(overdueBalance)}</p>
+                <p className="text-xs text-muted-foreground">pending overdue balance</p>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {customize ? (
-            <Button variant="outline" size="sm" className="min-h-[44px]" onClick={handleResetLayout}>
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Reset layout
+
+          <div className="relative mt-4 flex flex-wrap items-center gap-2">
+            {customize ? (
+              <Button variant="outline" size="sm" className="min-h-[44px]" onClick={handleResetLayout}>
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                Reset layout
+              </Button>
+            ) : null}
+            <Button
+              variant={customize ? "default" : "outline"}
+              size="sm"
+              className="min-h-[44px]"
+              onClick={() => setCustomize((v) => !v)}
+              aria-pressed={customize}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+              {customize ? "Done" : "Customize"}
             </Button>
-          ) : null}
-          <Button
-            variant={customize ? "default" : "outline"}
-            size="sm"
-            className="min-h-[44px]"
-            onClick={() => setCustomize((v) => !v)}
-            aria-pressed={customize}
-          >
-            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-            {customize ? "Done" : "Customize"}
-          </Button>
-        </div>
+          </div>
+        </section>
       </header>
 
       <OverviewTodayCard
-        jobsCompleted={data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length}
+        jobsCompleted={completedTodayCount}
         jobsToday={data.todayJobs.length}
-        goalPct={
-          data.todayJobs.length
-            ? (data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length /
-                data.todayJobs.length) *
-              100
-            : 0
-        }
+        goalPct={completionPct}
         onTimePct={
           data.todayJobs.length
             ? Math.round(
-                (data.todayJobs.filter((j) => /done|complete|closed/i.test(String(j.status || ""))).length /
-                  Math.max(data.todayJobs.length, 1)) *
-                  100
+                (completedTodayCount / Math.max(data.todayJobs.length, 1)) * 100
               )
             : null
         }
@@ -1233,11 +1279,11 @@ export default function Dashboard({ isActive = true }) {
 
       <HomeAdClips isActive={isActive} />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
         {visibleWidgets.map((id) => (
           <div
             key={id}
-            className={`${WIDE_WIDGETS.has(id) ? "lg:col-span-2" : ""} ${
+            className={`${WIDE_WIDGETS.has(id) ? "lg:col-span-12" : "lg:col-span-6"} ${
               customize && hiddenWidgets.includes(id) ? "opacity-45" : ""
             }`}
             style={{ overflowAnchor: "none" }}

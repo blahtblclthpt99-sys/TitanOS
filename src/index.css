@@ -263,13 +263,43 @@
 
   /* Typography hierarchy */
   h1 {
-    @apply font-heading tracking-tight text-foreground text-2xl md:text-3xl font-bold;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: hsl(var(--foreground));
+    font-size: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 1.875rem;
+    }
   }
   h2 {
-    @apply font-heading tracking-tight text-foreground text-xl md:text-2xl font-semibold;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: hsl(var(--foreground));
+    font-size: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    h2 {
+      font-size: 1.5rem;
+    }
   }
   h3 {
-    @apply font-heading tracking-tight text-foreground text-base md:text-lg font-semibold;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: hsl(var(--foreground));
+    font-size: 1rem;
+  }
+  @media (min-width: 768px) {
+    h3 {
+      font-size: 1.125rem;
+    }
   }
 
   /* Focus — keyboard accessibility */

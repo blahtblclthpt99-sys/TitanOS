@@ -45,13 +45,13 @@ export default function SocialAuthButtons({ onError, returnTo }) {
           onClick={() => start(id)}
           disabled={Boolean(loadingProvider)}
           className={cn(
-            "w-full h-12 rounded-xl border border-border bg-card text-foreground text-[15px] font-medium shadow-soft",
-            "flex items-center justify-center gap-3 hover:bg-muted/60 transition-colors",
+            "w-full h-12 rounded-xl border border-slate-200 bg-white text-slate-700 text-[15px] font-medium",
+            "flex items-center justify-center gap-3 hover:bg-slate-50 transition-colors",
             "disabled:opacity-60"
           )}
         >
           {loadingProvider === id ? (
-            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
           ) : (
             <Icon className="w-5 h-5" />
           )}

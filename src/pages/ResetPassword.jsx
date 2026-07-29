@@ -90,11 +90,11 @@ export default function ResetPassword() {
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-slate-700 font-medium">
+          <Label htmlFor="password" className="font-medium text-foreground">
             New password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="password"
               type="password"
@@ -103,17 +103,17 @@ export default function ResetPassword() {
               placeholder="••••••••"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="pl-10 h-12 rounded-xl bg-background border-border text-foreground"
               required
             />
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm" className="text-slate-700 font-medium">
+          <Label htmlFor="confirm" className="font-medium text-foreground">
             Confirm password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="confirm"
               type="password"
@@ -121,7 +121,7 @@ export default function ResetPassword() {
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-slate-50/50 border-slate-200 text-slate-900"
+              className="pl-10 h-12 rounded-xl bg-background border-border text-foreground"
               required
             />
           </div>

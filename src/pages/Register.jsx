@@ -152,7 +152,7 @@ export default function Register() {
   return (
     <AuthLayout title="Create your TitanOS account" subtitle="Free During Beta — all features included">
       {refCode ? (
-        <p className="mb-4 text-xs text-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+        <p className="mb-4 text-xs text-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-700 dark:text-emerald-300">
           Referral code applied: <span className="font-mono font-semibold">{refCode}</span>
         </p>
       ) : null}

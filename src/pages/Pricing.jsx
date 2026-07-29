@@ -158,8 +158,8 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }
         asChild
         className={`w-full rounded-2xl h-11 text-sm font-semibold gap-2 ${
           highlighted
-            ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black"
-            : "bg-muted hover:bg-muted/80 text-foreground border border-border"
+            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-soft"
+            : "border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
         }`}
       >
         {checkoutHref ? (
@@ -237,7 +237,7 @@ export default function Pricing() {
           </div>
           <Button
             onClick={openPlayStore}
-            className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 px-4 gap-1.5 flex-shrink-0"
+            className="h-10 flex-shrink-0 gap-1.5 rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <Download className="w-4 h-4" />
             Get App

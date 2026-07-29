@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0A0B" />
+    <meta name="description" content="TitanOS — The AI Operating System for Service Businesses" />
+    <title>TitanOS</title>
+    <script>
+      (function () {
+        const storageKey = 'titanos_theme';
+
+        const getPreferredTheme = () => {
+          try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved === 'dark' || saved === 'light') {
+              return saved;
+            }
+          } catch (error) {}
+
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        };
+
+        const applyTheme = (theme) => {
+          const isDark = theme === 'dark';
+          document.documentElement.classList.toggle('dark', isDark);
+
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute('content', isDark ? '#0A0A0B' : '#F8FAFC');
+          }
+
+          const toggle = document.getElementById('titanos-theme-toggle');
+          if (toggle) {
+            toggle.setAttribute('aria-pressed', String(isDark));
+            toggle.textContent = isDark ? '☾ Dark' : '☀ Light';
+            toggle.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+            toggle.style.background = isDark ? 'rgba(10,10,11,0.72)' : 'rgba(248,250,252,0.92)';
+            toggle.style.color = isDark ? '#ffffff' : '#0A0A0B';
+            toggle.style.borderColor = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(10,10,11,0.12)';
+          }
+        };
+
+        const toggleTheme = () => {
+          const nextTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+          try {
+            localStorage.setItem(storageKey, nextTheme);
+          } catch (error) {}
+          applyTheme(nextTheme);
+        };
+
+        const ensureToggleButton = () => {
+          if (document.getElementById('titanos-theme-toggle')) {
+            return;
+          }
+
+          const button = document.createElement('button');
+          button.id = 'titanos-theme-toggle';
+          button.type = 'button';
+          button.setAttribute('aria-label', 'Toggle light and dark theme');
+          button.title = 'Toggle theme';
+          button.textContent = '☾ Dark';
+          button.addEventListener('click', toggleTheme);
+          button.style.position = 'fixed';
+          button.style.top = '16px';
+          button.style.right = '16px';
+          button.style.zIndex = '9999';
+          button.style.border = '1px solid rgba(255,255,255,0.14)';
+          button.style.borderRadius = '999px';
+          button.style.padding = '10px 14px';
+          button.style.background = 'rgba(10,10,11,0.72)';
+          button.style.color = '#ffffff';
+          button.style.font = '600 12px/1 system-ui, sans-serif';
+          button.style.backdropFilter = 'blur(18px)';
+          button.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+          button.style.transition = 'transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease';
+          button.style.cursor = 'pointer';
+
+          const syncOffset = () => {
+            const isCompact = window.matchMedia('(max-width: 640px)').matches;
+            button.style.top = isCompact ? '72px' : '16px';
+          };
+
+          window.addEventListener('resize', syncOffset, { passive: true });
+          syncOffset();
+          document.body.appendChild(button);
+        };
+
+        const syncTheme = () => {
+          applyTheme(getPreferredTheme());
+          ensureToggleButton();
+        };
+
+        const keepThemeSynced = () => {
+          const expectedTheme = getPreferredTheme();
+          const isDark = document.documentElement.classList.contains('dark');
+
+          if ((expectedTheme === 'dark') !== isDark) {
+            applyTheme(expectedTheme);
+          }
+        };
+
+        let themeObserver = null;
+
+        const startThemeGuard = () => {
+          if (themeObserver || typeof MutationObserver === 'undefined') {
+            return;
+          }
+
+          themeObserver = new MutationObserver(keepThemeSynced);
+          themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+          });
+        };
+
+        document.addEventListener('DOMContentLoaded', syncTheme, { once: true });
+        document.addEventListener('DOMContentLoaded', startThemeGuard, { once: true });
+        window.addEventListener('load', syncTheme, { once: true });
+        window.addEventListener('pageshow', syncTheme);
+        window.addEventListener('load', startThemeGuard, { once: true });
+        setTimeout(syncTheme, 0);
+        setTimeout(syncTheme, 250);
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-eCOcSDB4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Ph7z8W-2.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -1,0 +1,482 @@
+You are the TitanOS Final Launch Certification Team.
+
+Your job is NOT to review casually.
+
+Your job is to determine if TitanOS is ready for real-world public release.
+
+Act as:
+
+• Principal Software Engineer
+• Security Engineer
+• DevOps Engineer
+• Database Architect
+• QA Automation Engineer
+• UX/UI Designer
+• Performance Engineer
+• Accessibility Specialist
+• Product Manager
+• Reliability Engineer
+
+Your standard:
+
+TitanOS must be secure, reliable, scalable, maintainable, and professional.
+
+Do not approve anything without verification.
+
+==================================================
+FULL CODEBASE INSPECTION
+==================================================
+
+Inspect:
+
+Frontend
+Backend
+API routes
+Database
+Authentication
+Authorization
+Components
+Pages
+Hooks
+Utilities
+State management
+Middleware
+Configuration
+Dependencies
+Environment variables
+Deployment files
+
+Identify all weaknesses.
+
+Fix all practical issues.
+
+==================================================
+PRODUCTION DEPLOYMENT AUDIT
+==================================================
+
+Verify:
+
+✓ Production build works
+✓ Preview and production match
+✓ Environment variables are correct
+✓ Deployment configuration is correct
+✓ Domain configuration works
+✓ SSL works
+✓ CDN behavior works
+✓ Cache rules are correct
+✓ Redirects work
+✓ No deployment warnings exist
+
+Verify rollback procedures.
+
+==================================================
+SECURITY CERTIFICATION
+==================================================
+
+Perform a complete security review.
+
+Test:
+
+Authentication
+
+Authorization
+
+Sessions
+
+Permissions
+
+Database access
+
+API security
+
+Input validation
+
+Output sanitization
+
+XSS
+
+CSRF
+
+Injection attacks
+
+Rate limiting
+
+Secrets exposure
+
+Cookie security
+
+Headers
+
+File uploads
+
+Privilege escalation
+
+Data leaks
+
+Fix every vulnerability.
+
+==================================================
+DATABASE CERTIFICATION
+==================================================
+
+Review:
+
+Tables
+
+Relationships
+
+Indexes
+
+Queries
+
+Policies
+
+Permissions
+
+Backups
+
+Recovery
+
+Data integrity
+
+Performance
+
+Verify:
+
+✓ No unauthorized access
+✓ No exposed private data
+✓ No inefficient queries
+✓ No missing protections
+
+==================================================
+PAYMENT / TRANSACTION SAFETY
+==================================================
+
+If payments exist:
+
+Verify:
+
+Webhook security
+
+Duplicate transaction protection
+
+Idempotency
+
+Failed payment handling
+
+Refund handling
+
+Transaction logging
+
+Audit history
+
+Recovery process
+
+Never trust client-side payment confirmation.
+
+==================================================
+ERRORS AND MONITORING
+==================================================
+
+TitanOS must never fail silently.
+
+Implement:
+
+✓ Global error handling
+✓ Client error tracking
+✓ Server error tracking
+✓ API monitoring
+✓ Database monitoring
+✓ Performance monitoring
+✓ Security event logging
+✓ User-impact alerts
+
+Verify monitoring actually works.
+
+==================================================
+PERFORMANCE CERTIFICATION
+==================================================
+
+Optimize:
+
+Loading speed
+
+Bundle size
+
+Database speed
+
+API response time
+
+Memory usage
+
+Images
+
+Caching
+
+Rendering
+
+Network requests
+
+Remove:
+
+Unused code
+
+Unused packages
+
+Duplicate processes
+
+==================================================
+USER EXPERIENCE CERTIFICATION
+==================================================
+
+Test as a brand-new user.
+
+Review:
+
+First impression
+
+Navigation
+
+Onboarding
+
+Clarity
+
+Forms
+
+Buttons
+
+Feedback
+
+Loading states
+
+Empty states
+
+Error messages
+
+Mobile usability
+
+Desktop usability
+
+Accessibility
+
+Make every interaction polished.
+
+==================================================
+VISUAL QUALITY REVIEW
+==================================================
+
+Inspect:
+
+Typography
+
+Spacing
+
+Colors
+
+Layouts
+
+Animations
+
+Transitions
+
+Consistency
+
+Responsive design
+
+Professional appearance
+
+Nothing should feel unfinished.
+
+==================================================
+SCALABILITY REVIEW
+==================================================
+
+Determine whether TitanOS can support:
+
+1,000 users
+
+10,000 users
+
+100,000 users
+
+1,000,000 users
+
+Identify:
+
+Database bottlenecks
+
+API bottlenecks
+
+Frontend bottlenecks
+
+Infrastructure limits
+
+==================================================
+DEPENDENCY HEALTH
+==================================================
+
+Review:
+
+Package versions
+
+Security vulnerabilities
+
+Deprecated libraries
+
+Unused dependencies
+
+License issues
+
+Update safely where needed.
+
+==================================================
+COMPATIBILITY TESTING
+==================================================
+
+Test:
+
+Chrome
+
+Firefox
+
+Safari
+
+Edge
+
+Mobile browsers
+
+Different screen sizes
+
+Slow networks
+
+Older devices
+
+==================================================
+BACKUP AND RECOVERY
+==================================================
+
+Verify:
+
+Database backups
+
+Recovery process
+
+Failure recovery
+
+Data restoration
+
+Rollback capability
+
+Emergency procedures
+
+==================================================
+PRIVACY AND TRUST
+==================================================
+
+Review:
+
+User data handling
+
+Privacy controls
+
+Account deletion
+
+Data visibility
+
+Sensitive information protection
+
+Terms/privacy requirements
+
+==================================================
+PRODUCT QUALITY REVIEW
+==================================================
+
+Evaluate:
+
+Does TitanOS solve its intended problem?
+
+Is the value immediately clear?
+
+Are users guided properly?
+
+Are important actions obvious?
+
+Are retention features strong?
+
+Are analytics available?
+
+==================================================
+FINAL BREAK TEST
+==================================================
+
+Attempt to break TitanOS.
+
+Try:
+
+Invalid inputs
+
+Rapid clicking
+
+Duplicate requests
+
+Expired sessions
+
+Permission abuse
+
+Large data loads
+
+Network failures
+
+Browser refreshes
+
+Multiple accounts
+
+Unexpected failures
+
+Fix everything discovered.
+
+==================================================
+FINAL CERTIFICATION REPORT
+==================================================
+
+Provide:
+
+1. Executive summary
+
+2. All problems found
+
+3. Severity rating:
+Critical
+High
+Medium
+Low
+
+4. All fixes completed
+
+5. Security score /100
+
+6. Performance score /100
+
+7. UX score /100
+
+8. Reliability score /100
+
+9. Scalability score /100
+
+10. Code quality score /100
+
+11. Production readiness score /100
+
+12. Remaining risks
+
+13. Recommended future improvements
+
+14. Final decision:
+
+NOT READY
+
+READY WITH MINOR ISSUES
+
+PRODUCTION CERTIFIED
+
+Do not certify TitanOS unless every major category has been verified.

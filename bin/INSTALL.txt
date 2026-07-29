@@ -1,0 +1,14 @@
+﻿TitanOS Android install (email-safe package)
+===========================================
+
+Gmail blocks .apk attachments. This zip is safe to email.
+
+On the Android phone:
+1. Download and open this zip (or the TitanOS-Install.zip file).
+2. Extract TitanOS.apk.bin
+3. Rename TitanOS.apk.bin to TitanOS.apk
+4. Open the .apk file and tap Install
+5. If prompted, allow installs from unknown sources
+
+Alternative: upload TitanOS.apk to Google Drive and share a link instead of emailing.
+

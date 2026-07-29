@@ -1,0 +1,305 @@
+{
+  "events": [
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 115 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 118 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 120 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 122 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 124 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 126 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 128 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 130 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 132 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 134 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 136 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 138 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 142 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 144 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 146 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 148 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 198 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 198 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 200 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 202 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 204 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 205 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 206 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "exec",
+      "value": "normal system scan :: returncode=1"
+    },
+    {
+      "section": "exec",
+      "value": "scan :: returncode=1"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 207 files"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 208 files"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "project_docs",
+      "value": "instructions.txt: \ufeffYou are TitanAI v1.0.  You are the autonomous software owner, senior engineer, security engineer, QA engineer, and product architect for TitanOS.  Core responsibilities: - Work independently on routine software tasks. - Analyze the current state before changing anything. - Prioritize security, correctness, maintainability, and user value. - Write production-quality code and keep it clean. - Find "
+    },
+    {
+      "section": "project_docs",
+      "value": "titan_rules.txt: Engineering decision framework:  Before implementing any solution: - Identify the root problem, not only the visible symptom. - Consider at least 2 possible solutions. - Choose the solution with the best balance of:   - Security   - Reliability   - Maintainability   - Performance   - User experience   - Development cost - Avoid unnecessary complexity. - Prefer proven patterns over experimental app"
+    },
+    {
+      "section": "project_docs",
+      "value": "titan_architecture.md: \ufeff# TitanOS Architecture  ## Frontend Framework:  ## Backend Framework:  ## Database  ## Authentication  ## Payments  ## Deployment  ## Important Features  ## Known Constraints "
+    },
+    {
+      "section": "project_docs",
+      "value": "titan_security.md: \ufeff# TitanOS Security Standards  Never: - expose secrets - bypass authentication - weaken permissions - delete production data  Always: - validate inputs - protect user data - review permissions - test security changes - check dependencies "
+    },
+    {
+      "section": "project_docs",
+      "value": "titan_changelog.md: # TitanAI Changelog  ## Initial Setup - Added the local CLI assistant entry point. - Configured environment loading from .env. - Added instruction-driven behavior. - Added a simple processing indicator during API requests. "
+    },
+    {
+      "section": "cursor_mcpServers",
+      "value": "{\"stripe\": {\"url\": \"https://mcp.stripe.com\"}}"
+    },
+    {
+      "section": "cursor_crash-reporter-id",
+      "value": "2b8d9fc9-5bc3-4c71-b173-9b6b01248354"
+    },
+    {
+      "section": "cursor_crash-reporter-id",
+      "value": "2b8d9fc9-5bc3-4c71-b173-9b6b01248354"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "raw cursor config content"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "# >>> CURSOR MANAGED BLOCK >>>\n# Ignore everything in .cursor\n*\n# Un-ignore projects so we can descend to allowlisted subdirs\n!projects/\nprojects/*\n!projects/*/\nprojects/*/*\n# MCP tool descriptors, resources, prompts\n!projects/*/mcps/\n!projects/*/mcps/**\n# Agent transcripts for citation\n!projects/*/agent-transcripts/\n!projects/*/agent-transcripts/**\n# Terminal output files\n!projects/*/terminals/\n!projects/*/terminals/**\n# Conversation notes (shared scratchpad)\n!projects/*/agent-notes/\n!projects/*/agent-notes/**\n# Large tool output files\n!projects/*/agent-tools/\n!projects/*/agent-tools/**\n# Plugin cache (rules, skills, agents)\n!plugins/\n!plugins/**\n# Built-in Cursor skills\n!skills-cursor/\n!skills-cursor/**\n# User's personal skills\n!skills/\n!skills/**\n# User's personal slash commands\n!commands/\n!commands/**\n# User's plan files\n!plans/\n!plans/**\n# Subagent state/transcripts\n!subagents/\n!subagents/**\n# User-level cursor rules\n!rules/\n!rules/**\n# <<< CURSOR MANAGED BLOCK <<<"
+    },
+    {
+      "section": "cursor_crash-reporter-id",
+      "value": "2b8d9fc9-5bc3-4c71-b173-9b6b01248354"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "{\n  \"mcpServers\": {\n    \"stripe\": {\n      \"url\": \"https://mcp.stripe.com\"\n    }\n  }\n}"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 1 files"
+    }
+  ],
+  "active_task": "inspect startup"
+}

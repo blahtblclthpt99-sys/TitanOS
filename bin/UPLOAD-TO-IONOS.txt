@@ -1,0 +1,15 @@
+﻿TitanOS — IONOS upload (REPLACE old site completely)
+
+1. Unzip release\TitanOS-IONOS-Web.zip
+2. In IONOS File Manager, open web root (/ or /httpdocs)
+3. Delete old index.html + assets/ folder
+4. Upload ALL files from the zip (keep .htaccess + static/ folder)
+5. Hard refresh the site (Ctrl+F5)
+
+Verified locally:
+- Get Started Free -> /register (real signup)
+- Sign in -> /login
+- Download -> /download with working /static/TitanOS.apk + .aab
+- Beta form submits successfully
+- Feature tiles -> /features/...
+- Privacy -> /privacy-policy

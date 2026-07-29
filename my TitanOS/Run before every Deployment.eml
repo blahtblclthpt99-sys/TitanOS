@@ -1,0 +1,107 @@
+MIME-Version: 1.0
+Date: Mon, 20 Jul 2026 19:18:47 -0500
+Message-ID: <CAPuwerswvG705iYq7rNzcYOmJ4cgMgk9LjcgV8PdwPELEKgR0Q@mail.gmail.com>
+Subject: Run before every Deployment
+From: M L <blahtblclthpt99@gmail.com>
+To: "M L (Mitch Conner)" <blahtblclthpt99@gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000007244db065713f7ed"
+
+--0000000000007244db065713f7ed
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Prepare TitanOS for production deployment.
+
+Verify:
+
+=E2=9C=93 Production build passes
+
+=E2=9C=93 No console errors
+
+=E2=9C=93 No TypeScript errors
+
+=E2=9C=93 No ESLint errors
+
+=E2=9C=93 No broken links
+
+=E2=9C=93 No broken images
+
+=E2=9C=93 Mobile responsiveness
+
+=E2=9C=93 Performance optimization
+
+=E2=9C=93 Accessibility
+
+=E2=9C=93 Error boundaries
+
+=E2=9C=93 API error handling
+
+=E2=9C=93 Authentication
+
+=E2=9C=93 Security best practices
+
+=E2=9C=93 Loading states
+
+=E2=9C=93 Empty states
+
+=E2=9C=93 Environment variables
+
+=E2=9C=93 Database connections
+
+=E2=9C=93 Rate limiting where appropriate
+
+=E2=9C=93 SEO metadata
+
+=E2=9C=93 Sitemap
+
+=E2=9C=93 Robots.txt
+
+=E2=9C=93 Favicon
+
+=E2=9C=93 Manifest
+
+=E2=9C=93 PWA support if enabled
+
+Generate a deployment report summarizing any remaining issues and
+recommendations.
+
+--0000000000007244db065713f7ed
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div style=3D"font-size:inherit">Prepare TitanOS for production deployment.=
+<br style=3D"font-size:inherit"><br style=3D"font-size:inherit">Verify:<br =
+style=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=9C=93 Produ=
+ction build passes<br style=3D"font-size:inherit"><br style=3D"font-size:in=
+herit">=E2=9C=93 No console errors<br style=3D"font-size:inherit"><br style=
+=3D"font-size:inherit">=E2=9C=93 No TypeScript errors<br style=3D"font-size=
+:inherit"><br style=3D"font-size:inherit">=E2=9C=93 No ESLint errors<br sty=
+le=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=9C=93 No broke=
+n links<br style=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=
+=9C=93 No broken images<br style=3D"font-size:inherit"><br style=3D"font-si=
+ze:inherit">=E2=9C=93 Mobile responsiveness<br style=3D"font-size:inherit">=
+<br style=3D"font-size:inherit">=E2=9C=93 Performance optimization<br style=
+=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=9C=93 Accessibil=
+ity<br style=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=9C=
+=93 Error boundaries<br style=3D"font-size:inherit"><br style=3D"font-size:=
+inherit">=E2=9C=93 API error handling<br style=3D"font-size:inherit"><br st=
+yle=3D"font-size:inherit">=E2=9C=93 Authentication<br style=3D"font-size:in=
+herit"><br style=3D"font-size:inherit">=E2=9C=93 Security best practices<br=
+ style=3D"font-size:inherit"><br style=3D"font-size:inherit">=E2=9C=93 Load=
+ing states<br style=3D"font-size:inherit"><br style=3D"font-size:inherit">=
+=E2=9C=93 Empty states<br style=3D"font-size:inherit"><br style=3D"font-siz=
+e:inherit">=E2=9C=93 Environment variables<br style=3D"font-size:inherit"><=
+br style=3D"font-size:inherit">=E2=9C=93 Database connections<br style=3D"f=
+ont-size:inherit"><br style=3D"font-size:inherit">=E2=9C=93 Rate limiting w=
+here appropriate<br style=3D"font-size:inherit"><br style=3D"font-size:inhe=
+rit">=E2=9C=93 SEO metadata<br style=3D"font-size:inherit"><br style=3D"fon=
+t-size:inherit">=E2=9C=93 Sitemap<br style=3D"font-size:inherit"><br style=
+=3D"font-size:inherit">=E2=9C=93 Robots.txt<br style=3D"font-size:inherit">=
+<br style=3D"font-size:inherit">=E2=9C=93 Favicon<br style=3D"font-size:inh=
+erit"><br style=3D"font-size:inherit">=E2=9C=93 Manifest<br style=3D"font-s=
+ize:inherit"><br style=3D"font-size:inherit">=E2=9C=93 PWA support if enabl=
+ed<br style=3D"font-size:inherit"><br style=3D"font-size:inherit">Generate =
+a deployment report summarizing any remaining issues and recommendations.</=
+div>
+
+--0000000000007244db065713f7ed--

@@ -30,6 +30,73 @@ const PREFIX = "titanos_driver";
 const SESSION_KEY = "session";
 const STOPS_KEY = "stops";
 const PREFS_KEY = "prefs";
+const TAX_SYNC_QUEUE_KEY = "tax_sync_queue";
+
+function enqueueTaxSync(userId, entry) {
+  if (!userId || !entry) return [];
+  const queue = readLocal(PREFIX, userId, TAX_SYNC_QUEUE_KEY, []);
+  const next = [{ id: uid(), queued_at: new Date().toISOString(), ...entry }, ...(Array.isArray(queue) ? queue : [])]
+    .slice(0, 80);
+  writeLocal(PREFIX, userId, TAX_SYNC_QUEUE_KEY, next);
+  return next;
+}
+
+export function readTaxSyncQueue(userId) {
+  const raw = readLocal(PREFIX, userId, TAX_SYNC_QUEUE_KEY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+async function applyQueuedTaxEntry(entry) {
+  if (!entry?.type || !entry?.op || !entry?.payload) {
+    throw new Error("invalid_queue_entry");
+  }
+  if (entry.type === "mileage_trip") {
+    if (entry.op === "update" && entry.entity_id) {
+      return api.entities.MileageTrip.update(entry.entity_id, entry.payload);
+    }
+    return api.entities.MileageTrip.create(entry.payload);
+  }
+  if (entry.type === "expense") {
+    if (entry.op === "update" && entry.entity_id) {
+      return api.entities.Expense.update(entry.entity_id, entry.payload);
+    }
+    return api.entities.Expense.create(entry.payload);
+  }
+  throw new Error("unsupported_queue_entry");
+}
+
+export async function replayQueuedTaxSync(userId, { limit = 20 } = {}) {
+  if (!userId) return { processed: 0, success: 0, remaining: 0, failed: 0 };
+  const queue = readTaxSyncQueue(userId);
+  if (!queue.length) return { processed: 0, success: 0, remaining: 0, failed: 0 };
+
+  const cap = Math.min(100, Math.max(1, Number(limit) || 20));
+  const work = queue.slice(0, cap);
+  const tail = queue.slice(cap);
+  const keep = [...tail];
+  let success = 0;
+  let failed = 0;
+
+  for (const entry of work) {
+    try {
+      await applyQueuedTaxEntry(entry);
+      success += 1;
+    } catch {
+      failed += 1;
+      keep.push(entry);
+    }
+  }
+
+  writeLocal(PREFIX, userId, TAX_SYNC_QUEUE_KEY, keep.slice(0, 80));
+  if (success > 0) emitDriverSessionChanged();
+
+  return {
+    processed: work.length,
+    success,
+    failed,
+    remaining: keep.length,
+  };
+}
 
 /** Notify UI / keep-alive that session or telemetry changed (survives refresh via localStorage). */
 export function emitDriverSessionChanged() {
@@ -66,8 +133,40 @@ const FX_TO_USD = {
   BRL: 0.18,
 };
 
+const SUPPORTED_CURRENCIES = new Set(Object.keys(FX_TO_USD));
+
+function normalizeCurrency(currency) {
+  const c = String(currency || "USD").trim().toUpperCase();
+  return SUPPORTED_CURRENCIES.has(c) ? c : "USD";
+}
+
+function normalizePrefs(raw = {}) {
+  const next = { ...(raw && typeof raw === "object" ? raw : {}) };
+  const stopConfirmSec = Number(next.stopConfirmSec);
+  const lat = Number(next.lat);
+  const lng = Number(next.lng);
+  return {
+    currency: normalizeCurrency(next.currency),
+    city: String(next.city || "").slice(0, 120),
+    zip: String(next.zip || "").slice(0, 20),
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+    mpg: Number.isFinite(Number(next.mpg)) ? Number(next.mpg) : null,
+    connectedApps: Array.isArray(next.connectedApps) ? next.connectedApps : [],
+    equipmentId: next.equipmentId || null,
+    mode: next.mode === "riding" ? "riding" : "driving",
+    requestingRide: Boolean(next.requestingRide),
+    autoTrack: next.autoTrack !== false,
+    stopConfirmSec: Number.isFinite(stopConfirmSec)
+      ? Math.min(600, Math.max(30, Math.round(stopConfirmSec)))
+      : 90,
+    locationPrivacyAck: Boolean(next.locationPrivacyAck),
+    autoStartOnMotion: Boolean(next.autoStartOnMotion),
+  };
+}
+
 export function readPrefs(userId) {
-  return readLocal(PREFIX, userId, PREFS_KEY, {
+  const defaults = {
     currency: "USD",
     city: "",
     zip: "",
@@ -86,13 +185,16 @@ export function readPrefs(userId) {
     locationPrivacyAck: false,
     /** Opt-in: start a work session when sustained motion is detected while off-shift */
     autoStartOnMotion: false,
-  });
+  };
+  const stored = readLocal(PREFIX, userId, PREFS_KEY, defaults);
+  return normalizePrefs({ ...defaults, ...stored });
 }
 
 export function savePrefs(userId, prefs) {
-  writeLocal(PREFIX, userId, PREFS_KEY, prefs);
+  const safe = normalizePrefs(prefs);
+  writeLocal(PREFIX, userId, PREFS_KEY, safe);
   emitDriverSessionChanged();
-  return prefs;
+  return safe;
 }
 
 export function readSession(userId) {
@@ -117,7 +219,7 @@ export function estimateGasPriceUsd(zip = "") {
 }
 
 export function convertFromUsd(amountUsd, currency = "USD") {
-  const rate = FX_TO_USD[currency] || 1;
+  const rate = FX_TO_USD[normalizeCurrency(currency)] || 1;
   // FX_TO_USD is currency→USD; invert for display in local currency
   const local = amountUsd / rate;
   return Math.round(local * 100) / 100;
@@ -125,7 +227,8 @@ export function convertFromUsd(amountUsd, currency = "USD") {
 
 export function currencySymbol(currency = "USD") {
   const map = { USD: "$", CAD: "C$", MXN: "MX$", EUR: "€", GBP: "£", AUD: "A$", JPY: "¥", BRL: "R$" };
-  return map[currency] || `${currency} `;
+  const safe = normalizeCurrency(currency);
+  return map[safe] || `${safe} `;
 }
 
 /** Rough MPG from vehicle category/name when not set. */
@@ -478,11 +581,18 @@ export function topHotspotsNow(hotspots, limit = 3) {
 }
 
 export function openStreetMapEmbed(lat, lng, zoom = 12) {
-  const b = 0.045;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${lng - b}%2C${lat - b}%2C${lng + b}%2C${lat + b}&layer=mapnik&marker=${lat}%2C${lng}`;
+  const safeLat = Number(lat);
+  const safeLng = Number(lng);
+  if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return "";
+  const boundedLat = Math.min(85, Math.max(-85, safeLat));
+  const boundedLng = Math.min(180, Math.max(-180, safeLng));
+  const boundedZoom = Math.min(18, Math.max(4, Math.round(Number(zoom) || 12)));
+  const b = Math.max(0.0015, 0.09 / boundedZoom);
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${boundedLng - b}%2C${boundedLat - b}%2C${boundedLng + b}%2C${boundedLat + b}&layer=mapnik&marker=${boundedLat}%2C${boundedLng}&zoom=${boundedZoom}`;
 }
 
 export async function startDrivingSession(user, prefs) {
+  const safePrefs = normalizePrefs(prefs);
   const session = {
     id: uid(),
     user_id: user.id,
@@ -492,23 +602,23 @@ export async function startDrivingSession(user, prefs) {
     paused: false,
     paused_at: null,
     pause_accum_sec: 0,
-    city: prefs.city || "",
-    zip: prefs.zip || "",
-    lat: prefs.lat,
-    lng: prefs.lng,
-    equipment_id: prefs.equipmentId || null,
-    currency: prefs.currency || "USD",
+    city: safePrefs.city || "",
+    zip: safePrefs.zip || "",
+    lat: safePrefs.lat,
+    lng: safePrefs.lng,
+    equipment_id: safePrefs.equipmentId || null,
+    currency: safePrefs.currency || "USD",
     miles: 0,
     auto_miles: 0,
-    miles_source: prefs.autoTrack === false ? "manual" : "gps",
+    miles_source: safePrefs.autoTrack === false ? "manual" : "gps",
     stops: 0,
-    apps: prefs.connectedApps || [],
+    apps: safePrefs.connectedApps || [],
     drive_sec: 0,
     idle_sec: 0,
     max_speed_mph: 0,
     avg_speed_mph: 0,
     stop_phase: "moving",
-    auto_track: prefs.autoTrack !== false,
+    auto_track: safePrefs.autoTrack !== false,
   };
   writeLocal(PREFIX, user.id, SESSION_KEY, session);
   writeLocal(PREFIX, user.id, STOPS_KEY, []);
@@ -851,6 +961,7 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
   };
 
   let trip = null;
+  let queuedTrip = false;
   try {
     if (session.tax_trip_id) {
       trip = await api.entities.MileageTrip.update(session.tax_trip_id, tripPayload);
@@ -864,9 +975,17 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
       : { id: uid(), created_at: new Date().toISOString(), ...tripPayload };
     const next = [trip, ...local.filter((t) => t.id !== trip.id)];
     writeLocal(PREFIX, user.id, "tax_trips", next);
+    queuedTrip = true;
+    enqueueTaxSync(user.id, {
+      type: "mileage_trip",
+      op: session.tax_trip_id ? "update" : "create",
+      entity_id: session.tax_trip_id || null,
+      payload: tripPayload,
+    });
   }
 
   let expense = null;
+  let queuedExpense = false;
   if (fuel.cost > 0) {
     const expensePayload = {
       description: `Fuel · Driver Hub (${vehicleName || "vehicle"})`,
@@ -886,7 +1005,13 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
         expense = await api.entities.Expense.create(expensePayload);
       }
     } catch {
-      /* optional */
+      queuedExpense = true;
+      enqueueTaxSync(user.id, {
+        type: "expense",
+        op: session.tax_expense_id ? "update" : "create",
+        entity_id: session.tax_expense_id || null,
+        payload: expensePayload,
+      });
     }
   }
 
@@ -897,7 +1022,14 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
   };
   writeLocal(PREFIX, user.id, SESSION_KEY, patched);
 
-  return { ok: true, trip, expense, fuel, session: patched };
+  return {
+    ok: true,
+    queued: queuedTrip || queuedExpense,
+    trip,
+    expense,
+    fuel,
+    session: patched,
+  };
 }
 
 export function sessionStats(session, stops) {

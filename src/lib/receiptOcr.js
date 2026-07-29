@@ -6,7 +6,7 @@
 import { EXPENSE_CATEGORIES } from "@/lib/platformConstants";
 
 const AMOUNT_RE = /(?:total|amount|balance|due|grand\s*total)?\s*\$?\s*(\d{1,5}(?:\.\d{2}))/gi;
-const DATE_RE = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|(\d{4}-\d{2}-\d{2})/;
+const DATE_RE = /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})|(\d{4}-\d{2}-\d{2})/;
 const VENDOR_HINTS = [
   "shell", "exxon", "chevron", "costco", "home depot", "lowe", "walmart", "amazon",
   "office depot", "staples", "uber", "lyft", "mcdonald", "starbucks",

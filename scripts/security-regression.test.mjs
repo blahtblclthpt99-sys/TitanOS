@@ -23,7 +23,7 @@ describe("security regression", () => {
       "api/functions/paypalWebhook.js",
       "api/paypal",
     ];
-    const found = candidates.some((p) => existsSync(join(root, p)));
+    assert.ok(candidates.some((p) => existsSync(join(root, p))));
     // Broader scan
     const payDir = join(root, "api");
     assert.ok(existsSync(payDir));

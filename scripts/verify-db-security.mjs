@@ -169,11 +169,6 @@ async function main() {
       finalStatus = check?.status;
     }
 
-    const blocked =
-      Boolean(payUpErr) ||
-      finalStatus !== "succeeded" ||
-      afterPay == null;
-
     report.probes.paymentClientSucceeded = {
       blocked: finalStatus !== "succeeded",
       finalStatus,

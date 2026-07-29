@@ -3,7 +3,6 @@ import { requireUser } from "../_lib/auth.js";
 import { clearFeeConfigCache, loadFeeCategories, loadFeeRules } from "../_lib/feeConfig.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
-import { captureApiException } from "../_lib/sentry.js";
 
 async function assertAdmin(admin, user, res) {
   const { data: profile } = await admin

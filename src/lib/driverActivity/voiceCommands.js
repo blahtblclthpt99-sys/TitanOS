@@ -5,6 +5,7 @@
  */
 
 import { parseOfferQuickText } from "./autopilot.js";
+import { DRIVER_OS_FOLDERS } from "../driverOs/folders.js";
 
 const ONES = {
   zero: 0,
@@ -104,6 +105,72 @@ function normalizeUtterance(raw = "") {
   );
 }
 
+function inferStartOrderType(text = "") {
+  const slow = /\bslow\b/.test(text);
+  if (/\btriple\b|\bthree\b/.test(text)) return slow ? "slow_triple" : "triple";
+  if (/\bdouble\b|\btwo\b/.test(text)) return slow ? "slow_double" : "double";
+  if (/\bsingle\b|\bone\b/.test(text)) return slow ? "slow_single" : "single";
+  return slow ? "slow_single" : "single";
+}
+
+function inferAddonCount(text = "") {
+  if (/\btriple\b|\bthree\b|\badd\s+2\b/.test(text)) return 2;
+  return 1;
+}
+
+function inferTeachTopic(text = "") {
+  if (/\b(delivery|doordash|door dash|pickup|dropoff|drop off)\b/.test(text)) return "delivery";
+  if (/\b(folder|hub|explorer|analytics|tax|reports|settings|search|navigate|navigation)\b/.test(text)) {
+    return "hub";
+  }
+  if (/\b(offer|accept|deny|autopilot|money mode|formula)\b/.test(text)) return "offers";
+  return "general";
+}
+
+const HUB_GROUP_TO_FOLDER = {
+  live: "live-shift",
+  history: "trip-history",
+  analytics: "analytics",
+  reports: "reports",
+  settings: "settings",
+  configuration: "settings",
+};
+
+const HUB_FOLDER_ALIASES = {
+  "live-shift": ["live shift", "shift", "driving", "session"],
+  doordash: ["doordash", "door dash"],
+  "todays-orders": ["today orders", "today s orders", "todays orders"],
+  "trip-history": ["trip history", "history"],
+  expenses: ["expenses", "logbook", "fuel", "parking", "tolls"],
+  analytics: ["analytics"],
+  rush: ["rush", "rush intelligence"],
+  platforms: ["platforms", "platform statistics"],
+  heatmaps: ["heat map", "heatmaps"],
+  performance: ["performance"],
+  ai: ["ai insights", "insights"],
+  goals: ["goals", "targets"],
+  vehicle: ["vehicle", "car"],
+  tax: ["tax", "tax center"],
+  reports: ["reports", "report"],
+  maintenance: ["maintenance"],
+  directory: ["find drivers", "directory", "drivers"],
+  settings: ["settings", "configuration", "preferences", "prefs"],
+};
+
+function matchHubFolder(text = "") {
+  const withVerb = /\b(open|go to|show|launch)\b/.test(text);
+  if (!withVerb) return null;
+
+  const groupKey = Object.keys(HUB_GROUP_TO_FOLDER).find((g) => new RegExp(`\\b${g}\\b`).test(text));
+  if (groupKey) return HUB_GROUP_TO_FOLDER[groupKey];
+
+  for (const folder of DRIVER_OS_FOLDERS) {
+    const aliases = HUB_FOLDER_ALIASES[folder.id] || [folder.label.toLowerCase()];
+    if (aliases.some((alias) => text.includes(alias))) return folder.id;
+  }
+  return null;
+}
+
 /**
  * Parse a voice utterance into a command intent.
  * @returns {{ intent: string, payload?: object, reply?: string }}
@@ -112,12 +179,33 @@ export function parseVoiceCommand(utterance = "") {
   const text = normalizeUtterance(utterance);
   if (!text) return { intent: "empty", reply: "I didn’t catch that. Try again." };
 
+  // Confirmation flow for destructive actions.
+  if (/\b(confirm|confirmed|yes do it|yes proceed|go ahead|do it now|approve)\b/.test(text)) {
+    return { intent: "confirm_action", reply: "Confirming." };
+  }
+  if (/\b(never mind|nevermind|cancel that|forget that|dismiss that|stop that)\b/.test(text)) {
+    return { intent: "cancel_action", reply: "Canceled." };
+  }
+
+  // Guided learning and coaching.
+  if (/\b(teach me|training mode|train me|practice mode|coach me|show examples)\b/.test(text)) {
+    const topic = inferTeachTopic(text);
+    return {
+      intent: "teach_mode",
+      payload: { topic },
+      reply: "Training mode ready.",
+    };
+  }
+  if (/\b(what('?s| is) next|next step|what should i do|what now|next action)\b/.test(text)) {
+    return { intent: "what_next", reply: null };
+  }
+
   // Help
   if (/\b(help|what can you|commands|what do you)\b/.test(text)) {
     return {
       intent: "help",
       reply:
-        "Say: decide fourteen fifty, four miles, eighteen minutes. Or: start driving, pause, resume, end shift, max money mode, keep busy, high roller, open logbook, open intelligence, read timers, repeat decision.",
+        "Say: decide fourteen fifty, four miles, eighteen minutes. Or: start driving, pause, resume, end shift, start delivery single, add double, reject order, arrived restaurant, arrived customer, order delivered, open analytics, open tax center, search hub for 75201, clear hub search, what is next, teach me delivery, max money mode, keep busy, high roller, read timers, repeat decision.",
     };
   }
 
@@ -156,6 +244,44 @@ export function parseVoiceCommand(utterance = "") {
     return { intent: "resume", reply: "Resuming tracking." };
   }
 
+  // DoorDash / delivery workflow controls
+  if (/\b(start|begin)\b.*\b(order|delivery|doordash)\b/.test(text)) {
+    const orderTypeId = inferStartOrderType(text);
+    return {
+      intent: "start_delivery",
+      payload: { orderTypeId },
+      reply: `Starting ${orderTypeId.replace("_", " ")} delivery.`,
+    };
+  }
+  if (/\b(add|accept)\b.*\b(double|triple|stack|addon|add on|new order|order)\b/.test(text)) {
+    return {
+      intent: "accept_delivery_addon",
+      payload: { count: inferAddonCount(text) },
+      reply: "Accepting add-on order.",
+    };
+  }
+  if (/\b(reject|decline|skip)\b.*\b(order|addon|add on|stack|delivery)\b/.test(text)) {
+    return {
+      intent: "reject_delivery_addon",
+      reply: "Rejecting add-on order.",
+    };
+  }
+  if (/\b(arrived|at)\b.*\b(restaurant|pickup)\b/.test(text)) {
+    return { intent: "arrive_restaurant", reply: "Marking arrived at restaurant." };
+  }
+  if (/\b(depart|left|leaving)\b.*\b(restaurant|pickup)\b/.test(text)) {
+    return { intent: "depart_restaurant", reply: "Marking departure from restaurant." };
+  }
+  if (/\b(arrived|at)\b.*\b(customer|dropoff|drop off)\b/.test(text)) {
+    return { intent: "arrive_customer", reply: "Marking arrived at customer." };
+  }
+  if (/\b(delivered|complete|completed|finished)\b.*\b(order|delivery|dropoff|drop off)?\b/.test(text)) {
+    return { intent: "complete_delivery", reply: "Completing delivery." };
+  }
+  if (/\b(cancel|unassign|abort)\b.*\b(order|delivery)?\b/.test(text)) {
+    return { intent: "cancel_delivery", reply: "Cancelling active delivery." };
+  }
+
   // Navigation
   if (/\b(open|go to|show)\b.*\blogbook\b/.test(text) || /\blogbook\b/.test(text) && /\bopen\b/.test(text)) {
     return { intent: "navigate", payload: { tab: "logbook" }, reply: "Opening logbook." };
@@ -171,6 +297,55 @@ export function parseVoiceCommand(utterance = "") {
   }
   if (/\b(open|go to)\b.*\bcomms\b/.test(text) || /\btitan ?comms\b/.test(text)) {
     return { intent: "navigate_path", payload: { path: "/comms" }, reply: "Opening TitanCom." };
+  }
+
+  // Driver Hub folder/search/refresh
+  if (/\b(refresh|reload)\b.*\b(driver|hub|explorer)\b/.test(text)) {
+    return { intent: "refresh_hub", reply: "Refreshing Driver Hub." };
+  }
+
+  if (/\b(clear|reset)\b.*\b(driver\s+hub\s+)?(search|query|filter)\b/.test(text)) {
+    return { intent: "clear_hub_search", reply: "Clearing Driver Hub search." };
+  }
+
+  const searchMatch = text.match(
+    /\b(search|find|look up)\b(?:\s+in)?\s+(?:driver\s+)?hub(?:\s+for)?\s+(.+)/
+  );
+  if (searchMatch && searchMatch[2]) {
+    const query = searchMatch[2].trim();
+    if (query.length >= 2) {
+      return {
+        intent: "navigate_hub_search",
+        payload: { query },
+        reply: `Searching Driver Hub for ${query}.`,
+      };
+    }
+  }
+
+  if (/\b(open|go to|show)\b.*\b(driver hub|driver|hub|explorer|mission control)\b/.test(text)) {
+    return { intent: "navigate_hub", reply: "Opening Driver Hub." };
+  }
+
+  const folderHelpMatch = text.match(/\b(?:what can i do|commands?|help)\s+(?:in|for)\s+(.+)/);
+  if (folderHelpMatch?.[1]) {
+    const folderId = matchHubFolder(`open ${folderHelpMatch[1]}`) || matchHubFolder(folderHelpMatch[1]);
+    if (folderId) {
+      return {
+        intent: "hub_folder_help",
+        payload: { folderId },
+        reply: null,
+      };
+    }
+  }
+
+  const hubFolderId = matchHubFolder(text);
+  if (hubFolderId) {
+    const folder = DRIVER_OS_FOLDERS.find((f) => f.id === hubFolderId);
+    return {
+      intent: "navigate_hub_folder",
+      payload: { folderId: hubFolderId },
+      reply: `Opening ${folder?.label || "that folder"}.`,
+    };
   }
 
   // Status / timers
@@ -231,7 +406,7 @@ export function parseVoiceCommand(utterance = "") {
   return {
     intent: "unknown",
     reply:
-      "I can decide offers, start or end driving, pause, change money mode, open logbook or intelligence, and read timers. Say help for examples.",
+      "I can run shift controls, DoorDash workflow, and Driver Hub folders like analytics, tax center, reports, settings, and directory. Say teach me or help for examples.",
   };
 }
 

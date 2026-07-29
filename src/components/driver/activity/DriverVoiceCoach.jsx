@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,52 @@ import { buildZipBenchmarks } from "@/lib/driverActivity/zipBenchmarks";
 import { listTripJournal } from "@/lib/driverActivity/tripJournal";
 import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
 import { formatDuration } from "@/lib/driverHubApi";
+import {
+  acceptNewOrder,
+  arriveAtCustomer,
+  arriveAtRestaurant,
+  cancelDelivery,
+  completeDelivery,
+  createDelivery,
+  departRestaurant,
+  lastKnownGps,
+  rejectNewOrder,
+  readActiveDelivery,
+  saveDeliverySnapshot,
+} from "@/lib/driverActivity/doorDashWorkflow";
+
+const FOLDER_VOICE_GUIDE = {
+  "live-shift": "Live Shift: say start driving, pause, resume, or end shift.",
+  doordash:
+    "DoorDash: say start delivery single or double, add double, reject order, arrived restaurant, depart restaurant, arrived customer, or order delivered.",
+  "trip-history": "Trip History: say open trip history, search hub for a ZIP, or open reports for exports.",
+  analytics: "Analytics: say open analytics, open performance, open rush intelligence, or what is next.",
+  rush: "Rush Intelligence: say open rush intelligence, then read timers to compare your window pacing.",
+  platforms: "Platform Statistics: say open platform statistics to review app-by-app performance.",
+  heatmaps: "Heat Maps: say open heat maps, then search hub for a ZIP to jump to recent matching history.",
+  performance: "Performance: say open performance, then ask what is next for your next best action.",
+  ai: "AI Insights: say open ai insights, then ask what is next to get a practical recommendation.",
+  goals: "Goals: say open goals and keep busy mode or high roller to tune your offer strategy.",
+  vehicle: "Vehicle: say open vehicle and max money mode to protect your all-in cost floor.",
+  tax: "Tax Center: say open tax center, then open reports when you need exportable records.",
+  reports: "Reports: say open reports, then export report from the report panel.",
+  maintenance: "Maintenance: say open maintenance to review reminders and service windows.",
+  directory: "Find Drivers: say open find drivers or search hub for a city or ZIP.",
+  settings: "Settings: say open settings to adjust GPS, privacy, and driving preferences.",
+};
+
+function teachReply(topic) {
+  if (topic === "delivery") {
+    return "Delivery training: start delivery double. Then say arrived restaurant, depart restaurant, arrived customer, and order delivered. Say cancel delivery only if needed.";
+  }
+  if (topic === "hub") {
+    return "Hub training: open analytics, open tax center, open reports, search hub for 75201, clear hub search, and refresh driver hub.";
+  }
+  if (topic === "offers") {
+    return "Offer training: say decide fourteen fifty, four miles, eighteen minutes. Then use max money mode, keep busy, or high roller.";
+  }
+  return "Training: say start driving, decide fourteen fifty four miles eighteen minutes, open analytics, and what is next.";
+}
 
 /**
  * Hands-free voice coach for Driver Hub — speak offers & commands, hear ACCEPT/DENY.
@@ -40,7 +86,6 @@ export default function DriverVoiceCoach({
   onDecision,
 }) {
   const navigate = useNavigate();
-  const [, setParams] = useSearchParams();
   const supported = isVoiceSupported();
   const [listening, setListening] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
@@ -50,6 +95,7 @@ export default function DriverVoiceCoach({
   const recogRef = useRef(null);
   const handsFreeRef = useRef(false);
   const lastDecisionRef = useRef(null);
+  const pendingActionRef = useRef(null);
 
   useEffect(() => {
     handsFreeRef.current = handsFree;
@@ -78,6 +124,58 @@ export default function DriverVoiceCoach({
         case "empty":
         case "export_report":
           break;
+        case "teach_mode":
+          reply = teachReply(cmd.payload?.topic);
+          break;
+        case "hub_folder_help": {
+          const folderId = cmd.payload?.folderId;
+          reply = FOLDER_VOICE_GUIDE[folderId] || "Say open analytics, open reports, open tax center, or open settings.";
+          break;
+        }
+        case "what_next": {
+          const activeDelivery = userId ? readActiveDelivery(userId) : null;
+          if (activeDelivery?.status === "active") {
+            reply =
+              activeDelivery.stage === "to_pickup"
+                ? "You are on an active delivery. Next say arrived restaurant when you reach pickup."
+                : activeDelivery.stage === "at_pickup"
+                  ? "You are at pickup. Next say depart restaurant once food is loaded."
+                  : activeDelivery.stage === "to_dropoff"
+                    ? "You are heading to customer. Next say arrived customer at dropoff."
+                    : activeDelivery.stage === "at_dropoff"
+                      ? "You are at dropoff. Next say order delivered to close this trip."
+                      : "You have an active delivery. Continue with delivery stage commands.";
+            break;
+          }
+          if (!drivingActive) {
+            reply = "Next: say start driving, then speak an offer like decide fourteen fifty, four miles, eighteen minutes.";
+            break;
+          }
+          reply =
+            "Next: keep driving and either ask me to decide your next offer, or say open analytics for performance.";
+          break;
+        }
+        case "confirm_action": {
+          const pending = pendingActionRef.current;
+          if (!pending?.intent) {
+            reply = "Nothing is waiting for confirmation.";
+            break;
+          }
+          if (Date.now() - Number(pending.createdAt || 0) > 20000) {
+            pendingActionRef.current = null;
+            reply = "That confirmation expired. Say the command again.";
+            break;
+          }
+          pendingActionRef.current = null;
+          return runIntent({
+            ...pending,
+            payload: { ...(pending.payload || {}), confirmed: true },
+          });
+        }
+        case "cancel_action":
+          pendingActionRef.current = null;
+          reply = "Canceled. I did not change anything.";
+          break;
         case "autopilot_on":
           if (userId) saveAutopilotSettings(userId, { enabled: true });
           break;
@@ -97,6 +195,15 @@ export default function DriverVoiceCoach({
           else reply = "You're already driving.";
           break;
         case "stop_driving":
+          if (!cmd.payload?.confirmed) {
+            pendingActionRef.current = {
+              intent: "stop_driving",
+              payload: {},
+              createdAt: Date.now(),
+            };
+            reply = "Confirm stop shift to end driving, or say never mind.";
+            break;
+          }
           if (drivingActive) await onStopDriving?.();
           else reply = "No active drive session.";
           break;
@@ -108,16 +215,183 @@ export default function DriverVoiceCoach({
           if (drivingActive && sessionPaused) onResume?.();
           else reply = "Nothing to resume.";
           break;
+        case "start_delivery": {
+          if (!userId) {
+            reply = "Sign in first so I can save delivery state.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (active?.status === "active") {
+            reply = "A delivery is already active. Say cancel delivery or order delivered first.";
+            break;
+          }
+          const created = createDelivery({
+            orderTypeId: cmd.payload?.orderTypeId || "single",
+            gps: lastKnownGps(),
+          });
+          saveDeliverySnapshot(userId, created);
+          break;
+        }
+        case "accept_delivery_addon": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const count = Math.max(1, Number(cmd.payload?.count || 1));
+          let next = active;
+          for (let i = 0; i < count; i += 1) {
+            next = acceptNewOrder(next, { gps: lastKnownGps() });
+          }
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "reject_delivery_addon": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const next = rejectNewOrder(active, { gps: lastKnownGps(), reason: "voice_reject" });
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "arrive_restaurant": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const next = arriveAtRestaurant(active, { gps: lastKnownGps() });
+          if (next === active) {
+            reply = "You can mark restaurant arrival only while driving to pickup.";
+            break;
+          }
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "depart_restaurant": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const next = departRestaurant(active, { gps: lastKnownGps(), auto: false });
+          if (next === active) {
+            reply = "You can depart only after restaurant arrival.";
+            break;
+          }
+          saveDeliverySnapshot(userId, next, { departed: true });
+          break;
+        }
+        case "arrive_customer": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const next = arriveAtCustomer(active, { gps: lastKnownGps() });
+          if (next === active) {
+            reply = "You can mark customer arrival only while driving to customer.";
+            break;
+          }
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "complete_delivery": {
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery. Say start delivery first.";
+            break;
+          }
+          const next = completeDelivery(active, { gps: lastKnownGps() });
+          if (next === active) {
+            reply = "You can complete only after arriving at customer.";
+            break;
+          }
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "cancel_delivery": {
+          if (!cmd.payload?.confirmed) {
+            pendingActionRef.current = {
+              intent: "cancel_delivery",
+              payload: {},
+              createdAt: Date.now(),
+            };
+            reply = "Confirm cancel delivery to stop this active order, or say never mind.";
+            break;
+          }
+          if (!userId) {
+            reply = "Sign in first so I can update this delivery.";
+            break;
+          }
+          const active = readActiveDelivery(userId);
+          if (!active || active.status !== "active") {
+            reply = "No active delivery to cancel.";
+            break;
+          }
+          const next = cancelDelivery(active, { gps: lastKnownGps() });
+          saveDeliverySnapshot(userId, next);
+          break;
+        }
+        case "navigate_hub":
+          navigate("/driver");
+          break;
+        case "navigate_hub_folder": {
+          const folderId = cmd.payload?.folderId;
+          if (!folderId) {
+            reply = "Say which Driver Hub folder to open.";
+            break;
+          }
+          navigate(`/driver?folder=${encodeURIComponent(folderId)}`);
+          break;
+        }
+        case "navigate_hub_search": {
+          const query = String(cmd.payload?.query || "").trim();
+          if (query.length < 2) {
+            reply = "Say search hub for, then at least two words.";
+            break;
+          }
+          navigate(`/driver?folder=directory&q=${encodeURIComponent(query)}`);
+          break;
+        }
+        case "clear_hub_search":
+          navigate("/driver?folder=directory");
+          break;
+        case "refresh_hub":
+          navigate("/driver");
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("focus"));
+          }
+          break;
         case "navigate":
           if (cmd.payload?.tab) {
-            setParams(
-              (prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("tab", cmd.payload.tab);
-                return next;
-              },
-              { replace: true }
-            );
+            navigate(`/driver?tab=${encodeURIComponent(cmd.payload.tab)}`);
           }
           break;
         case "navigate_path":
@@ -198,7 +472,6 @@ export default function DriverVoiceCoach({
       onResume,
       onDecision,
       navigate,
-      setParams,
     ]
   );
 
@@ -322,8 +595,9 @@ export default function DriverVoiceCoach({
             {handsFree ? "Listening — ask me anything for your shift" : "Hands-free driver coach"}
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Decide offers, start/end drive, pause, money mode, open logbook — just talk. I speak
-            ACCEPT or DENY with $/mi vs your all-in floor; you still tap the gig app.
+            Decide offers, run delivery stages, and open Hub folders like analytics, tax, reports,
+            and settings by voice. I speak ACCEPT or DENY with $/mi vs your all-in floor; you
+            still tap the gig app.
           </p>
         </div>
       </div>
@@ -351,6 +625,40 @@ export default function DriverVoiceCoach({
           {handsFree ? "Voice ON" : "Hands-free"}
         </Button>
       </div>
+
+      <details className="rounded-xl border border-border/70 bg-background/30 px-3 py-2">
+        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Voice command quick sheet
+        </summary>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Keep it short while driving. Example phrases:
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {[
+            "start driving",
+            "start delivery double",
+            "add double",
+            "reject order",
+            "arrived restaurant",
+            "arrived customer",
+            "order delivered",
+            "open analytics",
+            "open tax center",
+            "search hub for 75201",
+            "clear hub search",
+            "what is next",
+            "teach me delivery",
+            "confirm stop shift",
+          ].map((sample) => (
+            <span
+              key={sample}
+              className="rounded-full border border-border/70 bg-muted/30 px-2 py-1 text-[10px] text-foreground"
+            >
+              {sample}
+            </span>
+          ))}
+        </div>
+      </details>
 
       {!supported ? (
         <p className="text-xs text-titan-amber">

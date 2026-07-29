@@ -54,8 +54,10 @@ import {
   readSession,
   readShiftHistory,
   readStops,
+  readTaxSyncQueue,
   renameStop,
   resumeDrivingSession,
+  replayQueuedTaxSync,
   savePrefs,
   startDrivingSession,
   stopDrivingSession,
@@ -87,6 +89,7 @@ export default function DriverShiftPanel() {
   const [toggleError, setToggleError] = useState("");
   const [gpsError, setGpsError] = useState("");
   const [reviewSessionId, setReviewSessionId] = useState(null);
+  const [taxQueueCount, setTaxQueueCount] = useState(() => (user?.id ? readTaxSyncQueue(user.id).length : 0));
 
   const mode = prefs.mode === "riding" ? "riding" : "driving";
   const requestingRide = Boolean(prefs.requestingRide);
@@ -99,6 +102,7 @@ export default function DriverShiftPanel() {
     setSession(readSession(user.id));
     setStops(readStops(user.id));
     setHistory(readShiftHistory(user.id));
+    setTaxQueueCount(readTaxSyncQueue(user.id).length);
   }, [user?.id]);
 
   useEffect(() => {
@@ -120,6 +124,43 @@ export default function DriverShiftPanel() {
   useEffect(() => {
     if (!user?.id) return;
     listDriverVehicles(user.id).then(setVehicles).catch(() => setVehicles([]));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+
+    const replay = async () => {
+      if (cancelled) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      try {
+        const result = await replayQueuedTaxSync(user.id, { limit: 25 });
+        setTaxQueueCount(result.remaining);
+        if (cancelled || result.success <= 0) return;
+        toast({
+          title: "Tax sync restored",
+          description:
+            result.remaining > 0
+              ? `${result.success} queued row(s) synced · ${result.remaining} still pending.`
+              : `${result.success} queued row(s) synced successfully.`,
+        });
+      } catch {
+        // Keep queue for later retries.
+      }
+    };
+
+    replay();
+    const onOnline = () => {
+      replay();
+    };
+    window.addEventListener("online", onOnline);
+    const timer = window.setInterval(replay, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", onOnline);
+      window.clearInterval(timer);
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -417,7 +458,7 @@ export default function DriverShiftPanel() {
             title: "Driving ended · tax synced",
             description: `${miles} mi logged to Tax Center${
               synced.fuel?.cost ? ` · ~${currencySymbol(prefs.currency)}${synced.fuel.cost} fuel` : ""
-            }.`,
+            }${synced.queued ? " · some rows queued for retry" : ""}.`,
           });
         } else {
           toast({
@@ -427,6 +468,7 @@ export default function DriverShiftPanel() {
             }.`,
           });
         }
+        setTaxQueueCount(readTaxSyncQueue(user.id).length);
       } else {
         updatePref({ mode: "driving", requestingRide: false });
         const next = await startDrivingSession(user, {
@@ -526,9 +568,10 @@ export default function DriverShiftPanel() {
       toast({
         title: synced.ok ? "Miles saved · tax updated" : "Miles recorded",
         description: synced.ok
-          ? "Tax Center mileage refreshed while driving."
+          ? `Tax Center mileage refreshed while driving${synced.queued ? " (with queued retries)." : "."}`
           : `${next.miles} mi saved on this device.`,
       });
+        setTaxQueueCount(readTaxSyncQueue(user.id).length);
     } catch (err) {
       toast({
         variant: "destructive",
@@ -555,6 +598,11 @@ export default function DriverShiftPanel() {
           track in the background unless you explicitly enable a future background option. You can
           pause or end the session anytime. Route points stay on this device (last ~400 samples).
         </p>
+        {taxQueueCount > 0 ? (
+          <p className="text-xs rounded-lg border border-titan-amber/35 bg-titan-amber/10 px-2.5 py-2 text-titan-amber">
+            {taxQueueCount} tax sync item{taxQueueCount === 1 ? "" : "s"} queued. They auto-retry when online.
+          </p>
+        ) : null}
         <label className="flex items-start gap-3 text-sm text-foreground cursor-pointer">
           <input
             type="checkbox"

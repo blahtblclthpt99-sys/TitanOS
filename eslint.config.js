@@ -1,104 +1,44 @@
+import js from "@eslint/js";
 import globals from "globals";
-import pluginJs from "@eslint/js";
-import pluginReact from "eslint-plugin-react";
-import pluginReactHooks from "eslint-plugin-react-hooks";
-import pluginUnusedImports from "eslint-plugin-unused-imports";
-
-const reactRules = {
-  "no-unused-vars": "off",
-  "react/jsx-uses-vars": "error",
-  "react/jsx-uses-react": "error",
-  "unused-imports/no-unused-imports": "error",
-  "unused-imports/no-unused-vars": [
-    "warn",
-    {
-      vars: "all",
-      varsIgnorePattern: "^_",
-      args: "after-used",
-      argsIgnorePattern: "^_",
-    },
-  ],
-  "react/prop-types": "off",
-  "react/react-in-jsx-scope": "off",
-  "react/no-unknown-property": [
-    "error",
-    { ignore: ["cmdk-input-wrapper", "toast-close"] },
-  ],
-  "react-hooks/rules-of-hooks": "error",
-};
+import reactPlugin from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import unusedImports from "eslint-plugin-unused-imports";
 
 export default [
   {
     ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/release/**",
-      "**/android/**",
-      "**/.tools/**",
-      // API is Node/serverless — lint separately when Node globals block is ready
-      "**/api/**",
-      // Generated / vendor-style shadcn primitives (adopt or prune intentionally)
-      "src/components/ui/**",
+      "dist/**",
+      "node_modules/**",
+      "**/.gradle/**",
+      "**/*.bak",
+      "src/Untitled-1.js",
     ],
   },
+  js.configs.recommended,
   {
-    files: [
-      "src/pages/**/*.{js,mjs,cjs,jsx}",
-      "src/components/**/*.{js,mjs,cjs,jsx}",
-      "src/hooks/**/*.{js,mjs,cjs,jsx}",
-      "src/Layout.jsx",
-      "src/App.jsx",
-      "src/main.jsx",
-      "src/AuthenticatedShell.jsx",
-    ],
-    ...pluginJs.configs.recommended,
-    ...pluginReact.configs.flat.recommended,
+    files: ["**/*.{js,jsx,mjs,cjs}"],
     languageOptions: {
-      globals: globals.browser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-        ecmaFeatures: { jsx: true },
-      },
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.browser, ...globals.node },
+      parserOptions: { ecmaFeatures: { jsx: true } },
     },
     settings: { react: { version: "detect" } },
     plugins: {
-      react: pluginReact,
-      "react-hooks": pluginReactHooks,
-      "unused-imports": pluginUnusedImports,
-    },
-    rules: reactRules,
-  },
-  {
-    // Pure libs — catch dead imports without React JSX rules noise
-    files: ["src/lib/**/*.{js,mjs,cjs}"],
-    ...pluginJs.configs.recommended,
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-      },
-    },
-    plugins: {
-      "unused-imports": pluginUnusedImports,
+      react: reactPlugin,
+      "react-hooks": reactHooks,
+      "jsx-a11y": jsxA11y,
+      "unused-imports": unusedImports,
     },
     rules: {
+      ...reactPlugin.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "react/no-unescaped-entities": "off",
       "no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
-      "unused-imports/no-unused-vars": [
-        "warn",
-        {
-          vars: "all",
-          varsIgnorePattern: "^_",
-          args: "after-used",
-          argsIgnorePattern: "^_",
-        },
-      ],
-      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 ];

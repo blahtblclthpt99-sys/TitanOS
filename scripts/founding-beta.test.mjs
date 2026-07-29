@@ -10,7 +10,6 @@ import {
   FOUNDING_USER_CAP,
   normalizeLaunchStatus,
   applyLaunchStatus,
-  isBetaActive,
   isMembershipCheckoutLive,
 } from "../src/lib/launchStatus.js";
 import {

@@ -123,7 +123,7 @@ export function parseOfferQuickText(text = "") {
   const zip = raw.match(/\b(\d{5})\b/);
   const stack = raw.match(/(?:x|×|stack(?:ed)?|orders?)\s*[:=]?\s*(\d)/i);
 
-  const slash = raw.match(/^(\d+(?:\.\d+)?)\s*[\/|]\s*(\d+(?:\.\d+)?)\s*[\/|]\s*(\d+(?:\.\d+)?)/);
+  const slash = raw.match(/^(\d+(?:\.\d+)?)\s*[/|]\s*(\d+(?:\.\d+)?)\s*[/|]\s*(\d+(?:\.\d+)?)/);
   if (slash) {
     return {
       pay: Number(slash[1]),

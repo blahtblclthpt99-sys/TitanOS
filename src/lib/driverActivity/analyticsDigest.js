@@ -52,7 +52,7 @@ export function generateShiftDigest(userId, endedSession, stops = [], opts = {})
     generatedAt: new Date().toISOString(),
     source: "shift_end",
     sessionId: endedSession.id,
-    day: todayISO(),
+    date: todayISO(),
     summary,
     day,
     rush,

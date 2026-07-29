@@ -48,6 +48,74 @@ describe("Driver voice commands", () => {
     assert.equal(parseVoiceCommand("open logbook").payload.tab, "logbook");
   });
 
+  it("parses delivery workflow commands", () => {
+    const start = parseVoiceCommand("start delivery double");
+    assert.equal(start.intent, "start_delivery");
+    assert.equal(start.payload.orderTypeId, "double");
+
+    const add = parseVoiceCommand("add double");
+    assert.equal(add.intent, "accept_delivery_addon");
+    assert.equal(add.payload.count, 1);
+
+    const acceptTriple = parseVoiceCommand("accept triple stack");
+    assert.equal(acceptTriple.intent, "accept_delivery_addon");
+    assert.equal(acceptTriple.payload.count, 2);
+
+    assert.equal(parseVoiceCommand("reject order").intent, "reject_delivery_addon");
+    assert.equal(parseVoiceCommand("arrived at restaurant").intent, "arrive_restaurant");
+    assert.equal(parseVoiceCommand("depart restaurant").intent, "depart_restaurant");
+    assert.equal(parseVoiceCommand("arrived customer").intent, "arrive_customer");
+    assert.equal(parseVoiceCommand("order delivered").intent, "complete_delivery");
+    assert.equal(parseVoiceCommand("cancel delivery").intent, "cancel_delivery");
+  });
+
+  it("parses Driver Hub folder and search commands", () => {
+    const openHub = parseVoiceCommand("open driver hub");
+    assert.equal(openHub.intent, "navigate_hub");
+
+    const analytics = parseVoiceCommand("open analytics");
+    assert.equal(analytics.intent, "navigate_hub_folder");
+    assert.equal(analytics.payload.folderId, "analytics");
+
+    const tax = parseVoiceCommand("open tax center");
+    assert.equal(tax.intent, "navigate_hub_folder");
+    assert.equal(tax.payload.folderId, "tax");
+
+    const search = parseVoiceCommand("search hub for order 75201");
+    assert.equal(search.intent, "navigate_hub_search");
+    assert.equal(search.payload.query, "order 75201");
+
+    const refresh = parseVoiceCommand("refresh driver hub");
+    assert.equal(refresh.intent, "refresh_hub");
+
+    const clear = parseVoiceCommand("clear hub search");
+    assert.equal(clear.intent, "clear_hub_search");
+  });
+
+  it("parses teaching and folder guidance commands", () => {
+    const teachDelivery = parseVoiceCommand("teach me delivery");
+    assert.equal(teachDelivery.intent, "teach_mode");
+    assert.equal(teachDelivery.payload.topic, "delivery");
+
+    const teachHub = parseVoiceCommand("teach me hub navigation");
+    assert.equal(teachHub.intent, "teach_mode");
+    assert.equal(teachHub.payload.topic, "hub");
+
+    const folderHelp = parseVoiceCommand("what can i do in tax center");
+    assert.equal(folderHelp.intent, "hub_folder_help");
+    assert.equal(folderHelp.payload.folderId, "tax");
+
+    const next = parseVoiceCommand("what is next");
+    assert.equal(next.intent, "what_next");
+  });
+
+  it("parses confirmation flow commands", () => {
+    assert.equal(parseVoiceCommand("confirm").intent, "confirm_action");
+    assert.equal(parseVoiceCommand("go ahead").intent, "confirm_action");
+    assert.equal(parseVoiceCommand("never mind").intent, "cancel_action");
+    assert.equal(parseVoiceCommand("cancel that").intent, "cancel_action");
+  });
+
   it("returns help for help requests", () => {
     const cmd = parseVoiceCommand("help what can you do");
     assert.equal(cmd.intent, "help");

@@ -15,7 +15,10 @@ export function sanitizeAppPath(raw) {
   if (!s.startsWith("/")) return "";
   if (s.startsWith("//")) return "";
   if (s.includes("://")) return "";
-  if (/[\u0000-\u001F\u007F]/.test(s)) return "";
+  for (let i = 0; i < s.length; i += 1) {
+    const code = s.charCodeAt(i);
+    if (code <= 31 || code === 127) return "";
+  }
   if (!/^\/[A-Za-z0-9/_\-.?=&%~]*$/.test(s)) return "";
   if (s.length > 500) return "";
   return s;

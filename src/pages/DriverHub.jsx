@@ -231,6 +231,29 @@ export default function DriverHub() {
           </div>
         ) : null}
 
+        {search.trim().length >= 2 && deliveryHits.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card/60 p-3.5 space-y-2 shadow-soft" role="status">
+            <p className="text-sm font-medium text-foreground">No delivery matches for "{search.trim()}".</p>
+            <p className="text-xs text-muted-foreground">
+              Try a customer name, ZIP, app, or part of an order note from Trip Journal.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-[40px]"
+                onClick={() => onOpenFolder("trip-history")}
+              >
+                Open Trip History
+              </Button>
+              <Button type="button" size="sm" className="min-h-[40px]" onClick={() => setSearch("")}>
+                Clear Search
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <DriverExplorer
           user={user}
           openMap={openMap}

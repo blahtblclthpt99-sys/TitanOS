@@ -49,8 +49,11 @@ function McCard({ icon: Icon, label, value, sub, accent = "cyan", className }) {
 function safeSnapshot(userId, extra) {
   try {
     return buildMissionSnapshot(userId, extra);
-  } catch (err) {
-    console.error("[MissionControl]", err);
+  } catch {
+    if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
+      // Keep noisy snapshot errors out of production logs.
+      console.error("[MissionControl] snapshot failed");
+    }
     return null;
   }
 }
@@ -65,12 +68,15 @@ export default function MissionControl({ userId, onOpenFolder }) {
 
   useEffect(() => {
     let cancelled = false;
+    let batteryManager = null;
+    let sync = null;
     if (typeof navigator !== "undefined" && navigator.getBattery) {
       navigator
         .getBattery()
         .then((b) => {
           if (cancelled) return;
-          const sync = () => setBattery({ level: b.level, charging: b.charging });
+          batteryManager = b;
+          sync = () => setBattery({ level: b.level, charging: b.charging });
           sync();
           b.addEventListener("levelchange", sync);
           b.addEventListener("chargingchange", sync);
@@ -79,6 +85,10 @@ export default function MissionControl({ userId, onOpenFolder }) {
     }
     return () => {
       cancelled = true;
+      if (batteryManager && sync) {
+        batteryManager.removeEventListener("levelchange", sync);
+        batteryManager.removeEventListener("chargingchange", sync);
+      }
     };
   }, []);
 

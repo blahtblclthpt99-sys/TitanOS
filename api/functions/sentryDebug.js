@@ -31,6 +31,7 @@ export default async function handler(req, res) {
 
   try {
     // Intentionally undefined — ReferenceError for setup verification
+    // eslint-disable-next-line no-undef
     foo();
   } catch (e) {
     Sentry.captureException(e);

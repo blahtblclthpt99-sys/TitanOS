@@ -55,6 +55,6 @@ describe("maintainability barrels", () => {
   });
 
   it("Mission Control imports driverOs barrel", () => {
-    assert.match(read("src/components/driver/os/MissionControl.jsx"), /from \"@\/lib\/driverOs\"/);
+    assert.match(read("src/components/driver/os/MissionControl.jsx"), /from "@\/lib\/driverOs"/);
   });
 });

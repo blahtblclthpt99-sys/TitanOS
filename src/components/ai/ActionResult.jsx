@@ -1,10 +1,16 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, Undo2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 
-export default function ActionResult({ message, isError = false }) {
+export default function ActionResult({
+  message,
+  isError = false,
+  onRollback = null,
+  rollbackLabel = "Rollback",
+  rollbackLoading = false,
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -27,6 +33,23 @@ export default function ActionResult({ message, isError = false }) {
           {message}
         </ReactMarkdown>
       </div>
+      {!isError && typeof onRollback === "function" ? (
+        <div className="mt-3 border-t border-border/70 pt-2.5">
+          <button
+            type="button"
+            onClick={onRollback}
+            disabled={rollbackLoading}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/70 disabled:opacity-40"
+          >
+            {rollbackLoading ? (
+              <div className="h-3.5 w-3.5 rounded-full border-2 border-foreground/25 border-t-foreground animate-spin" />
+            ) : (
+              <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {rollbackLabel}
+          </button>
+        </div>
+      ) : null}
     </motion.div>
   );
 }

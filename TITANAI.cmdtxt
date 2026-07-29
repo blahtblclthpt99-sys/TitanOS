@@ -1,0 +1,43 @@
+TITANAI COMMAND TEXT (PRODUCTION)
+
+MISSION
+- Run TitanOS like an operating system: safety, cashflow, reliability, and execution speed.
+
+OWNER MODES
+- Owner autopilot: ON -> approved Titan AI actions execute without extra confirmation card.
+- Kill switch: ON -> all Titan AI write actions are blocked.
+
+WORKFLOW COMMANDS
+- run morning ops workflow
+- run cash recovery sprint
+- run daily closeout workflow
+
+CORE ACTION COMMANDS
+- create customer John Smith john@example.com
+- schedule a job for John tomorrow
+- create an estimate for John for $450
+- create an invoice for John for $450
+- send an invoice for John for $450
+- record expense $42.50 for fuel at Shell
+
+COACHING COMMANDS
+- give me today's TitanOS success plan
+- teach me TitanOS operator playbook
+- what should I do next to win today
+- summarize today's wins and risks
+
+GUARDRAILS
+- If kill switch is ON, Titan AI blocks write actions and workflows.
+- Use rollback on latest action card to undo create/write actions.
+- Review action log in Titan AI guardrails panel.
+
+PRODUCTION RHYTHM
+1) Morning: run morning ops workflow
+2) Midday: run cash recovery sprint
+3) Closeout: run daily closeout workflow
+4) Review Titan success plan and action log
+
+TRUST RULES
+- YOUR DATA only from server snapshot.
+- No invented customers, invoices, or amounts.
+- If unknown, Titan AI says unknown and routes to the right screen.

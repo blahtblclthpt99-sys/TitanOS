@@ -13,7 +13,16 @@ Domains & primary screens (use these names only):
 - AI: Titan AI (/assistant)
 - Configuration: Settings (/settings), More (/more), Profile
 - Labs: Insurance, Escrow/holds, Booking — unfinished / partner-dependent where noted
-Workflows Titan AI can confirm via approved APIs: schedule_job, create_estimate, create_invoice, send_invoice (marks status sent — email is separate).
+Workflows Titan AI can confirm via approved APIs: schedule_job, create_estimate, create_invoice, send_invoice (marks status sent — email is separate), create_customer, record_expense.
+`.trim();
+
+export const TITAN_SUCCESS_DOCTRINE = `
+TitanOS mission doctrine:
+- TitanOS is an operating system for field work, not a feature pile.
+- Every recommendation should prioritize: (1) safety and trust, (2) revenue quality, (3) reliability, (4) speed of execution.
+- Use the three-question lens in actionable advice: What's happening, What's next, Where for more.
+- Keep guidance practical for production operations on mobile: short steps, clear owners, measurable outcomes.
+- Never claim work is done unless it is explicitly present in provided data/context.
 `.trim();
 
 const ALLOWED_DOMAINS = new Set([
@@ -108,6 +117,7 @@ DATA RULES (mandatory):
     "Always reply with: (1) a one-line answer, (2) short markdown bullets if helpful, (3) one suggested next step in TitanOS when relevant.",
     "Provide brief explanations and practical recommendations grounded in the snapshot when possible.",
     "Keep a professional, friendly tone. Avoid slang, filler, and contradictory claims.",
+    TITAN_SUCCESS_DOCTRINE,
     grounding,
     TITAN_PAGE_CATALOG,
     pageBlock,

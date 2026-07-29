@@ -12,6 +12,8 @@ describe("AI workflow allowlist", () => {
     assert.ok(ids.includes("schedule_job"));
     assert.ok(ids.includes("create_invoice"));
     assert.ok(ids.includes("send_invoice"));
+    assert.ok(ids.includes("create_customer"));
+    assert.ok(ids.includes("record_expense"));
     assert.ok(!ids.includes("delete_account"));
     assert.ok(!ids.includes("refund_payment"));
   });
@@ -35,6 +37,7 @@ describe("AI workflow allowlist", () => {
       assert.ok(meta.label, id);
       assert.ok(meta.path?.startsWith("/"), id);
       assert.ok(meta.description, id);
+      assert.equal(typeof meta.autopilotEligible, "boolean", id);
     }
   });
 });

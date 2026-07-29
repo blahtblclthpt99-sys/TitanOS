@@ -7,27 +7,44 @@ export const ALLOWED_AI_INTENTS = Object.freeze({
     label: "Schedule job",
     path: "/jobs",
     description: "Creates a scheduled job owned by the user",
+    autopilotEligible: true,
   },
   create_job: {
     label: "Create job",
     path: "/jobs",
     description: "Alias of schedule_job",
+    autopilotEligible: true,
   },
   create_estimate: {
     label: "Create estimate",
     path: "/estimates",
     description: "Creates a draft estimate",
+    autopilotEligible: true,
   },
   create_invoice: {
     label: "Create invoice",
     path: "/invoices",
     description: "Creates a draft invoice",
+    autopilotEligible: true,
   },
   send_invoice: {
     label: "Mark invoice sent",
     path: "/invoices",
     description: "Creates invoice with status=sent (does not send email)",
     honesty: "Marks status as sent — email/share is separate in Invoices",
+    autopilotEligible: true,
+  },
+  create_customer: {
+    label: "Create customer",
+    path: "/customers",
+    description: "Creates a customer record owned by the user",
+    autopilotEligible: true,
+  },
+  record_expense: {
+    label: "Record expense",
+    path: "/finances",
+    description: "Creates an expense record owned by the user",
+    autopilotEligible: true,
   },
 });
 

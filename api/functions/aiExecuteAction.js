@@ -28,6 +28,27 @@ export function sanitizeMoney(value, { allowZero = true } = {}) {
   return Math.round(n * 100) / 100;
 }
 
+function sanitizeText(value, max = 200) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+function sanitizeIsoDate(value, fallback) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return fallback;
+}
+
+const ENTITY_TABLE = Object.freeze({
+  Job: "jobs",
+  Estimate: "estimates",
+  Invoice: "invoices",
+  Customer: "customers",
+  Expense: "expenses",
+});
+
 /**
  * Shared AI office action executor (ownership + money sanitize).
  * Used by aiExecuteAction HTTP handler and titanAI confirmedAction path.
@@ -74,6 +95,7 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       entity: "Job",
       id: data.id,
       path: "/jobs",
+      rollback: { kind: "delete", entity: "Job", id: data.id },
     };
   }
 
@@ -105,6 +127,7 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       entity: "Estimate",
       id: data.id,
       path: "/estimates",
+      rollback: { kind: "delete", entity: "Estimate", id: data.id },
     };
   }
 
@@ -137,12 +160,140 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       entity: "Invoice",
       id: data.id,
       path: "/invoices",
+      rollback: { kind: "delete", entity: "Invoice", id: data.id },
+    };
+  }
+
+  if (intent === "create_customer") {
+    const firstName = sanitizeText(params.first_name || params.firstName, 100);
+    const lastName = sanitizeText(params.last_name || params.lastName, 100);
+    const customerName = sanitizeText(params.customer_name || params.customerName, 200);
+    const fallbackParts = customerName.split(" ").filter(Boolean);
+    const resolvedFirst = firstName || fallbackParts[0] || "Customer";
+    const resolvedLast =
+      lastName || (fallbackParts.length > 1 ? fallbackParts.slice(1).join(" ").slice(0, 100) : "");
+    const email = sanitizeText(params.email, 200).toLowerCase();
+
+    const row = {
+      first_name: resolvedFirst,
+      last_name: resolvedLast,
+      email: email || null,
+      phone: sanitizeText(params.phone, 40) || null,
+      address: sanitizeText(params.address, 200) || null,
+      city: sanitizeText(params.city, 120) || null,
+      state: sanitizeText(params.state, 40) || null,
+      zip: sanitizeText(params.zip, 20) || null,
+      status: sanitizeText(params.status || "lead", 20) || "lead",
+      source: sanitizeText(params.source || "ai", 40) || "ai",
+      notes: sanitizeText(params.notes || "Created by Titan AI", 2000),
+      created_by_id: user.id,
+      user_id: user.id,
+    };
+
+    if (row.email) {
+      const { data: existing } = await admin
+        .from("customers")
+        .select("id")
+        .eq("created_by_id", user.id)
+        .eq("email", row.email)
+        .limit(1);
+      if (Array.isArray(existing) && existing.length > 0) {
+        const err = new Error("A customer with that email already exists.");
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    const { data, error } = await admin.from("customers").insert(row).select("*").maybeSingle();
+    if (error) throw error;
+    return {
+      type: "done",
+      message: `Created customer **${[data.first_name, data.last_name].filter(Boolean).join(" ").trim() || "Customer"}**.`,
+      entity: "Customer",
+      id: data.id,
+      path: "/customers",
+      rollback: { kind: "delete", entity: "Customer", id: data.id },
+    };
+  }
+
+  if (intent === "record_expense") {
+    const amount = sanitizeMoney(params.amount, { allowZero: false });
+    if (amount == null) {
+      const err = new Error("Invalid expense amount");
+      err.status = 400;
+      throw err;
+    }
+    const date = sanitizeIsoDate(params.date, new Date().toISOString().slice(0, 10));
+    const businessUsePercent = Math.min(100, Math.max(0, Number(params.business_use_percent ?? 100) || 100));
+    const row = {
+      description: sanitizeText(params.description || "Expense", 300) || "Expense",
+      amount,
+      category: sanitizeText(params.category || "other", 80) || "other",
+      date,
+      vendor: sanitizeText(params.vendor, 200) || null,
+      receipt_url: sanitizeText(params.receipt_url, 1000) || null,
+      is_tax_deductible: params.is_tax_deductible !== false,
+      tax_year: Number(date.slice(0, 4)),
+      business_use_percent: Math.round(businessUsePercent * 100) / 100,
+      notes: sanitizeText(params.notes || "Recorded by Titan AI", 2000) || "Recorded by Titan AI",
+      created_by_id: user.id,
+      user_id: user.id,
+    };
+    const { data, error } = await admin.from("expenses").insert(row).select("*").maybeSingle();
+    if (error) throw error;
+    return {
+      type: "done",
+      message: `Recorded expense **${data.description}** for **$${Number(data.amount || 0).toLocaleString()}**.`,
+      entity: "Expense",
+      id: data.id,
+      path: "/finances",
+      rollback: { kind: "delete", entity: "Expense", id: data.id },
     };
   }
 
   const err = new Error(`Unknown intent: ${intent}`);
   err.status = 400;
   throw err;
+}
+
+export async function rollbackAiOfficeAction(admin, user, rollbackAction = {}) {
+  const kind = String(rollbackAction.kind || "");
+  const entity = String(rollbackAction.entity || "");
+  const id = String(rollbackAction.id || "");
+  if (kind !== "delete" || !entity || !id) {
+    const err = new Error("Rollback payload is invalid.");
+    err.status = 400;
+    throw err;
+  }
+  const table = ENTITY_TABLE[entity];
+  if (!table) {
+    const err = new Error("Rollback target is unsupported.");
+    err.status = 400;
+    throw err;
+  }
+
+  const { data: found, error: readErr } = await admin
+    .from(table)
+    .select("id,created_by_id")
+    .eq("id", id)
+    .eq("created_by_id", user.id)
+    .maybeSingle();
+  if (readErr) throw readErr;
+  if (!found) {
+    const err = new Error("Rollback target not found or not owned by you.");
+    err.status = 403;
+    throw err;
+  }
+
+  const { error: delErr } = await admin.from(table).delete().eq("id", id).eq("created_by_id", user.id);
+  if (delErr) throw delErr;
+
+  return {
+    type: "done",
+    message: `Rolled back ${entity} ${id.slice(0, 8)} successfully.`,
+    entity,
+    id,
+  };
 }
 
 /**

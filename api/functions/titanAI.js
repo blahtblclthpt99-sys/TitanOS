@@ -6,6 +6,11 @@ import { logError } from "../_lib/safeLog.js";
 import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.js";
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
+import { isOwnerEmail } from "../../shared/entitlements.js";
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function money(n) {
   return (Number(n) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -88,6 +93,46 @@ function buildSummary(businessData = {}) {
   };
 }
 
+function buildSuccessPlan(summary) {
+  const c = summary?.counts || {};
+  const overdueCount = Number(c.unpaidInvoices || 0);
+  const todays = Number(c.todaysJobs || 0);
+  const outstanding = Number(summary?.outstandingTotal || 0);
+  const net = Number(summary?.netThisMonth || 0);
+  const netLine = net >= 0 ? `Net this month is positive at ${money(net)}.` : `Net this month is negative at ${money(net)}.`;
+
+  const priorities = [
+    overdueCount > 0
+      ? `Revenue recovery: follow up ${overdueCount} unpaid invoice(s) totaling ${money(outstanding)}.`
+      : "Revenue recovery: no unpaid invoices detected in current snapshot.",
+    todays > 0
+      ? `Execution reliability: confirm dispatch readiness for ${todays} job(s) today.`
+      : "Execution reliability: no jobs scheduled today, so queue outreach and booking work.",
+    net >= 0
+      ? "Margin protection: keep expense logging current so reports stay decision-grade."
+      : "Margin protection: tighten spend and audit loss-driving categories this week.",
+  ];
+
+  return [
+    "TitanOS success plan for today:",
+    "",
+    "What's happening:",
+    `- ${netLine}`,
+    `- Outstanding AR: ${money(outstanding)} across ${overdueCount} invoice(s).`,
+    `- Today's scheduled jobs in snapshot: ${todays}.`,
+    "",
+    "What's next:",
+    `1. ${priorities[0]}`,
+    `2. ${priorities[1]}`,
+    `3. ${priorities[2]}`,
+    "",
+    "Where for more:",
+    "- Invoices for AR actions and send status",
+    "- Jobs and Schedule for dispatch confidence",
+    "- Finances, Reports, and Tax Center for margin visibility",
+  ].join("\n");
+}
+
 /** Server-owned snapshot only — never trust client businessData / businessSummary. */
 async function loadOwnedBusinessSummary(admin, userId) {
   const [jobsRes, invoicesRes, customersRes, expensesRes] = await Promise.all([
@@ -108,6 +153,34 @@ async function loadOwnedBusinessSummary(admin, userId) {
 function answerLocally(question, summary) {
   const q = String(question || "").toLowerCase();
   if (!summary) return null;
+
+  if (
+    /how (do|can) (we|i) (win|succeed)|titanos success|production success|daily plan|what should i do next|what('?s| is) the plan|launch checklist|go no go/.test(
+      q
+    )
+  ) {
+    return buildSuccessPlan(summary);
+  }
+
+  if (/teach me titanos|train me on titanos|how do i run titanos|operator playbook/.test(q)) {
+    return [
+      "TitanOS operator training lane:",
+      "",
+      "What's happening:",
+      "- TitanOS should be run as an operations system: dispatch, cash collection, margin control, and customer retention.",
+      "",
+      "What's next:",
+      "1. Morning command: ask 'Give me today's TitanOS success plan'.",
+      "2. Revenue command: ask 'Who owes money right now?' then trigger invoice actions.",
+      "3. Execution command: ask 'What jobs are today?' then confirm schedule readiness.",
+      "4. Margin command: ask 'How is net this month?' then log missing expenses.",
+      "5. Closeout command: ask 'Summarize today's wins and risks'.",
+      "",
+      "Where for more:",
+      "- Invoices, Jobs, Customers, Finances, Reports, and Driver Hub.",
+      "- Ask me to create customers, record expenses, schedule jobs, and draft estimates/invoices.",
+    ].join("\n");
+  }
 
   if (
     /today'?s jobs|jobs?.*today|today.*(job|schedule)|what('s| is) on (my )?schedule/.test(q)
@@ -157,11 +230,11 @@ function answerLocally(question, summary) {
   return null;
 }
 
-function detectConfirmIntent(question) {
+export function detectConfirmIntent(question) {
   const q = String(question || "").toLowerCase();
   const customer =
-    q.match(/(?:for|with|customer)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/)?.[1] ||
-    q.match(/([A-Z][a-z]+)\s+(?:tomorrow|today|next)/)?.[1] ||
+    q.match(/(?:for|with|customer)\s+([a-z][a-z\s.'-]{1,80})/)?.[1]?.trim() ||
+    q.match(/([a-z][a-z\s.'-]{1,80})\s+(?:tomorrow|today|next)/)?.[1]?.trim() ||
     "";
 
   if (/schedule\s+(a\s+)?job|book\s+(an?\s+)?appointment|add\s+(a\s+)?job/.test(q)) {
@@ -218,7 +291,259 @@ function detectConfirmIntent(question) {
     };
   }
 
+  if (/add\s+(a\s+)?customer|create\s+(a\s+)?customer|new\s+customer/.test(q)) {
+    const nameMatch = q.match(/(?:customer|named)\s+([a-z][a-z\s.'-]{1,80})/);
+    const fullName = (nameMatch?.[1] || customer || "").trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const first = parts[0] || "Customer";
+    const last = parts.length > 1 ? parts.slice(1).join(" ") : "";
+    const email = q.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)?.[0] || "";
+    const phone = q.match(/(?:\+?1\s*)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
+
+    return {
+      type: "confirm",
+      intent: "create_customer",
+      confirmationSummary: `Create customer${fullName ? ` ${fullName}` : ""}${email ? ` (${email})` : ""}?`,
+      confirmationDetails: [
+        `Name: ${[first, last].filter(Boolean).join(" ")}`,
+        email ? `Email: ${email}` : "Email: optional",
+        phone ? `Phone: ${phone}` : "Phone: optional",
+      ],
+      params: {
+        first_name: first,
+        last_name: last,
+        customer_name: [first, last].filter(Boolean).join(" "),
+        email,
+        phone,
+        status: "lead",
+        source: "ai",
+      },
+    };
+  }
+
+  if (/record\s+(an?\s+)?expense|add\s+(an?\s+)?expense|log\s+(an?\s+)?expense/.test(q)) {
+    const amount = Number(q.match(/\$\s*(\d+(?:\.\d{1,2})?)/)?.[1] || q.match(/(\d+(?:\.\d{1,2})?)\s*(dollars?|usd)/)?.[1] || 0);
+    const category =
+      q.match(/\b(fuel|gas|parking|tolls|meals|insurance|repairs?|maintenance|supplies|software|phone|advertising|rent|utilities)\b/)?.[1] ||
+      "other";
+    const vendor = q.match(/(?:at|from|vendor)\s+([a-z0-9&.' -]{2,80})/)?.[1]?.trim() || "";
+    const description =
+      q.match(/(?:for|on)\s+([a-z0-9&.' -]{2,120})/)?.[1]?.trim() ||
+      `${category} expense`;
+
+    if (!amount || !Number.isFinite(amount) || amount <= 0) {
+      return {
+        type: "clarify",
+        message:
+          "I can record that expense, but I need an amount. Example: record expense $42.50 for fuel at Shell.",
+      };
+    }
+
+    return {
+      type: "confirm",
+      intent: "record_expense",
+      confirmationSummary: `Record ${`$${amount.toLocaleString()}`} expense for ${description}?`,
+      confirmationDetails: [
+        `Amount: $${amount.toLocaleString()}`,
+        `Category: ${category}`,
+        vendor ? `Vendor: ${vendor}` : "Vendor: optional",
+        `Date: ${new Date().toISOString().slice(0, 10)}`,
+      ],
+      params: {
+        amount,
+        category,
+        vendor,
+        description,
+        date: new Date().toISOString().slice(0, 10),
+        is_tax_deductible: true,
+        business_use_percent: 100,
+      },
+    };
+  }
+
+  if (/run\s+(the\s+)?(morning|startup)\s+(workflow|routine|ops)|morning ops/.test(q)) {
+    return {
+      type: "confirm",
+      intent: "run_workflow",
+      confirmationSummary: "Run Morning Ops workflow (customer, invoice draft, and expense log)?",
+      confirmationDetails: [
+        "Step 1: create customer lead 'Morning Lead'.",
+        "Step 2: create invoice draft for $125 named Morning Ops Invoice.",
+        "Step 3: record $15 operations expense for setup prep.",
+      ],
+      params: {
+        workflowId: "morning_ops",
+        steps: [
+          {
+            intent: "create_customer",
+            params: {
+              first_name: "Morning",
+              last_name: "Lead",
+              customer_name: "Morning Lead",
+              status: "lead",
+              source: "ai_workflow",
+            },
+          },
+          {
+            intent: "create_invoice",
+            params: {
+              customer_name: "Morning Lead",
+              total: 125,
+              notes: "Generated by Morning Ops workflow",
+            },
+          },
+          {
+            intent: "record_expense",
+            params: {
+              amount: 15,
+              category: "supplies",
+              description: "Morning setup prep",
+              vendor: "Operations",
+              date: todayISO(),
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  if (/run\s+(the\s+)?cash\s+recovery\s+(workflow|routine|sprint)|cash recovery sprint/.test(q)) {
+    return {
+      type: "confirm",
+      intent: "run_workflow",
+      confirmationSummary: "Run Cash Recovery workflow (create and mark sent invoice draft)?",
+      confirmationDetails: [
+        "Step 1: create customer lead 'AR Followup'.",
+        "Step 2: create invoice marked sent for $185.",
+      ],
+      params: {
+        workflowId: "cash_recovery",
+        steps: [
+          {
+            intent: "create_customer",
+            params: {
+              first_name: "AR",
+              last_name: "Followup",
+              customer_name: "AR Followup",
+              status: "lead",
+              source: "ai_workflow",
+            },
+          },
+          {
+            intent: "send_invoice",
+            params: {
+              customer_name: "AR Followup",
+              total: 185,
+              notes: "Generated by Cash Recovery workflow",
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  if (/run\s+(the\s+)?(closeout|shutdown|end of day)\s+(workflow|routine)|daily closeout/.test(q)) {
+    return {
+      type: "confirm",
+      intent: "run_workflow",
+      confirmationSummary: "Run Daily Closeout workflow (expense, estimate, and tomorrow job)?",
+      confirmationDetails: [
+        "Step 1: record $20 expense for closeout reconciliation.",
+        "Step 2: create estimate draft for follow-up work at $240.",
+        "Step 3: schedule a job for tomorrow.",
+      ],
+      params: {
+        workflowId: "closeout",
+        steps: [
+          {
+            intent: "record_expense",
+            params: {
+              amount: 20,
+              category: "other",
+              description: "Daily closeout reconciliation",
+              vendor: "Operations",
+              date: todayISO(),
+            },
+          },
+          {
+            intent: "create_estimate",
+            params: {
+              customer_name: "Followup Customer",
+              total: 240,
+              title: "Follow-up service estimate",
+              notes: "Generated by Daily Closeout workflow",
+            },
+          },
+          {
+            intent: "schedule_job",
+            params: {
+              customer_name: "Followup Customer",
+              scheduled_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+              title: "Follow-up job",
+              service_type: "General",
+            },
+          },
+        ],
+      },
+    };
+  }
+
   return null;
+}
+
+async function executeWorkflow(admin, user, params = {}) {
+  const steps = Array.isArray(params.steps) ? params.steps : [];
+  if (steps.length < 1 || steps.length > 10) {
+    const err = new Error("Workflow steps are invalid.");
+    err.status = 400;
+    throw err;
+  }
+
+  const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
+  const results = [];
+  for (const step of steps) {
+    const intent = String(step?.intent || "");
+    if (!isAllowedAiIntent(intent)) {
+      const err = new Error(`Workflow step intent is not allowed: ${intent || "unknown"}`);
+      err.status = 400;
+      throw err;
+    }
+    const result = await executeAiOfficeAction(admin, user, intent, step?.params || {});
+    results.push({ intent, ...result });
+  }
+
+  return {
+    type: "workflow_done",
+    workflowId: String(params.workflowId || "custom"),
+    message: `Workflow complete: ${results.length} step(s) executed.`,
+    steps: results,
+    rollback: {
+      kind: "workflow",
+      steps: results
+        .map((r) => r.rollback)
+        .filter(Boolean)
+        .reverse(),
+    },
+  };
+}
+
+async function rollbackWorkflow(admin, user, rollbackAction = {}) {
+  const { rollbackAiOfficeAction } = await import("./aiExecuteAction.js");
+  const steps = Array.isArray(rollbackAction.steps) ? rollbackAction.steps : [];
+  if (!steps.length) {
+    const err = new Error("Rollback workflow payload is empty.");
+    err.status = 400;
+    throw err;
+  }
+  const results = [];
+  for (const step of steps) {
+    const res = await rollbackAiOfficeAction(admin, user, step);
+    results.push(res);
+  }
+  return {
+    type: "done",
+    message: `Workflow rollback complete: ${results.length} step(s) rolled back.`,
+  };
 }
 
 export default async function handler(req, res) {
@@ -246,21 +571,67 @@ export default async function handler(req, res) {
     if (!entitled) return;
 
     const body = readJson(req);
-    const { messages = [], confirmedAction = null, lawMastermind = false } = body;
+    const {
+      messages = [],
+      confirmedAction = null,
+      rollbackAction = null,
+      lawMastermind = false,
+      ownerAutopilot = false,
+      guardrails = {},
+    } = body;
     const pageContext = sanitizePageContext(body.pageContext);
+    const ownerMode = Boolean(ownerAutopilot) && isOwnerEmail(userData.user.email || "");
+    const killSwitchOn = Boolean(guardrails?.killSwitch);
+
+    if (rollbackAction) {
+      if (killSwitchOn) {
+        return res.status(200).json({
+          data: {
+            type: "error",
+            message: "Titan guardrail kill switch is ON. Disable it to run rollback actions.",
+          },
+        });
+      }
+      try {
+        const { rollbackAiOfficeAction } = await import("./aiExecuteAction.js");
+        const data =
+          rollbackAction.kind === "workflow"
+            ? await rollbackWorkflow(admin, userData.user, rollbackAction)
+            : await rollbackAiOfficeAction(admin, userData.user, rollbackAction);
+        return res.status(200).json({ data });
+      } catch (execErr) {
+        logError("titanAI:rollback", execErr);
+        const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
+        if (status !== 200) {
+          return res.status(status).json({ error: execErr.message || "Rollback rejected" });
+        }
+        return res.status(200).json({ data: { type: "error", message: "Rollback failed." } });
+      }
+    }
 
     if (confirmedAction?.intent) {
-      if (!isAllowedAiIntent(confirmedAction.intent)) {
+      if (killSwitchOn) {
+        return res.status(200).json({
+          data: {
+            type: "error",
+            message: "Titan guardrail kill switch is ON. Disable it to run write actions.",
+          },
+        });
+      }
+      if (confirmedAction.intent !== "run_workflow" && !isAllowedAiIntent(confirmedAction.intent)) {
         return res.status(400).json({ error: "That action is not available through Titan AI." });
       }
       try {
         const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
-        const data = await executeAiOfficeAction(
-          admin,
-          userData.user,
-          confirmedAction.intent,
-          confirmedAction.params || {}
-        );
+        const data =
+          confirmedAction.intent === "run_workflow"
+            ? await executeWorkflow(admin, userData.user, confirmedAction.params || {})
+            : await executeAiOfficeAction(
+                admin,
+                userData.user,
+                confirmedAction.intent,
+                confirmedAction.params || {}
+              );
         return res.status(200).json({ data });
       } catch (execErr) {
         logError("titanAI:action_execute", execErr);
@@ -285,6 +656,45 @@ export default async function handler(req, res) {
 
     const confirm = detectConfirmIntent(lastMessage);
     if (confirm) {
+      if (confirm.type === "clarify") {
+        return res.status(200).json({ data: confirm });
+      }
+      if (killSwitchOn && (confirm.intent === "run_workflow" || isAllowedAiIntent(confirm.intent))) {
+        return res.status(200).json({
+          data: {
+            type: "error",
+            message: "Titan guardrail kill switch is ON. Disable it to run write actions.",
+          },
+        });
+      }
+      if (ownerMode && (confirm.intent === "run_workflow" || isAllowedAiIntent(confirm.intent))) {
+        try {
+          const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
+          const data =
+            confirm.intent === "run_workflow"
+              ? await executeWorkflow(admin, userData.user, confirm.params || {})
+              : await executeAiOfficeAction(
+                  admin,
+                  userData.user,
+                  confirm.intent,
+                  confirm.params || {}
+                );
+          return res.status(200).json({ data });
+        } catch (execErr) {
+          logError("titanAI:owner_autopilot_execute", execErr);
+          const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
+          if (status !== 200) {
+            return res.status(status).json({ error: execErr.message || "Action rejected" });
+          }
+          return res.status(200).json({
+            data: {
+              type: "error",
+              message:
+                "Owner autopilot could not complete that action. Open the related screen to finish in one tap.",
+            },
+          });
+        }
+      }
       return res.status(200).json({ data: confirm });
     }
 

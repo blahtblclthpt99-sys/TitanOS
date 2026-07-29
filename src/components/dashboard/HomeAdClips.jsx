@@ -11,7 +11,7 @@ const TITAN_CLIPS = [
     cta: "Open AI",
     path: "/assistant",
     badge: "AI",
-    poster: "https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-indigo-950/85 via-indigo-900/35 to-transparent",
   },
@@ -22,7 +22,7 @@ const TITAN_CLIPS = [
     cta: "Open Jobs",
     path: "/jobs",
     badge: "Tip",
-    poster: "https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-slate-950/85 via-slate-900/40 to-transparent",
   },
@@ -33,7 +33,7 @@ const TITAN_CLIPS = [
     cta: "Estimates",
     path: "/job-estimator",
     badge: "Tip",
-    poster: "https://images.pexels.com/photos/8293778/pexels-photo-8293778.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/8293778/pexels-photo-8293778.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-emerald-950/85 via-emerald-900/30 to-transparent",
   },
@@ -44,7 +44,7 @@ const TITAN_CLIPS = [
     cta: "Payments",
     path: "/payments",
     badge: "Money",
-    poster: "https://images.pexels.com/photos/4386431/pexels-photo-4386431.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/4386431/pexels-photo-4386431.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-cyan-950/85 via-cyan-900/30 to-transparent",
   },
@@ -55,7 +55,7 @@ const TITAN_CLIPS = [
     cta: "Marketing",
     path: "/marketing",
     badge: "Grow",
-    poster: "https://images.pexels.com/photos/6476589/pexels-photo-6476589.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/6476589/pexels-photo-6476589.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-violet-950/85 via-violet-900/30 to-transparent",
   },
@@ -66,7 +66,7 @@ const TITAN_CLIPS = [
     cta: "Driver Hub",
     path: "/driver",
     badge: "Tools",
-    poster: "https://images.pexels.com/photos/1112598/pexels-photo-1112598.jpeg?auto=compress&cs=tinysrgb&w=600",
+    poster: "https://images.pexels.com/photos/1112598/pexels-photo-1112598.jpeg?auto=compress&cs=tinysrgb&w=1200",
     video: null,
     tint: "from-amber-950/85 via-amber-900/30 to-transparent",
   },
@@ -79,7 +79,7 @@ function ClipCard({ clip, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(clip.path)}
-      className="relative flex-shrink-0 w-[148px] sm:w-[168px] h-[260px] sm:h-[290px] rounded-2xl overflow-hidden border border-border text-left shadow-soft opacity-95 hover:opacity-100"
+      className="relative h-[288px] w-[176px] flex-shrink-0 rounded-2xl border border-border text-left shadow-soft opacity-95 overflow-hidden hover:opacity-100 sm:h-[320px] sm:w-[206px] lg:h-[344px] lg:w-[224px]"
       aria-label={`${clip.title}. ${clip.cta}`}
     >
       {!failed && clip.video ? (
@@ -150,7 +150,7 @@ export default function HomeAdClips({ isActive = true }) {
             badge: "Listing",
             poster:
               r.images?.[0] ||
-              "https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=600",
+              "https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=1200",
             video: null,
             tint: "from-slate-950/85 via-slate-900/40 to-transparent",
           }));

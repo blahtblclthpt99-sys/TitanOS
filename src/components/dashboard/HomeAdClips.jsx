@@ -108,7 +108,7 @@ function ClipCard({ clip, onSelect }) {
       <div className={`absolute inset-0 bg-gradient-to-t ${clip.tint || "from-black/80 via-black/30 to-transparent"}`} />
 
       <div className="absolute top-3 left-2 right-2 flex items-center justify-between gap-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/90 text-slate-900">
+        <span className="rounded-full border border-border/70 bg-card/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-card-foreground shadow-soft backdrop-blur">
           {clip.badge}
         </span>
       </div>

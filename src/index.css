@@ -116,6 +116,7 @@
     --titan-navy: #0B1F3A;
     --titan-royal: #1E3A8A;
     --titan-electric: #2563EB;
+    --titan-heading: #0B1F3A;
     --titan-surface-0: #EEF2F7;
     --titan-surface-1: #FFFFFF;
     --titan-surface-2: #E2E8F0;
@@ -172,6 +173,7 @@
     --titan-navy: #93C5FD;
     --titan-royal: #3B82F6;
     --titan-electric: #3B82F6;
+    --titan-heading: #0B1F3A;
     --titan-surface-0: #10141B;
     --titan-surface-1: #161B24;
     --titan-surface-2: #1F2633;
@@ -255,7 +257,7 @@
   h1 {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
-    color: hsl(var(--foreground));
+    color: var(--titan-heading);
     font-size: 1.5rem;
     line-height: 2rem;
     font-weight: 700;
@@ -263,7 +265,7 @@
   h2 {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
-    color: hsl(var(--foreground));
+    color: var(--titan-heading);
     font-size: 1.25rem;
     line-height: 1.75rem;
     font-weight: 600;
@@ -271,7 +273,7 @@
   h3 {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
-    color: hsl(var(--foreground));
+    color: var(--titan-heading);
     font-size: 1rem;
     line-height: 1.5rem;
     font-weight: 600;

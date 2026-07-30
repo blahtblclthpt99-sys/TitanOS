@@ -88,9 +88,9 @@ export const MOTION = {
 };
 
 export const TYPE = {
-  display: "text-display font-display text-foreground",
-  title: "text-title font-heading text-foreground",
-  heading: "text-heading font-heading text-foreground",
+  display: "text-display font-display text-[var(--titan-heading)]",
+  title: "text-title font-heading text-[var(--titan-heading)]",
+  heading: "text-heading font-heading text-[var(--titan-heading)]",
   body: "text-body text-foreground",
   caption: "text-caption text-muted-foreground",
   eyebrow: "text-caption font-bold uppercase tracking-wider text-primary",

@@ -79,12 +79,12 @@ function ClipCard({ clip, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(clip.path)}
-      className="relative flex-shrink-0 snap-start w-[82vw] max-w-[340px] sm:w-[190px] md:w-[210px] h-[58vw] max-h-[300px] sm:h-[290px] rounded-2xl overflow-hidden border border-border text-left shadow-soft opacity-95 hover:opacity-100"
+      className="relative flex-shrink-0 snap-center w-[calc(100vw-2.25rem)] max-w-[420px] sm:w-[220px] md:w-[240px] aspect-[4/5] rounded-2xl overflow-hidden border border-border text-left shadow-soft opacity-95 hover:opacity-100"
       aria-label={`${clip.title}. ${clip.cta}`}
     >
       {!failed && clip.video ? (
         <video
-          className="absolute inset-0 w-full h-full object-contain bg-slate-950 pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
           src={clip.video}
           poster={clip.poster}
           muted
@@ -96,7 +96,7 @@ function ClipCard({ clip, onSelect }) {
         <img
           src={clip.poster}
           alt=""
-          className="absolute inset-0 w-full h-full object-contain bg-slate-950 pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
           loading="lazy"
           decoding="async"
           onError={(e) => {
@@ -184,6 +184,7 @@ export default function HomeAdClips({ isActive = true }) {
           overflowAnchor: "none",
           overscrollBehaviorX: "contain",
           overscrollBehaviorY: "none",
+          scrollPaddingLeft: "0.25rem",
         }}
       >
         {clips.map((clip) => (

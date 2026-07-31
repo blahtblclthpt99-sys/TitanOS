@@ -25,6 +25,74 @@ function invAmount(inv) {
   return Number(inv.total ?? inv.amount ?? inv.balance_due ?? 0) || 0;
 }
 
+function dateOnly(value) {
+  const text = String(value || "");
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : "";
+}
+
+function buildPrioritySignal(summary) {
+  const counts = summary?.counts || {};
+  const unpaidInvoices = Array.isArray(summary?.unpaidInvoices) ? summary.unpaidInvoices : [];
+  const today = todayISO();
+  const netThisMonth = Number(summary?.netThisMonth || 0);
+  const overdueInvoices = unpaidInvoices.filter((invoice) => {
+    const due = dateOnly(invoice.due);
+    return due && due < today;
+  });
+  const overdueTotal = overdueInvoices.reduce((sum, invoice) => sum + (Number(invoice.amount) || 0), 0);
+  const outstandingTotal = Number(summary?.outstandingTotal || 0);
+  const todaysJobs = Number(counts.todaysJobs || 0);
+  const unpaidCount = Number(counts.unpaidInvoices || unpaidInvoices.length || 0);
+
+  const focusAreas = [];
+  let level = "low";
+  let headline = "Operations look stable: no urgent cash or dispatch issues in the current snapshot.";
+  let nextAction = "Use Jobs, Customers, or Estimates to generate the next opportunity.";
+
+  if (overdueTotal > 0) {
+    level = "high";
+    headline = `Collections need attention: ${overdueInvoices.length} overdue invoice(s) totaling ${money(overdueTotal)}.`;
+    nextAction = "Open Invoices and follow up on the oldest overdue balances first.";
+    focusAreas.push("Collections", "Cash flow");
+    if (todaysJobs > 0) focusAreas.push("Dispatch");
+  } else if (todaysJobs > 0) {
+    level = unpaidCount > 0 ? "medium" : "high";
+    headline = `Dispatch needs attention: ${todaysJobs} job(s) are scheduled today.`;
+    nextAction = "Open Jobs / Schedule and confirm time windows, crew readiness, and customer updates.";
+    focusAreas.push("Dispatch", "Customer communication");
+    if (unpaidCount > 0) focusAreas.push("Collections");
+  } else if (netThisMonth < 0) {
+    level = "medium";
+    headline = `Margin needs attention: net this month is ${money(netThisMonth)}.`;
+    nextAction = "Review Expenses and Reports for the biggest cost drivers.";
+    focusAreas.push("Margin", "Expense review");
+  } else if (outstandingTotal > 0) {
+    level = "medium";
+    headline = `Revenue recovery is still active: ${money(outstandingTotal)} remains outstanding.`;
+    nextAction = "Open Invoices to review unpaid balances and send follow-ups where needed.";
+    focusAreas.push("Collections", "Revenue recovery");
+  }
+
+  if (focusAreas.length < 3) {
+    focusAreas.push(todaysJobs > 0 ? "Dispatch readiness" : "Pipeline growth");
+  }
+
+  return {
+    level,
+    headline,
+    nextAction,
+    focusAreas: [...new Set(focusAreas)].slice(0, 3),
+    overdueInvoices: overdueInvoices.length,
+    overdueTotal,
+    outstandingTotal,
+    todaysJobs,
+    unpaidInvoices: unpaidCount,
+    collectedThisMonth: Number(summary?.collectedThisMonth || 0),
+    expensesThisMonth: Number(summary?.expensesThisMonth || 0),
+    netThisMonth,
+  };
+}
+
 function buildSummary(businessData = {}) {
   const jobs = Array.isArray(businessData.jobs) ? businessData.jobs : [];
   const invoices = Array.isArray(businessData.invoices) ? businessData.invoices : [];
@@ -73,6 +141,24 @@ function buildSummary(businessData = {}) {
       value: Number(c.lifetime_value) || 0,
     }));
 
+  const prioritySignals = buildPrioritySignal({
+    counts: {
+      jobs: jobs.length,
+      invoices: invoices.length,
+      customers: customers.length,
+      expenses: expenses.length,
+      employees: employees.length,
+      unpaidInvoices: unpaid.length,
+      todaysJobs: todaysJobs.length,
+    },
+    todaysJobs,
+    unpaidInvoices: unpaidList,
+    outstandingTotal: outstanding,
+    collectedThisMonth: collectedMonth,
+    expensesThisMonth: monthExpenses,
+    netThisMonth: collectedMonth - monthExpenses,
+  });
+
   return {
     counts: {
       jobs: jobs.length,
@@ -90,20 +176,24 @@ function buildSummary(businessData = {}) {
     expensesThisMonth: monthExpenses,
     netThisMonth: collectedMonth - monthExpenses,
     topCustomers,
+    prioritySignals,
   };
 }
 
 function buildSuccessPlan(summary) {
   const c = summary?.counts || {};
-  const overdueCount = Number(c.unpaidInvoices || 0);
-  const todays = Number(c.todaysJobs || 0);
-  const outstanding = Number(summary?.outstandingTotal || 0);
-  const net = Number(summary?.netThisMonth || 0);
+  const signals = summary?.prioritySignals || {};
+  const overdueCount = Number(signals.overdueInvoices || c.unpaidInvoices || 0);
+  const todays = Number(signals.todaysJobs || c.todaysJobs || 0);
+  const outstanding = Number(signals.outstandingTotal || summary?.outstandingTotal || 0);
+  const net = Number(signals.netThisMonth || summary?.netThisMonth || 0);
   const netLine = net >= 0 ? `Net this month is positive at ${money(net)}.` : `Net this month is negative at ${money(net)}.`;
 
   const priorities = [
     overdueCount > 0
-      ? `Revenue recovery: follow up ${overdueCount} unpaid invoice(s) totaling ${money(outstanding)}.`
+      ? `Revenue recovery: follow up ${overdueCount} overdue invoice(s) totaling ${money(signals.overdueTotal || 0)}.`
+      : outstanding > 0
+        ? `Revenue recovery: ${money(outstanding)} remains outstanding.`
       : "Revenue recovery: no unpaid invoices detected in current snapshot.",
     todays > 0
       ? `Execution reliability: confirm dispatch readiness for ${todays} job(s) today.`
@@ -113,18 +203,23 @@ function buildSuccessPlan(summary) {
       : "Margin protection: tighten spend and audit loss-driving categories this week.",
   ];
 
+  const nextAction = signals.nextAction || priorities[0];
+  const focusAreas = signals.focusAreas?.length ? signals.focusAreas : ["Collections", "Dispatch", "Reports"];
+
   return [
     "TitanOS success plan for today:",
     "",
     "What's happening:",
+    `- Priority signal: ${signals.level || "low"} — ${signals.headline || "No priority signal available."}`,
     `- ${netLine}`,
     `- Outstanding AR: ${money(outstanding)} across ${overdueCount} invoice(s).`,
     `- Today's scheduled jobs in snapshot: ${todays}.`,
     "",
     "What's next:",
-    `1. ${priorities[0]}`,
+    `1. ${nextAction}`,
     `2. ${priorities[1]}`,
     `3. ${priorities[2]}`,
+    `- Focus areas: ${focusAreas.join(", ")}`,
     "",
     "Where for more:",
     "- Invoices for AR actions and send status",

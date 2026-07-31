@@ -57,6 +57,7 @@ import {
   renameStop,
   resumeDrivingSession,
   savePrefs,
+  summarizeProfitGrowth,
   startDrivingSession,
   stopDrivingSession,
   syncSessionToTax,
@@ -232,6 +233,13 @@ export default function DriverShiftPanel() {
   );
 
   const recorded = useMemo(() => summarizeRecordedShifts(history), [history]);
+  const profitGrowth = useMemo(
+    () =>
+      summarizeProfitGrowth(history, {
+        installedAt: new Date(Date.now() - 140 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    [history]
+  );
 
   /** Persist miles on every valid edit — no silent drops */
   const persistMilesNow = useCallback(
@@ -1068,6 +1076,31 @@ export default function DriverShiftPanel() {
 
       {mode === "driving" && (
         <section className="titan-surface p-5 border border-border" aria-label="Recorded driver totals">
+          {history.length > 0 ? (
+            <div className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                    Profit growth
+                  </p>
+                  <p className="text-2xl font-semibold text-foreground mt-1">
+                    {profitGrowth.growthPct > 0 ? "+" : ""}
+                    {profitGrowth.growthPct.toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your average shift profit is up from about {sym}
+                    {profitGrowth.baselineProfit.toFixed(2)} to {sym}
+                    {profitGrowth.currentProfit.toFixed(2)} since install day.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-500/20 bg-background/70 px-3 py-2 text-right">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Since install</p>
+                  <p className="text-sm font-semibold text-foreground">{profitGrowth.daysSinceInstall} days</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground">Recorded totals</h2>

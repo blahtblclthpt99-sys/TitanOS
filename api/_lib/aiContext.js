@@ -70,6 +70,13 @@ export function formatSummaryForPrompt(summary) {
     `Outstanding AR: ${money(summary.outstandingTotal)}`,
     `Expenses this month: ${money(summary.expensesThisMonth)}`,
     `Net this month: ${money(summary.netThisMonth)}`,
+    summary.prioritySignals
+      ? `Priority signal: ${summary.prioritySignals.level} — ${summary.prioritySignals.headline}`
+      : "Priority signal: unavailable",
+    summary.prioritySignals ? `Next action: ${summary.prioritySignals.nextAction}` : "Next action: unavailable",
+    summary.prioritySignals && summary.prioritySignals.focusAreas.length
+      ? `Focus areas: ${summary.prioritySignals.focusAreas.join(", ")}`
+      : "Focus areas: unavailable",
     `Today's jobs: ${JSON.stringify(summary.todaysJobs)}`,
     `Unpaid sample: ${JSON.stringify(summary.unpaidInvoices)}`,
     `Top customers: ${JSON.stringify(summary.topCustomers)}`,
@@ -95,6 +102,7 @@ DATA RULES (mandatory):
 - UNKNOWN = missing from snapshot or outside TitanOS — say you don't have it and point to the right screen.
 - Clearly separate YOUR DATA from GENERAL KNOWLEDGE in answers when both appear.
 - Snapshot rows are capped samples — if asked "how many", say counts are from the current snapshot sample.
+- When the snapshot includes a Priority signal, treat it as the highest-priority operational guidance for your answer.
 `.trim();
 
   if (lawMastermind) {

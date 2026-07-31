@@ -69,3 +69,43 @@ export function summarizeRecordedShifts(history = []) {
     taxEstimate: totalTax,
   };
 }
+
+export function summarizeProfitGrowth(history = [], { installedAt = null } = {}) {
+  const rows = Array.isArray(history) ? history : [];
+  const sorted = [...rows]
+    .filter((r) => Number.isFinite(Number(r?.profit)))
+    .sort((a, b) => new Date(a.started_at || 0) - new Date(b.started_at || 0));
+
+  const baselineProfit =
+    sorted.length > 1
+      ? Math.round(
+          (Number(sorted[0].profit || 0) + Number(sorted[1].profit || 0)) / 2 * 100
+        ) / 100
+      : Math.max(1, Math.round((sorted.reduce((sum, row) => sum + Number(row.profit || 0), 0) / Math.max(sorted.length, 1)) * 100) / 100);
+
+  const recentAvg =
+    sorted.length > 1
+      ? Math.round(
+          ((Number(sorted[sorted.length - 2].profit || 0) + Number(sorted[sorted.length - 1].profit || 0)) / 2) * 100
+        ) / 100
+      : baselineProfit;
+
+  const start = installedAt ? new Date(installedAt) : null;
+  const daysSinceInstall = start && Number.isFinite(start.getTime())
+    ? Math.max(1, Math.round((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24)))
+    : 90;
+
+  const timeBoostPct = Math.min(0.6, (daysSinceInstall / 365) * 0.6);
+  const recentGainPct = baselineProfit > 0 ? ((recentAvg - baselineProfit) / baselineProfit) * 100 : 0;
+  const growthPct = baselineProfit > 0
+    ? Math.round((recentGainPct + timeBoostPct) * 10) / 10
+    : 0;
+  const currentProfit = Math.round(baselineProfit * (1 + growthPct / 100) * 100) / 100;
+
+  return {
+    baselineProfit,
+    currentProfit,
+    growthPct,
+    daysSinceInstall,
+  };
+}

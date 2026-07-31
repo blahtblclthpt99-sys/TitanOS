@@ -14,7 +14,7 @@ const SECTIONS = [
   },
   {
     title: "Description of Service",
-    body: `TitanOS is a field service management platform that helps businesses manage jobs, customers, estimates, invoices, drivers, and related workflows. Features may change over time as we improve the product. Beta or preview features may be incomplete and are provided as-is.`,
+    body: `TitanOS is a driver-first operating platform that helps users manage shifts, miles, expenses, profit signals, and related workflows. Features may change over time as we improve the product. Beta or preview features may be incomplete and are provided as-is.`,
   },
   {
     title: "Accounts & Eligibility",
@@ -26,11 +26,11 @@ const SECTIONS = [
   },
   {
     title: "Your Content & Data",
-    body: `You retain ownership of the business data you enter into TitanOS (jobs, customers, invoices, and similar records). You grant us a limited license to host, process, and display that data solely to operate and improve the Service. See our Privacy Policy for how we handle personal information.`,
+    body: `You retain ownership of the driver and operational data you enter into TitanOS (shifts, miles, expenses, and similar records). You grant us a limited license to host, process, and display that data solely to operate and improve the Service. See our Privacy Policy for how we handle personal information.`,
   },
   {
     title: "Payments & Billing",
-    body: `Paid membership plans or payment processing (including Stripe) are subject to the pricing shown in the product and any third-party processor terms. The marketplace for browsing, posting, and messaging is free. You are responsible for applicable taxes. Refunds, if any, are handled according to our published billing policy or as required by law. [Legal review: insert refund/chargeback policy details.]`,
+    body: `Paid membership plans or payment processing (including Stripe) are subject to the pricing shown in the product and any third-party processor terms. The marketplace for browsing, posting, and messaging is free. You are responsible for applicable taxes. New users may start with a 3-day free trial. After the trial, the core plan continues at $4.99/month unless you cancel. If you use TitanOS correctly and still do not see a clear profit improvement during that period, you may request a refund or account credit subject to our review and applicable law. Refunds, if any, are handled according to our published billing policy or as required by law.`,
   },
   {
     title: "Third-Party Services",

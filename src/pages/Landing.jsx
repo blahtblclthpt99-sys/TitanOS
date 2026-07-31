@@ -52,26 +52,21 @@ const ICONS = {
 
 const FEATURES = [
   { icon: "sparkles", title: "Titan AI", slug: "titan-ai", desc: "Briefs, notes, and follow-ups written for you between stops." },
-  { icon: "briefcase", title: "Jobs & dispatch", slug: "jobs", desc: "From first call to done — assign, track, and close out." },
-  { icon: "users", title: "Customers", slug: "customers", desc: "History and notes so every visit starts informed." },
-  { icon: "file", title: "Invoicing", slug: "invoicing", desc: "Estimates and invoices that look professional, sent in seconds." },
-  { icon: "calc", title: "Expenses & tax", slug: "expenses", desc: "Receipts, mileage, and write-offs ready for tax season." },
-  { icon: "calendar", title: "Schedule", slug: "schedule", desc: "A clear week view that keeps crews on time." },
-  { icon: "truck", title: "Fleet", slug: "fleet", desc: "Vehicles, assignments, and service records in one place." },
+  { icon: "calc", title: "Mileage & expenses", slug: "expenses", desc: "Track miles, receipts, and write-offs without digging through paper records." },
   { icon: "car", title: "Driver Hub", slug: "driver-hub", desc: "Driver OS — Mission Control for live shifts, Explorer for analytics." },
 ];
 
 const AUDIENCES = [
   {
     icon: "building",
-    title: "Owners & operators",
-    desc: "See jobs, money, and team status without living in a spreadsheet.",
+    title: "Independent drivers",
+    desc: "See your day, your miles, and your earnings without living in a spreadsheet.",
     href: "/register",
   },
   {
     icon: "wrench",
-    title: "Technicians",
-    desc: "Job details, checklists, and invoices from the van — not the office.",
+    title: "Road pros",
+    desc: "Shift details, mileage, and profit signals from the van — not the office.",
     href: "/register",
   },
   {
@@ -86,7 +81,7 @@ const WHY = [
   {
     icon: "sparkles",
     title: "One app, not five",
-    desc: "Jobs, customers, schedule, money, and AI share the same workspace — so nothing falls through the cracks.",
+    desc: "Stops, miles, earnings, and AI help share the same workspace — so nothing falls through the cracks.",
   },
   {
     icon: "map",
@@ -102,40 +97,38 @@ const WHY = [
 
 const TRUST = [
   { label: "Free to start", detail: "Shift tracking included" },
-  { label: "PayPal checkout", detail: "Premium & Business" },
+  { label: "PayPal checkout", detail: "Premium plans" },
   { label: "Android app", detail: "Install the APK" },
   { label: "Field-ready", detail: "Mobile-first design" },
 ];
 
 const REVIEWS = [
   {
-    quote: "I used to spend Sunday evenings doing invoices. Now it takes ten minutes in the van.",
+    quote: "I used to spend Sunday evenings chasing paperwork. Now it takes ten minutes in the van.",
     name: "Marcus R.",
-    role: "Plumbing contractor",
+    role: "Owner-operator",
   },
   {
-    quote: "Scheduling alone paid for itself in the first week. My team actually shows up on time.",
+    quote: "The mileage and profit view paid for itself in the first week. I finally know what I’m really making.",
     name: "Sarah K.",
-    role: "Electrical business owner",
+    role: "Independent driver",
   },
   {
-    quote: "Titan AI writes my job notes faster than I can type. Complete game changer.",
+    quote: "Titan AI writes my shift notes faster than I can type. Complete game changer.",
     name: "James T.",
-    role: "HVAC technician",
+    role: "Road professional",
   },
 ];
 
 const INCLUDED = [
-  "Unlimited customers & jobs",
   "Titan AI Assistant",
-  "Invoicing & estimates",
+  "Mileage & expense tracking",
   "Expense & tax tracking",
   "Mile tracker",
-  "Schedule & dispatch",
-  "Fleet management",
-  "Reports & analytics",
+  "Shift profit tracking",
   "Driver Hub (shift miles)",
   "Mobile-first app",
+  "Pay-ready reporting",
 ];
 
 function scrollToId(id) {
@@ -172,15 +165,15 @@ function ProductPreview() {
                 <Icon d={ICONS.sparkles} className="h-3 w-3" />
                 Titan AI · Daily brief
               </div>
-              <p className="text-xs font-medium text-foreground">4 jobs today · $1,240 expected</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">2 invoices need a follow-up</p>
+              <p className="text-xs font-medium text-foreground">24 stops today · $1,860 expected</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">2 follow-ups ready for the day</p>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">
               {[
-                ["4", "Jobs"],
-                ["$3.2k", "This week"],
-                ["98", "Score"],
+                ["24", "Stops"],
+                ["$4.8k", "This week"],
+                ["91", "Score"],
               ].map(([value, label]) => (
                 <div key={label} className="rounded-md border border-border bg-card px-1.5 py-2.5 text-center shadow-soft">
                   <div className="text-sm font-bold tabular-nums text-foreground">{value}</div>
@@ -194,8 +187,8 @@ function ProductPreview() {
                 <Icon d={ICONS.briefcase} className="h-3.5 w-3.5 text-primary" />
                 Next up
               </div>
-              <p className="text-xs text-foreground/90">10:30 · Smith HVAC install</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Midtown · estimate signed</p>
+              <p className="text-xs text-foreground/90">10:30 · Smith delivery stop</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Midtown · mileage ready</p>
               <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full w-2/3 rounded-full bg-primary" />
               </div>
@@ -238,11 +231,14 @@ function FieldShowcase() {
           <h3 className="landing-display mt-2 text-2xl text-foreground sm:text-3xl">
             Your day, one screen.
           </h3>
+          <p className="mt-4 text-sm leading-relaxed text-foreground/85">
+            A driver averaging about $3,000 a week can often make at least 10% more with clearer mileage, payout tracking, and better daily planning.
+          </p>
           <ul className="mt-6 space-y-3">
             {[
               "Open the day with a Titan AI brief",
-              "Dispatch jobs and see crew status",
-              "Send invoices before you leave the driveway",
+              "Track miles, expenses, and profit from the road",
+              "Lock in your mileage and notes before you leave the driveway",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5 text-sm text-foreground/85">
                 <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
@@ -270,7 +266,7 @@ export default function Landing() {
   const menuPanelRef = useRef(null);
 
   useEffect(() => {
-    document.title = "TitanOS — AI OS for Service Businesses";
+    document.title = "TitanOS — Driver OS for the Road";
   }, []);
 
   useEffect(() => {
@@ -409,13 +405,13 @@ export default function Landing() {
                 <TitanBrandLogo layout="stacked" imgClassName="h-16 sm:h-20" />
                 <ThemeToggle variant="segmented" className="max-w-xs w-full sm:w-auto" />
               </div>
-              <p className="mb-4 text-caption font-semibold text-primary">Free to start · Premium when you need it</p>
+              <p className="mb-4 text-caption font-semibold text-primary">Try free for 3 days · Then $4.99/month</p>
               <h1 className="landing-display max-w-xl text-3xl text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.12]">
-                The operating system for service businesses.
+                The operating system for the road.
               </h1>
               <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
-                Jobs, customers, invoices, schedule, and Titan AI in one mobile-first app — built for owners,
-                techs, and drivers who work in the field.
+                Start with a 3-day free trial, use TitanOS on real shifts, and see the payoff in your mileage,
+                invoicing, and profit tracking — then continue at $4.99/month if it works for you.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link to="/register" className={btnPrimary}>
@@ -426,7 +422,7 @@ export default function Landing() {
                 </button>
               </div>
               <p className="mt-5 text-caption text-muted-foreground">
-                Free shift tracking · Upgrade for add-ons
+                3-day free trial · $4.99/month after trial · Upgrade for add-ons
               </p>
             </div>
 
@@ -453,11 +449,11 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl">
             <p className="landing-eyebrow">What is TitanOS?</p>
             <h2 className="landing-display mt-2 max-w-3xl text-3xl text-foreground sm:text-4xl">
-              One place to run the business — from the first call to the paid invoice.
+              One place to run the day — from the first stop to the final mile.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              TitanOS replaces the patchwork of texts, spreadsheets, and separate apps most service teams juggle.
-              Open one Command Center and see today&apos;s jobs, money, and next moves.
+              TitanOS replaces the patchwork of texts, spreadsheets, and separate apps most drivers and owner-operators juggle.
+              Open one Command Center and see today&apos;s stops, mileage, expenses, and profit in one place.
             </p>
             <div className="mt-10">
               <FieldShowcase />
@@ -470,7 +466,7 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl">
             <p className="landing-eyebrow">Who it&apos;s for</p>
             <h2 className="landing-display mt-2 text-3xl text-foreground sm:text-4xl">
-              Built for people who work with their hands — and run a business.
+              Built for people who work with their hands — and run the day.
             </h2>
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {AUDIENCES.map(({ icon, title, desc, href }) => (
@@ -520,7 +516,7 @@ export default function Landing() {
               Everything you need to run the day — included.
             </h2>
             <p className="mt-3 max-w-xl text-muted-foreground">
-              Core tools free to start. Premium unlocks Driver Hub add-ons, Marketplace Apps, and lower fees.
+              Core tools focused on profit, mileage, and faster payout — with premium add-ons when you want more.
             </p>
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map(({ icon, title, desc, slug }) => (
@@ -548,7 +544,7 @@ export default function Landing() {
               What early users are saying
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
-              Placeholder quotes from beta testers — real stories coming as we grow.
+              Early driver stories from beta users — more are coming as we grow.
             </p>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {REVIEWS.map((r) => (
@@ -574,17 +570,17 @@ export default function Landing() {
           <div className="mx-auto max-w-3xl text-center">
             <p className="landing-eyebrow">What to do next</p>
             <h2 className="landing-display mt-2 text-3xl text-foreground sm:text-4xl">
-              Start free. Run your next job on TitanOS.
+              Start free. Run your next shift on TitanOS.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Create an account in minutes. Start free for shifts and listings — upgrade for Premium add-ons.
+              Create an account in minutes. Try free for 3 days, then continue at $4.99/month if TitanOS is helping your profit — upgrade for Premium add-ons if you want more.
             </p>
           </div>
           <div className="titan-surface mx-auto mt-10 max-w-lg p-6 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div className="text-left">
-                <h3 className="text-xl font-bold text-foreground">Core product included</h3>
-                <p className="text-xs text-muted-foreground">Jobs, money, schedule · Labs labeled separately</p>
+                <h3 className="text-xl font-bold text-foreground">Driver-first tools included</h3>
+                <p className="text-xs text-muted-foreground">Mileage, expenses, invoicing, and profit tracking</p>
               </div>
               <div className="text-right">
                 <div className="text-4xl font-bold tabular-nums text-primary">$0</div>
@@ -623,9 +619,6 @@ export default function Landing() {
             <h2 className="landing-display mt-4 text-3xl text-foreground sm:text-4xl">
               Ready when you are.
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Join service businesses running jobs on TitanOS — free to start, Premium when you scale.
-            </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link to="/register" className={btnPrimary}>
                 Get started free
@@ -634,7 +627,7 @@ export default function Landing() {
                 Sign in
               </Link>
             </div>
-            <p className="mt-3 text-caption text-muted-foreground">No credit card · No commitment</p>
+            <p className="mt-3 text-caption text-muted-foreground">No credit card · 3-day free trial · $4.99/month after trial</p>
           </div>
         </section>
       </main>

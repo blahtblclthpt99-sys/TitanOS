@@ -9,6 +9,7 @@ import {
   estimateShiftEarnings,
   parseMilesInput,
   IRS_MILEAGE_RATE_USD,
+  summarizeProfitGrowth,
   summarizeRecordedShifts,
 } from "../src/lib/driverHubMath.js";
 
@@ -78,6 +79,21 @@ describe("summarizeRecordedShifts", () => {
     assert.equal(s.stops, 3);
     assert.equal(s.jobsCompleted, 3);
     assert.equal(s.hours, 1.5);
+  });
+});
+
+describe("summarizeProfitGrowth", () => {
+  it("computes a realistic gain from the launch baseline", () => {
+    const growth = summarizeProfitGrowth([
+      { profit: 140, started_at: "2025-01-01T08:00:00.000Z" },
+      { profit: 152, started_at: "2025-01-03T08:00:00.000Z" },
+      { profit: 186, started_at: "2025-01-06T08:00:00.000Z" },
+      { profit: 201, started_at: "2025-01-09T08:00:00.000Z" },
+    ], { installedAt: "2024-12-30T00:00:00.000Z" });
+
+    assert.equal(growth.baselineProfit, 146);
+    assert.equal(growth.currentProfit, 194.33);
+    assert.equal(growth.growthPct, 33.1);
   });
 });
 

@@ -50,7 +50,7 @@ function buildCards() {
       features: [
         `${PLANS.starter.feeLabel} fee on payments you collect`,
         foundingOpen ? `Founding: first month free, then $${PLANS.starter.priceMonthly}/mo locked` : `$${PLANS.starter.priceMonthly}/mo`,
-        "Dashboard, schedule, estimates & invoices",
+        "Dashboard, schedule, mileage & expense tracking",
         "Driver Hub Lite + messaging",
         "Marketplace browsing",
       ],
@@ -196,20 +196,20 @@ export default function Pricing() {
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
           {foundingOpen ? (
             <>
-              Founding 100 — first month free<br />
-              <span className="gradient-text">then locked pricing</span>
+              Try free for 3 days<br />
+              <span className="gradient-text">then $4.99/month</span>
             </>
           ) : (
             <>
-              Simple plans that<br />
-              <span className="gradient-text">scale with you</span>
+              Try free for 3 days<br />
+              <span className="gradient-text">then $4.99/month</span>
             </>
           )}
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
           {foundingOpen
-            ? `First ${spots} founder spots: month one free on Pro ($${PLANS.worker_premium.priceMonthly}/mo lock). Fees still apply when you collect payment.`
-            : `Starter $${PLANS.starter.priceMonthly} · Pro $${PLANS.worker_premium.priceMonthly} · Business $${PLANS.business.priceMonthly}. Transaction fees apply when you get paid.`}
+            ? `Start with a 3-day free trial, then continue at $${PLANS.starter.priceMonthly}/month for the core plan. Fees still apply when you collect payment.`
+            : `Start with a 3-day free trial, then continue at $${PLANS.starter.priceMonthly}/month for the core plan. Pro and Business are available for more tools and larger operations.`}
         </p>
       </motion.div>
 
@@ -256,7 +256,7 @@ export default function Pricing() {
           <div>
             <p className="text-sm font-semibold text-foreground mb-1">Why this structure</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Founding members get month one free, then a lifetime price lock. Everyone else pays Starter / Pro / Business.
+              Start with a 3-day free trial, then continue at $4.99/month for the core plan. Premium tiers unlock more automation and team tools.
               Fees apply when you collect payment — Customer {PLANS.customer.feeLabel}, Starter {PLANS.starter.feeLabel},
               Pro {PLANS.worker_premium.feeLabel}, Business {PLANS.business.feeLabel}.
             </p>

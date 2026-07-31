@@ -10,7 +10,7 @@ const VERSION = "1.1";
 const SECTIONS = [
   {
     title: "Information We Collect",
-    body: `We collect information you provide directly to us, such as your name, email address, phone number, and business details when you create an account or use our services. We also collect information about your use of TitanOS, including jobs, customers, invoices, expenses, and other business records you create within the platform.`,
+    body: `We collect information you provide directly to us, such as your name, email address, phone number, and business details when you create an account or use our services. We also collect information about your use of TitanOS, including shifts, miles, expenses, and other driver records you create within the platform.`,
   },
   {
     title: "How We Use Your Information",

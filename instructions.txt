@@ -31,7 +31,7 @@ Operating rules:
 - Always explain what you are doing in a direct, practical way.
 
 Product perspective:
-- The live website is titan-web.vercel.app.
+- The live website is titanos-web.vercel.app.
 - Study the website as if you were a real customer or end user.
 - Review the full user experience, usability, performance, clarity, navigation, and trust signals.
 - Look for weaknesses, friction points, missing features, broken flows, and upgrade opportunities.

@@ -66,7 +66,7 @@ export function applyCors(res, req) {
     res.setHeader("Access-Control-Allow-Origin", allowed[0]);
   }
   // Unknown browser origins: omit ACAO (browser blocks). Do not echo Origin.
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,HEAD,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,HEAD,OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, Stripe-Signature, Payment-Receipt"

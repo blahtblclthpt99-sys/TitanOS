@@ -17,6 +17,17 @@ const DEFAULT_ALLOWED = [
   "http://localhost",
 ];
 
+function isTrustedDynamicOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    return url.hostname === "app.base44.com" || url.hostname.endsWith(".base44.app");
+  } catch {
+    return false;
+  }
+}
+
 export function allowedOrigins() {
   const extra = String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
@@ -29,7 +40,9 @@ export function allowedOrigins() {
 export function resolveAppOrigin(req) {
   const origin = req?.headers?.origin || "";
   const allowed = allowedOrigins();
-  if (origin && allowed.includes(origin)) return origin;
+  if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
+    return origin;
+  }
   const configured =
     process.env.VITE_TITANOS_PUBLIC_ORIGIN ||
     process.env.VITE_APP_URL ||
@@ -45,7 +58,7 @@ export function resolveAppOrigin(req) {
 export function applyCors(res, req) {
   const origin = req?.headers?.origin || "";
   const allowed = allowedOrigins();
-  if (origin && allowed.includes(origin)) {
+  if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   } else if (!origin) {

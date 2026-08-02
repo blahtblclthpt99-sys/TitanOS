@@ -69,6 +69,7 @@ const Companies = lazy(() => import("@/pages/Companies"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
+const Autopilot = lazy(() => import("@/pages/Autopilot"));
 const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
 const Leads = lazy(() => import("@/pages/Leads"));
@@ -116,6 +117,7 @@ const NON_TAB_ROUTES = {
   "/employees": Employees,
   "/inventory": Inventory,
   "/follow-ups": FollowUps,
+  "/autopilot": Autopilot,
   "/reputation": Reputation,
   "/credentials": Credentials,
   "/leads": Leads,

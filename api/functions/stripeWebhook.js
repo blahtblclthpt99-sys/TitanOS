@@ -214,6 +214,9 @@ export default async function handler(req, res) {
     ) {
       await syncStripeSubscription(admin, session);
     } else if (event.type === "checkout.session.completed") {
+      if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
+        return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
+      }
       // Prefer payment row linkage; verify ownership before marking invoice
       if (paymentId) {
         const { data: payRow } = await admin

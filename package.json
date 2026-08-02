@@ -35,7 +35,7 @@
     "ops:readiness": "node scripts/payment-failure-scenarios.mjs && node scripts/backup-restore-drill.mjs --export && node scripts/outage-recovery-drill.mjs && node scripts/load-test.mjs --profile storm",
     "test:fees": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/fee-engine.test.mjs",
     "test:hire": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/hire-security.test.mjs",
-    "test:payments": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs scripts/mpp-helpers.test.mjs",
+    "test:payments": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs scripts/mpp-helpers.test.mjs scripts/autopilot-service.test.mjs",
     "test:driver": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs scripts/driver-activity.test.mjs scripts/driver-intelligence.test.mjs scripts/driver-logbook.test.mjs scripts/driver-trip-journal.test.mjs scripts/driver-offer-analyzer.test.mjs scripts/driver-autopilot.test.mjs scripts/driver-voice.test.mjs scripts/driver-true-cost.test.mjs scripts/driver-coach.test.mjs scripts/driver-session-persist.test.mjs scripts/door-dash-workflow.test.mjs",
     "icons:pwa": "node scripts/generate-pwa-icons.mjs",
     "test:money": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",

@@ -44,6 +44,7 @@ import {
   Percent,
   Landmark,
   Radio,
+  Workflow,
 } from "lucide-react";
 
 /**
@@ -92,6 +93,7 @@ export const APP_NAV_ITEMS = [
   { icon: Bot, label: "Titan AI", path: "/assistant", group: "ai" },
   { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "ai" },
   { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "ai" },
+  { icon: Workflow, label: "Titan Autopilot", path: "/autopilot", group: "ai" },
 
   // —— Configuration — setup self / business / assets
   { icon: Settings, label: "Settings", path: "/settings", group: "configuration" },
@@ -187,7 +189,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "AI",
     description: "Assistants and coaching",
-    paths: ["/assistant", "/marketing", "/growth-coach"],
+    paths: ["/assistant", "/marketing", "/growth-coach", "/autopilot"],
   },
   {
     title: "Configuration",

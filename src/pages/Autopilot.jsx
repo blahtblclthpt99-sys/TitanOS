@@ -84,6 +84,12 @@ export default function Autopilot() {
           <div className="rounded-lg bg-muted p-3"><ShieldCheck className="w-4 h-4 mb-2 text-titan-cyan" />You approve recipients</div>
           <div className="rounded-lg bg-muted p-3"><CheckCircle2 className="w-4 h-4 mb-2 text-titan-cyan" />Audited completion</div>
         </div>
+        {!paidMembership && (
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-titan-cyan/30 bg-titan-cyan/5 p-4">
+            <div className="flex-1"><p className="font-semibold">Put invoice follow-up on repeat</p><p className="text-sm text-muted-foreground mt-1">Pro includes one recovery sprint every month, plus the full TitanOS Pro toolkit.</p></div>
+            <Button asChild className="min-h-11 shrink-0"><a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">Get Pro · $9.99/month <ExternalLink className="w-4 h-4" /></a></Button>
+          </div>
+        )}
       </section>
       <section className="titan-surface p-5">
         <h2 className="font-semibold">Select overdue invoices <span className="text-muted-foreground font-normal">({selected.length}/10)</span></h2>
@@ -96,7 +102,6 @@ export default function Autopilot() {
           </label>
         )) : <EmptyState title="No eligible invoices" description="Add a customer email and due date to an unpaid invoice; it will appear here after its due date." actionLabel="Open invoices" onAction={() => { window.location.href = "/invoices"; }} />}
         {eligible.length > 0 && paidMembership && <Button className="w-full sm:w-auto mt-5 min-h-11" disabled={!selected.length || working} onClick={runMembership}>{working ? "Running approved sprint…" : "Run this month's included sprint"}</Button>}
-        {eligible.length > 0 && !paidMembership && <Button asChild className="w-full sm:w-auto mt-5 min-h-11"><a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">Get Pro for $9.99/month <ExternalLink className="w-4 h-4" /></a></Button>}
         {eligible.length > 0 && showOneTime && <Button variant="outline" className="w-full sm:w-auto mt-5 sm:ml-2 min-h-11" disabled={!selected.length || working} onClick={checkoutNow}>{working ? "Opening secure checkout…" : <>One-time sprint · $9 <ExternalLink className="w-4 h-4" /></>}</Button>}
       </section>
     </div>

@@ -4,7 +4,7 @@
     "node": ">=20 <25"
   },
   "private": true,
-  "version": "1.5.5",
+  "version": "1.6.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -60,14 +60,15 @@
     "test:observability": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/observability.test.mjs",
     "test:regression": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/regression-wiring.test.mjs",
     "test:final-qa": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/final-qa.test.mjs",
+    "test:integration-merge": "node --test scripts/integration-merge.test.mjs",
     "test:founding": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/founding-beta.test.mjs",
     "grade:driver-hub": "npm run lint && npm run test:driver && npm run test:payments && npm run test:security && npm run test:hardening && npm run build",
     "test:db-security": "node scripts/verify-db-security.mjs",
     "test:e2e": "playwright test --project=chromium-desktop",
     "test:e2e:browsers": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit",
-    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:final-qa && npm run test:founding && npm run test:regression",
-    "gate:ship": "npm run lint && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:final-qa && npm run build"
+    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
+    "gate:ship": "npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -120,13 +121,13 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^1.27.0",
     "mppx": "^0.8.14",
-    "react": "^18.3.1",
+    "react": "19.2.7",
     "react-day-picker": "^10.0.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "19.2.7",
     "react-hook-form": "^7.83.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.12.2",
-    "react-router-dom": "^7.11.0",
+    "react-router": "8.3.0",
     "recharts": "^3.10.1",
     "stripe": "^22.3.2",
     "tailwind-merge": "^3.6.0",
@@ -137,6 +138,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
@@ -146,8 +148,10 @@
     "eslint-plugin-react-hooks": "^5.0.1",
     "eslint-plugin-unused-imports": "^4.0.0",
     "globals": "^15.0.0",
+    "playwright": "^1.62.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
     "vite": "^6.4.3"
   }
 }

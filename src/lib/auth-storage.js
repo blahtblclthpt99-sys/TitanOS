@@ -1,9 +1,9 @@
-import { Capacitor } from "@capacitor/core";
-
 /**
  * Auth storage for Supabase PKCE.
- * Native: Capacitor Preferences (survives Custom Tab OAuth + process pauses).
- * Web: localStorage (same-tab redirect).
+ * Web and Capacitor both use the WebView's durable localStorage. Supabase's
+ * browser PKCE client expects storage operations to complete synchronously;
+ * an async native Preferences bridge can stall signInWithOAuth before the
+ * Custom Tab is opened on some Android WebViews.
  */
 function createWebStorage() {
   return {
@@ -22,36 +22,6 @@ function createWebStorage() {
   };
 }
 
-function createNativeStorage() {
-  // Lazy import so web builds don't require Preferences at call time
-  let prefsPromise;
-  const prefs = () => {
-    if (!prefsPromise) {
-      prefsPromise = import("@capacitor/preferences").then((m) => m.Preferences);
-    }
-    return prefsPromise;
-  };
-
-  return {
-    async getItem(key) {
-      const Preferences = await prefs();
-      const { value } = await Preferences.get({ key });
-      return value ?? null;
-    },
-    async setItem(key, value) {
-      const Preferences = await prefs();
-      await Preferences.set({ key, value });
-    },
-    async removeItem(key) {
-      const Preferences = await prefs();
-      await Preferences.remove({ key });
-    },
-  };
-}
-
 export function createAuthStorage() {
-  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-    return createNativeStorage();
-  }
   return createWebStorage();
 }

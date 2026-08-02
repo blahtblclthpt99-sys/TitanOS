@@ -22,12 +22,12 @@ export const DD_SCREENS = Object.freeze({
 });
 
 export const DD_ORDER_TYPES = Object.freeze([
-  { id: "slow_single", label: "Slow Business Single", column: "left", stack: 1 },
-  { id: "slow_double", label: "Slow Business Double", column: "left", stack: 2 },
-  { id: "slow_triple", label: "Slow Business Triple", column: "left", stack: 3 },
-  { id: "single", label: "Single", column: "right", stack: 1 },
-  { id: "double", label: "Double", column: "right", stack: 2 },
-  { id: "triple", label: "Triple", column: "right", stack: 3 },
+  { id: "slow_single", label: "Single Delivery", stack: 1, legacy: true },
+  { id: "slow_double", label: "Double Delivery", stack: 2, legacy: true },
+  { id: "slow_triple", label: "Triple Delivery", stack: 3, legacy: true },
+  { id: "single", label: "Single Delivery", stack: 1 },
+  { id: "double", label: "Double Delivery", stack: 2 },
+  { id: "triple", label: "Triple Delivery", stack: 3 },
 ]);
 
 export const DD_DEPART_SPEED_MPH = 15;

@@ -55,11 +55,14 @@ describe("founding launch status", () => {
     assert.equal(closed.membershipPaymentsLive, true);
   });
 
-  it("shows PayPal checkout while founding enrollment is open", () => {
+  it("uses server-created Stripe checkout while founding enrollment is open", () => {
     assert.equal(isFreeDuringBeta(), true);
     assert.equal(isMembershipCheckoutLive(), true);
-    assert.match(String(getPlanCheckoutUrl("worker_premium") || ""), /paypal\.com/);
-    assert.match(String(getPlanCheckoutUrl("starter") || ""), /paypal\.com/);
+    assert.equal(getPlanCheckoutUrl("worker_premium"), null);
+    assert.equal(getPlanCheckoutUrl("starter"), null);
+    const pricing = readFileSync(join(root, "src/pages/Pricing.jsx"), "utf8");
+    assert.match(pricing, /startStripeSubscription/);
+    assert.doesNotMatch(pricing, /paypal\.com/i);
   });
 
   it("catalog prices are Starter 4.99 / Pro 9.99 / Business 19.99", () => {

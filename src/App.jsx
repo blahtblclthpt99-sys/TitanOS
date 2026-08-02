@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router";
 import React, { Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
@@ -139,8 +139,7 @@ function AppShellGate() {
   const wantsAppShell =
     (isAuthenticated && !publicPath) ||
     (isAuthenticated && isHome) ||
-    (cachedSession && (isHome || !publicPath)) ||
-    nativeRoot;
+    (cachedSession && (isHome || !publicPath));
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {

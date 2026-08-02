@@ -106,7 +106,9 @@ describe("final-qa: launch stack honesty", () => {
 
   it("marketplace modules are $0.99 pack (all modules)", () => {
     assert.match(read("src/lib/marketplaceCatalog.js"), /MODULE_PRICE\s*=\s*0\.99/);
-    assert.match(read("src/lib/plan.js"), /USR42PN73VD9N/);
+    const plan = read("src/lib/plan.js");
+    assert.match(plan, /STRIPE_CHECKOUT/);
+    assert.doesNotMatch(plan, /paypal\.com\/ncp/i);
     assert.match(read("src/lib/plan.js"), /modules:/);
   });
 });

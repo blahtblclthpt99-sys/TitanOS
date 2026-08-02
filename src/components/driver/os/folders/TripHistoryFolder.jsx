@@ -19,7 +19,7 @@ export default function TripHistoryFolder({ user, refreshTick = 0 }) {
       kind: "doordash",
       id: d.id,
       when: d.startedAt,
-      label: `DoorDash · ${d.orderTypeLabel || "Order"}`,
+      label: `Delivery · ${d.orderTypeLabel || "Order"}`,
       meta: d.dateLocal || "",
     }));
     return [...shifts, ...dd].sort((a, b) => String(b.when || "").localeCompare(String(a.when || "")));

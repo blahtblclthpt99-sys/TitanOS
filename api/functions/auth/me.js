@@ -154,41 +154,49 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
 
-  if (req.method !== "GET" && req.method !== "PATCH") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  try {
+    if (req.method !== "GET" && req.method !== "PATCH") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
 
-  const token = extractBearerToken(req);
-  if (!token) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
+    const token = extractBearerToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
 
-  const admin = getSupabaseAdmin();
-  const { data: userResult, error: userError } = await admin.auth.getUser(token);
-  if (userError || !userResult?.user) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
+    const admin = getSupabaseAdmin();
+    const { data: userResult, error: userError } = await admin.auth.getUser(token);
+    const authUser = !userError ? userResult?.user : null;
 
-  const authUser = userResult.user;
+    // Never trust decoded-but-unverified JWT claims. getUser() validates the
+    // signature and current Supabase Auth state server-side.
+    if (!authUser) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
 
-  if (req.method === "GET") {
+    if (req.method === "GET") {
+      const profile = await fetchProfile(admin, authUser.id);
+      return res.status(200).json(buildUser(authUser, profile));
+    }
+
+    const updates = pickProfileUpdates(readJson(req));
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "No profile fields provided" });
+    }
+
+    const { error: updateError } = await admin
+      .from("profiles")
+      .upsert({ id: authUser.id, ...updates }, { onConflict: "id" });
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message || "Profile update failed" });
+    }
+
     const profile = await fetchProfile(admin, authUser.id);
     return res.status(200).json(buildUser(authUser, profile));
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const message = status >= 500 ? "Internal server error" : error?.message || "Request failed";
+    return res.status(status).json({ error: message });
   }
-
-  const updates = pickProfileUpdates(readJson(req));
-  if (!Object.keys(updates).length) {
-    return res.status(400).json({ error: "No profile fields provided" });
-  }
-
-  const { error: updateError } = await admin
-    .from("profiles")
-    .upsert({ id: authUser.id, ...updates }, { onConflict: "id" });
-
-  if (updateError) {
-    return res.status(400).json({ error: updateError.message || "Profile update failed" });
-  }
-
-  const profile = await fetchProfile(admin, authUser.id);
-  return res.status(200).json(buildUser(authUser, profile));
 }

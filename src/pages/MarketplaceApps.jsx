@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import {
   Store,
   Star,
@@ -317,7 +317,7 @@ export default function Marketplace() {
       if (error?.code === "MARKETPLACE_APPS_LOCKED") {
         setActionError(
           error.message ||
-            "Unlock all modules for $0.99 via PayPal, then return to install."
+            "Upgrade your TitanOS membership to unlock Marketplace modules."
         );
         return;
       }
@@ -445,7 +445,7 @@ export default function Marketplace() {
               All modules · <span className="gradient-text">$0.99</span>
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              One PayPal payment unlocks every industry workflow, creative tool, and AI agent.
+              Upgrade your TitanOS membership to unlock industry workflows, creative tools, and AI agents.
               Also included with Pro ($9.99) or Business ($19.99).
             </p>
             {!modulesUnlocked && modulesCheckout ? (
@@ -460,7 +460,7 @@ export default function Marketplace() {
             {[
               { icon: Shield, label: "Verified secure" },
               { icon: Clock, label: "1-click install" },
-              { icon: Download, label: "PayPal checkout" },
+              { icon: Download, label: "Secure checkout" },
             ].map(({ icon: Icon, label }) => (
               <span key={label} className="flex items-center gap-1.5 titan-surface px-3 py-2 border border-border">
                 <Icon className="w-3.5 h-3.5 text-titan-cyan" />

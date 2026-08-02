@@ -45,6 +45,12 @@ function loadEnvLocal() {
   return out;
 }
 
+function normalizeSupabaseUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  return value.replace(/\/(rest|auth)\/v1\/?$/i, "").replace(/\/$/, "");
+}
+
 const CRITICAL_TABLES = [
   "profiles",
   "customers",
@@ -74,7 +80,7 @@ async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   mkdirSync(RESULTS, { recursive: true });
   const env = loadEnvLocal();
-  const url = env.VITE_SUPABASE_URL;
+  const url = normalizeSupabaseUrl(env.VITE_SUPABASE_URL);
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Need VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY");
 

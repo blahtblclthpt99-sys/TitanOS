@@ -215,50 +215,6 @@ export async function getPublicProfileBySlug(slug) {
     if (owned?.public !== false) return normalizeProfile(owned);
   }
 
-  // Demo public profiles for discovery
-  if (key === "titan-demo" || key === "demo") {
-    return normalizeProfile({
-      slug: "titan-demo",
-      display_name: "Alex Titan",
-      headline: "Licensed trades & field operations",
-      bio: "Demo professional profile showcasing portfolio, skills, verification, and reviews on TitanOS.",
-      city: "Dallas",
-      state: "TX",
-      verified: true,
-      skills: ["HVAC", "Electrical", "Project management"],
-      portfolio: [
-        {
-          id: "p1",
-          title: "Kitchen remodel coordination",
-          description: "Managed subcontractors and punch-list to finish.",
-          image_url: "https://images.unsplash.com/photo-1556912173-46c336c7fd55?w=800&h=600&fit=crop",
-          year: "2025",
-        },
-      ],
-      work_history: [
-        {
-          id: "w1",
-          role: "Lead technician",
-          company: "Titan Field Services",
-          start: "2018",
-          end: "Present",
-          summary: "Crew leadership and customer-facing quality checks.",
-        },
-      ],
-      achievements: [
-        {
-          id: "a1",
-          title: "Zero safety incidents",
-          year: "2024",
-          description: "Full year without recordable incidents.",
-        },
-      ],
-      badges: ["verified", "top_rated", "fast_response", "milestone_50"],
-      social: { website: "https://titanos-web.vercel.app", linkedin: "", instagram: "", facebook: "", youtube: "", x: "" },
-      public: true,
-    });
-  }
-
   return null;
 }
 

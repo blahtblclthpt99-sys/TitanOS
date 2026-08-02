@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { Bookmark, BriefcaseBusiness, CalendarDays, Check, Loader2, MapPin, MessageCircle, Search, Send, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

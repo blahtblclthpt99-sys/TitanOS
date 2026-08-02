@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router";
 import { Users, Search, Phone, Mail } from "lucide-react";
 import DeleteButton from "@/components/shared/DeleteButton";
 import { toast } from "@/components/ui/use-toast";

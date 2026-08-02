@@ -1,5 +1,5 @@
 import React, { useState, useImperativeHandle, forwardRef } from "react";
-import { Bug, Lightbulb, Star, Send, Check } from "lucide-react";
+import { Bug, Lightbulb, Star, Send, Check, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +42,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [screenshot, setScreenshot] = useState(null);
 
   const resetForm = () => {
     setType("general");
@@ -49,6 +50,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
     setSubmitted(false);
     setError("");
     setLoading(false);
+    setScreenshot(null);
   };
 
   useImperativeHandle(ref, () => ({
@@ -70,32 +72,19 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
     setError("");
 
     const payload = {
-      type,
+      category: type,
       message: message.trim(),
-      email: user?.email || undefined,
-      status: "new",
       page: typeof window !== "undefined" ? window.location.pathname : undefined,
+      app_version: import.meta.env.VITE_APP_VERSION || "unknown",
+      device: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
     };
 
     try {
-      try {
-        await api.entities.BetaFeedback.create(payload);
-      } catch {
-        saveFeedbackLocally(payload);
+      if (screenshot) {
+        const uploaded = await api.integrations.Core.UploadFile({ file: screenshot });
+        payload.screenshot_url = uploaded.file_url;
       }
-
-      try {
-        const mail = await api.integrations.Core.SendEmail({
-          to: "hello@titanos.app",
-          subject: `[${type.toUpperCase()}] TitanOS Feedback`,
-          body: `Type: ${type}\nUser: ${user?.email || "Unknown"}\nPage: ${payload.page || "/"}\n\nMessage:\n${payload.message}`,
-        });
-        if (mail?.stub) {
-          /* recorded; email not delivered */
-        }
-      } catch {
-        /* optional */
-      }
+      await api.functions.invoke("submitFeedback", payload);
 
       setSubmitted(true);
       setTimeout(() => {
@@ -103,6 +92,7 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
         resetForm();
       }, 1600);
     } catch (err) {
+      saveFeedbackLocally({ ...payload, email: user?.email || undefined, status: "unread" });
       setError(err?.message || "Could not send feedback. Please try again.");
     } finally {
       setLoading(false);
@@ -162,6 +152,17 @@ const FeedbackButton = forwardRef(function FeedbackButton(_props, ref) {
                 className="resize-none min-h-[44px]"
               />
             </FormField>
+
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted/40">
+              <Paperclip className="h-4 w-4" aria-hidden="true" />
+              <span className="truncate">{screenshot ? screenshot.name : "Attach screenshot (optional)"}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(event) => setScreenshot(event.target.files?.[0] || null)}
+              />
+            </label>
 
             <Button
               type="button"

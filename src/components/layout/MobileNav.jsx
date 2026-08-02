@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { LayoutGrid } from "lucide-react";
 import { isRouteActive } from "@/lib/nav-utils";
 import { useNavBadges } from "@/hooks/useNavBadges";

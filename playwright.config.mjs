@@ -23,9 +23,16 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "npx vite preview --host 127.0.0.1 --port 4173",
+        // Build with non-secret, unreachable local values so auth UI can load
+        // without borrowing production credentials. Network auth is not part
+        // of this public-shell smoke; live auth has its own operational gate.
+        command: "npm run build && npx vite preview --host 127.0.0.1 --port 4173",
         url: "http://127.0.0.1:4173",
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        env: {
+          VITE_SUPABASE_URL: "http://127.0.0.1:54321",
+          VITE_SUPABASE_ANON_KEY: "e2e-placeholder-anon-key",
+        },
       },
 });

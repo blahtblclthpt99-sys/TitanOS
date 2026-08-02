@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 

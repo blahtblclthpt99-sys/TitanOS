@@ -3,6 +3,7 @@
  * Enable with SENTRY_DEBUG_ROUTE=1, then GET/POST /api/functions/sentryDebug
  */
 import { applyCors, handleOptions } from "../_lib/cors.js";
+import { secretsEqual } from "../_lib/secureCompare.js";
 import {
   isApiSentryEnabled,
   isApiSentryProfilingEnabled,
@@ -14,6 +15,12 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
 
   if (String(process.env.SENTRY_DEBUG_ROUTE || "") !== "1") {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  const opsSecret = process.env.HEALTH_DEEP_SECRET || process.env.TITANOS_OPS_SECRET;
+  const provided = req.headers["x-titanos-ops"] || req.headers["x-health-deep"];
+  if (!opsSecret || !secretsEqual(opsSecret, provided)) {
     return res.status(404).json({ error: "Not found" });
   }
 

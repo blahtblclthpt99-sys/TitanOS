@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import { CreditCard } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { useEntityRecord } from "@/hooks/useEntityRecord";

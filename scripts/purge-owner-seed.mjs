@@ -16,7 +16,10 @@ const OWNER_EMAILS = [
 
 const SEED_TAG = "owner_year_seed_v1";
 
-const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const url = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "")
+  .trim()
+  .replace(/\/(rest|auth)\/v1\/?$/i, "")
+  .replace(/\/$/, "");
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
   console.error("Need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");

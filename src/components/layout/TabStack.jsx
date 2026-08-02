@@ -5,7 +5,7 @@
  * they keep a real height (absolute overlays collapse when all tabs are hidden).
  */
 import React, { Suspense, lazy, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -59,6 +59,7 @@ const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
 const AdminFees = lazy(() => import("@/pages/AdminFees"));
 const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
+const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
 const Booking = lazy(() => import("@/pages/Booking"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
 const Payments = lazy(() => import("@/pages/Payments"));
@@ -105,6 +106,7 @@ const NON_TAB_ROUTES = {
   "/admin/moderation": AdminModeration,
   "/admin/fees": AdminFees,
   "/admin/tax-rules": AdminTaxRules,
+  "/admin": AdminControlCenter,
   "/booking": Booking,
   "/contracts": Contracts,
   "/payments": Payments,

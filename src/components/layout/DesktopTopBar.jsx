@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Clock, Command, Plus, Search, Sparkles } from "lucide-react";
 import NotificationCenter from "@/components/layout/NotificationCenter";

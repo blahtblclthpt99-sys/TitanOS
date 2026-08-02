@@ -1,12 +1,12 @@
 # TitanOS Backup & Restore Runbook
 
-Generated: 2026-07-19T18:32:58.033Z
+Generated: 2026-08-01T22:30:50.590Z
 
 ## Automated this run
 - Table inventory: 10/10 reachable
 - Auth admin API: ok
 - Storage buckets: titanos-uploads
-- Sample export: `C:\Users\Karen Lafferty\Projects\titanfieldos\ops\backups\logical-sample-1784485978031.json`
+- Sample export: `C:\Users\Karen Lafferty\Desktop\TitanAI\ops\backups\logical-sample-1785623450528.json`
 
 ## Required manual drills (before public launch)
 

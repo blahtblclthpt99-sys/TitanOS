@@ -61,35 +61,6 @@ describe("Stripe money path guards", () => {
   });
 });
 
-describe("PayPal membership path", () => {
-  it("webhook verifies via PayPal API and uses idempotency table", () => {
-    const src = read("api/functions/paypalWebhook.js");
-    assert.match(src, /verifyPayPalWebhook/);
-    assert.match(src, /paypal_webhook_events/);
-    assert.match(src, /assertRateLimit/);
-  });
-
-  it("maps checkout amounts to plan tiers", async () => {
-    const { planTierFromAmount, isMarketplaceModuleAmount, extractPayerEmail } = await import(
-      "../api/_lib/paypal.js"
-    );
-    assert.equal(planTierFromAmount(4.99), "starter");
-    assert.equal(planTierFromAmount(9.99), "worker_premium");
-    assert.equal(planTierFromAmount(19.99), "business");
-    assert.equal(planTierFromAmount(29.99), "worker_premium");
-    assert.equal(planTierFromAmount(49.99), "business");
-    assert.equal(planTierFromAmount(0.99), null);
-    assert.equal(planTierFromAmount(10), null);
-    assert.equal(isMarketplaceModuleAmount(0.99), true);
-    assert.equal(isMarketplaceModuleAmount(1.99), true);
-    assert.equal(isMarketplaceModuleAmount(4.99), false);
-    assert.equal(
-      extractPayerEmail({ payer: { email_address: "a@b.com" } }),
-      "a@b.com"
-    );
-  });
-});
-
 describe("Marketplace free + payment fees", () => {
   it("marketplace modules are $0.99 pack (all modules)", async () => {
     const { MODULE_PRICE, MODULE_PRICE_LABEL, MARKETPLACE_MODULES, formatModulePrice } = await import(
@@ -111,13 +82,10 @@ describe("Marketplace free + payment fees", () => {
     assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0.99));
     assert.match(formatModulePrice({ price: 0.99, price_label: MODULE_PRICE_LABEL }), /0\.99/);
     assert.equal(formatModulePrice({ price: 0 }), "Included with Pro");
-    const { PAYPAL_CHECKOUT, PAYPAL_MODULE_PRICE } = await import("../src/lib/plan.js");
-    assert.ok(PAYPAL_CHECKOUT.starter.includes("TK7HZNKJWAKUL"));
-    assert.ok(PAYPAL_CHECKOUT.worker_premium.includes("Q63SUKNY5AK58"));
-    assert.ok(PAYPAL_CHECKOUT.business.includes("5V47YYFZVCNZ4"));
-    assert.ok(PAYPAL_CHECKOUT.modules.includes("USR42PN73VD9N"));
-    assert.equal(PAYPAL_MODULE_PRICE, 0.99);
-    assert.equal(PAYPAL_CHECKOUT.module, undefined);
+    const planSrc = read("src/lib/plan.js");
+    assert.match(planSrc, /export const STRIPE_CHECKOUT/);
+    assert.doesNotMatch(planSrc, /paypal\.com\/ncp/i);
+    assert.match(planSrc, /export const MARKETPLACE_MODULE_PRICE\s*=\s*0\.99/);
   });
 
   it("createPaymentLink supports module purpose without service fee", () => {
@@ -139,6 +107,21 @@ describe("Security headers & rate limits", () => {
   it("portal mutate routes are rate-limited", () => {
     assert.match(read("api/functions/portalAcceptEstimate.js"), /assertRateLimit/);
     assert.match(read("api/functions/portalLeaveReview.js"), /assertRateLimit/);
+  });
+});
+
+describe("Authentication trust boundary", () => {
+  it("auth/me requires server-verified Supabase user state", () => {
+    const src = read("api/functions/auth/me.js");
+    assert.match(src, /admin\.auth\.getUser\(token\)/);
+    assert.doesNotMatch(src, /decodeJwtClaims|preview-user/);
+  });
+
+  it("OAuth callback has bounded exchange and profile initialization", () => {
+    const src = read("src/pages/AuthCallback.jsx");
+    assert.match(src, /OAUTH_EXCHANGE_TIMEOUT_MS/);
+    assert.match(src, /PROFILE_BOOT_TIMEOUT_MS/);
+    assert.match(src, /Retry sign in/);
   });
 });
 

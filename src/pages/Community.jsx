@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Heart, ImagePlus, Loader2, MessageCircle, Send, Share2, ShieldCheck, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

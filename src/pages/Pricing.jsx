@@ -13,7 +13,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { openPlayStore } from "@/lib/app-download";
 import {
@@ -26,6 +26,17 @@ import {
 import { getLaunchStatus } from "@/lib/launchStatus";
 import { formatMoney } from "@/lib/platformFee";
 import SiteFooter from "@/components/marketing/SiteFooter";
+import { useAuth } from "@/lib/AuthContext";
+import { toast } from "@/components/ui/use-toast";
+import {
+  PLAY_SUBSCRIPTIONS,
+  isAndroidPlayBuild,
+  loadPlaySubscriptions,
+  onPlayPurchaseUpdated,
+  startPlaySubscription,
+  verifyPlayPurchase,
+} from "@/lib/playBilling";
+import { startStripeSubscription } from "@/lib/stripeSubscriptions";
 
 function buildCards() {
   const foundingOpen = isFreeDuringBeta();
@@ -107,8 +118,11 @@ function buildCards() {
   ];
 }
 
-function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }) {
-  const checkoutHref = cta.href || plan.checkoutUrl || null;
+function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge, androidPlay, playProduct, onPlayPurchase, onStripePurchase, purchasing }) {
+  const checkoutHref = androidPlay ? null : (cta.href || plan.checkoutUrl || null);
+  const isPaidPlayPlan = androidPlay && Boolean(PLAY_SUBSCRIPTIONS[plan.id]);
+  const isPaidStripePlan = !androidPlay && plan.priceMonthly > 0;
+  const playPrice = playProduct?.offers?.[0]?.pricingPhases?.slice(-1)[0]?.formattedPrice;
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -134,7 +148,7 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }
         </div>
         <div className="text-right shrink-0">
           <span className="text-2xl font-bold text-titan-cyan">
-            {plan.priceMonthly === 0 ? "$0" : formatMoney(plan.priceMonthly)}
+            {plan.priceMonthly === 0 ? "$0" : (playPrice || formatMoney(plan.priceMonthly))}
           </span>
           <p className="text-xs text-muted-foreground mt-0.5">
             {plan.priceMonthly === 0 ? "to hire" : "/ month"}
@@ -155,14 +169,18 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }
       </div>
 
       <Button
-        asChild
+        asChild={!isPaidPlayPlan && !isPaidStripePlan}
+        onClick={isPaidPlayPlan ? () => onPlayPurchase(plan.id) : isPaidStripePlan ? () => onStripePurchase(plan.id) : undefined}
+        disabled={(isPaidPlayPlan || isPaidStripePlan) && purchasing}
         className={`w-full rounded-2xl h-11 text-sm font-semibold gap-2 ${
           highlighted
             ? "bg-titan-cyan hover:bg-titan-cyan/90 text-black"
             : "bg-muted hover:bg-muted/80 text-foreground border border-border"
         }`}
       >
-        {checkoutHref ? (
+        {isPaidPlayPlan || isPaidStripePlan ? (
+          <span>{purchasing ? "Opening secure checkout…" : `Choose ${plan.name}`} <ArrowRight className="w-4 h-4" /></span>
+        ) : checkoutHref ? (
           <a href={checkoutHref} target="_blank" rel="noopener noreferrer">
             {cta.label} <ArrowRight className="w-4 h-4" />
           </a>
@@ -172,17 +190,84 @@ function PlanCard({ plan, icon: Icon, features, highlighted, cta, delay, badge }
           </Link>
         )}
       </Button>
-      {checkoutHref ? (
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure checkout via PayPal</p>
+      {isPaidPlayPlan ? (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure subscription via Google Play · Cancel anytime</p>
+      ) : isPaidStripePlan || checkoutHref ? (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">Secure subscription via Stripe · Cancel anytime</p>
       ) : null}
     </motion.div>
   );
 }
 
 export default function Pricing() {
+  const { user, checkUserAuth } = useAuth();
+  const androidPlay = isAndroidPlayBuild();
+  const [playProducts, setPlayProducts] = React.useState([]);
+  const [purchasing, setPurchasing] = React.useState(false);
   const foundingOpen = isFreeDuringBeta();
   const cards = buildCards();
   const spots = getLaunchStatus().spotsRemaining;
+
+  React.useEffect(() => {
+    if (!androidPlay) return undefined;
+    loadPlaySubscriptions().then(setPlayProducts).catch(() => {
+      toast({ variant: "destructive", title: "Plans are temporarily unavailable", description: "Check your connection and try again." });
+    });
+    let handle;
+    onPlayPurchaseUpdated(async ({ responseCode, purchases = [] }) => {
+      if (responseCode !== 0) {
+        setPurchasing(false);
+        if (responseCode !== 1) toast({ variant: "destructive", title: "Purchase not completed", description: "Google Play did not complete the subscription." });
+        return;
+      }
+      const purchased = purchases.filter((purchase) => purchase.purchaseState === 1);
+      if (!purchased.length) {
+        setPurchasing(false);
+        toast({ title: "Purchase pending", description: "Your plan will unlock after Google Play confirms payment." });
+        return;
+      }
+      try {
+        for (const purchase of purchased) await verifyPlayPurchase(purchase);
+        await checkUserAuth();
+        toast({ title: "Subscription active", description: "Your TitanOS plan is ready." });
+      } catch (error) {
+        toast({ variant: "destructive", title: "Purchase needs verification", description: error.message || "Try Restore purchases shortly." });
+      } finally {
+        setPurchasing(false);
+      }
+    }).then((listener) => { handle = listener; });
+    return () => { handle?.remove(); };
+  }, [androidPlay, checkUserAuth]);
+
+  const buyWithPlay = React.useCallback(async (planId) => {
+    if (!user?.id) {
+      toast({ title: "Sign in first", description: "Your Play subscription must be linked to your TitanOS account." });
+      window.location.assign("/login?next=/pricing");
+      return;
+    }
+    try {
+      setPurchasing(true);
+      await startPlaySubscription(planId, user.id);
+    } catch (error) {
+      setPurchasing(false);
+      toast({ variant: "destructive", title: "Could not open Google Play", description: error.message || "Try again." });
+    }
+  }, [user?.id]);
+
+  const buyWithStripe = React.useCallback(async (planId) => {
+    if (!user?.id) {
+      toast({ title: "Sign in first", description: "Your subscription must be linked to your TitanOS account." });
+      window.location.assign("/login?next=/pricing");
+      return;
+    }
+    try {
+      setPurchasing(true);
+      await startStripeSubscription(planId);
+    } catch (error) {
+      setPurchasing(false);
+      toast({ variant: "destructive", title: "Checkout unavailable", description: error.message || "Try again later." });
+    }
+  }, [user?.id]);
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
     <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
@@ -215,7 +300,16 @@ export default function Pricing() {
 
       <div className="w-full max-w-6xl grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
         {cards.map((card, index) => (
-          <PlanCard key={card.plan.id} {...card} delay={0.05 + index * 0.05} />
+          <PlanCard
+            key={card.plan.id}
+            {...card}
+            delay={0.05 + index * 0.05}
+            androidPlay={androidPlay}
+            playProduct={playProducts.find((product) => product.productId === PLAY_SUBSCRIPTIONS[card.plan.id])}
+            onPlayPurchase={buyWithPlay}
+            onStripePurchase={buyWithStripe}
+            purchasing={purchasing}
+          />
         ))}
       </div>
 

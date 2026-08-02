@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
@@ -97,7 +97,7 @@ const WHY = [
 
 const TRUST = [
   { label: "Free to start", detail: "Shift tracking included" },
-  { label: "PayPal checkout", detail: "Premium plans" },
+  { label: "Secure checkout", detail: "Powered by Stripe" },
   { label: "Android app", detail: "Install the APK" },
   { label: "Field-ready", detail: "Mobile-first design" },
 ];
@@ -337,7 +337,7 @@ export default function Landing() {
 
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
-          <Link to="/" className="flex items-center gap-2.5 rounded-md focus-ring">
+          <Link to="/" className="flex min-h-11 items-center gap-2.5 rounded-md focus-ring">
             <TitanMark className="h-9 w-9" title="TitanOS" />
             <span className="landing-display text-base tracking-tight">TitanOS</span>
           </Link>
@@ -351,7 +351,7 @@ export default function Landing() {
             <button
               ref={menuBtnRef}
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border lg:hidden focus-ring"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border lg:hidden focus-ring"
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
               aria-controls="landing-mobile-nav"
@@ -637,23 +637,23 @@ export default function Landing() {
           <span className="inline-flex items-center gap-2">
             <TitanMark className="h-6 w-6" />© {new Date().getFullYear()} TitanOS
           </span>
-          <div className="flex flex-wrap gap-4">
-            <Link to="/download" className="rounded-md hover:text-foreground focus-ring">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link to="/download" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Download
             </Link>
-            <Link to="/pricing" className="rounded-md hover:text-foreground focus-ring">
+            <Link to="/pricing" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Pricing
             </Link>
-            <Link to="/beta" className="rounded-md hover:text-foreground focus-ring">
+            <Link to="/beta" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Beta
             </Link>
-            <Link to="/privacy-policy" className="rounded-md hover:text-foreground focus-ring">
+            <Link to="/privacy-policy" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Privacy Policy
             </Link>
-            <Link to="/terms" className="rounded-md hover:text-foreground focus-ring">
+            <Link to="/terms" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Terms of Service
             </Link>
-            <Link to="/login" className="rounded-md hover:text-foreground focus-ring">
+            <Link to="/login" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Sign in
             </Link>
           </div>

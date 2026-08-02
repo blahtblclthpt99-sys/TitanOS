@@ -100,7 +100,7 @@ if (typeof window !== "undefined") {
 }
 
 // Native-only deep links — keep Capacitor plugins out of the web entry chunk
-if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
+if (typeof window !== "undefined") {
   import("@/lib/capacitor-auth")
     .then((m) => m.installNativeAuthDeepLinks())
     .catch(() => {});

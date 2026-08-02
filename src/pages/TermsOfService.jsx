@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, FileText } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
 const EFFECTIVE_DATE = "July 13, 2026";

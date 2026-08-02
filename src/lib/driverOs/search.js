@@ -24,11 +24,11 @@ export function buildFolderSummaries(userId) {
 
   return {
     "live-shift": session?.active ? (session.paused ? "Paused" : "Driving ON") : "Off shift",
-    "todays-orders": `${todaysDd.length} DoorDash · ${history.filter((s) => String(s.started_at || "").slice(0, 10) === day).length} shifts`,
+    "todays-orders": `${todaysDd.length} deliveries · ${history.filter((s) => String(s.started_at || "").slice(0, 10) === day).length} shifts`,
     "trip-history": `${history.length + ddHist.length} records`,
     analytics: week.trips ? `${week.trips} trips this week` : "Open for full stats",
     rush: "Breakfast → Overnight",
-    platforms: dd ? "DoorDash live" : "Multi-platform ready",
+    platforms: dd ? "Delivery live" : "Multi-platform ready",
     heatmaps: "ZIP density",
     vehicle: "Economics & MPG",
     expenses: "Fuel · parking · tolls",
@@ -98,7 +98,7 @@ export function searchDeliveries(userId, query) {
         id: d.id,
         kind: "doordash",
         folder: "todays-orders",
-        title: `DoorDash · ${d.orderTypeLabel || "Order"}`,
+        title: `Delivery · ${d.orderTypeLabel || "Order"}`,
         subtitle: d.dateLocal || d.startedAt || "",
       });
     }

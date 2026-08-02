@@ -12,7 +12,9 @@ North star: [`FINAL_OBJECTIVE.md`](./FINAL_OBJECTIVE.md) — OS feel + ship gate
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `npm run build`
-- [ ] `npm run test:e2e` (Chromium smoke after build — run in CI / when Playwright browsers installed)
+- [x] `npm run test:e2e` (Chromium desktop smoke after isolated-config production build)
+- [x] Chromium Pixel 5 smoke (`npx playwright test --project=chromium-mobile`)
+- [x] `npm run test:integration-merge` (TitanOS + Titan AI + Base44 + Cursor closure)
 
 ### Structural (enforced by `scripts/final-qa.test.mjs`)
 

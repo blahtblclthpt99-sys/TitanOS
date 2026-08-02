@@ -1,7 +1,7 @@
 import { readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
-import { assertRateLimit } from "../_lib/rateLimit.js";
+import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { sanitizeAppPath, isUuid } from "../_lib/safePath.js";
 
 async function canNotifyUser(admin, callerId, targetId, isAdmin) {
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!assertRateLimit(req, res, { limit: 40, windowMs: 60_000, key: "createNotification" })) return;
+  if (!(await assertRateLimitAsync(req, res, { limit: 40, windowMs: 60_000, key: "createNotification" }))) return;
 
   const auth = await requireUser(req, res);
   if (!auth) return;

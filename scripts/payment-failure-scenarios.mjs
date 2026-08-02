@@ -24,6 +24,12 @@ function arg(name, fallback) {
 
 const BASE = String(arg("base", "https://titanos-web.vercel.app")).replace(/\/$/, "");
 
+function normalizeSupabaseUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  return value.replace(/\/(rest|auth)\/v1\/?$/i, "").replace(/\/$/, "");
+}
+
 function loadEnvLocal() {
   const envPath = join(ROOT, ".env.local");
   if (!existsSync(envPath)) return {};
@@ -233,7 +239,7 @@ async function run() {
   // 10) Supabase payment table reachability (read-only)
   {
     const env = loadEnvLocal();
-    const url = env.VITE_SUPABASE_URL;
+    const url = normalizeSupabaseUrl(env.VITE_SUPABASE_URL);
     const key = env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) {
       record("pay.db.payments_readable", false, "missing SUPABASE creds in .env.local");

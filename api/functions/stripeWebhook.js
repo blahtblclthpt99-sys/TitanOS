@@ -3,6 +3,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
+import { syncStripeSubscription } from "../_lib/stripeSubscriptions.js";
 
 /**
  * Stripe webhook — only trusted path to mark payments/invoices paid.
@@ -197,7 +198,22 @@ export default async function handler(req, res) {
     const expectedPlatformFee =
       session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
-    if (event.type === "checkout.session.completed") {
+    if (event.type === "checkout.session.completed" && session.mode === "subscription") {
+      const stripe = new (await import("stripe")).default(stripeKey);
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (subscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ["items.data.price"],
+        });
+        await syncStripeSubscription(admin, subscription);
+      }
+    } else if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      await syncStripeSubscription(admin, session);
+    } else if (event.type === "checkout.session.completed") {
       // Prefer payment row linkage; verify ownership before marking invoice
       if (paymentId) {
         const { data: payRow } = await admin

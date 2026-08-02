@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { AlertTriangle, Plus, Truck } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,13 @@ import {
   VEHICLE_MAKES,
   modelsForMake,
   vehicleLabel,
-  vehicleYearOptions,
 } from "@/lib/vehicleCatalog";
 
 const EMPTY = {
   name: "",
   make: "",
   model: "",
-  year: "",
+  purchase_date: "",
   category: "vehicle",
   status: "active",
   next_service_date: "",
@@ -30,7 +29,6 @@ const EMPTY = {
 };
 
 const due = (date) => date && new Date(date) <= new Date(Date.now() + 30 * 86400000);
-const YEARS = vehicleYearOptions();
 const fieldClass = "w-full h-10 px-3 rounded-xl bg-muted border border-border text-foreground text-sm";
 
 export default function Fleet() {
@@ -49,10 +47,10 @@ export default function Fleet() {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "make") next.model = "";
-      // Auto nickname from year/make/model when user hasn't typed a custom name
-      if (["make", "model", "year"].includes(key)) {
-        const auto = [next.year, next.make, next.model].filter(Boolean).join(" ");
-        if (!prev.name || prev.name === [prev.year, prev.make, prev.model].filter(Boolean).join(" ")) {
+      // Auto nickname from make/model when user hasn't typed a custom name.
+      if (["make", "model"].includes(key)) {
+        const auto = [next.make, next.model].filter(Boolean).join(" ");
+        if (!prev.name || prev.name === [prev.make, prev.model].filter(Boolean).join(" ")) {
           next.name = auto;
         }
       }
@@ -65,13 +63,13 @@ export default function Fleet() {
     if (isVehicle && (!form.make || !form.model)) return;
     if (!form.name && !(form.make && form.model)) return;
     const payload = {
-      name: form.name || [form.year, form.make, form.model].filter(Boolean).join(" "),
+      name: form.name || [form.make, form.model].filter(Boolean).join(" "),
       category: form.category,
       status: form.status,
       // DB uses brand for make
       brand: form.make || "",
       model: form.model || "",
-      year: form.year ? Number(form.year) : null,
+      purchase_date: form.purchase_date || null,
       next_service_date: form.next_service_date || null,
       warranty_expires: form.warranty_expires || null,
       // local mirror for Driver Hub labels
@@ -173,19 +171,13 @@ export default function Fleet() {
                   </select>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-xs text-muted-foreground">Year</label>
-                  <select
-                    value={form.year}
-                    onChange={(e) => setField("year", e.target.value)}
-                    className={`mt-1 ${fieldClass}`}
-                  >
-                    <option value="">Year (optional)</option>
-                    {YEARS.map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="text-xs text-muted-foreground">Purchase date</label>
+                  <Input
+                    type="date"
+                    value={form.purchase_date}
+                    onChange={(e) => setField("purchase_date", e.target.value)}
+                    className="mt-1 bg-muted border-border text-foreground rounded-xl"
+                  />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-xs text-muted-foreground">Nickname (optional)</label>
@@ -255,7 +247,9 @@ export default function Fleet() {
                   {(row.make || row.brand) && row.model
                     ? ` · ${row.make || row.brand} ${row.model}`
                     : ""}
-                  {row.year ? ` · ${row.year}` : ""}
+                  {row.purchase_date
+                    ? ` · Purchased ${new Date(`${row.purchase_date}T00:00:00`).toLocaleDateString()}`
+                    : ""}
                 </p>
                 {(due(row.next_service_date) || due(row.warranty_expires)) && (
                   <p className="text-xs text-titan-amber flex gap-1 mt-1">

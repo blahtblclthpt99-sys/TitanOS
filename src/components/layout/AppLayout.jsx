@@ -10,6 +10,7 @@ import AppDownloadBanner from "@/components/shared/AppDownloadBanner";
 import FeedbackButton from "@/components/shared/FeedbackButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
+import AppUpdateGate from "@/components/shared/AppUpdateGate";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 
 export default function AppLayout() {
@@ -34,6 +35,7 @@ export default function AppLayout() {
       <div className="sr-only" aria-live="polite" id="a11y-status" />
       <OfflineIndicator />
       <SessionExpiryBanner />
+      <AppUpdateGate />
       <div className="contents">
         <Sidebar />
         <DesktopTopBar />

@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { Capacitor } from "@capacitor/core";
 import { createAuthStorage } from "@/lib/auth-storage";
+import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 import { envString } from "@/lib/viteEnv";
 
 // Vite uses VITE_*; Supabase dashboard snippets often use NEXT_PUBLIC_* / PUBLISHABLE_KEY.
-const supabaseUrl =
-  envString("VITE_SUPABASE_URL") ||
-  envString("NEXT_PUBLIC_SUPABASE_URL") ||
-  "";
+const supabaseUrl = normalizeSupabaseUrl(
+  envString("VITE_SUPABASE_URL") || envString("NEXT_PUBLIC_SUPABASE_URL") || ""
+);
 const supabaseAnonKey =
   envString("VITE_SUPABASE_ANON_KEY") ||
   envString("VITE_SUPABASE_PUBLISHABLE_KEY") ||

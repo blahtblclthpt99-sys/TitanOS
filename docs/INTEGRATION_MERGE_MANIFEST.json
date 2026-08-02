@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "canonicalRuntime": ".",
+  "product": "TitanOS",
+  "packageId": "com.titanos.myapp",
+  "systems": {
+    "TitanOS": {
+      "status": "canonical",
+      "runtime": "React + Vite + Supabase + Capacitor",
+      "legacySource": "TitanOS/"
+    },
+    "TitanAI": {
+      "status": "merged",
+      "chatEndpoint": "api/functions/titanAI.js",
+      "capabilitiesEndpoint": "api/functions/titanAICapabilities.js",
+      "actionEndpoint": "api/functions/aiExecuteAction.js",
+      "ui": "src/pages/AIAssistant.jsx"
+    },
+    "Base44": {
+      "status": "migrated",
+      "legacySource": "TitatnCl/",
+      "dataMigration": "scripts/import-legacy-csv.mjs",
+      "archiveMigration": "supabase/migrations/039_legacy_csv_archives.sql",
+      "externalClient": "docs/base44/titanClient.js"
+    },
+    "Cursor": {
+      "status": "integrated-development-tooling",
+      "rules": ".cursor/rules/",
+      "memoryImporter": "memory.py",
+      "importTest": "test_cursor_import.py"
+    }
+  },
+  "base44PageMappings": {
+    "BusinessAssistant": "AIAssistant",
+    "CommandCenter": "Dashboard",
+    "Customers": "Customers",
+    "DriverHub": "DriverHub",
+    "DriverProfile": "DriverProfile",
+    "Expenses": "TaxCenter",
+    "Fleet": "Fleet",
+    "Invoices": "Invoices",
+    "Jobs": "Jobs",
+    "Profile": "Profile",
+    "Schedule": "Schedule"
+  },
+  "base44EntityMappings": {
+    "Customer": "customers",
+    "Expense": "expenses",
+    "Invoice": "invoices",
+    "Job": "jobs",
+    "User": "profiles",
+    "Vehicle": "equipment",
+    "VehicleCapacity": "legacy_vehicle_capacity",
+    "AreaStat": "legacy_area_stats",
+    "AuditLog": "audit_events",
+    "Base44Purchase": "legacy_base44_purchases",
+    "FuelLog": "legacy_fuel_logs",
+    "GigOrder": "legacy_gig_orders",
+    "Reminder": "legacy_reminders",
+    "Shift": "legacy_shifts",
+    "TeamMember": "legacy_team_members"
+  },
+  "rules": [
+    "Only the repository root is deployable.",
+    "TitanOS/ and TitatnCl/ are migration evidence and must never be imported by root runtime code.",
+    "Base44 clients call TitanOS APIs; Base44 is not a second source of truth.",
+    "Titan AI reads owned Supabase snapshots and executes allowlisted actions only.",
+    "Cursor configuration and imported history must never ship as application runtime data."
+  ]
+}

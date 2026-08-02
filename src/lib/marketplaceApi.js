@@ -118,7 +118,7 @@ export async function installModule(user, module) {
 
 /**
  * Install a module. Entitled via Pro/Business, founding trial, or $0.99 pack unlock.
- * If locked, opens the Marketplace Modules PayPal NCP ($0.99 · all modules).
+ * If locked, directs the user to membership checkout when configured.
  */
 export async function purchaseAndInstallModule(user, module) {
   const { canUseMarketplaceApps, getModulesCheckoutUrl } = await import("@/lib/plan");
@@ -129,7 +129,7 @@ export async function purchaseAndInstallModule(user, module) {
     }
     const err = new Error(
       checkoutUrl
-        ? "Unlock all Marketplace modules for $0.99 in PayPal (use the same email as TitanOS), then return and install. Or upgrade to Pro."
+        ? "Upgrade your TitanOS membership, then return to install this module."
         : "Unlock Marketplace modules for $0.99 or upgrade to Pro ($9.99)."
     );
     err.code = "MARKETPLACE_APPS_LOCKED";

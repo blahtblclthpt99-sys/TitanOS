@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
   FileText, DollarSign, TrendingDown, AlertCircle, Lightbulb, Calculator, Car,

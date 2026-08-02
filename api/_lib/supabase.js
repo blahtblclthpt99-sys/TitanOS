@@ -1,7 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
+function normalizeSupabaseUrl(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.replace(/\/(rest|auth)\/v1\/?$/i, "").replace(/\/$/, "");
+}
+
 export function getSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const url = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");

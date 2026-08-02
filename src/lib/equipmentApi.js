@@ -16,7 +16,6 @@ export async function createEquipment(user, values) {
     status: values.status || "active",
     brand: values.brand || values.make || "",
     model: values.model || "",
-    year: values.year != null && values.year !== "" ? Number(values.year) : null,
     serial_number: values.serial_number || "",
     purchase_date: values.purchase_date || null,
     purchase_price: values.purchase_price ?? 0,

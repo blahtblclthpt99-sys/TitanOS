@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { ArrowLeft, Search } from "lucide-react";
 import { MOBILE_ROOT_PATHS, resolvePageTitle } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";

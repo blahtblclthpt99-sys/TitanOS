@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebarState } from "@/hooks/useSidebarState";

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanWordmark from "@/components/brand/TitanWordmark";
 

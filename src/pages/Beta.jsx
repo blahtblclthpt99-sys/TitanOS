@@ -4,7 +4,7 @@ import { Rocket, Star, Zap, Shield, MessageSquare, Check, ChevronRight, Users, S
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/api/apiClient";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 const BENEFITS = [
   { icon: Star,    title: "Early Access",        description: "Every new feature lands in your hands first." },

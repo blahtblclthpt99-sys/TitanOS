@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Award, BadgeCheck, ChevronRight, Shield } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import PageHeader from "@/components/shared/PageHeader";
 import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";

@@ -163,7 +163,7 @@ function ConfirmCancel({ open, onConfirm, onDismiss }) {
           Unassign / cancel order?
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ends this DoorDash run and saves analytics. You can’t undo this.
+          Ends this delivery run and saves analytics. You can’t undo this.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
@@ -280,7 +280,7 @@ export default function DoorDashWorkflowPanel() {
         if (toastOk) toastOk(next);
       } catch (err) {
         toast({
-          title: "DoorDash workflow",
+          title: "Delivery workflow",
           description: err?.message || "Action failed",
           variant: "destructive",
         });
@@ -363,7 +363,7 @@ export default function DoorDashWorkflowPanel() {
             </p>
             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Package className="w-6 h-6 text-titan-amber" aria-hidden="true" />
-              DoorDash
+              Deliveries
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
               {snap.stage?.label || "One-handed · GPS stages · auto-depart"}
@@ -424,32 +424,19 @@ export default function DoorDashWorkflowPanel() {
                   </div>
                 ) : null}
                 <div
-                  className="grid grid-cols-2 gap-3"
+                  className="grid gap-3 sm:grid-cols-3"
                   role="group"
-                  aria-label="Start DoorDash order type"
+                  aria-label="Start delivery type"
                 >
-                  <div className="grid gap-3">
-                    {DD_ORDER_TYPES.filter((t) => t.column === "left").map((t) => (
-                      <ActionTile
-                        key={t.id}
-                        label={t.label}
-                        variant="warn"
-                        disabled={busy}
-                        onClick={() => startOrder(t.id)}
-                      />
-                    ))}
-                  </div>
-                  <div className="grid gap-3">
-                    {DD_ORDER_TYPES.filter((t) => t.column === "right").map((t) => (
-                      <ActionTile
-                        key={t.id}
-                        label={t.label}
-                        variant="primary"
-                        disabled={busy}
-                        onClick={() => startOrder(t.id)}
-                      />
-                    ))}
-                  </div>
+                  {DD_ORDER_TYPES.filter((t) => !t.legacy).map((t) => (
+                    <ActionTile
+                      key={t.id}
+                      label={t.label}
+                      variant="primary"
+                      disabled={busy}
+                      onClick={() => startOrder(t.id)}
+                    />
+                  ))}
                 </div>
               </div>
             ) : null}
@@ -549,7 +536,7 @@ export default function DoorDashWorkflowPanel() {
       {recent.length > 0 ? (
         <div className="rounded-2xl border border-border bg-card/60 p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
-            Recent DoorDash runs
+            Recent delivery runs
           </p>
           <ul className="space-y-2">
             {recent.map((d) => {

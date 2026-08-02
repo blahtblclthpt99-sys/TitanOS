@@ -1,4 +1,8 @@
 /* Self-hosted display/body font — latin only, font-display: swap */
+@import "tailwindcss";
+
+@config "../tailwind.config.js";
+
 @font-face {
   font-family: "Plus Jakarta Sans";
   font-style: normal;
@@ -16,9 +20,6 @@
   src: url("/fonts/plus-jakarta-sans-latin-ext.woff2") format("woff2-variations");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
-
-@config "../tailwind.config.js";
-@import "tailwindcss";
 
 @tailwind base;
 @tailwind components;
@@ -63,63 +64,63 @@
     --icon-md: 1.25rem;
     --icon-lg: 1.5rem;
 
-    /* ── Light — soft grey canvas, white cards ── */
-    --background: 210 25% 96%;
-    --foreground: 222 47% 9%;
+    /* ── Light — Base44 palette ── */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 9%;
-    --primary: 217 91% 48%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 192 95% 42%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 18% 92%;
-    --secondary-foreground: 222 47% 9%;
-    --muted: 210 16% 92%;
-    --muted-foreground: 215 16% 38%;
-    --accent: 214 80% 94%;
-    --accent-foreground: 217 91% 32%;
-    --destructive: 0 72% 48%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 217 91% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 32%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 42%;
-    --warning-foreground: 222 47% 9%;
-    --border: 214 16% 86%;
-    --input: 210 16% 92%;
-    --ring: 217 91% 48%;
-    --chart-1: 217 91% 48%;
-    --chart-2: 221 70% 40%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 160 84% 39%;
-    --chart-5: 0 72% 55%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 222 47% 11%;
+    --border: 214 32% 89%;
+    --input: 214 32% 91%;
+    --ring: 192 95% 42%;
+    --chart-1: 192 95% 42%;
+    --chart-2: 217 91% 50%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 38 92% 45%;
+    --chart-5: 280 60% 55%;
 
-    --font-heading: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-    --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    --sidebar-background: 210 20% 97%;
-    --sidebar-foreground: 222 40% 14%;
-    --sidebar-primary: 217 91% 48%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 16% 47%;
+    --sidebar-primary: 192 95% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 18% 92%;
-    --sidebar-accent-foreground: 217 91% 32%;
-    --sidebar-border: 214 16% 88%;
-    --sidebar-ring: 217 91% 48%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 89%;
+    --sidebar-ring: 192 95% 42%;
     --sidebar-width: 72px;
 
-    /* Brand aliases — electric blue + cyan orbit (matches TitanOS shield lockup) */
-    --titan-cyan: #0891B2;
-    --titan-orbit: #06B6D4;
-    --titan-amber: #D97706;
-    --titan-indigo: #1E3A8A;
-    --titan-navy: #0B1F3A;
-    --titan-royal: #1E3A8A;
-    --titan-electric: #2563EB;
-    --titan-heading: #0B1F3A;
-    --titan-surface-0: #EEF2F7;
-    --titan-surface-1: #FFFFFF;
-    --titan-surface-2: #E2E8F0;
+    /* Brand aliases synced to Base44 cyan/blue direction */
+    --titan-cyan: #06b6d4;
+    --titan-orbit: #06b6d4;
+    --titan-amber: #f59e0b;
+    --titan-indigo: #3b82f6;
+    --titan-navy: #0f172a;
+    --titan-royal: #3b82f6;
+    --titan-electric: #06b6d4;
+    --titan-heading: #111827;
+    --titan-surface-0: #f8fafc;
+    --titan-surface-1: #ffffff;
+    --titan-surface-2: #e2e8f0;
 
     --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
     --shadow-lift: 0 4px 12px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(37, 99, 235, 0.08);
@@ -128,55 +129,55 @@
   }
 
   .dark {
-    --background: 222 20% 8%;
+    --background: 222 47% 6%;
     --foreground: 210 40% 98%;
-    --card: 222 18% 11%;
+    --card: 222 27% 11%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 18% 11%;
+    --popover: 222 30% 9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 213 94% 60%;
-    --primary-foreground: 222 47% 8%;
-    --secondary: 222 16% 15%;
+    --primary: 191 100% 50%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 222 14% 16%;
-    --muted-foreground: 214 16% 72%;
-    --accent: 217 40% 16%;
-    --accent-foreground: 213 94% 78%;
-    --destructive: 0 72% 55%;
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 42%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 8%;
-    --border: 222 14% 20%;
-    --input: 222 14% 16%;
-    --ring: 213 94% 60%;
-    --chart-1: 213 94% 60%;
-    --chart-2: 221 70% 55%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 160 84% 42%;
-    --chart-5: 0 72% 55%;
+    --warning-foreground: 222 47% 6%;
+    --border: 217 33% 18%;
+    --input: 217 33% 20%;
+    --ring: 191 100% 50%;
+    --chart-1: 191 100% 50%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 280 65% 60%;
 
-    --sidebar-background: 222 22% 7%;
-    --sidebar-foreground: 214 24% 88%;
-    --sidebar-primary: 213 94% 60%;
-    --sidebar-primary-foreground: 222 47% 8%;
-    --sidebar-accent: 222 16% 13%;
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 191 100% 50%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 217 33% 14%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 14% 14%;
-    --sidebar-ring: 213 94% 60%;
+    --sidebar-border: 217 33% 16%;
+    --sidebar-ring: 191 100% 50%;
 
-    --titan-cyan: #22D3EE;
-    --titan-orbit: #22D3EE;
-    --titan-amber: #F59E0B;
-    --titan-indigo: #60A5FA;
-    --titan-navy: #93C5FD;
-    --titan-royal: #3B82F6;
-    --titan-electric: #3B82F6;
-    --titan-heading: #0B1F3A;
-    --titan-surface-0: #10141B;
-    --titan-surface-1: #161B24;
-    --titan-surface-2: #1F2633;
+    --titan-cyan: #22d3ee;
+    --titan-orbit: #22d3ee;
+    --titan-amber: #f59e0b;
+    --titan-indigo: #60a5fa;
+    --titan-navy: #93c5fd;
+    --titan-royal: #3b82f6;
+    --titan-electric: #22d3ee;
+    --titan-heading: #e5e7eb;
+    --titan-surface-0: #0b1220;
+    --titan-surface-1: #111827;
+    --titan-surface-2: #1f2937;
 
     --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.22), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-lift: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 40px rgba(59, 130, 246, 0.1);
@@ -324,6 +325,9 @@
 /* Skip link */
 .skip-link {
   position: absolute;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   left: var(--space-2);
   top: -100px;
   z-index: 200;

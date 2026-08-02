@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import {
   Briefcase, FileText, Receipt, MessageSquare, Image as ImageIcon,
   MapPin, Star, CheckCircle, Calendar, CreditCard, Paperclip, Clock,

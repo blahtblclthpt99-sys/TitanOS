@@ -32,7 +32,7 @@ export default function TodaysOrdersFolder({ user }) {
       {rows.dd.map((d) => (
         <details key={d.id} className="rounded-xl border border-border bg-muted/30 px-3 py-2">
           <summary className="cursor-pointer text-sm font-semibold text-foreground min-h-[40px] flex items-center">
-            DoorDash · {d.orderTypeLabel || "Delivery"} · ${(Number(d.payoutUsd) || 0).toFixed(2)}
+            Delivery · {d.orderTypeLabel || "Delivery"} · ${(Number(d.payoutUsd) || 0).toFixed(2)}
           </summary>
           <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <div>Status <span className="text-foreground">{d.status}</span></div>

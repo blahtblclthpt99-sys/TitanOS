@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
@@ -411,7 +411,7 @@ export default function Settings() {
         ) : null}
       </div>
 
-      {/* Membership / PayPal upgrade */}
+      {/* Membership upgrade */}
       {!isPaidPlan(user) && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -442,7 +442,7 @@ export default function Settings() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(!isFoundingTrialActive(user)) && (
+            {(!isFoundingTrialActive(user) && getPlanCheckoutUrl("starter")) && (
               <>
                 <Button asChild size="sm" variant="outline" className="border-border">
                   <a href={getPlanCheckoutUrl("starter")} target="_blank" rel="noopener noreferrer">
@@ -491,7 +491,7 @@ export default function Settings() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">Plans & pricing</p>
-            <p className="text-xs text-muted-foreground">Free shifts · Premium add-ons · PayPal checkout</p>
+            <p className="text-xs text-muted-foreground">Free shifts · Premium add-ons · Secure platform checkout</p>
           </div>
           <ChevronRight className="w-4 h-4 text-primary/50" />
         </motion.div>

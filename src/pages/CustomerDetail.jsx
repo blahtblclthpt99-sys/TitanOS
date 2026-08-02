@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { api } from "@/api/apiClient";
 import { useEntityRecord } from "@/hooks/useEntityRecord";
 import { useEntityData } from "@/hooks/useEntityData";

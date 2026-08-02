@@ -42,6 +42,12 @@ function loadEnvLocal() {
   return out;
 }
 
+function normalizeSupabaseUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  return value.replace(/\/(rest|auth)\/v1\/?$/i, "").replace(/\/$/, "");
+}
+
 const findings = [];
 
 function note(id, severity, pass, detail, recovery) {
@@ -144,10 +150,11 @@ async function main() {
   // E. Live Supabase latency
   {
     const env = loadEnvLocal();
-    if (!env.VITE_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabaseUrl = normalizeSupabaseUrl(env.VITE_SUPABASE_URL);
+    if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) {
       note("dep.supabase_live", "P0", false, "missing .env.local creds", "Restore env secrets from password manager");
     } else {
-      const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      const admin = createClient(supabaseUrl, env.SUPABASE_SERVICE_ROLE_KEY, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
       const started = performance.now();

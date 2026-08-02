@@ -112,9 +112,14 @@ export default async function handler(req, res) {
     });
     if (signInError || !signedIn.session) {
       logError("api/register:signIn", signInError);
-      return res.status(500).json({
-        error: "Account created but sign-in failed. Try logging in.",
-        code: "SIGN_IN_AFTER_REGISTER_FAILED",
+      return res.status(200).json({
+        user: {
+          id: created.user?.id,
+          email: created.user?.email || email,
+        },
+        session: null,
+        needsEmailVerification: true,
+        verificationMode: "email_link",
         userId: created.user?.id,
       });
     }

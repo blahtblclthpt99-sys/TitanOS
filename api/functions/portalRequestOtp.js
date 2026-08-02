@@ -4,14 +4,10 @@ import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { hashPortalOtp } from "../_lib/portalOtp.js";
 import { logError } from "../_lib/safeLog.js";
+import { randomInt } from "node:crypto";
 
 function randomOtp() {
-  try {
-    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 900000;
-    return String(100000 + n);
-  } catch {
-    return String(100000 + Math.floor(Math.random() * 900000));
-  }
+  return String(randomInt(100000, 1000000));
 }
 
 async function sendOtpEmail(email, otpCode) {

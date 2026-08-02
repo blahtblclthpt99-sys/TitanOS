@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { ArrowLeft, MapPin, Gauge, Clock, Fuel, FileText } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import PageHeader from "@/components/shared/PageHeader";

@@ -29,7 +29,9 @@ function sha256File(path) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const aabPath = resolve(root, args.aabPath || "bin/static/TitanOS.aab");
+  // This is the signed artifact produced by android:sign and submitted to Play.
+  // The legacy download-directory bundle may be stale and must not be baselined.
+  const aabPath = resolve(root, args.aabPath || "release/TitanOS.aab");
   const outPath = resolve(root, args.out || "ops/aab-baseline.json");
 
   if (!existsSync(aabPath)) {

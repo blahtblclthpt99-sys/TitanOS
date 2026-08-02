@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   Award,
   BadgeCheck,
@@ -33,6 +33,10 @@ import {
 } from "@/lib/professionalProfileApi";
 
 const inputClass = "bg-muted border-border text-foreground rounded-md";
+const MAX_ACHIEVEMENTS = Math.max(
+  1,
+  Number.parseInt(import.meta.env.VITE_MAX_PROFILE_ACHIEVEMENTS || "12", 10) || 12
+);
 
 function Section({ title, children, action }) {
   return (
@@ -100,9 +104,23 @@ export default function Profile() {
 
   const save = async () => {
     if (!user || !profile || saving) return;
+    const achievements = (profile.achievements || []).filter((item) =>
+      String(item?.title || "").trim()
+    );
+    const normalizedTitles = achievements.map((item) =>
+      String(item.title).trim().toLocaleLowerCase()
+    );
+    if (new Set(normalizedTitles).size !== normalizedTitles.length) {
+      toast({
+        variant: "destructive",
+        title: "Remove duplicate achievements",
+        description: "Each achievement needs a unique title.",
+      });
+      return;
+    }
     setSaving(true);
     try {
-      const saved = await saveProfessionalProfile(user, profile);
+      const saved = await saveProfessionalProfile(user, { ...profile, achievements });
       setProfile(saved);
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 2000);
@@ -512,31 +530,42 @@ export default function Profile() {
         <Section
           title="Achievements"
           action={
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-xl"
-              onClick={() =>
-                setProfile((p) => ({
-                  ...p,
-                  achievements: [
-                    {
-                      id: uid(),
-                      title: "Achievement",
-                      year: String(new Date().getFullYear()),
-                      description: "",
-                    },
-                    ...(p.achievements || []),
-                  ],
-                }))
-              }
-            >
-              <Award className="w-3.5 h-3.5 mr-1" /> Add
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {(profile.achievements || []).length}/{MAX_ACHIEVEMENTS}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                disabled={(profile.achievements || []).length >= MAX_ACHIEVEMENTS}
+                onClick={() =>
+                  setProfile((p) => ({
+                    ...p,
+                    achievements: [
+                      {
+                        id: uid(),
+                        title: "",
+                        year: String(new Date().getFullYear()),
+                        description: "",
+                      },
+                      ...(p.achievements || []),
+                    ],
+                  }))
+                }
+              >
+                <Award className="w-3.5 h-3.5 mr-1" /> Add
+              </Button>
+            </div>
           }
         >
-          <div className="space-y-3">
+          {(profile.achievements || []).length === 0 && (
+            <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Add awards, certifications, milestones, or recognition that helps customers understand your experience.
+            </p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
             {(profile.achievements || []).map((item, idx) => (
               <div key={item.id || idx} className="rounded-xl border border-border p-3 space-y-2">
                 <div className="grid sm:grid-cols-[1fr_100px] gap-2">

@@ -74,7 +74,7 @@ async function localFallback(functionName, payload) {
     };
   }
 
-  if (functionName === "createAutopilotOrder" || functionName === "runAutopilotOrder") {
+  if (functionName === "createAutopilotOrder" || functionName === "runAutopilotOrder" || functionName === "runAutopilotMembership") {
     throw apiError("Titan Autopilot requires a secure connection to the live billing service.", 503);
   }
 

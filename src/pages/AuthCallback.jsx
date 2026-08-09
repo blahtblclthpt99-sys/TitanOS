@@ -1,30 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
 import { supabase } from "@/api/supabaseClient";
 import { consumeReturnTo } from "@/lib/returnTo";
-
-const OAUTH_EXCHANGE_TIMEOUT_MS = 15000;
-const PROFILE_BOOT_TIMEOUT_MS = 12000;
-
-function withTimeout(promise, ms, message) {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(message)), ms);
-    Promise.resolve(promise).then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
-}
 
 function friendlyAuthError(message) {
   if (/code verifier|pkce|flow state|invalid.*code/i.test(message || "")) {
@@ -44,11 +25,7 @@ export default function AuthCallback() {
     const finish = async () => {
       try {
         if (hasPendingOAuthParams()) {
-          const result = await withTimeout(
-            completeOAuthFromUrl(),
-            OAUTH_EXCHANGE_TIMEOUT_MS,
-            "Google sign-in took too long to return. Check your connection and try again."
-          );
+          const result = await completeOAuthFromUrl();
           if (!result.ok) {
             if (!cancelled) setError(friendlyAuthError(result.error));
             return;
@@ -89,11 +66,7 @@ export default function AuthCallback() {
           /* ignore */
         }
 
-        await withTimeout(
-          checkUserAuth(),
-          PROFILE_BOOT_TIMEOUT_MS,
-          "Your account signed in, but profile setup took too long. Tap retry to continue."
-        );
+        await checkUserAuth();
         const dest = consumeReturnTo("/driver");
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
@@ -115,7 +88,7 @@ export default function AuthCallback() {
             {error}
           </p>
           <Link to="/login" className="text-sm font-semibold text-slate-800 hover:underline">
-            Retry sign in
+            Back to sign in
           </Link>
         </div>
       ) : (

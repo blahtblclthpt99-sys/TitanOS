@@ -10,20 +10,6 @@ const dsn = envString("VITE_SENTRY_DSN");
 let initialized = false;
 let replayEnabled = false;
 
-function isValidSentryDsn(value) {
-  try {
-    const parsed = new URL(String(value || "").trim());
-    return (
-      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
-      Boolean(parsed.hostname) &&
-      Boolean(parsed.username) &&
-      parsed.pathname.split("/").filter(Boolean).length > 0
-    );
-  } catch {
-    return false;
-  }
-}
-
 function resolveRelease() {
   return (
     envString("VITE_SENTRY_RELEASE") ||
@@ -68,7 +54,7 @@ function buildIntegrations(withReplay) {
  * Replay is privacy-gated (env + user Privacy → session_replay).
  */
 export function initSentry() {
-  if (initialized || !dsn || !isValidSentryDsn(dsn)) return;
+  if (initialized || !dsn) return;
   try {
     const env = resolveEnvironment();
     const withReplay = wantsReplay();

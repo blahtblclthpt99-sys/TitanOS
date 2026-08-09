@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Building2,
@@ -67,7 +67,7 @@ export default function UserProfileMenu() {
         aria-label="Account menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-md py-1 pl-1 pr-2 transition-colors duration-fast hover:bg-muted focus-ring ${
+        className={`flex min-h-[40px] items-center gap-2 rounded-md py-1 pl-1 pr-2 transition-colors duration-fast hover:bg-muted focus-ring ${
           open ? "bg-muted" : ""
         }`}
       >
@@ -75,10 +75,10 @@ export default function UserProfileMenu() {
           <img
             src={user.avatar_url || user.avatar}
             alt=""
-            className="h-9 w-9 rounded-full object-cover ring-1 ring-border"
+            className="h-8 w-8 rounded-full object-cover ring-1 ring-border"
           />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-soft">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-soft">
             {initials}
           </span>
         )}
@@ -116,7 +116,7 @@ export default function UserProfileMenu() {
                   type="button"
                   role="menuitem"
                   onClick={() => go(item.path)}
-                  className="flex min-h-[44px] w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors duration-fast hover:bg-muted focus-ring"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors duration-fast hover:bg-muted focus-ring"
                 >
                   <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <span className="flex-1">
@@ -137,7 +137,7 @@ export default function UserProfileMenu() {
                   setOpen(false);
                   logout("/login");
                 }}
-                className="flex min-h-[44px] w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-destructive transition-colors duration-fast hover:bg-destructive/10 focus-ring"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-destructive transition-colors duration-fast hover:bg-destructive/10 focus-ring"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
                 Sign out

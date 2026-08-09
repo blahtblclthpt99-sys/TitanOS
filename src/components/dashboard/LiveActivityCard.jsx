@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Activity, ChevronRight } from "lucide-react";
 import { listActivity } from "@/lib/communityApi";
 import { timeAgo } from "@/lib/platformConstants";

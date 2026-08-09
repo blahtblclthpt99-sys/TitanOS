@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";

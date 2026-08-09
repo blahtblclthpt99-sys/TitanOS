@@ -8,9 +8,7 @@ import TabStack from "./TabStack";
 import FloatingAIButton from "@/components/shared/FloatingAIButton";
 import AppDownloadBanner from "@/components/shared/AppDownloadBanner";
 import FeedbackButton from "@/components/shared/FeedbackButton";
-import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
-import AppUpdateGate from "@/components/shared/AppUpdateGate";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 
 export default function AppLayout() {
@@ -28,14 +26,12 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
       <div className="sr-only" aria-live="polite" id="a11y-status" />
-      <OfflineIndicator />
       <SessionExpiryBanner />
-      <AppUpdateGate />
       <div className="contents">
         <Sidebar />
         <DesktopTopBar />
@@ -49,7 +45,7 @@ export default function AppLayout() {
         id="main-content"
         tabIndex={-1}
         aria-label="Main content"
-        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
+        className="md:ml-[calc(var(--sidebar-width,72px)+env(safe-area-inset-left))] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-[calc(env(safe-area-inset-top)+3.5rem)] outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-[max(2rem,env(safe-area-inset-bottom))]"
         style={{
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",

@@ -30,7 +30,7 @@ export function resolveDriverIntent(snap) {
       happening: `${stage}${platform ? ` · ${platform}` : ""}${rush ? ` · ${rush}` : ""}`,
       nextLabel: "Continue delivery",
       nextFolder: "doordash",
-      nextHint: "Open the delivery workflow",
+      nextHint: "Open DoorDash workflow",
       moreLabel: "Explorer",
       moreHint: "Orders, history, and analytics",
     };

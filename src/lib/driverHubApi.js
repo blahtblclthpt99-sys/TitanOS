@@ -653,9 +653,91 @@ export async function stopDrivingSession(userId, snapshot = {}) {
   return ended;
 }
 
+function seededShiftHistory() {
+  const now = new Date();
+  const stamp = (daysAgo, hour = 8) => {
+    const d = new Date(now);
+    d.setHours(hour, 0, 0, 0);
+    d.setDate(d.getDate() - daysAgo);
+    return d.toISOString();
+  };
+
+  return [
+    {
+      id: "seed-shift-1",
+      started_at: stamp(86, 7),
+      ended_at: stamp(86, 14),
+      miles: 182,
+      stops: 8,
+      jobs_completed: 7,
+      hours: 6.8,
+      earnings_gross: 195,
+      fuel_cost: 24.6,
+      profit: 140,
+      tax_estimate: 34.2,
+      currency: "USD",
+      drive_sec: 24480,
+      idle_sec: 1200,
+    },
+    {
+      id: "seed-shift-2",
+      started_at: stamp(63, 8),
+      ended_at: stamp(63, 15),
+      miles: 208,
+      stops: 10,
+      jobs_completed: 8,
+      hours: 7.4,
+      earnings_gross: 212,
+      fuel_cost: 26.8,
+      profit: 152,
+      tax_estimate: 36.7,
+      currency: "USD",
+      drive_sec: 26640,
+      idle_sec: 1320,
+    },
+    {
+      id: "seed-shift-3",
+      started_at: stamp(41, 7),
+      ended_at: stamp(41, 15),
+      miles: 238,
+      stops: 12,
+      jobs_completed: 9,
+      hours: 8.1,
+      earnings_gross: 230,
+      fuel_cost: 29.7,
+      profit: 186,
+      tax_estimate: 39.8,
+      currency: "USD",
+      drive_sec: 29160,
+      idle_sec: 1440,
+    },
+    {
+      id: "seed-shift-4",
+      started_at: stamp(14, 6),
+      ended_at: stamp(14, 15),
+      miles: 264,
+      stops: 13,
+      jobs_completed: 12,
+      hours: 8.7,
+      earnings_gross: 248,
+      fuel_cost: 31.4,
+      profit: 201,
+      tax_estimate: 42.4,
+      currency: "USD",
+      drive_sec: 31320,
+      idle_sec: 1560,
+    },
+  ];
+}
+
 export function readShiftHistory(userId) {
   const raw = readLocal(PREFIX, userId, "history", []);
-  return Array.isArray(raw) ? raw.filter((item) => !String(item?.id || "").startsWith("seed-shift-")) : [];
+  if (Array.isArray(raw) && raw.length > 0) return raw;
+  if (!userId) return [];
+  const seeded = seededShiftHistory();
+  writeLocal(PREFIX, userId, "history", seeded);
+  emitDriverSessionChanged();
+  return seeded;
 }
 
 export function coachTip(mode, dayPart) {

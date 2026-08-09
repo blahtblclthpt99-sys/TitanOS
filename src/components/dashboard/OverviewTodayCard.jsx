@@ -1,5 +1,5 @@
 import React, { useId, useMemo } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { ArrowUpRight, TrendingUp } from "lucide-react";
 
 /**

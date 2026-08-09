@@ -17,6 +17,7 @@ export default defineConfig({
   projects: [
     { name: "chromium-desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "chromium-mobile", use: { ...devices["Pixel 5"] } },
+    { name: "chromium-tablet", use: { ...devices["Galaxy Tab S4"] } },
     { name: "firefox-desktop", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit-desktop", use: { ...devices["Desktop Safari"] } },
   ],

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, Link } from "react-router";
+import { useLocation } from "react-router-dom";
 import { CreditCard, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -10,7 +10,6 @@ import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import FormField from "@/components/shared/FormField";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { useAuth } from "@/lib/AuthContext";
-import { betaBadgeLabel } from "@/lib/plan";
 import { calcPlatformFee, formatMoney } from "@/lib/platformFee";
 import { getPlanConfig } from "@/lib/plan";
 import { createPaymentLink, deletePayment, listPaymentAccounts, listPayments, markPaymentStatus, upsertPaymentAccount } from "@/lib/paymentsApi";
@@ -245,19 +244,7 @@ export default function Payments() {
           : ""}
       </FeatureHonestyBanner>
       <div className="titan-surface p-4 mb-6 border border-titan-cyan/20 text-sm text-foreground/90">
-        <span className="text-titan-cyan font-semibold">
-          Your plan: {plan.name} · {plan.feeLabel} fee
-        </span>
-        {" "}on every payment collected through the app
-        {plan.id === "worker_free" ? (
-          <>
-            {" · "}
-            <Link to="/pricing" className="text-titan-cyan underline-offset-2 hover:underline">
-              Upgrade to cut fees to 2.5%
-            </Link>
-          </>
-        ) : null}
-        {betaBadgeLabel() ? ` · ${betaBadgeLabel()}` : ""}.
+        Payment processing details are shown before confirmation.
       </div>
 
       <section className="grid md:grid-cols-3 gap-4 mb-7">

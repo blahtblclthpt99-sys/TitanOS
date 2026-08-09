@@ -1,6 +1,6 @@
 import React from "react";
 import { Bell } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
 import NavBadge from "@/components/shared/NavBadge";

@@ -3,7 +3,7 @@
  * Module/file prefix remains `TitanComms` / `titanComms*` for stable imports.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "react-router-dom";
 import {
   Mic,
   Plus,
@@ -456,7 +456,7 @@ export default function TitanComms() {
             </Button>
             {!persistOk ? (
               <p className="text-[10px] text-muted-foreground leading-snug">
-                Free: expires tonight. Upgrade to keep channels.
+                This temporary channel expires tonight.
               </p>
             ) : null}
           </form>

@@ -15,15 +15,6 @@ function throwIfError(error, status = 400) {
   throw apiError(error.message || "Request failed", status);
 }
 
-function withTimeout(promise, ms, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(apiError(message, 408)), ms);
-    }),
-  ]);
-}
-
 async function fetchProfile(userId) {
   const { data, error } = await supabase
     .from("profiles")
@@ -304,20 +295,11 @@ export function createAuthModule() {
     },
 
     async loginWithProvider(provider) {
+      await assertOAuthProviderEnabled(provider);
+
       // Always absolute callback URL so Supabase does not fall back to Site URL `/`.
       const redirectTo = getAuthRedirectTo("/auth/callback");
       const isNative = Capacitor.isNativePlatform();
-
-      // Supabase provider availability is already enforced by the OAuth
-      // endpoint. Avoid blocking Android Custom Tab launch on an extra
-      // settings request, which can hang indefinitely on some WebViews.
-      if (!isNative) {
-        await withTimeout(
-          assertOAuthProviderEnabled(provider),
-          5000,
-          "Could not verify Google sign-in. Check your connection and try again."
-        );
-      }
       const options = {
         redirectTo,
         skipBrowserRedirect: true,
@@ -326,11 +308,10 @@ export function createAuthModule() {
         options.queryParams = { access_type: "offline", prompt: "consent select_account" };
       }
 
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithOAuth({ provider, options }),
-        12000,
-        "Google sign-in could not start. Check your connection and try again."
-      );
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options,
+      });
       throwIfError(error);
       if (!data?.url) throw apiError("Could not start sign-in. Try again.", 400);
 

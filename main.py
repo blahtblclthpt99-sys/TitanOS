@@ -3,8 +3,6 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - optional dependency guard
@@ -66,7 +64,7 @@ from infinite_evolution_architecture import describe_infinite_evolution_architec
 from autonomous_intelligence_expansion import describe_autonomous_intelligence_expansion
 from autonomous_enterprise_civilization import describe_autonomous_enterprise_civilization
 from terminal import run_command
-from config import PROJECT_FOLDER, REPORT_FOLDER, BACKUP_FOLDER, LOG_FOLDER
+from config import BACKUP_FOLDER, LOG_FOLDER, PROJECT_FOLDER, REPORT_FOLDER, load_dotenv
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent
 

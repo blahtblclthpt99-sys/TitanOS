@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, ArrowRight } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 export default function ThankYou() {
@@ -15,7 +15,7 @@ export default function ThankYou() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <h1 className="text-4xl font-bold text-foreground mb-3">You're in!</h1>
         <p className="text-muted-foreground text-lg max-w-sm mx-auto mb-8">
-          Welcome to TitanOS Pro. Your subscription is active and every feature is unlocked.
+          Welcome to TitanOS. Your workspace is ready and every feature is unlocked.
         </p>
 
         <Link to="/">

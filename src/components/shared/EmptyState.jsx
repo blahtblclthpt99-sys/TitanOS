@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Inbox, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";

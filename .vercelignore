@@ -9,19 +9,6 @@ scripts
 supabase
 .vscode
 .git
-.venv
-backups
-bin
-data
-logs
-memory
-my TitanOS
-ops
-projects
-reports
-test-results
-TitanOS
-TitatnCl
 
 # Binaries & local tooling
 *.apk

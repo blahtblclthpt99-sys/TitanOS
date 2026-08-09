@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCachedAuthSession } from "@/lib/sessionPeek";
 import Spinner from "@/components/shared/Spinner";
+import { trackEvent } from "@/lib/productAnalytics";
+import { captureMarketingAttribution } from "@/lib/marketingAttribution";
 
 const btn =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-[48px] px-6";
@@ -59,20 +61,20 @@ const FEATURES = [
 const AUDIENCES = [
   {
     icon: "building",
-    title: "Independent drivers",
-    desc: "See your day, your miles, and your earnings without living in a spreadsheet.",
+    title: "Owner-operators",
+    desc: "Run customers, jobs, invoices, expenses, and the day from one command center.",
     href: "/register",
   },
   {
     icon: "wrench",
-    title: "Road pros",
-    desc: "Shift details, mileage, and profit signals from the van — not the office.",
+    title: "Service businesses",
+    desc: "Keep the office and field aligned from first estimate through final payment.",
     href: "/register",
   },
   {
     icon: "car",
-    title: "Drivers",
-    desc: "Find hauling work or run gig shifts with miles ready for tax.",
+    title: "Drivers and crews",
+    desc: "Track shifts, stops, mileage, true costs, and follow-ups without extra apps.",
     href: "/register",
   },
 ];
@@ -91,32 +93,32 @@ const WHY = [
   {
     icon: "shield",
     title: "Plans that scale with you",
-    desc: "Start free for shifts and listings. Upgrade when you need Driver Hub add-ons, apps, and lower fees.",
+    desc: "Run shifts, listings, Driver Hub, apps, and team workflows in one workspace.",
   },
 ];
 
 const TRUST = [
-  { label: "Free to start", detail: "Shift tracking included" },
-  { label: "Secure checkout", detail: "Powered by Stripe" },
-  { label: "Android app", detail: "Install the APK" },
-  { label: "Field-ready", detail: "Mobile-first design" },
+  { label: "Free public beta", detail: "No credit card required" },
+  { label: "One workspace", detail: "Jobs through payment" },
+  { label: "Android ready", detail: "Built for the field" },
+  { label: "Complete toolkit", detail: "Web and Android ready" },
 ];
 
-const REVIEWS = [
+const REVENUE_FLOW = [
   {
-    quote: "I used to spend Sunday evenings chasing paperwork. Now it takes ten minutes in the van.",
-    name: "Marcus R.",
-    role: "Owner-operator",
+    step: "01",
+    title: "Win the work",
+    detail: "Capture customers, build estimates, schedule jobs, and keep every follow-up visible.",
   },
   {
-    quote: "The mileage and profit view paid for itself in the first week. I finally know what I’m really making.",
-    name: "Sarah K.",
-    role: "Independent driver",
+    step: "02",
+    title: "Run the day",
+    detail: "Give the field one live view of jobs, routes, notes, mileage, expenses, and team communication.",
   },
   {
-    quote: "Titan AI writes my shift notes faster than I can type. Complete game changer.",
-    name: "James T.",
-    role: "Road professional",
+    step: "03",
+    title: "Get paid and improve",
+    detail: "Send invoices, collect payment, review profit signals, and let Titan AI surface the next action.",
   },
 ];
 
@@ -267,6 +269,7 @@ export default function Landing() {
 
   useEffect(() => {
     document.title = "TitanOS — Driver OS for the Road";
+    captureMarketingAttribution(window.location.search);
   }, []);
 
   useEffect(() => {
@@ -298,7 +301,7 @@ export default function Landing() {
         ["who", "Who it's for"],
         ["why", "Why TitanOS"],
         ["features", "Features"],
-        ["pricing", "Pricing"],
+        ["included", "Included"],
       ].map(([id, label]) => (
         <button
           key={id}
@@ -405,24 +408,27 @@ export default function Landing() {
                 <TitanBrandLogo layout="stacked" imgClassName="h-16 sm:h-20" />
                 <ThemeToggle variant="segmented" className="max-w-xs w-full sm:w-auto" />
               </div>
-              <p className="mb-4 text-caption font-semibold text-primary">Try free for 3 days · Then $4.99/month</p>
+              <p className="mb-4 text-caption font-semibold text-primary">One system for field work, money, and growth</p>
               <h1 className="landing-display max-w-xl text-3xl text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.12]">
-                The operating system for the road.
+                Run your field business from one place.
               </h1>
               <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
-                Start with a 3-day free trial, use TitanOS on real shifts, and see the payoff in your mileage,
-                invoicing, and profit tracking — then continue at $4.99/month if it works for you.
+                Win work, run the day, track true costs, and get paid without stitching together separate apps.
+                Titan AI keeps the next revenue action in view.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link to="/register" className={btnPrimary}>
-                  Get started free <Icon d={ICONS.arrow} className="h-4 w-4" />
+              <Link to="/register" className={btnPrimary} onClick={() => trackEvent("cta_clicked", { location: "landing_hero", action: "register" })}>
+                  Join the free public beta <Icon d={ICONS.arrow} className="h-4 w-4" />
                 </Link>
                 <button type="button" onClick={() => scrollToId("what")} className={btnOutline}>
                   See what it does
                 </button>
+                <Link to="/driver-beta" className={btnOutline} onClick={() => trackEvent("cta_clicked", { location: "landing_hero", action: "driver_cohort" })}>
+                  Driver founding cohort
+                </Link>
               </div>
               <p className="mt-5 text-caption text-muted-foreground">
-                3-day free trial · $4.99/month after trial · Upgrade for add-ons
+                No credit card required · Core access is free during public beta
               </p>
             </div>
 
@@ -449,11 +455,11 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl">
             <p className="landing-eyebrow">What is TitanOS?</p>
             <h2 className="landing-display mt-2 max-w-3xl text-3xl text-foreground sm:text-4xl">
-              One place to run the day — from the first stop to the final mile.
+              From first lead to final payment, the work stays connected.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              TitanOS replaces the patchwork of texts, spreadsheets, and separate apps most drivers and owner-operators juggle.
-              Open one Command Center and see today&apos;s stops, mileage, expenses, and profit in one place.
+              TitanOS replaces the patchwork of texts, spreadsheets, and disconnected point tools.
+              Open one Command Center to see what is happening, what needs action, and where revenue is getting stuck.
             </p>
             <div className="mt-10">
               <FieldShowcase />
@@ -516,7 +522,7 @@ export default function Landing() {
               Everything you need to run the day — included.
             </h2>
             <p className="mt-3 max-w-xl text-muted-foreground">
-              Core tools focused on profit, mileage, and faster payout — with premium add-ons when you want more.
+              Core tools focused on profit, mileage, faster payout, and connected field workflows.
             </p>
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map(({ icon, title, desc, slug }) => (
@@ -536,30 +542,23 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Testimonials */}
-        <section id="reviews" className="landing-section scroll-mt-16 border-b border-border px-4" aria-label="Testimonials">
+        {/* Revenue workflow */}
+        <section id="workflow" className="landing-section scroll-mt-16 border-b border-border px-4" aria-label="Revenue workflow">
           <div className="mx-auto max-w-6xl">
-            <p className="landing-eyebrow text-center">From the field</p>
+            <p className="landing-eyebrow text-center">One connected workflow</p>
             <h2 className="landing-display mt-2 text-center text-3xl text-foreground">
-              What early users are saying
+              Keep work moving toward revenue.
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
-              Early driver stories from beta users — more are coming as we grow.
+              Every stage answers what is happening, what comes next, and where to go for more.
             </p>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {REVIEWS.map((r) => (
-                <blockquote key={r.name} className="titan-surface flex flex-col p-5">
-                  <div className="mb-3 flex gap-0.5 text-primary" aria-hidden="true">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <Icon key={i} d={ICONS.star} className="h-3.5 w-3.5 fill-primary/20" />
-                    ))}
-                  </div>
-                  <p className="flex-1 text-sm leading-relaxed text-foreground/85">&ldquo;{r.quote}&rdquo;</p>
-                  <footer className="mt-5 border-t border-border pt-4">
-                    <div className="text-sm font-semibold text-foreground">{r.name}</div>
-                    <div className="text-xs text-muted-foreground">{r.role}</div>
-                  </footer>
-                </blockquote>
+              {REVENUE_FLOW.map((item) => (
+                <article key={item.step} className="titan-surface p-5">
+                  <div className="text-caption font-bold text-primary">{item.step}</div>
+                  <h3 className="mt-3 text-heading text-foreground">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.detail}</p>
+                </article>
               ))}
             </div>
           </div>
@@ -570,10 +569,10 @@ export default function Landing() {
           <div className="mx-auto max-w-3xl text-center">
             <p className="landing-eyebrow">What to do next</p>
             <h2 className="landing-display mt-2 text-3xl text-foreground sm:text-4xl">
-              Start free. Run your next shift on TitanOS.
+              Put your next job through TitanOS.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Create an account in minutes. Try free for 3 days, then continue at $4.99/month if TitanOS is helping your profit — upgrade for Premium add-ons if you want more.
+              Create an account in minutes. Core access is free during the public beta while we earn our first users and improve from real feedback.
             </p>
           </div>
           <div className="titan-surface mx-auto mt-10 max-w-lg p-6 sm:p-8">
@@ -581,10 +580,6 @@ export default function Landing() {
               <div className="text-left">
                 <h3 className="text-xl font-bold text-foreground">Driver-first tools included</h3>
                 <p className="text-xs text-muted-foreground">Mileage, expenses, invoicing, and profit tracking</p>
-              </div>
-              <div className="text-right">
-                <div className="text-4xl font-bold tabular-nums text-primary">$0</div>
-                <p className="text-xs text-muted-foreground">during beta</p>
               </div>
             </div>
             <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
@@ -597,13 +592,13 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <Link to="/register" className={`${btnPrimary} mt-6 w-full`}>
-              Create your free account <Icon d={ICONS.arrow} className="h-4 w-4" />
+            <Link to="/register" className={`${btnPrimary} mt-6 w-full`} onClick={() => trackEvent("cta_clicked", { location: "landing_pricing", action: "register" })}>
+              Create beta account <Icon d={ICONS.arrow} className="h-4 w-4" />
             </Link>
             <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 p-4">
               <div className="text-left">
                 <p className="text-sm font-semibold text-foreground">Prefer Android?</p>
-                <p className="text-xs text-muted-foreground">Download the APK — no store required</p>
+                <p className="text-xs text-muted-foreground">Use the Android build in the field</p>
               </div>
               <Link to="/download" className={`${btnOutline} h-10 min-h-[40px] flex-shrink-0 px-3 text-xs`}>
                 Get app
@@ -613,6 +608,20 @@ export default function Landing() {
         </section>
 
         {/* Final CTA */}
+        <section className="landing-section border-b border-border bg-muted/30 px-4" aria-labelledby="organic-resources-title">
+          <div className="mx-auto max-w-6xl">
+            <p className="landing-eyebrow">Start with something useful</p>
+            <h2 id="organic-resources-title" className="landing-display mt-2 text-3xl text-foreground sm:text-4xl">Tools and workflows for your kind of work.</h2>
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              <Link to="/free-tools" className="titan-surface titan-surface-interactive p-6 focus-ring"><h3 className="text-xl font-bold">Free weekly profit calculator</h3><p className="mt-2 text-sm text-muted-foreground">Estimate profit after labor, materials, fees, mileage, and vehicle cost. No signup required.</p><span className="mt-4 inline-flex text-sm font-semibold text-primary">Open free tool →</span></Link>
+              <div className="titan-surface p-6"><h3 className="text-xl font-bold">Explore by industry</h3><div className="mt-4 flex flex-wrap gap-2">{["handyman", "cleaning", "hvac", "landscaping", "mobile-repair", "delivery", "hauling"].map((slug) => <Link key={slug} to={`/industries/${slug}`} className="rounded-full border border-border px-3 py-2 text-xs capitalize hover:border-primary hover:text-primary">{slug.replace("-", " ")}</Link>)}</div></div>
+            </div>
+            <div className="mt-10 grid gap-4 md:grid-cols-3">
+              {[["Do I need a credit card?", "No. Core access is free during the public beta."], ["What do beta users contribute?", "Use TitanOS on real work and share honest feedback or a measurable success story."], ["Is this only for drivers?", "No. TitanOS connects office, field, money, communication, and AI workflows for owner-operators and service teams."]].map(([question, answer]) => <article key={question}><h3 className="font-semibold">{question}</h3><p className="mt-2 text-sm text-muted-foreground">{answer}</p></article>)}
+            </div>
+          </div>
+        </section>
+
         <section className="landing-section px-4">
           <div className="mx-auto max-w-3xl text-center">
             <TitanMark className="mx-auto h-14 w-14" title="TitanOS" />
@@ -627,7 +636,7 @@ export default function Landing() {
                 Sign in
               </Link>
             </div>
-            <p className="mt-3 text-caption text-muted-foreground">No credit card · 3-day free trial · $4.99/month after trial</p>
+            <p className="mt-3 text-caption text-muted-foreground">No credit card · Free core access during public beta · Honest feedback welcome</p>
           </div>
         </section>
       </main>
@@ -640,9 +649,6 @@ export default function Landing() {
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <Link to="/download" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Download
-            </Link>
-            <Link to="/pricing" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
-              Pricing
             </Link>
             <Link to="/beta" className="inline-flex min-h-11 items-center rounded-md hover:text-foreground focus-ring">
               Beta

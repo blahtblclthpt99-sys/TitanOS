@@ -1,6 +1,6 @@
 import React from "react";
 import { Clock } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

@@ -26,13 +26,27 @@
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://titanos-web.vercel.app/login</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
+    <loc>https://titanos-web.vercel.app/free-tools</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://titanos-web.vercel.app/register</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.7</priority>
+    <loc>https://titanos-web.vercel.app/driver-beta</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
+  <url>
+    <loc>https://titanos-web.vercel.app/features/titan-ai</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url><loc>https://titanos-web.vercel.app/features/driver-hub</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/features/expenses</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/handyman</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/cleaning</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/hvac</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/landscaping</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/mobile-repair</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/delivery</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://titanos-web.vercel.app/industries/hauling</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import {
   Store,
   Star,
@@ -317,11 +317,11 @@ export default function Marketplace() {
       if (error?.code === "MARKETPLACE_APPS_LOCKED") {
         setActionError(
           error.message ||
-            "Upgrade your TitanOS membership to unlock Marketplace modules."
+            "This module is not enabled in the current workspace."
         );
         return;
       }
-      setActionError(error?.message || "Failed to purchase module. Please try again.");
+      setActionError(error?.message || "Failed to install module. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -414,7 +414,7 @@ export default function Marketplace() {
                 TitanOS <span className="gradient-text">Marketplace</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {modules.length} modules · $0.99 unlock all · or included with Pro
+                {modules.length} workspace modules
               </p>
             </div>
           </div>
@@ -442,16 +442,15 @@ export default function Marketplace() {
               <span className="text-xs font-semibold text-titan-amber uppercase tracking-wider">Marketplace Apps</span>
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-              All modules · <span className="gradient-text">$0.99</span>
+              Extend your workspace
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Upgrade your TitanOS membership to unlock industry workflows, creative tools, and AI agents.
-              Also included with Pro ($9.99) or Business ($19.99).
+              Add industry workflows, creative tools, and AI agents to your workspace.
             </p>
             {!modulesUnlocked && modulesCheckout ? (
               <Button asChild className="mt-4 bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold min-h-[44px]">
                 <a href={modulesCheckout} target="_blank" rel="noopener noreferrer">
-                  Unlock all modules · $0.99
+                  Enable workspace modules
                 </a>
               </Button>
             ) : null}
@@ -460,7 +459,7 @@ export default function Marketplace() {
             {[
               { icon: Shield, label: "Verified secure" },
               { icon: Clock, label: "1-click install" },
-              { icon: Download, label: "Secure checkout" },
+              { icon: Download, label: "Workspace install" },
             ].map(({ icon: Icon, label }) => (
               <span key={label} className="flex items-center gap-1.5 titan-surface px-3 py-2 border border-border">
                 <Icon className="w-3.5 h-3.5 text-titan-cyan" />

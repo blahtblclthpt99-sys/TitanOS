@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, Suspense, lazy } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { motion } from "framer-motion";
 import { DollarSign, TrendingUp, TrendingDown, Receipt, Camera, X, ScanLine } from "lucide-react";

@@ -14,7 +14,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { matchVoiceCommand, speechSupported } from "@/lib/voiceCommands";

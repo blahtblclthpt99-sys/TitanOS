@@ -12,7 +12,7 @@ import { Capacitor } from "@capacitor/core";
 export function installNativeAuthDeepLinks() {
   if (!Capacitor.isNativePlatform()) return () => {};
 
-  const handleAuthUrl = async (url) => {
+  const sub = App.addListener("appUrlOpen", async ({ url }) => {
     try {
       const parsed = new URL(url);
       if (parsed.host === "auth" && parsed.pathname.startsWith("/callback")) {
@@ -33,19 +33,7 @@ export function installNativeAuthDeepLinks() {
     } catch {
       // ignore malformed deep links
     }
-  };
-
-  // A Custom Tab can recreate the Android activity. In that case appUrlOpen
-  // may fire before the web bundle registers its listener, so recover the URL
-  // that launched the activity as well as listening for warm returns.
-  App.getLaunchUrl()
-    .then((result) => {
-      if (result?.url) return handleAuthUrl(result.url);
-      return undefined;
-    })
-    .catch(() => {});
-
-  const sub = App.addListener("appUrlOpen", ({ url }) => handleAuthUrl(url));
+  });
 
   return () => {
     sub.then((handle) => handle.remove()).catch(() => {});

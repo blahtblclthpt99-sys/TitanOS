@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
@@ -37,7 +37,7 @@ export default function MoreMenu() {
         {MORE_MENU_GROUPS.map((group) => {
           const paths = group.paths.filter(
             (path) =>
-              (!path.startsWith("/admin")) || isAdmin
+              (path !== "/admin/moderation" && path !== "/admin/fees" && path !== "/admin/tax-rules") || isAdmin
           );
           const items = filterNavItems(navItemsByPaths(paths), { isAdmin });
           if (!items.length) return null;

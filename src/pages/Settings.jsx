@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
 import { motion } from "framer-motion";
@@ -411,8 +411,8 @@ export default function Settings() {
         ) : null}
       </div>
 
-      {/* Membership upgrade */}
-      {!isPaidPlan(user) && (
+      {/* Membership / PayPal upgrade */}
+      {false && !isPaidPlan(user) && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -442,7 +442,7 @@ export default function Settings() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(!isFoundingTrialActive(user) && getPlanCheckoutUrl("starter")) && (
+            {(!isFoundingTrialActive(user)) && (
               <>
                 <Button asChild size="sm" variant="outline" className="border-border">
                   <a href={getPlanCheckoutUrl("starter")} target="_blank" rel="noopener noreferrer">
@@ -483,7 +483,7 @@ export default function Settings() {
       </Link>}
 
       {/* Plans */}
-      <Link to="/pricing">
+      {false && <Link to="/pricing">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="titan-surface p-4 mb-4 border border-primary/20 bg-titan-cyan/5 flex items-center gap-4 hover:bg-titan-cyan/10 transition-colors cursor-pointer">
           <div className="w-10 h-10 rounded-md bg-titan-cyan/20 flex items-center justify-center flex-shrink-0">
@@ -491,11 +491,11 @@ export default function Settings() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">Plans & pricing</p>
-            <p className="text-xs text-muted-foreground">Free shifts · Premium add-ons · Secure platform checkout</p>
+            <p className="text-xs text-muted-foreground">Free shifts · Premium add-ons · PayPal checkout</p>
           </div>
           <ChevronRight className="w-4 h-4 text-primary/50" />
         </motion.div>
-      </Link>
+      </Link>}
 
       <Button onClick={() => logout("/login")} variant="outline"
         className="w-full border-red-400/20 text-red-400 hover:bg-red-400/10 rounded-md h-11 gap-2 mb-3">

@@ -62,7 +62,7 @@ export function modelsForMake(make) {
 
 export function vehicleDisplayName(row = {}) {
   const make = row.make || row.brand;
-  const parts = [make, row.model].filter(Boolean);
+  const parts = [row.year, make, row.model].filter(Boolean);
   if (parts.length) return parts.join(" ");
   return row.name || "Vehicle";
 }

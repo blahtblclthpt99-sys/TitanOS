@@ -1,5 +1,12 @@
 import os
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # Loading a local .env file is a convenience, not a runtime requirement.
+    # Production supplies configuration through the process environment.
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 load_dotenv()
 

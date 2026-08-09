@@ -3,7 +3,7 @@
  * Prefer /analytics for operational KPIs; /reports for financial deep-dives.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowDownRight,
@@ -20,7 +20,6 @@ import {
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorState from "@/components/shared/ErrorState";
-import AnimatedCounter from "@/components/shared/AnimatedCounter";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -205,9 +204,8 @@ export default function Analytics() {
                 {kpi.trend && <TrendIcon direction={kpi.trend} />}
               </div>
               <p className="text-xs text-muted-foreground">{kpi.label}</p>
-              <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-                <AnimatedCounter value={kpi.value} />
-                {kpi.suffix || ""}
+              <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                {kpi.value}{kpi.suffix || ""}
               </p>
               <p className="mt-1.5 text-xs text-muted-foreground">{kpi.hint}</p>
             </button>
@@ -237,7 +235,7 @@ export default function Analytics() {
         <section className="titan-surface p-4 md:p-5">
           <h2 className="mb-3 text-sm font-semibold text-foreground">Engagement score</h2>
           <p className="mb-2 text-3xl font-bold tabular-nums text-foreground">
-            <AnimatedCounter value={snapshot.kpis.find((k) => k.id === "engagement")?.value || 0} />
+            {snapshot.kpis.find((k) => k.id === "engagement")?.value || 0}
             <span className="text-base font-medium text-muted-foreground">/100</span>
           </p>
           <Progress
@@ -313,7 +311,7 @@ export default function Analytics() {
             </div>
             <div>
               <p className="text-xl font-bold tabular-nums text-foreground">
-                <AnimatedCounter value={snapshot.notifications.unread} />
+                {snapshot.notifications.unread}
               </p>
               <p className="text-xs text-muted-foreground">
                 unread of {snapshot.notifications.total} total

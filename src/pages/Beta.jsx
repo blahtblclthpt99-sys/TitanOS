@@ -4,12 +4,13 @@ import { Rocket, Star, Zap, Shield, MessageSquare, Check, ChevronRight, Users, S
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/api/apiClient";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
+import { trackEvent } from "@/lib/productAnalytics";
 
 const BENEFITS = [
   { icon: Star,    title: "Early Access",        description: "Every new feature lands in your hands first." },
   { icon: Zap,     title: "Shape the Roadmap",   description: "Your feedback directly drives what we build next." },
-  { icon: Shield,  title: "Founder Pricing",     description: "Beta testers lock in special rates when paid plans launch." },
+  { icon: Shield,  title: "Founder Access",      description: "Beta testers help shape TitanOS before the full launch." },
   { icon: Users,   title: "Direct Founder Line", description: "Chat directly with the team building TitanOS." },
 ];
 
@@ -31,6 +32,7 @@ const FEEDBACK_TYPES = [
   { id: "bug",     label: "Bug",     icon: Bug,          color: "text-red-400",        bg: "bg-red-400/10",        border: "border-red-400/30" },
   { id: "feature", label: "Feature", icon: Lightbulb,    color: "text-titan-amber",    bg: "bg-titan-amber/10",    border: "border-titan-amber/30" },
   { id: "general", label: "General", icon: MessageSquare, color: "text-titan-cyan",    bg: "bg-titan-cyan/10",     border: "border-titan-cyan/30" },
+  { id: "success_story", label: "Success", icon: Star, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/30" },
 ];
 
 export default function Beta() {
@@ -47,6 +49,7 @@ export default function Beta() {
   const [fbSent, setFbSent]       = useState(false);
   const [fbLoading, setFbLoading] = useState(false);
   const [fbError, setFbError]     = useState("");
+  const [publishConsent, setPublishConsent] = useState(false);
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -96,6 +99,7 @@ export default function Beta() {
       email: fbEmail || undefined,
       status: "new",
       submitted_at: new Date().toISOString(),
+      publish_consent: fbType === "success_story" ? publishConsent : false,
     };
     try {
       try {
@@ -115,6 +119,9 @@ export default function Beta() {
         /* optional on static hosts */
       }
       setFbSent(true);
+      if (fbType === "success_story") {
+        trackEvent("success_story_submitted", { publish_consent: publishConsent });
+      }
     } catch {
       setFbError("Something went wrong. Please try again.");
     } finally {
@@ -297,7 +304,7 @@ export default function Beta() {
           ) : (
             <form onSubmit={handleFeedback} className="space-y-4">
               {/* Type selector */}
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {FEEDBACK_TYPES.map(t => (
                   <button type="button" key={t.id} onClick={() => setFbType(t.id)}
                     className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-all ${fbType === t.id ? `${t.bg} ${t.border} ${t.color}` : "border-border text-muted-foreground/70 hover:text-foreground"}`}>
@@ -310,12 +317,19 @@ export default function Beta() {
               {/* Message */}
               <div>
                 <label className="text-xs text-muted-foreground mb-1.5 block">
-                  {fbType === "bug" ? "What happened? How do we reproduce it?" : fbType === "feature" ? "What feature would help you most?" : "What's on your mind?"}
+                  {fbType === "bug" ? "What happened? How do we reproduce it?" : fbType === "feature" ? "What feature would help you most?" : fbType === "success_story" ? "What measurable result did TitanOS help you achieve?" : "What's on your mind?"}
                 </label>
                 <textarea value={fbMessage} onChange={e => setFbMessage(e.target.value)} required rows={4}
-                  placeholder={fbType === "bug" ? "Describe the bug and steps to reproduce..." : fbType === "feature" ? "Describe the feature you'd like to see..." : "Share thoughts, ideas, or anything..."}
+                  placeholder={fbType === "bug" ? "Describe the bug and steps to reproduce..." : fbType === "feature" ? "Describe the feature you'd like to see..." : fbType === "success_story" ? "Example: I found $___ in missed expenses or saved ___ minutes per job..." : "Share thoughts, ideas, or anything..."}
                   className="w-full bg-muted border border-border text-foreground rounded-xl p-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-titan-indigo/50 resize-none" />
               </div>
+
+              {fbType === "success_story" && (
+                <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={publishConsent} onChange={e => setPublishConsent(e.target.checked)} className="mt-0.5" />
+                  <span>TitanOS may contact me to verify this result and, only after verification, publish my words with my approval. Submitting without checking this still sends private feedback.</span>
+                </label>
+              )}
 
               {/* Optional email */}
               <div>

@@ -7,9 +7,8 @@
   "functions": {
     "api/functions/mppPaid.js": { "maxDuration": 30 },
     "api/functions/createPaymentLink.js": { "maxDuration": 30 },
-    "api/functions/createSubscriptionCheckout.js": { "maxDuration": 30 },
-    "api/functions/stripeCustomerPortal.js": { "maxDuration": 30 },
     "api/functions/stripeWebhook.js": { "maxDuration": 30 },
+    "api/functions/paypalWebhook.js": { "maxDuration": 30 },
     "api/functions/titanAI.js": { "maxDuration": 60 },
     "api/functions/aiExecuteAction.js": { "maxDuration": 30 },
     "api/functions/receiptVisionOcr.js": { "maxDuration": 60 },

@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { TrendingUp, Users, Briefcase, Receipt, DollarSign, ArrowDownRight } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Check,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import PageHeader from "@/components/shared/PageHeader";
+import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import PageLoader from "@/components/shared/PageLoader";
 import EmptyState from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/AuthContext";
@@ -386,7 +387,7 @@ export default function Messages() {
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
           <PageHeader
             title="Messages"
-            subtitle="Private conversations with your customers and team"
+            subtitle="Real chats when contacts exist — a sample inbox may appear for preview"
           />
           <div className="flex flex-wrap gap-2 shrink-0">
             {pushPerm !== "granted" && pushPerm !== "unsupported" && (
@@ -399,6 +400,11 @@ export default function Messages() {
             </Button>
           </div>
         </div>
+
+        <FeatureHonestyBanner tone="info">
+          If you see Titan Support or other starter threads, those are demo conversations seeded for
+          preview. New chats you start with real users are stored for your account.
+        </FeatureHonestyBanner>
 
         {composerSearch && (
           <div className="mb-4 titan-surface border border-border p-4">

@@ -156,11 +156,11 @@ export default function Marketplace() {
         ) : (
           <PremiumGate
             title="Marketplace Apps"
-            description="Unlock all modules for $0.99, or with Pro / Business. Service listings stay available on Free."
+            description="This module collection is not enabled in the current workspace."
           />
         )
       ) : <>
-        <div className="titan-surface mb-5 p-4 border border-primary/20 flex items-center justify-between gap-4"><div><p className="font-semibold text-foreground">Service listings</p><p className="text-xs text-muted-foreground mt-1">Post, browse, and message locally. Apps modules are a Premium unlock.</p></div><span className="text-xs font-medium text-primary">{isMarketplaceFree(user) ? "Listings free" : ""}</span></div>
+        <div className="titan-surface mb-5 p-4 border border-primary/20 flex items-center justify-between gap-4"><div><p className="font-semibold text-foreground">Service listings</p><p className="text-xs text-muted-foreground mt-1">Post, browse, and message locally. Workspace apps are available from the Apps tab.</p></div><span className="text-xs font-medium text-primary">{isMarketplaceFree(user) ? "Available" : ""}</span></div>
         <div className="titan-surface p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"><div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" /><Input value={filters.search} onChange={e => updateFilter("search", e.target.value)} placeholder="Search services" className={`${fieldClass} pl-9`} /></div><select value={filters.category} onChange={e => updateFilter("category", e.target.value)} className={fieldClass}><option value="All">All categories</option>{SERVICE_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select><select value={filters.state} onChange={e => updateFilter("state", e.target.value)} className={fieldClass}><option value="">All states</option>{US_STATES.map(value => <option key={value}>{value}</option>)}</select><Input value={filters.city} onChange={e => updateFilter("city", e.target.value)} placeholder="City" className={fieldClass} /></div>
         {loading ? (
           <PageLoader variant="list" label="Loading listings" />

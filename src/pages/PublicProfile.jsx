@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router-dom";
 import {
   Award,
   Briefcase,
@@ -84,6 +84,12 @@ export default function PublicProfile() {
           <Button asChild className="mt-5 rounded-xl">
             <Link to="/">Go home</Link>
           </Button>
+          <p className="text-xs text-muted-foreground mt-4">
+            Try the demo:{" "}
+            <Link to="/u/titan-demo" className="text-titan-cyan hover:underline">
+              /u/titan-demo
+            </Link>
+          </p>
         </div>
       </main>
     );

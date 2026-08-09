@@ -91,7 +91,7 @@ export default function ReferralProgram() {
   if (!user?.id) {
     return (
       <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
-        <PageHeader title="Referral Program" subtitle="Invite your network. Unlock premium for life." />
+        <PageHeader title="Referral Program" subtitle="Invite your network and grow the TitanOS community." />
         <EmptyState
           title="Sign in to view referrals"
           description="Your referral link and invite history require an account."
@@ -107,7 +107,7 @@ export default function ReferralProgram() {
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
       <PageHeader
         title="Referral Program"
-        subtitle="Invite your network. Unlock premium for life. Email invites need a configured mail provider."
+        subtitle="Invite your network and grow the TitanOS community. Email invites need a configured mail provider."
       />
 
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="titan-surface p-6 mb-5 border border-titan-cyan/20 bg-titan-cyan/5">
@@ -118,7 +118,7 @@ export default function ReferralProgram() {
               <h2 className="text-lg font-bold text-foreground">Earn {REFERRAL_REWARD.label}</h2>
               {betaBadgeLabel(user) && <span className="text-[10px] font-semibold text-titan-cyan bg-titan-cyan/10 rounded-full px-2 py-0.5">{betaBadgeLabel(user)}</span>}
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">Founding 100 get the app free (fees still apply). After paid launch, 3 verified paying subscribers unlock Lifetime TitanOS Premium.</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">Invite verified users and help build the founding TitanOS community.</p>
           </div>
         </div>
       </motion.section>
@@ -127,7 +127,7 @@ export default function ReferralProgram() {
         <div className="flex justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-foreground">{stats.progressLabel}</p>
-            <p className="text-xs text-muted-foreground mt-1">{stats.rewardUnlocked ? "Lifetime Premium unlocked!" : `${stats.required - stats.completedPaying} more verified subscriber${stats.required - stats.completedPaying === 1 ? "" : "s"} to go`}</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats.rewardUnlocked ? "Founder milestone unlocked!" : `${stats.required - stats.completedPaying} more verified member${stats.required - stats.completedPaying === 1 ? "" : "s"} to go`}</p>
           </div>
           <span className="text-titan-cyan font-bold">{stats.completedPaying}/{stats.required}</span>
         </div>

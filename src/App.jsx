@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router";
+import { BrowserRouter, HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import React, { Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
@@ -26,6 +26,9 @@ const Pricing = lazy(() => import("@/pages/Pricing"));
 const Beta = lazy(() => import("@/pages/Beta"));
 const Download = lazy(() => import("@/pages/Download"));
 const FeatureDetail = lazy(() => import("@/pages/FeatureDetail"));
+const FreeTools = lazy(() => import("@/pages/FreeTools"));
+const IndustryLanding = lazy(() => import("@/pages/IndustryLanding"));
+const DriverBeta = lazy(() => import("@/pages/DriverBeta"));
 const ThankYou = lazy(() => import("@/pages/ThankYou"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
@@ -39,7 +42,9 @@ const ShareReport = lazy(() => import("@/pages/ShareReport"));
 const PUBLIC_EXACT = new Set([
   "/pricing",
   "/download",
+  "/free-tools",
   "/beta",
+  "/driver-beta",
   "/thank-you",
   "/privacy-policy",
   "/privacy",
@@ -57,6 +62,7 @@ function isPublicPath(pathname) {
   const p = normalizeAppPath(pathname);
   if (PUBLIC_EXACT.has(p)) return true;
   if (p.startsWith("/features/")) return true;
+  if (p.startsWith("/industries/")) return true;
   if (p.startsWith("/book/")) return true;
   if (p.startsWith("/u/")) return true;
   if (p.startsWith("/sign/")) return true;
@@ -73,7 +79,10 @@ function PublicRoutes() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/download" element={<Download />} />
           <Route path="/features/:slug" element={<FeatureDetail />} />
+          <Route path="/free-tools" element={<FreeTools />} />
+          <Route path="/industries/:slug" element={<IndustryLanding />} />
           <Route path="/beta" element={<Beta />} />
+          <Route path="/driver-beta" element={<DriverBeta />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -139,7 +148,8 @@ function AppShellGate() {
   const wantsAppShell =
     (isAuthenticated && !publicPath) ||
     (isAuthenticated && isHome) ||
-    (cachedSession && (isHome || !publicPath));
+    (cachedSession && (isHome || !publicPath)) ||
+    nativeRoot;
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {

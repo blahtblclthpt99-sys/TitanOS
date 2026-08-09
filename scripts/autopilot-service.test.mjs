@@ -24,20 +24,3 @@ test("Autopilot recipient storage is owner-scoped through the existing queue", a
   assert.match(migration, /ADD COLUMN IF NOT EXISTS customer_email TEXT/);
   assert.match(migration, /created_by_id, status, scheduled_for/);
 });
-
-test("Membership sprint enforces paid entitlement, ownership, and monthly replay protection", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  const migration = await read("supabase/migrations/042_autopilot_membership_claims.sql");
-  assert.match(source, /paying_subscriber === true/);
-  assert.match(source, /eq\("created_by_id", auth\.user\.id\)/);
-  assert.match(source, /claimError\?\.code === "23505"/);
-  assert.match(migration, /UNIQUE \(user_id, period_key\)/);
-  assert.match(migration, /REVOKE ALL .* FROM anon, authenticated/);
-});
-
-test("Membership sprint prepares an auditable queue when email delivery is unavailable", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  assert.match(source, /prepared \+= 1/);
-  assert.match(source, /if \(!resendKey\) continue/);
-  assert.match(source, /delivery_mode: resendKey \? "email" : "review_queue"/);
-});

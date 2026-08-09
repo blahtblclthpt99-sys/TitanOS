@@ -11,7 +11,6 @@ import {
   BarChart3,
   LineChart,
   Settings,
-  Store,
   ClipboardList,
   Shield,
   UserPlus,
@@ -58,7 +57,6 @@ export const APP_NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Command Center", path: "/", group: "live" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "live" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "live" },
-  { icon: Store, label: "Marketplace", path: "/marketplace", group: "live" },
   { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "live" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "live" },
 
@@ -109,7 +107,6 @@ export const APP_NAV_ITEMS = [
 
   // —— Administration
   { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "administration", adminOnly: true },
-  { icon: Shield, label: "Control Center", path: "/admin", group: "administration", adminOnly: true },
   { icon: Percent, label: "Fee management", path: "/admin/fees", group: "administration", adminOnly: true },
   { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
 
@@ -164,7 +161,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Live",
     description: "What is happening now",
-    paths: ["/driver", "/", "/jobs", "/schedule", "/marketplace", "/hire", "/booking"],
+    paths: ["/driver", "/", "/jobs", "/schedule", "/hire", "/booking"],
   },
   {
     title: "History",
@@ -210,7 +207,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Administration",
     description: "Platform controls",
-    paths: ["/admin", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
+    paths: ["/admin/moderation", "/admin/fees", "/admin/tax-rules"],
   },
   {
     title: "Labs",
@@ -262,7 +259,6 @@ export function resolvePageTitle(pathname = "/") {
   if (path.startsWith("/invoices/") && path !== "/invoices") return "Invoice";
   if (path.startsWith("/features/")) return "Feature";
   if (path.startsWith("/admin/moderation")) return "Moderation";
-  if (path === "/admin") return "Control Center";
   if (path.startsWith("/admin/fees")) return "Fee management";
   if (path.startsWith("/admin/tax-rules")) return "Tax Rules";
   if (path.startsWith("/book/")) return "Booking";

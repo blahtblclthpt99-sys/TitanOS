@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import {
   Car,
   Fuel,
@@ -18,8 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import HotspotMap from "@/components/driver/HotspotMap";
 import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
-import SetForgetOfferPanel from "@/components/driver/activity/SetForgetOfferPanel";
 import DriverVoiceCoach from "@/components/driver/activity/DriverVoiceCoach";
+import OfferAnalyzerPanel from "@/components/driver/activity/OfferAnalyzerPanel";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -66,6 +66,7 @@ import {
   summarizeRecordedShifts,
 } from "@/lib/driverHubApi";
 import { vehicleLabel } from "@/lib/vehicleCatalog";
+import { loadLocalWeather } from "@/lib/weatherApi";
 
 const CURRENCIES = ["USD", "CAD", "MXN", "EUR", "GBP", "AUD", "JPY", "BRL"];
 
@@ -88,8 +89,9 @@ export default function DriverShiftPanel() {
   const [toggleError, setToggleError] = useState("");
   const [gpsError, setGpsError] = useState("");
   const [reviewSessionId, setReviewSessionId] = useState(null);
+  const [weather, setWeather] = useState(null);
 
-  const mode = prefs.mode === "riding" ? "riding" : "driving";
+  const mode = "driving";
   const requestingRide = Boolean(prefs.requestingRide);
   const drivingActive = Boolean(session?.active);
   const sessionPaused = Boolean(session?.paused);
@@ -105,6 +107,12 @@ export default function DriverShiftPanel() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    loadLocalWeather(user).then((next) => active && setWeather(next)).catch(() => {});
+    return () => { active = false; };
+  }, [user]);
 
   // Live session/telemetry from KeepAlive (survives refresh + other tabs/pages)
   useEffect(() => {
@@ -550,13 +558,13 @@ export default function DriverShiftPanel() {
 
   return (
     <div className="space-y-5">
-      <FeatureHonestyBanner>
+      {false && <FeatureHonestyBanner>
         Work sessions auto-track GPS miles and stops while Driving is ON (after you allow
         location). Hotspot pins are planning suggestions — not live third-party demand. Tax
         mileage sync is for recordkeeping only, not tax advice.
-      </FeatureHonestyBanner>
+      </FeatureHonestyBanner>}
 
-      <div className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+      {false && <div className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Location & privacy</p>
         <p className="text-xs text-muted-foreground leading-relaxed">
           TitanOS collects GPS only during an active work session when Auto GPS is on. We do not
@@ -581,7 +589,18 @@ export default function DriverShiftPanel() {
           />
           <span>Auto GPS miles & stop detection (recommended for hauling / delivery)</span>
         </label>
-      </div>
+      </div>}
+
+      {weather && !weather.unavailable ? (
+        <section className="rounded-xl border border-border bg-card/70 px-4 py-3" aria-label="Weather">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Weather now</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
+            {weather.temp}° · {weather.label}
+          </p>
+          <p className="text-xs text-muted-foreground">{weather.place || "Near you"} · Wind {weather.wind} mph</p>
+          {weather.warning ? <p className="mt-1 text-xs text-titan-amber">{weather.warning}</p> : null}
+        </section>
+      ) : null}
 
       {/* Coach tip */}
       <div className="rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-card to-card px-4 py-3 flex gap-3 items-start">
@@ -603,7 +622,7 @@ export default function DriverShiftPanel() {
       ) : null}
 
       {/* Mode: Requesting a ride vs Driving */}
-      <section className="titan-surface p-4 border border-border">
+      {false && <section className="titan-surface p-4 border border-border">
         <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Mode</p>
         <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted border border-border">
           <button
@@ -631,7 +650,7 @@ export default function DriverShiftPanel() {
             <Car className="w-4 h-4" /> Driving
           </button>
         </div>
-      </section>
+      </section>}
 
       {/* Active session toggles */}
       <section className="titan-surface p-5 border border-border">
@@ -728,19 +747,21 @@ export default function DriverShiftPanel() {
               </ErrorBoundary>
             )}
 
-            <ErrorBoundary message="Offer autopilot couldn't load.">
-              <SetForgetOfferPanel
+            <ErrorBoundary message="Money Coach couldn't load.">
+              <OfferAnalyzerPanel
                 userId={user?.id}
                 mpg={Number(prefs.mpg) || 22}
                 gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
                 defaultZip={prefs.zip || ""}
                 history={history}
-                drivingActive={drivingActive}
-                voiceSeed={voiceSeed}
               />
             </ErrorBoundary>
 
-            <ErrorBoundary message="Voice coach couldn't load.">
+            <Button asChild variant="outline" className="mt-3 w-full border-border">
+              <Link to="/receipts">Scan a receipt for Money Coach</Link>
+            </Button>
+
+            {false && <ErrorBoundary message="Voice coach couldn't load.">
               <DriverVoiceCoach
                 userId={user?.id}
                 mpg={Number(prefs.mpg) || mpg || 22}
@@ -760,7 +781,7 @@ export default function DriverShiftPanel() {
                 onResume={handleResumeSession}
                 onDecision={(decision, input) => setVoiceSeed({ decision, input, at: Date.now() })}
               />
-            </ErrorBoundary>
+            </ErrorBoundary>}
 
             {drivingActive && gpsError && (
               <p className="mt-2 text-xs text-titan-amber" role="status">
@@ -768,7 +789,7 @@ export default function DriverShiftPanel() {
               </p>
             )}
 
-            {drivingActive && (
+            {false && drivingActive && (
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="driver-hub-miles" className="text-xs text-muted-foreground">
@@ -885,7 +906,7 @@ export default function DriverShiftPanel() {
           </div>
         )}
 
-        <div className="grid sm:grid-cols-3 gap-2 mb-3">
+        {false && <div className="grid sm:grid-cols-3 gap-2 mb-3">
           <Input
             placeholder="City (Driver Location)"
             value={prefs.city || ""}
@@ -912,11 +933,11 @@ export default function DriverShiftPanel() {
               </option>
             ))}
           </select>
-        </div>
-        <p className="mb-3 text-[11px] text-muted-foreground">
+        </div>}
+        {false && <p className="mb-3 text-[11px] text-muted-foreground">
           These fields are your Driver Location (maps & weather). They do not set sales tax — Job
           Location on estimates does.
-        </p>
+        </p>}
 
         <HotspotMap
           centerLat={mapLat}
@@ -930,10 +951,10 @@ export default function DriverShiftPanel() {
           onFocus={setFocusId}
         />
 
-        <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+        {false && <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
           All zones · timed tips
-        </p>
-        <ul className="grid sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
+        </p>}
+        {false && <ul className="grid sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {hotspots.map((h) => (
             <li key={h.id}>
               <button
@@ -964,11 +985,11 @@ export default function DriverShiftPanel() {
               </button>
             </li>
           ))}
-        </ul>
+        </ul>}
       </section>
 
       {/* Fleet + fuel — driving only */}
-      {mode === "driving" && (
+      {false && mode === "driving" && (
         <section className="titan-surface p-5 border border-border">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -1037,7 +1058,7 @@ export default function DriverShiftPanel() {
         </section>
       )}
 
-      {mode === "driving" && session && (
+      {false && mode === "driving" && session && (
         <section className="titan-surface p-5 border border-border">
           <ErrorBoundary message="Time between stops couldn't load. Other shift tools still work.">
             <BetweenStopsPanel
@@ -1068,13 +1089,13 @@ export default function DriverShiftPanel() {
         </section>
       )}
 
-      {mode === "driving" && (
+      {false && mode === "driving" && (
         <ErrorBoundary message="Driver statistics couldn't load. Try refresh.">
           <ActivityStatsPanel history={history} liveSession={drivingActive ? session : null} stops={stops} />
         </ErrorBoundary>
       )}
 
-      {mode === "driving" && (
+      {false && mode === "driving" && (
         <section className="titan-surface p-5 border border-border" aria-label="Recorded driver totals">
           {history.length > 0 ? (
             <div className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -1264,7 +1285,7 @@ export default function DriverShiftPanel() {
       )}
 
       {/* Emergency — last so driving tools stay uninterrupted */}
-      <section className="titan-surface p-5 border border-red-500/30 bg-red-500/5">
+      {false && <section className="titan-surface p-5 border border-red-500/30 bg-red-500/5">
         <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
           <Siren className="w-4 h-4 text-red-400" /> Emergency
         </h2>
@@ -1277,7 +1298,7 @@ export default function DriverShiftPanel() {
         >
           <Phone className="w-4 h-4" /> Call emergency (911)
         </a>
-      </section>
+      </section>}
     </div>
   );
 }

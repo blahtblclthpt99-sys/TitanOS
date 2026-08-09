@@ -30,16 +30,14 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { DashboardSkeleton } from "@/components/shared/SkeletonLoader";
 import ErrorState from "@/components/shared/ErrorState";
 import PageShell from "@/components/shared/PageShell";
-import AnimatedCounter from "@/components/shared/AnimatedCounter";
 import PullToRefreshIndicator from "@/components/shared/PullToRefreshIndicator";
 import LiveActivityCard from "@/components/dashboard/LiveActivityCard";
-import HomeAdClips from "@/components/dashboard/HomeAdClips";
 import OverviewTodayCard from "@/components/dashboard/OverviewTodayCard";
 import BusinessTimeline from "@/components/timeline/BusinessTimeline";
 import TitanVerifiedBadge from "@/components/shared/TitanVerifiedBadge";
@@ -437,7 +435,7 @@ export default function Dashboard({ isActive = true }) {
         linkLabel="Full analytics"
         {...shellProps}
       >
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
               label: "Today's schedule",
@@ -479,21 +477,16 @@ export default function Dashboard({ isActive = true }) {
               key={kpi.label}
               type="button"
               onClick={() => navigate(kpi.path)}
-              className="min-h-[100px] rounded-lg border border-border bg-muted/30 p-3.5 text-left transition-colors hover:bg-muted/60 focus-ring"
+              className="group relative min-h-[118px] overflow-hidden rounded-xl border border-border/80 bg-gradient-to-br from-card to-muted/35 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft focus-ring"
             >
+              <span className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-primary transition-transform group-hover:scale-x-100" aria-hidden="true" />
               <div className="mb-2 flex items-center justify-between">
                 <kpi.icon className="h-4 w-4 text-primary" aria-hidden="true" />
                 <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               </div>
               <p className="mb-1 text-xs text-muted-foreground">{kpi.label}</p>
-              <p className="text-2xl font-bold tracking-tight text-foreground">
-                {kpi.currency ? (
-                  <AnimatedCounter value={kpi.value} format={(n) => formatCurrency(n)} />
-                ) : kpi.numeric ? (
-                  <AnimatedCounter value={kpi.value} />
-                ) : (
-                  kpi.value
-                )}
+              <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                {kpi.currency ? formatCurrency(kpi.value) : kpi.value}
               </p>
               <p className="mt-1.5 text-xs text-muted-foreground">{kpi.sub}</p>
             </button>
@@ -1113,7 +1106,8 @@ export default function Dashboard({ isActive = true }) {
         </div>
       ) : null}
 
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <header className="relative mb-5 flex flex-wrap items-start justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-soft md:p-6">
+        <span className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
         <div className="min-w-0">
           <p className="mb-1 text-caption font-bold uppercase tracking-widest text-primary">
             Command Center · {todayLabel}
@@ -1121,8 +1115,8 @@ export default function Dashboard({ isActive = true }) {
           <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
             {greeting}, {name}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-            Your personalized cockpit — analytics, alerts, favorites, and next steps in one place.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Live work, exceptions, and next actions in one operational view.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <TitanScoreBadge score={health.score} grade={health.grade} size="md" />
@@ -1154,7 +1148,7 @@ export default function Dashboard({ isActive = true }) {
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex flex-wrap items-center gap-2">
           {customize ? (
             <Button variant="outline" size="sm" className="min-h-[44px]" onClick={handleResetLayout}>
               <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -1231,9 +1225,7 @@ export default function Dashboard({ isActive = true }) {
         </div>
       )}
 
-      <HomeAdClips isActive={isActive} />
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {visibleWidgets.map((id) => (
           <div
             key={id}

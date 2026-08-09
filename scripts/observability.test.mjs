@@ -41,6 +41,7 @@ beforeEach(() => {
 describe("product analytics", () => {
   it("allowlists known events only", () => {
     assert.ok(ALLOWED_ANALYTICS_EVENTS.includes("session_start"));
+    assert.ok(ALLOWED_ANALYTICS_EVENTS.includes("cta_clicked"));
     assert.equal(trackEvent("not_a_real_event"), false);
     assert.equal(trackEvent("session_start", { email: "x@y.com", plan: "free" }), true);
     const buf = peekAnalyticsBuffer();

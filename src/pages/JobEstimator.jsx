@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { Calculator, FilePlus2, Loader2, Receipt, Save, Sparkles } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";

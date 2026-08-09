@@ -20,34 +20,34 @@ export { FOUNDING_USER_CAP, isBetaActive, isMembershipCheckoutLive };
 
 /** True while founding enrollment spots remain (not “everyone free”). */
 export function isFreeDuringBeta() {
-  return isBetaActive();
+  return FREE_LAUNCH || isBetaActive();
 }
 
 /** @deprecated Prefer isFoundingEnrollmentOpen / isFoundingTrialActive */
-export const FREE_DURING_BETA = false;
+export const FREE_DURING_BETA = true;
 /** @deprecated */
-export const FREE_LAUNCH = false;
+export const FREE_LAUNCH = true;
 
 export const BETA_PERK_LABEL = "Founding 100 · first month free";
 export const FOUNDING_TRIAL_DAYS = 30;
 
 /**
- * Website membership checkout is created server-side with Stripe.
- * Trusted prices and Stripe secrets must never be placed in the browser bundle.
+ * Live PayPal No-Code Payment links (NCP button amounts must match).
+ * Legacy $29.99 / $49.99 membership amounts still map in paypal.js for in-flight payments.
  */
-export const STRIPE_CHECKOUT = Object.freeze({
+export const PAYPAL_CHECKOUT = Object.freeze({
   /** Starter — $4.99/mo */
-  starter: null,
+  starter: "https://www.paypal.com/ncp/payment/TK7HZNKJWAKUL",
   /** Pro — $9.99/mo */
-  worker_premium: null,
+  worker_premium: "https://www.paypal.com/ncp/payment/Q63SUKNY5AK58",
   /** Business — $19.99/mo */
-  business: null,
+  business: "https://www.paypal.com/ncp/payment/5V47YYFZVCNZ4",
   /** Marketplace Modules pack — $0.99 unlocks all catalog modules */
-  modules: null,
+  modules: "https://www.paypal.com/ncp/payment/USR42PN73VD9N",
 });
 
 /** Marketplace module pack price (all modules). Also included with Pro/Business. */
-export const MARKETPLACE_MODULE_PRICE = 0.99;
+export const PAYPAL_MODULE_PRICE = 0.99;
 
 export const PLANS = Object.freeze({
   customer: Object.freeze({
@@ -104,7 +104,7 @@ export const PLANS = Object.freeze({
     searchPriority: false,
     storageLabel: "Basic photo & document storage",
     blurb: "$4.99/mo — dashboard, schedule, estimates, invoices, Driver Hub Lite, messaging.",
-    checkoutUrl: STRIPE_CHECKOUT.starter,
+    checkoutUrl: PAYPAL_CHECKOUT.starter,
     mostPopular: false,
   }),
   worker_premium: Object.freeze({
@@ -123,7 +123,7 @@ export const PLANS = Object.freeze({
     searchPriority: true,
     storageLabel: "Expanded photo & document storage",
     blurb: "$9.99/mo — full Driver Hub, AI, Tax Center, Marketplace Apps, Titan Radio persist.",
-    checkoutUrl: STRIPE_CHECKOUT.worker_premium,
+    checkoutUrl: PAYPAL_CHECKOUT.worker_premium,
     mostPopular: true,
   }),
   business: Object.freeze({
@@ -142,7 +142,7 @@ export const PLANS = Object.freeze({
     searchPriority: true,
     storageLabel: "Priority photo & document storage",
     blurb: "$19.99/mo — everything in Pro plus teams, fleet, shared files, admin controls.",
-    checkoutUrl: STRIPE_CHECKOUT.business,
+    checkoutUrl: PAYPAL_CHECKOUT.business,
     mostPopular: false,
   }),
 });
@@ -350,14 +350,14 @@ export function canUseDriverAddons(_user) {
 }
 
 export function canUseMarketplaceApps(user) {
+  if (isFreeDuringBeta()) return true;
   if (user?.marketplace_pack_unlocked === true) return true;
   return canAccessFeature(user, PRO_FEATURES.marketplaceApps);
 }
 
-/** Website checkout URL for the all-modules pack, when configured. */
+/** PayPal NCP URL for the $0.99 all-modules pack. */
 export function getModulesCheckoutUrl() {
-  if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) return null;
-  return STRIPE_CHECKOUT.modules || null;
+  return PAYPAL_CHECKOUT.modules || null;
 }
 
 export function canPersistTitanComChannels(user) {
@@ -369,6 +369,7 @@ export function isMarketplaceFree(_user) {
 }
 
 export function betaBadgeLabel(user) {
+  if (isFreeDuringBeta()) return "Free during beta";
   if (isFoundingUser(user)) {
     const n = user.founding_number;
     const prefix = n != null && n !== "" ? `Founding #${n}` : "Founding 100";
@@ -416,14 +417,12 @@ export function assertWithinFreeLimit(user, kind, currentCount) {
   }
 }
 
-/** Website checkout URL for a plan id. Android uses Google Play Billing instead. */
+/** PayPal checkout URL for a plan id. Always live — founders use trial then locked price. */
 export function getPlanCheckoutUrl(planId) {
-  // Google Play policy: Android digital subscriptions must use Play Billing.
-  if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) return null;
   if (!isMembershipCheckoutLive() && !isFreeDuringBeta()) {
     // enrollment closed and payments flagged off
   }
   const id = PLAN_ALIASES[planId] || planId;
   if (id === "modules" || id === "marketplace_modules") return getModulesCheckoutUrl();
-  return PLANS[id]?.checkoutUrl || STRIPE_CHECKOUT[id] || null;
+  return PLANS[id]?.checkoutUrl || PAYPAL_CHECKOUT[id] || null;
 }

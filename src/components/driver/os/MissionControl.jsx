@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import {
   Activity,
   Battery,
   ChevronDown,
   ChevronRight,
-  Gauge,
   MapPin,
   Radio,
   Signal,
@@ -178,7 +177,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
       <p className="text-xs text-muted-foreground -mt-1">{intent.nextHint}</p>
 
       {/* Essential metrics only */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <McCard icon={Activity} label="Stage" value={snap.stage} sub={snap.workflowPhaseLabel} accent="amber" />
         <McCard
           icon={Wallet}
@@ -193,13 +192,6 @@ export default function MissionControl({ userId, onOpenFolder }) {
           value={snap.shiftTimeLabel}
           sub={snap.active ? `Idle ${snap.idleLabel}` : undefined}
           accent="cyan"
-        />
-        <McCard
-          icon={Gauge}
-          label="Miles"
-          value={`${Number(snap.miles || 0).toFixed(1)} mi`}
-          sub={`${Number(snap.speedMph || 0)} mph`}
-          accent="slate"
         />
       </div>
 

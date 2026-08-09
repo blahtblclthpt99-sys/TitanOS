@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { readPrefs, savePrefs } from "@/lib/driverHubApi";
 import { toast } from "@/components/ui/use-toast";
+import DriverLocationPanel from "@/components/driver/DriverLocationPanel";
 
 export default function SettingsFolder({ user }) {
   const initial = useMemo(() => (user?.id ? readPrefs(user.id) : {}), [user?.id]);
@@ -18,6 +19,7 @@ export default function SettingsFolder({ user }) {
 
   return (
     <div className="space-y-4">
+      <DriverLocationPanel />
       <label className="block space-y-1">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ZIP / market</span>
         <input

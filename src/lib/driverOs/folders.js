@@ -23,8 +23,8 @@ export const DRIVER_OS_FOLDERS = Object.freeze([
   },
   {
     id: "doordash",
-    label: "Deliveries",
-    description: "Platform-neutral delivery stages",
+    label: "DoorDash Workflow",
+    description: "Guided delivery stages",
     premium: false,
     icon: "package",
     group: "live",
@@ -72,7 +72,7 @@ export const DRIVER_OS_FOLDERS = Object.freeze([
   {
     id: "platforms",
     label: "Platform Statistics",
-    description: "Delivery and rideshare platforms",
+    description: "DoorDash, Uber, Lyft, and more",
     premium: false,
     icon: "layers",
     group: "analytics",
@@ -169,7 +169,7 @@ export function foldersByGroup(groupId) {
 
 /** Modular platform registry for Platform Statistics folders. */
 export const PLATFORMS = Object.freeze([
-  { id: "doordash", label: "Deliveries" },
+  { id: "doordash", label: "DoorDash" },
   { id: "uber_eats", label: "Uber Eats" },
   { id: "uber", label: "Uber Driver" },
   { id: "lyft", label: "Lyft" },

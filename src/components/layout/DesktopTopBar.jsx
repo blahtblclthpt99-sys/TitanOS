@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Clock, Command, Plus, Search, Sparkles } from "lucide-react";
 import NotificationCenter from "@/components/layout/NotificationCenter";
@@ -110,12 +110,12 @@ export default function DesktopTopBar() {
 
   return (
     <header
-      className="sticky top-0 z-30 hidden h-14 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-xl md:flex"
+      className="sticky top-0 z-30 hidden h-[calc(env(safe-area-inset-top)+3.5rem)] items-center gap-3 border-b border-border bg-background/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:flex"
       style={{
         position: "fixed",
         top: 0,
         right: 0,
-        left: "var(--sidebar-width, 72px)",
+        left: "calc(var(--sidebar-width, 72px) + env(safe-area-inset-left))",
       }}
       role="banner"
     >

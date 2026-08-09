@@ -2,7 +2,6 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import packageJson from './package.json' with { type: 'json' };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,7 +15,6 @@ export default defineConfig(() => {
       "import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA": JSON.stringify(
         process.env.VERCEL_GIT_COMMIT_SHA || ""
       ),
-      "import.meta.env.VITE_APP_VERSION": JSON.stringify(packageJson.version),
     },
     resolve: {
       alias: {

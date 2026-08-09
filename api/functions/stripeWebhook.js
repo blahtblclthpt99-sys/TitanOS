@@ -3,7 +3,6 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { syncStripeSubscription } from "../_lib/stripeSubscriptions.js";
 
 /**
  * Stripe webhook — only trusted path to mark payments/invoices paid.
@@ -198,22 +197,7 @@ export default async function handler(req, res) {
     const expectedPlatformFee =
       session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
-    if (event.type === "checkout.session.completed" && session.mode === "subscription") {
-      const stripe = new (await import("stripe")).default(stripeKey);
-      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-      if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-          expand: ["items.data.price"],
-        });
-        await syncStripeSubscription(admin, subscription);
-      }
-    } else if (
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated" ||
-      event.type === "customer.subscription.deleted"
-    ) {
-      await syncStripeSubscription(admin, session);
-    } else if (event.type === "checkout.session.completed") {
+    if (event.type === "checkout.session.completed") {
       if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
         return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
       }

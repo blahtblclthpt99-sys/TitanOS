@@ -12,7 +12,7 @@ import {
   Plus,
   Mic,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAuth } from "@/lib/AuthContext";
 import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";

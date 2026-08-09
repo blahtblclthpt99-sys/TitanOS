@@ -7,6 +7,7 @@ import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.j
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 import { isOwnerEmail } from "../../shared/entitlements.js";
+import { completionText, createChatCompletion } from "../_lib/openai.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -834,13 +835,9 @@ export default async function handler(req, res) {
       lawMastermind: Boolean(lawMastermind),
     });
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const response = await createChatCompletion(
+      openAiKey,
+      {
         model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: 0.3,
         max_tokens: 450,
@@ -851,12 +848,12 @@ export default async function handler(req, res) {
           },
           ...recent,
         ],
-      }),
-    });
+      },
+      { route: "titanAI:openai" }
+    );
 
     if (!response.ok) {
-      const errText = await response.text();
-      logError("titanAI:openai", errText.slice(0, 500));
+      logError("titanAI:openai", `provider returned ${response.status}`);
       return res.status(200).json({
         data: {
           type: "response",
@@ -870,8 +867,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const completion = await response.json();
-    const content = completion.choices?.[0]?.message?.content || "No response.";
+    const content = completionText(response.json) || "No response.";
 
     return res.status(200).json({
       data: {

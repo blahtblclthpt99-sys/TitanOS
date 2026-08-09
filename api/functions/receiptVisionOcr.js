@@ -4,6 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimit } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
+import { completionText, createChatCompletion } from "../_lib/openai.js";
 
 /**
  * Vision OCR for receipts. Uses OpenAI when OPENAI_API_KEY is set;
@@ -32,17 +33,16 @@ export default async function handler(req, res) {
     if (String(imageBase64).length > 6_000_000) {
       return res.status(400).json({ error: "Image too large" });
     }
+    if (!/^image\/(jpeg|jpg|png|webp|gif)$/i.test(String(mimeType))) {
+      return res.status(400).json({ error: "Unsupported image type" });
+    }
 
     const openAiKey = process.env.OPENAI_API_KEY;
     if (openAiKey) {
       const dataUrl = `data:${mimeType};base64,${String(imageBase64).replace(/^data:[^;]+;base64,/, "")}`;
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openAiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await createChatCompletion(
+        openAiKey,
+        {
           model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
           messages: [
             {
@@ -57,14 +57,14 @@ export default async function handler(req, res) {
             },
           ],
           max_tokens: 800,
-        }),
-      });
-      const json = await response.json();
+        },
+        { timeoutMs: 30_000, route: "receiptVisionOcr:openai" }
+      );
       if (!response.ok) {
-        logError("receiptVisionOcr:openai", json);
+        logError("receiptVisionOcr:openai", `provider returned ${response.status}`);
         return res.status(502).json({ error: "Vision OCR failed" });
       }
-      const text = json.choices?.[0]?.message?.content || "";
+      const text = completionText(response.json);
       return res.status(200).json({ text, source: "openai_vision" });
     }
 

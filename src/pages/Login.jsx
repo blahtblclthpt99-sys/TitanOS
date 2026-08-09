@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

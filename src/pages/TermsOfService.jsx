@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, FileText } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
 const EFFECTIVE_DATE = "July 13, 2026";
@@ -29,8 +29,8 @@ const SECTIONS = [
     body: `You retain ownership of the driver and operational data you enter into TitanOS (shifts, miles, expenses, and similar records). You grant us a limited license to host, process, and display that data solely to operate and improve the Service. See our Privacy Policy for how we handle personal information.`,
   },
   {
-    title: "Payments & Billing",
-    body: `Paid membership plans or payment processing (including Stripe) are subject to the pricing shown in the product and any third-party processor terms. The marketplace for browsing, posting, and messaging is free. You are responsible for applicable taxes. New users may start with a 3-day free trial. After the trial, the core plan continues at $4.99/month unless you cancel. If you use TitanOS correctly and still do not see a clear profit improvement during that period, you may request a refund or account credit subject to our review and applicable law. Refunds, if any, are handled according to our published billing policy or as required by law.`,
+    title: "Transactions",
+    body: `When you use an integrated processor to collect customer transactions, that processor's terms and privacy practices apply. You are responsible for reviewing transaction details before confirmation and for applicable taxes.`,
   },
   {
     title: "Third-Party Services",
@@ -42,7 +42,7 @@ const SECTIONS = [
   },
   {
     title: "Limitation of Liability",
-    body: `TO THE MAXIMUM EXTENT PERMITTED BY LAW, TITANOS AND ITS AFFILIATES SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, OR BUSINESS, ARISING FROM YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY FOR ANY CLAIM SHALL NOT EXCEED THE AMOUNTS YOU PAID US IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM (OR USD $100 IF YOU HAVE NOT PAID). [Legal review: confirm caps for your jurisdiction.]`,
+    body: `TO THE MAXIMUM EXTENT PERMITTED BY LAW, TITANOS AND ITS AFFILIATES SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, OR BUSINESS, ARISING FROM YOUR USE OF THE SERVICE. [Legal review: confirm appropriate liability limits for each launch jurisdiction.]`,
   },
   {
     title: "Termination",

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw, WifiOff } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,6 @@ export default function DriverHub() {
   const qParam = params.get("q") || "";
   const [refreshTick, setRefreshTick] = useState(0);
   const [forceOpenId, setForceOpenId] = useState(null);
-  const [online, setOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine !== false
-  );
 
   const explorer = useMemo(() => {
     void refreshTick;
@@ -50,17 +47,6 @@ export default function DriverHub() {
     setOpenMap(explorer.open);
     setSearch(explorer.search || "");
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per user
-
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
 
   // Deep-link: ?folder= or legacy ?tab=
   useEffect(() => {
@@ -197,7 +183,7 @@ export default function DriverHub() {
           </div>
         </header>
 
-        {!online ? (
+        {false ? (
           <div
             role="status"
             className="flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100"

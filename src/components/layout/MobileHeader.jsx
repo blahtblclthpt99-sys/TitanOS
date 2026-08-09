@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 import { MOBILE_ROOT_PATHS, resolvePageTitle } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
@@ -83,6 +83,19 @@ export default function MobileHeader() {
               <h1 className="text-sm font-semibold text-foreground truncate pr-1">{title}</h1>
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => navigate("/more")}
+            className="h-11 w-11 shrink-0 inline-flex items-center justify-center overflow-hidden rounded-xl focus-ring"
+            aria-label="Open menu"
+          >
+            <img
+              src="/brand/titanos-badge.png"
+              alt=""
+              aria-hidden="true"
+              className="h-9 w-9 aspect-square rounded-full object-contain"
+            />
+          </button>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}

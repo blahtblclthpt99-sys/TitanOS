@@ -19,7 +19,7 @@ import {
 } from "@/lib/date-utils";
 import { loadLocalWeather } from "@/lib/weatherApi";
 import { buildSmartScheduleTips } from "@/lib/smartSchedule";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 
 const STATUS_BORDER = {

@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import PageLoader from "@/components/shared/PageLoader";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { DRIVER_OS_FOLDERS, FOLDER_GROUPS } from "@/lib/driverOs/folders.js";
+import { DRIVER_OS_FOLDERS } from "@/lib/driverOs/folders.js";
 
 const LiveShiftFolder = lazy(() => import("./folders/LiveShiftFolder.jsx"));
 const TodaysOrdersFolder = lazy(() => import("./folders/TodaysOrdersFolder.jsx"));
@@ -143,10 +143,14 @@ export default function DriverExplorer({
   refreshTick = 0,
 }) {
   const q = String(search || "").trim().toLowerCase();
+  const activeFolderIds = new Set([
+    "live-shift", "todays-orders", "trip-history", "expenses", "goals", "vehicle", "reports", "settings",
+  ]);
 
   const folders = useMemo(() => {
-    if (!q) return DRIVER_OS_FOLDERS;
-    return DRIVER_OS_FOLDERS.filter(
+    const active = DRIVER_OS_FOLDERS.filter((folder) => activeFolderIds.has(folder.id));
+    if (!q) return active;
+    return active.filter(
       (f) =>
         f.label.toLowerCase().includes(q) ||
         f.description.toLowerCase().includes(q) ||
@@ -157,17 +161,17 @@ export default function DriverExplorer({
 
   const grouped = useMemo(() => {
     if (q) return [{ id: "search", label: "Results", folders }];
-    return FOLDER_GROUPS.map((g) => ({
-      ...g,
-      folders: folders.filter((f) => f.group === g.id),
-    })).filter((g) => g.folders.length > 0);
+    return [
+      { id: "drive", label: "Drive", folders: folders.filter((f) => f.id === "live-shift") },
+      { id: "details", label: "Details", folders: folders.filter((f) => f.id !== "live-shift") },
+    ].filter((group) => group.folders.length > 0);
   }, [folders, q]);
 
   return (
     <section aria-label="Driver Explorer" className="space-y-3">
       <div className="space-y-0.5">
         <p className="text-[11px] font-medium text-muted-foreground">Need more info?</p>
-        <h2 className="text-sm font-semibold text-foreground">Explorer</h2>
+        <h2 className="text-sm font-semibold text-foreground">Details</h2>
         <p className="text-xs text-muted-foreground">
           Live, history, analytics, and settings — open only what you need. Live status stays pinned above.
         </p>

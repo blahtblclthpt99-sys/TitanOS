@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebarState } from "@/hooks/useSidebarState";
@@ -129,7 +129,7 @@ export default function Sidebar() {
           ? { duration: 0 }
           : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
       }
-      className="hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40"
+      className="hidden md:flex flex-col h-dvh bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
       aria-label="Sidebar"
     >
       {/* Brand + collapse */}

@@ -493,6 +493,15 @@
     .page-pad {
       padding-block: var(--space-1);
     }
+
+    .auth-shell {
+      align-items: flex-start;
+      padding-block: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-bottom)) !important;
+    }
+
+    .auth-card {
+      padding: 1.25rem;
+    }
   }
 }
 

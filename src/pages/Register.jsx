@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useSearchParams, useLocation } from "react-router";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { attachReferralOnSignup } from "@/lib/referralApi";
 import { useAuth } from "@/lib/AuthContext";
 import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { trackEvent } from "@/lib/productAnalytics";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -41,6 +42,10 @@ export default function Register() {
       await attachReferralOnSignup({ userId, email, refCode });
     }
     await checkUserAuth();
+    trackEvent("signup_completed", {
+      cohort: searchParams.get("cohort") || "organic",
+      first_win: searchParams.get("first_win") || "default",
+    });
     navigate(consumeReturnTo(returnTo), { replace: true });
   };
 

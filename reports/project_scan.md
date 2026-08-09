@@ -1,14 +1,42 @@
 # TitanAI Project Scan
 
-- Root: C:\Users\Karen Lafferty\Desktop\TitanAI\projects\TitanOS
-- Files found: 1
-- Directories scanned: 0
+- Root: C:\Users\Karen Lafferty\Documents\titan
+- Files found: 2176
+- Directories scanned: 268
 
 ## Frameworks
-- None detected
+- Documentation
+- Node
 
 ## Likely entrypoints
-- None detected
+- main.py
+- test_main.py
+- TitanOS/api/functions/index.ts
+- TitanOS/src/main.tsx
+- TitanOS/src/api/auth/index.ts
+- TitanOS/src/api/entities/index.ts
+- TitanOS/src/components/index.ts
+- TitanOS/src/pages/index.tsx
+- TitatnCl/src/utils/index.ts
 
 ## Top-level structure
-- None detected
+- .cursor
+- .github
+- .tools
+- .vercel
+- .vscode
+- TitanOS
+- TitatnCl
+- android
+- api
+- bin
+- data
+- docs
+- e2e
+- memory
+- my TitanOS
+- ops
+- projects
+- public
+- release
+- reports

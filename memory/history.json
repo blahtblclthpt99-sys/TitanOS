@@ -299,6 +299,46 @@
     {
       "section": "decisions",
       "value": "Scanned project with 1 files"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "raw cursor config content"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 2175 files"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "raw cursor config content"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
+    },
+    {
+      "section": "decisions",
+      "value": "Scanned project with 2176 files"
+    },
+    {
+      "section": "cursor_raw",
+      "value": "raw cursor config content"
+    },
+    {
+      "section": "cursor_user",
+      "value": "hello from cursor"
+    },
+    {
+      "section": "task",
+      "value": "inspect startup path"
     }
   ],
   "active_task": "inspect startup"

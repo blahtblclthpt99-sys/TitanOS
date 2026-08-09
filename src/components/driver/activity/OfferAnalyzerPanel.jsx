@@ -309,7 +309,7 @@ export default function OfferAnalyzerPanel({
             className="h-9 bg-muted border-border"
           />
         </div>
-        <div className="flex items-end sm:col-span-2">
+        {false && <div className="flex items-end sm:col-span-2">
           <label className="flex items-center gap-2 text-xs text-foreground h-9 px-1 cursor-pointer">
             <input
               type="checkbox"
@@ -319,7 +319,7 @@ export default function OfferAnalyzerPanel({
             />
             Same restaurant
           </label>
-        </div>
+        </div>}
       </div>
 
       <div className={cn("rounded-2xl border p-4 flex flex-wrap items-center justify-between gap-3", verdictStyle)}>

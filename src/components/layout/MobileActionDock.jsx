@@ -20,9 +20,6 @@ import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { matchVoiceCommand, speechSupported } from "@/lib/voiceCommands";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { readSession } from "@/lib/driverHubApi";
-import { DD_EVENT, readActiveDelivery } from "@/lib/driverActivity";
-import { DRIVER_SESSION_EVENT } from "@/lib/driverOs";
 import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";
 import { upsertSearchDocs } from "@/lib/searchIndex";
 
@@ -34,51 +31,16 @@ const AI_SUGGESTIONS = [
   { icon: Users, label: "Find a customer", action: "/customers" },
 ];
 
-function useLiveDrivingMode(userId) {
-  const { pathname } = useLocation();
-  const onDriver = pathname === "/driver";
-  const [live, setLive] = useState(() => {
-    if (!userId || !onDriver) return false;
-    const session = readSession(userId);
-    const delivery = readActiveDelivery(userId);
-    return Boolean(session?.active) || delivery?.status === "active";
-  });
-
-  useEffect(() => {
-    if (!userId || !onDriver) {
-      setLive(false);
-      return undefined;
-    }
-    const sync = () => {
-      const session = readSession(userId);
-      const delivery = readActiveDelivery(userId);
-      setLive(Boolean(session?.active) || delivery?.status === "active");
-    };
-    sync();
-    window.addEventListener(DRIVER_SESSION_EVENT, sync);
-    window.addEventListener(DD_EVENT, sync);
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
-    return () => {
-      window.removeEventListener(DRIVER_SESSION_EVENT, sync);
-      window.removeEventListener(DD_EVENT, sync);
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("focus", sync);
-    };
-  }, [userId, onDriver]);
-
-  return onDriver && live;
-}
-
 /**
  * Single mobile action dock above the bottom nav — Create, AI, Voice.
- * Hidden in live driving mode on Driver Hub so Mission Control owns the thumb zone.
+ * Hidden throughout Driver Hub so its offer and voice controls own the thumb zone.
  */
 export default function MobileActionDock({ onOpenFeedback }) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const reduceMotion = usePrefersReducedMotion();
-  const drivingMode = useLiveDrivingMode(user?.id);
+  const hiddenForDriverHub = pathname === "/driver";
   const rootRef = useRef(null);
   const [menu, setMenu] = useState(null);
   const [voiceSupported] = useState(() => speechSupported());
@@ -86,8 +48,8 @@ export default function MobileActionDock({ onOpenFeedback }) {
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    if (drivingMode) setMenu(null);
-  }, [drivingMode]);
+    if (hiddenForDriverHub) setMenu(null);
+  }, [hiddenForDriverHub]);
 
   useEffect(() => {
     const onPointer = (e) => {
@@ -161,7 +123,7 @@ export default function MobileActionDock({ onOpenFeedback }) {
   const dockBtn =
     "inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-border bg-card text-foreground shadow-soft transition-colors focus-ring hover:bg-muted aria-expanded:bg-primary aria-expanded:text-primary-foreground aria-expanded:border-primary";
 
-  if (drivingMode) return null;
+  if (hiddenForDriverHub) return null;
 
   return (
     <div

@@ -50,6 +50,23 @@ function micConstraints() {
   };
 }
 
+export function microphoneErrorMessage(error) {
+  const name = String(error?.name || error?.code || "").toLowerCase();
+  if (name.includes("notallowed") || name.includes("permission") || name.includes("security")) {
+    return "Microphone blocked — allow microphone access in TitanOS app settings, then reconnect.";
+  }
+  if (name.includes("notfound") || name.includes("devicesnotfound")) {
+    return "No microphone was found. Connect a headset or enable the device microphone.";
+  }
+  if (name.includes("notreadable") || name.includes("trackstart")) {
+    return "Microphone is busy in another app. Close the other recorder or call, then try again.";
+  }
+  if (name.includes("overconstrained")) {
+    return "This microphone rejected the requested audio mode. Reconnect to retry with device defaults.";
+  }
+  return error?.message || "Microphone could not start. Check app permission and try again.";
+}
+
 export class TitanCommsSession {
   constructor({ user, channelId, voiceStatus = "available", shareLocation = false, onState }) {
     this.user = user;
@@ -119,7 +136,11 @@ export class TitanCommsSession {
     this._bindLifecycle();
     await this._subscribeChannel();
     // Warm mic in background — PTT then only unmutes
-    this._ensureMic().catch(() => {});
+    this._ensureMic().catch((err) => {
+      this.micReady = false;
+      this.error = microphoneErrorMessage(err);
+      this._emit();
+    });
   }
 
   _bindLifecycle() {
@@ -179,7 +200,8 @@ export class TitanCommsSession {
     this.rt = supabase.channel(topic, {
       config: {
         presence: { key: this.user.id },
-        broadcast: { self: false },
+        // Ack keeps floor claims and WebRTC signaling from silently disappearing.
+        broadcast: { self: false, ack: true },
       },
     });
 
@@ -324,8 +346,21 @@ export class TitanCommsSession {
       throw new Error("Microphone not available in this browser.");
     }
     const stream = await navigator.mediaDevices.getUserMedia(micConstraints());
-    for (const track of stream.getAudioTracks()) {
+    const tracks = stream.getAudioTracks();
+    if (!tracks.length) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error("No microphone audio track was returned.");
+    }
+    for (const track of tracks) {
       track.enabled = false; // warm but muted until PTT
+      track.onended = () => {
+        if (this._disposed) return;
+        this.localStream = null;
+        this.micReady = false;
+        this.talking = false;
+        this.error = "Microphone disconnected — reconnect your headset or allow microphone access.";
+        this._emit();
+      };
     }
     this.localStream = stream;
     this.micReady = true;
@@ -397,8 +432,12 @@ export class TitanCommsSession {
 
     try {
       await this._ensureMic();
-    } catch {
-      return { ok: false, reason: "Microphone permission denied." };
+    } catch (err) {
+      const reason = microphoneErrorMessage(err);
+      this.error = reason;
+      this.micReady = false;
+      this._emit();
+      return { ok: false, reason };
     }
 
     this._setMicEnabled(true);
@@ -408,23 +447,38 @@ export class TitanCommsSession {
     this.floorClaimAt = Date.now();
     this._armFloorWatch();
 
-    await this.rt.send({
-      type: "broadcast",
-      event: "floor",
-      payload: {
-        type: "claim",
-        userId: this.user.id,
-        name: displayName(this.user),
-        at: this.floorClaimAt,
-        leaseMs: FLOOR_LEASE_MS,
-      },
-    });
-    await this._trackPresence({ speaking: true });
+    try {
+      const floorAck = await this.rt.send({
+        type: "broadcast",
+        event: "floor",
+        payload: {
+          type: "claim",
+          userId: this.user.id,
+          name: displayName(this.user),
+          at: this.floorClaimAt,
+          leaseMs: FLOOR_LEASE_MS,
+        },
+      });
+      if (floorAck !== "ok") throw new Error("Floor claim was not acknowledged.");
+      await this._trackPresence({ speaking: true });
 
-    const peers = this.members.filter((m) => !m.self).map((m) => m.userId);
-    await Promise.all(peers.map((peerId) => this._ensureSendTo(peerId)));
-    this._emit();
-    return { ok: true };
+      const peers = this.members.filter((m) => !m.self).map((m) => m.userId);
+      await Promise.all(peers.map((peerId) => this._ensureSendTo(peerId)));
+      this.error = null;
+      this._emit();
+      return { ok: true };
+    } catch (err) {
+      this._setMicEnabled(false);
+      this.talking = false;
+      this.floorHolder = null;
+      this.floorName = null;
+      this.floorClaimAt = 0;
+      this._clearFloorWatch();
+      const reason = err?.message || "TitanCom could not open the audio channel.";
+      this.error = `${reason} Tap Reconnect and try again.`;
+      this._emit();
+      return { ok: false, reason: this.error };
+    }
   }
 
   async stopTalk() {
@@ -435,14 +489,20 @@ export class TitanCommsSession {
     this.talking = false;
     this._setMicEnabled(false);
 
-    // Keep peer connections for next press — only release floor + presence
-    if (this.rt) {
-      await this.rt.send({
-        type: "broadcast",
-        event: "floor",
-        payload: { type: "release", userId: this.user.id },
-      });
-      await this._trackPresence({ speaking: false });
+    // Keep peer connections for next press. Local mute and floor cleanup must
+    // still complete if Realtime drops during release.
+    try {
+      if (this.rt) {
+        await this.rt.send({
+          type: "broadcast",
+          event: "floor",
+          payload: { type: "release", userId: this.user.id },
+        });
+        await this._trackPresence({ speaking: false });
+      }
+    } catch (err) {
+      this.error = `${err?.message || "Floor release failed."} Reconnecting…`;
+      this._scheduleReconnect(0);
     }
     if (this.floorHolder === this.user.id) {
       this.floorHolder = null;

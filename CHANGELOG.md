@@ -2,6 +2,15 @@
 
 All notable improvements from the production refactor. Functionality, routes, API contracts, and Base44 entities/server functions are preserved unless noted as a bug fix.
 
+## 1.6.6 (Play AAB 29) — Adaptive Driver Hub + native voice
+
+- Driver offer engine now records the driver's actual ACCEPT / DECLINE choice separately from Titan's recommendation.
+- Personal minimums learn from real accepted offers using lower-quartile, median, and recency-weighted $/mile and $/hour math.
+- Advanced decision card replaces the static offer analyzer in Driver Hub; ride-request mode removed.
+- Hands-free voice is live in Driver Hub with a Capacitor 8 native Android recognizer fallback and spoken action logging.
+- TitanComm adds Android audio permissions, acknowledged Realtime signaling, microphone recovery, and safe push-to-talk rollback.
+- Android versionCode 29 / versionName 1.6.6.
+
 ## 1.5.5 (Play AAB 20) — Driver OS 4.0
 
 - Driver Hub redesign: Mission Control (live ops) + Driver Explorer (lazy folders)

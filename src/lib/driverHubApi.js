@@ -79,7 +79,6 @@ export function readPrefs(userId) {
     connectedApps: [],
     equipmentId: null,
     mode: "driving", // "driving" | "riding"
-    requestingRide: false,
     /** Auto GPS miles/stops only while a work session is active */
     autoTrack: true,
     /** Stationary seconds before confirming a delivery/haul stop */

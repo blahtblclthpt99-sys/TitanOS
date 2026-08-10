@@ -9,6 +9,7 @@ import {
   isChannelExpired,
   isChannelAdmin,
 } from "../src/lib/titanComRules.js";
+import { microphoneErrorMessage } from "../src/lib/titanCommsPtt.js";
 
 describe("TitanCom expiry", () => {
   it("endOfLocalDayIso is later today", () => {
@@ -28,5 +29,13 @@ describe("TitanCom expiry", () => {
     const ch = { created_by_id: "u1", admin_id: "u1", custom: true };
     assert.equal(isChannelAdmin(ch, "u1"), true);
     assert.equal(isChannelAdmin(ch, "u2"), false);
+  });
+});
+
+describe("TitanCom microphone recovery", () => {
+  it("turns browser microphone failures into actionable messages", () => {
+    assert.match(microphoneErrorMessage({ name: "NotAllowedError" }), /allow microphone access/i);
+    assert.match(microphoneErrorMessage({ name: "NotReadableError" }), /busy in another app/i);
+    assert.match(microphoneErrorMessage({ name: "NotFoundError" }), /No microphone/i);
   });
 });

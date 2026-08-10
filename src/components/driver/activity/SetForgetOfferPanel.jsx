@@ -15,8 +15,8 @@ import {
   saveAutopilotSettings,
   decideOfferSetForget,
   parseOfferQuickText,
-  logAutopilotDecision,
-  listAutopilotDecisions,
+  recordAutopilotAction,
+  listAutopilotActions,
   summarizeMoneyProtected,
 } from "@/lib/driverActivity/autopilot";
 import { buildZipBenchmarks } from "@/lib/driverActivity/zipBenchmarks";
@@ -24,7 +24,7 @@ import { listTripJournal } from "@/lib/driverActivity/tripJournal";
 import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
 import { formatOfferCoachCard } from "@/lib/driverActivity/driverCoach";
 import VehicleTrueCostPanel from "@/components/driver/activity/VehicleTrueCostPanel";
-import { mileMarginVsFloor } from "@/lib/driverActivity/trueCostPerMile";
+import { acceptDenyMileStats, mileMarginVsFloor } from "@/lib/driverActivity/trueCostPerMile";
 
 const SPECTRUM_LABELS = [
   ["true_cost", "All-in"],
@@ -81,23 +81,28 @@ export default function SetForgetOfferPanel({
     zip: defaultZip || "",
   });
   const [lastDecision, setLastDecision] = useState(null);
-  const [recent, setRecent] = useState(() => (userId ? listAutopilotDecisions(userId, 5) : []));
+  const [lastInput, setLastInput] = useState(null);
+  const [actionSaved, setActionSaved] = useState(null);
+  const [recent, setRecent] = useState(() => (userId ? listAutopilotActions(userId, 5) : []));
   const [econTick, setEconTick] = useState(0);
   const moneyStats = useMemo(
     () => (userId ? summarizeMoneyProtected(userId) : null),
     [userId, recent]
   );
+  const learned = useMemo(() => acceptDenyMileStats(userId), [userId, recent]);
 
   useEffect(() => {
     setSettings(readAutopilotSettings(userId));
-    setRecent(userId ? listAutopilotDecisions(userId, 5) : []);
+    setRecent(userId ? listAutopilotActions(userId, 5) : []);
   }, [userId]);
 
   useEffect(() => {
     if (!voiceSeed?.decision) return;
     setLastDecision(voiceSeed.decision);
+    setLastInput(voiceSeed.input || voiceSeed.decision.filled || null);
+    setActionSaved(voiceSeed.action || null);
     setSettings(readAutopilotSettings(userId));
-    setRecent(userId ? listAutopilotDecisions(userId, 5) : []);
+    setRecent(userId ? listAutopilotActions(userId, 5) : []);
     if (voiceSeed.input) {
       setForm((f) => ({
         ...f,
@@ -135,7 +140,10 @@ export default function SetForgetOfferPanel({
     setSettings(saveAutopilotSettings(userId, patch));
   };
 
-  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key, value) => {
+    setActionSaved(null);
+    setForm((f) => ({ ...f, [key]: value }));
+  };
 
   const runDecision = (override = null) => {
     const input = override || {
@@ -161,16 +169,28 @@ export default function SetForgetOfferPanel({
       rush,
     });
     setLastDecision(decision);
-    if (userId) {
-      logAutopilotDecision(userId, decision, input);
-      setRecent(listAutopilotDecisions(userId, 5));
-    }
+    setLastInput(input);
+    setActionSaved(null);
     return decision;
+  };
+
+  const saveDriverAction = (action) => {
+    if (!userId || !decision || actionSaved) return;
+    const saved = recordAutopilotAction(
+      userId,
+      decision,
+      lastInput || decision.filled || form,
+      action
+    );
+    if (!saved) return;
+    setActionSaved(action);
+    setRecent(listAutopilotActions(userId, 5));
   };
 
   const onPasteBlur = () => {
     const parsed = parseOfferQuickText(paste);
     if (!parsed) return;
+    setActionSaved(null);
     setForm((f) => ({
       ...f,
       pay: parsed.pay ? String(parsed.pay) : f.pay,
@@ -266,6 +286,41 @@ export default function SetForgetOfferPanel({
             />
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-border bg-black/10 p-3">
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Learned minimum</p>
+          <p className="text-lg font-black tabular-nums">
+            {learned.personal_floor_per_mile != null
+              ? `$${learned.personal_floor_per_mile.toFixed(2)}/mi`
+              : "Learning"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Hourly minimum</p>
+          <p className="text-lg font-black tabular-nums">
+            {learned.personal_floor_per_hour != null
+              ? `$${learned.personal_floor_per_hour.toFixed(0)}/hr`
+              : "Learning"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Your choices</p>
+          <p className="text-lg font-black tabular-nums">
+            {learned.accepted_count + learned.denied_count}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Model confidence</p>
+          <p className="text-lg font-black tabular-nums">
+            {Math.min(100, Math.round(((learned.accepted_count + learned.denied_count) / 12) * 100))}%
+          </p>
+        </div>
+        <p className="col-span-2 sm:col-span-4 text-[11px] text-muted-foreground">
+          Titan needs three accepted offers to set your first personal minimum, then weights recent
+          choices more heavily while filtering out one-off unusually high offers.
+        </p>
       </div>
 
       {showSetup ? (
@@ -437,6 +492,14 @@ export default function SetForgetOfferPanel({
                     : ""}
                 </p>
               ) : null}
+              {decision.minimum_offer_pay > 0 ? (
+                <div className="rounded-xl border border-current/25 bg-black/10 px-3 py-2 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold">Minimum needed for this delivery</span>
+                  <span className="text-xl font-black tabular-nums">
+                    ${Number(decision.minimum_offer_pay).toFixed(2)}
+                  </span>
+                </div>
+              ) : null}
               {mileGap?.margin != null ? (
                 <div className="flex flex-wrap gap-2 text-[11px] tabular-nums">
                   <span
@@ -466,6 +529,39 @@ export default function SetForgetOfferPanel({
                 {decision.breakdown.hourlyNet}/hr · ${decision.breakdown.perMileNet}/mi · {rush.label}{" "}
                 · {AUTOPILOT_PROFILES[settings.profileId]?.label || "Balanced"}
               </p>
+              <div className="grid grid-cols-2 gap-3 border-t border-current/20 pt-3">
+                <button
+                  type="button"
+                  onClick={() => saveDriverAction("ACCEPT")}
+                  disabled={!userId || Boolean(actionSaved)}
+                  className={cn(
+                    "min-h-[60px] rounded-xl border px-3 text-base font-black transition-colors disabled:opacity-70",
+                    actionSaved === "ACCEPT"
+                      ? "border-emerald-300 bg-emerald-300 text-black"
+                      : "border-emerald-400/60 bg-emerald-500 text-black hover:bg-emerald-400"
+                  )}
+                >
+                  I ACCEPTED
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveDriverAction("DENY")}
+                  disabled={!userId || Boolean(actionSaved)}
+                  className={cn(
+                    "min-h-[60px] rounded-xl border px-3 text-base font-black transition-colors disabled:opacity-70",
+                    actionSaved === "DENY"
+                      ? "border-red-300 bg-red-400 text-black"
+                      : "border-red-400/60 bg-slate-950/70 text-red-200 hover:bg-red-500/20"
+                  )}
+                >
+                  I DECLINED
+                </button>
+              </div>
+              <p className="text-[11px] text-center opacity-85">
+                {actionSaved
+                  ? "Choice saved. Titan recalculated your future minimum from what you actually did."
+                  : "Tap what you actually did in the delivery app so Titan can learn your minimum."}
+              </p>
             </div>
           ) : settings.enabled ? (
             <p className="text-xs text-muted-foreground text-center py-2">
@@ -487,7 +583,8 @@ export default function SetForgetOfferPanel({
                 {recent.map((r) => (
                   <li key={r.id} className="flex justify-between gap-2 tabular-nums text-muted-foreground">
                     <span>
-                      {r.verdict} · ${r.pay} / {r.miles}mi
+                      {r.user_action} · Titan said {r.recommended_verdict} · ${r.gross || r.pay} /{" "}
+                      {r.total_miles || r.miles}mi
                     </span>
                     <span>{r.spectrum_overall != null ? `σ ${r.spectrum_overall}` : ""}</span>
                   </li>

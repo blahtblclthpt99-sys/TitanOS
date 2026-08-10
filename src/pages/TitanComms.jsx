@@ -162,13 +162,21 @@ export default function TitanComms() {
     } catch {
       /* ignore */
     }
-    const result = await sessionRef.current?.startTalk();
-    if (!result?.ok) {
+    try {
+      const result = await sessionRef.current?.startTalk();
+      if (result?.ok) return;
       pttActive.current = false;
       toast({
         variant: "destructive",
         title: "Can't talk",
         description: result?.reason || "Try again",
+      });
+    } catch (err) {
+      pttActive.current = false;
+      toast({
+        variant: "destructive",
+        title: "TitanCom audio failed",
+        description: err?.message || "Reconnect and try again.",
       });
     }
   }, []);

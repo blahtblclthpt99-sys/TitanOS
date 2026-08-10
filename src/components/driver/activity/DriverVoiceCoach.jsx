@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition as NativeSpeechRecognition } from "@capgo/capacitor-speech-recognition";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,8 +16,9 @@ import {
   decideOfferSetForget,
   readAutopilotSettings,
   saveAutopilotSettings,
-  logAutopilotDecision,
+  recordAutopilotAction,
 } from "@/lib/driverActivity/autopilot";
+import { acceptDenyMileStats } from "@/lib/driverActivity/trueCostPerMile";
 import { buildZipBenchmarks } from "@/lib/driverActivity/zipBenchmarks";
 import { listTripJournal } from "@/lib/driverActivity/tripJournal";
 import { classifyRushWindow } from "@/lib/driverActivity/intelligence";
@@ -41,7 +44,8 @@ export default function DriverVoiceCoach({
 }) {
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
-  const supported = isVoiceSupported();
+  const nativeVoice = Capacitor.isNativePlatform();
+  const supported = nativeVoice || isVoiceSupported();
   const [listening, setListening] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
   const [lastHeard, setLastHeard] = useState("");
@@ -50,20 +54,31 @@ export default function DriverVoiceCoach({
   const recogRef = useRef(null);
   const handsFreeRef = useRef(false);
   const lastDecisionRef = useRef(null);
+  const lastOfferInputRef = useRef(null);
+  const restartTimerRef = useRef(null);
+  const nativeListeningRef = useRef(false);
 
   useEffect(() => {
     handsFreeRef.current = handsFree;
   }, [handsFree]);
 
   const stopRecog = useCallback(() => {
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     try {
       recogRef.current?.stop();
     } catch {
       /* ignore */
     }
     recogRef.current = null;
+    if (nativeVoice && nativeListeningRef.current) {
+      nativeListeningRef.current = false;
+      NativeSpeechRecognition.forceStop({ timeout: 1000 }).catch(() => {});
+    }
     setListening(false);
-  }, []);
+  }, [nativeVoice]);
 
   const runIntent = useCallback(
     async (cmd) => {
@@ -137,6 +152,29 @@ export default function DriverVoiceCoach({
         case "repeat_decision":
           reply = formatDecisionSpeech(lastDecisionRef.current);
           break;
+        case "record_offer_action": {
+          const action = cmd.payload?.action;
+          if (!lastDecisionRef.current || !lastOfferInputRef.current) {
+            reply = "Decide an offer first, then say I accepted or I declined.";
+            break;
+          }
+          const saved = recordAutopilotAction(
+            userId,
+            lastDecisionRef.current,
+            lastOfferInputRef.current,
+            action
+          );
+          if (!saved) {
+            reply = "I couldn't save that choice. Try the buttons on the offer card.";
+            break;
+          }
+          const learned = acceptDenyMileStats(userId);
+          onDecision?.(lastDecisionRef.current, lastOfferInputRef.current, action);
+          reply = learned.personal_floor_per_mile != null
+            ? `${action === "ACCEPT" ? "Accepted" : "Declined"} saved. Your learned minimum is now ${learned.personal_floor_per_mile.toFixed(2)} dollars per mile.`
+            : `${action === "ACCEPT" ? "Accepted" : "Declined"} saved. Keep recording choices so I can learn your minimum.`;
+          break;
+        }
         case "decide_offer": {
           const nextSettings = {
             ...settings,
@@ -169,7 +207,7 @@ export default function DriverVoiceCoach({
             }
           );
           lastDecisionRef.current = decision;
-          if (userId) logAutopilotDecision(userId, decision, cmd.payload);
+          lastOfferInputRef.current = cmd.payload;
           onDecision?.(decision, cmd.payload);
           reply = formatDecisionSpeech(decision);
           break;
@@ -215,7 +253,82 @@ export default function DriverVoiceCoach({
   );
 
   const startListen = useCallback(
-    (continuous = false) => {
+    async (continuous = false) => {
+      if (nativeVoice) {
+        stopRecog();
+        setError("");
+        try {
+          const permission = await NativeSpeechRecognition.requestPermissions();
+          if (permission.speechRecognition !== "granted") {
+            handsFreeRef.current = false;
+            setHandsFree(false);
+            setError("Microphone blocked — allow microphone access in TitanOS app settings.");
+            return;
+          }
+          const availability = await NativeSpeechRecognition.available();
+          if (!availability.available) {
+            handsFreeRef.current = false;
+            setHandsFree(false);
+            setError("Speech recognition is not installed or enabled on this Android device.");
+            return;
+          }
+          let useOnDeviceRecognition = false;
+          try {
+            const onDevice = await NativeSpeechRecognition.isOnDeviceRecognitionAvailable({
+              language: "en-US",
+            });
+            useOnDeviceRecognition = Boolean(onDevice.available);
+          } catch {
+            // The standard Android recognizer remains available as a fallback.
+          }
+
+          nativeListeningRef.current = true;
+          setListening(true);
+          const result = await NativeSpeechRecognition.start({
+            language: "en-US",
+            maxResults: 3,
+            popup: false,
+            partialResults: false,
+            allowForSilence: 1200,
+            useOnDeviceRecognition,
+            contextualStrings: [
+              "TitanOS",
+              "TitanCom",
+              "accept",
+              "decline",
+              "miles",
+              "minutes",
+              "start driving",
+              "read timers",
+            ],
+          });
+          const transcript = result.matches?.find((match) => String(match || "").trim());
+          if (transcript) await handleResult(transcript);
+        } catch (err) {
+          const message = String(err?.message || err || "Native speech recognition failed.");
+          const blocked = /permission|not.?allowed|denied/i.test(message);
+          if (blocked) {
+            handsFreeRef.current = false;
+            setHandsFree(false);
+          }
+          if (!/cancel|abort|no.?match|no.?speech/i.test(message)) {
+            setError(blocked
+              ? "Microphone blocked — allow microphone access in TitanOS app settings."
+              : `Voice error: ${message}`);
+          }
+        } finally {
+          nativeListeningRef.current = false;
+          setListening(false);
+          if (continuous && handsFreeRef.current) {
+            restartTimerRef.current = window.setTimeout(() => {
+              restartTimerRef.current = null;
+              if (handsFreeRef.current) startListen(true);
+            }, 350);
+          }
+        }
+        return;
+      }
+
       const Ctor = getSpeechRecognitionCtor();
       if (!Ctor) {
         setError("Voice isn’t supported in this browser. Try Chrome or Edge.");
@@ -231,7 +344,8 @@ export default function DriverVoiceCoach({
       recog.onstart = () => setListening(true);
       recog.onerror = (ev) => {
         const err = ev?.error || "error";
-        if (err === "not-allowed") {
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          handsFreeRef.current = false;
           setError("Microphone blocked — allow mic access for voice commands.");
           setHandsFree(false);
         } else if (err !== "aborted" && err !== "no-speech") {
@@ -244,7 +358,8 @@ export default function DriverVoiceCoach({
         recogRef.current = null;
         // Restart hands-free loop
         if (handsFreeRef.current) {
-          setTimeout(() => {
+          restartTimerRef.current = window.setTimeout(() => {
+            restartTimerRef.current = null;
             if (handsFreeRef.current) startListen(true);
           }, 350);
         }
@@ -259,11 +374,13 @@ export default function DriverVoiceCoach({
       try {
         recog.start();
       } catch (e) {
+        handsFreeRef.current = false;
+        setHandsFree(false);
         setError(e?.message || "Couldn’t start microphone.");
         setListening(false);
       }
     },
-    [handleResult, stopRecog]
+    [handleResult, nativeVoice, stopRecog]
   );
 
   useEffect(() => {

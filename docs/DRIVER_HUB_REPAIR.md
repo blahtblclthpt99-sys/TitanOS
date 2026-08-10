@@ -5,11 +5,10 @@
 
 ## Fixes delivered
 
-### Toggles (Driving / Requesting a ride / mode)
+### Driving controls
 - Driving ON/OFF shows busy state (`aria-busy`, disabled while saving) and reloads saved state on failure so UI cannot stay desynced from storage.
-- Switching to **Requesting a ride** while Driving is ON ends the shift, saves miles, and syncs tax before flipping mode.
-- Requesting-a-ride toggle persists via prefs and surfaces errors with toast + inline alert.
-- Mode / ride / drive controls use `aria-pressed` and clearer `aria-label`s.
+- Driving controls use `aria-pressed` and clear `aria-label`s.
+- Passenger ride-request mode was removed so Driver Hub stays focused on work sessions, offer decisions, GPS, and communication.
 
 ### Mile Tracker (shift + Tax Center)
 - Shared validation in `src/lib/driverHubMath.js` (`parseMilesInput`): rejects empty, NaN, negative, and oversize values; rounds to 0.1 mi.

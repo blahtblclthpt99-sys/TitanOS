@@ -12,6 +12,7 @@ import {
 } from "./offerAnalyzer.js";
 import { classifyRushWindow } from "./intelligence.js";
 import { normalizeZip } from "./zipBenchmarks.js";
+import { acceptDenyMileStats } from "./trueCostPerMile.js";
 import { readLocal, writeLocal, uid } from "../localStore.js";
 
 const PREFIX = "titanos_driver";
@@ -107,11 +108,22 @@ export function resolveAutopilotThresholds(userId, settings = null) {
   const s = settings || readAutopilotSettings(userId);
   const base = readOfferThresholds(userId);
   const profile = getAutopilotProfile(s.profileId);
-  return {
+  const resolved = {
     ...DEFAULT_OFFER_THRESHOLDS,
     ...base,
     ...profile.patch,
   };
+  const learned = acceptDenyMileStats(userId);
+  // The learned mile floor is gross $/mi and is enforced by
+  // ultimateWorthPerMile(). minPerMileAccept is net $/mi, so mixing them here
+  // would double-count vehicle costs and make the model artificially strict.
+  if (learned.personal_floor_per_hour != null) {
+    resolved.minHourlyAccept = Math.max(
+      num(resolved.minHourlyAccept),
+      learned.personal_floor_per_hour
+    );
+  }
+  return resolved;
 }
 
 export function parseOfferQuickText(text = "") {
@@ -365,6 +377,21 @@ export function decideOfferSetForget(input = {}, context = {}) {
   if (analysis.gates?.trueCost === false) verdict = "DENY";
 
   const action = moneyFirstAction(verdict, money, rush, analysis);
+  const b = analysis.breakdown || {};
+  const t = analysis.thresholds || thresholds;
+  const totalMiles = Math.max(0, num(b.totalMiles));
+  const totalMinutes = Math.max(1, num(b.totalMin, 1));
+  const costs = Math.max(0, num(b.costs));
+  // Total offer amount that clears every core gate. This converts the model's
+  // per-mile, hourly, profit, and true-cost math into one glanceable delivery minimum.
+  const minimumOfferPay = Math.round(
+    Math.max(
+      num(analysis.trueCost?.recommended_min_gross_per_mile) * totalMiles,
+      costs + num(t.minProfitAccept),
+      costs + num(t.minHourlyAccept) * (totalMinutes / 60),
+      costs + num(t.minPerMileAccept) * totalMiles
+    ) * 100
+  ) / 100;
 
   return {
     ...analysis,
@@ -376,10 +403,33 @@ export function decideOfferSetForget(input = {}, context = {}) {
     profileId: settings.profileId,
     autopilot: true,
     moneyFirst: true,
+    minimum_offer_pay: minimumOfferPay,
     filled,
   };
 }
 
+function buildDecisionEntry(decision, offerInput = {}) {
+  const gross = num(decision.breakdown?.gross, num(offerInput.pay) + num(offerInput.tip));
+  const totalMiles = num(decision.breakdown?.totalMiles, offerInput.miles);
+  return {
+    recommended_verdict: decision.verdict,
+    spectrum_overall: decision.spectrum?.overall ?? null,
+    money_delta_hr: decision.money?.delta_per_hour ?? null,
+    pay: num(offerInput.pay ?? decision.filled?.pay),
+    tip: num(offerInput.tip ?? decision.filled?.tip),
+    gross,
+    miles: num(offerInput.miles ?? decision.filled?.miles),
+    total_miles: totalMiles,
+    minutes: num(offerInput.minutes ?? decision.filled?.minutes),
+    gross_per_mile: num(decision.breakdown?.perMileGross, totalMiles > 0 ? gross / totalMiles : 0),
+    net_per_mile: num(decision.breakdown?.perMileNet),
+    hourly_net: num(decision.breakdown?.hourlyNet),
+    zip: decision.zip || decision.filled?.zip || "",
+    profileId: decision.profileId || null,
+  };
+}
+
+/** Store a recommendation for audit/debug only. It never trains the adaptive floor. */
 export function logAutopilotDecision(userId, decision, offerInput = {}) {
   if (!userId || !decision) return null;
   const rows = readLocal(PREFIX, userId, DECISIONS_KEY, []);
@@ -387,14 +437,31 @@ export function logAutopilotDecision(userId, decision, offerInput = {}) {
   const entry = {
     id: uid(),
     at: new Date().toISOString(),
+    record_type: "recommendation",
     verdict: decision.verdict,
-    spectrum_overall: decision.spectrum?.overall ?? null,
-    money_delta_hr: decision.money?.delta_per_hour ?? null,
-    pay: num(offerInput.pay ?? decision.filled?.pay),
-    miles: num(offerInput.miles ?? decision.filled?.miles),
-    minutes: num(offerInput.minutes ?? decision.filled?.minutes),
-    zip: decision.zip || decision.filled?.zip || "",
-    profileId: decision.profileId || null,
+    user_action: null,
+    ...buildDecisionEntry(decision, offerInput),
+  };
+  writeLocal(PREFIX, userId, DECISIONS_KEY, [entry, ...list].slice(0, MAX_LOG));
+  return entry;
+}
+
+/** Record what the driver actually did. Only these rows train future minimums. */
+export function recordAutopilotAction(userId, decision, offerInput = {}, userAction) {
+  if (!userId || !decision) return null;
+  const action = String(userAction || "").toUpperCase();
+  if (!["ACCEPT", "DENY"].includes(action)) return null;
+  const rows = readLocal(PREFIX, userId, DECISIONS_KEY, []);
+  const list = Array.isArray(rows) ? rows : [];
+  const entry = {
+    id: uid(),
+    at: new Date().toISOString(),
+    acted_at: new Date().toISOString(),
+    record_type: "action",
+    verdict: action,
+    user_action: action,
+    followed_recommendation: action === decision.verdict,
+    ...buildDecisionEntry(decision, offerInput),
   };
   writeLocal(PREFIX, userId, DECISIONS_KEY, [entry, ...list].slice(0, MAX_LOG));
   return entry;
@@ -406,17 +473,23 @@ export function listAutopilotDecisions(userId, limit = 20) {
   return (Array.isArray(rows) ? rows : []).slice(0, limit);
 }
 
+export function listAutopilotActions(userId, limit = 20) {
+  return listAutopilotDecisions(userId, MAX_LOG)
+    .filter((row) => row.record_type === "action" && row.user_action)
+    .slice(0, limit);
+}
+
 /** Rough $ protected by DENY decisions that were below average. */
 export function summarizeMoneyProtected(userId) {
-  const rows = listAutopilotDecisions(userId, 100);
+  const rows = listAutopilotActions(userId, 100);
   let deniedBelow = 0;
   let acceptedAbove = 0;
   for (const r of rows) {
     const d = num(r.money_delta_hr);
     const mins = Math.max(1, num(r.minutes, 15));
     const trip = d * (mins / 60);
-    if (r.verdict === "DENY" && d < 0) deniedBelow += Math.abs(trip);
-    if (r.verdict === "ACCEPT" && d > 0) acceptedAbove += trip;
+    if (r.user_action === "DENY" && d < 0) deniedBelow += Math.abs(trip);
+    if (r.user_action === "ACCEPT" && d > 0) acceptedAbove += trip;
   }
   return {
     decisions: rows.length,

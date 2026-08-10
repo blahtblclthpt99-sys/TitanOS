@@ -11,7 +11,6 @@ import {
   Siren,
   ToggleLeft,
   ToggleRight,
-  UserRound,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import HotspotMap from "@/components/driver/HotspotMap";
 import ActivityLiveDash from "@/components/driver/activity/ActivityLiveDash";
 import DriverVoiceCoach from "@/components/driver/activity/DriverVoiceCoach";
-import OfferAnalyzerPanel from "@/components/driver/activity/OfferAnalyzerPanel";
+import SetForgetOfferPanel from "@/components/driver/activity/SetForgetOfferPanel";
 import ActivityStatsPanel from "@/components/driver/activity/ActivityStatsPanel";
 import BetweenStopsPanel from "@/components/driver/activity/BetweenStopsPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -92,7 +91,6 @@ export default function DriverShiftPanel() {
   const [weather, setWeather] = useState(null);
 
   const mode = "driving";
-  const requestingRide = Boolean(prefs.requestingRide);
   const drivingActive = Boolean(session?.active);
   const sessionPaused = Boolean(session?.paused);
 
@@ -294,7 +292,7 @@ export default function DriverShiftPanel() {
     return () => window.clearTimeout(handle);
   }, [milesDraft, drivingActive, user?.id]);
 
-  const mapLit = (mode === "driving" && drivingActive) || (mode === "riding" && requestingRide);
+  const mapLit = drivingActive;
 
   const updatePref = (patch) => {
     if (!user?.id) return;
@@ -351,35 +349,6 @@ export default function DriverShiftPanel() {
     return { ended, synced, miles: parsed.miles };
   };
 
-  const setMode = async (nextMode) => {
-    if (!user?.id || busy) return;
-    setToggleError("");
-    // Prevent desync: ending an active drive when switching to passenger mode
-    if (nextMode === "riding" && session?.active) {
-      setBusy(true);
-      try {
-        await endShiftWithMiles();
-        refresh();
-        setMilesDraft("");
-        toast({
-          title: "Driving ended",
-          description: "Switched to Requesting a ride — your miles and totals were saved.",
-        });
-      } catch (err) {
-        setToggleError(err?.message || "Couldn't end driving before switching modes.");
-        toast({ variant: "destructive", title: "Couldn't switch modes", description: err?.message });
-        setBusy(false);
-        return;
-      } finally {
-        setBusy(false);
-      }
-    }
-    updatePref({
-      mode: nextMode,
-      requestingRide: nextMode === "riding" ? prefs.requestingRide : false,
-    });
-  };
-
   const detectLocation = () => {
     if (!navigator.geolocation) {
       toast({ variant: "destructive", title: "Location unavailable on this device" });
@@ -398,22 +367,6 @@ export default function DriverShiftPanel() {
         }),
       { enableHighAccuracy: true, timeout: 12000 }
     );
-  };
-
-  const toggleRequestingRide = () => {
-    if (!user?.id || busy) return;
-    setToggleError("");
-    try {
-      const next = !requestingRide;
-      updatePref({ requestingRide: next, mode: "riding" });
-      toast({
-        title: next ? "Requesting a ride · ON" : "Requesting a ride · OFF",
-        description: next ? "Pickup hotspots are lit on the map." : "Ride request mode ended.",
-      });
-    } catch (err) {
-      setToggleError(err?.message || "Couldn't update ride request.");
-      toast({ variant: "destructive", title: "Toggle failed", description: err?.message });
-    }
   };
 
   const toggleDriving = async () => {
@@ -444,7 +397,7 @@ export default function DriverShiftPanel() {
           });
         }
       } else {
-        updatePref({ mode: "driving", requestingRide: false });
+        updatePref({ mode: "driving" });
         const next = await startDrivingSession(user, {
           ...prefs,
           mode: "driving",
@@ -621,78 +574,9 @@ export default function DriverShiftPanel() {
         </p>
       ) : null}
 
-      {/* Mode: Requesting a ride vs Driving */}
-      {false && <section className="titan-surface p-4 border border-border">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Mode</p>
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted border border-border">
-          <button
-            type="button"
-            onClick={() => setMode("riding")}
-            className={`flex items-center justify-center gap-2 min-h-[48px] rounded-lg text-sm font-semibold transition-colors ${
-              mode === "riding"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            aria-pressed={mode === "riding"}
-          >
-            <UserRound className="w-4 h-4" /> Requesting a ride
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("driving")}
-            className={`flex items-center justify-center gap-2 min-h-[48px] rounded-lg text-sm font-semibold transition-colors ${
-              mode === "driving"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            aria-pressed={mode === "driving"}
-          >
-            <Car className="w-4 h-4" /> Driving
-          </button>
-        </div>
-      </section>}
-
       {/* Active session toggles */}
       <section className="titan-surface p-5 border border-border">
-        {mode === "riding" ? (
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Passenger</p>
-              <h2 className="text-lg font-semibold text-foreground mt-0.5">
-                {requestingRide ? "Looking for a ride" : "Need a ride?"}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {requestingRide
-                  ? "Map hotspots are lit for busy pickup zones."
-                  : "Toggle on to light pickup hotspots near you."}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={!user?.id || busy}
-              onClick={toggleRequestingRide}
-              aria-busy={busy}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold min-h-[44px] transition-colors disabled:opacity-60 ${
-                requestingRide
-                  ? "bg-amber-500/15 text-amber-300 border border-amber-500/40"
-                  : "bg-muted text-foreground border border-border hover:bg-secondary"
-              }`}
-              aria-pressed={requestingRide}
-              aria-label={requestingRide ? "Turn off requesting a ride" : "Turn on requesting a ride"}
-            >
-              {requestingRide ? (
-                <>
-                  <ToggleRight className="w-6 h-6" /> Requesting a ride · ON
-                </>
-              ) : (
-                <>
-                  <ToggleLeft className="w-6 h-6 text-muted-foreground" /> Requesting a ride · OFF
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          <>
+        <>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary">Driver</p>
@@ -748,12 +632,14 @@ export default function DriverShiftPanel() {
             )}
 
             <ErrorBoundary message="Money Coach couldn't load.">
-              <OfferAnalyzerPanel
+              <SetForgetOfferPanel
                 userId={user?.id}
                 mpg={Number(prefs.mpg) || 22}
                 gasUsd={typeof gasUsd === "number" ? gasUsd : 3.5}
                 defaultZip={prefs.zip || ""}
                 history={history}
+                drivingActive={drivingActive}
+                voiceSeed={voiceSeed}
               />
             </ErrorBoundary>
 
@@ -761,7 +647,7 @@ export default function DriverShiftPanel() {
               <Link to="/receipts">Scan a receipt for Money Coach</Link>
             </Button>
 
-            {false && <ErrorBoundary message="Voice coach couldn't load.">
+            <ErrorBoundary message="Voice coach couldn't load.">
               <DriverVoiceCoach
                 userId={user?.id}
                 mpg={Number(prefs.mpg) || mpg || 22}
@@ -779,9 +665,11 @@ export default function DriverShiftPanel() {
                 }}
                 onPause={handlePauseSession}
                 onResume={handleResumeSession}
-                onDecision={(decision, input) => setVoiceSeed({ decision, input, at: Date.now() })}
+                onDecision={(decision, input, action = null) =>
+                  setVoiceSeed({ decision, input, action, at: Date.now() })
+                }
               />
-            </ErrorBoundary>}
+            </ErrorBoundary>
 
             {drivingActive && gpsError && (
               <p className="mt-2 text-xs text-titan-amber" role="status">
@@ -854,20 +742,17 @@ export default function DriverShiftPanel() {
                 </div>
               </div>
             )}
-          </>
-        )}
+        </>
       </section>
 
       {/* Lit hotspot map — early so it's front-and-center */}
       <section className="titan-surface p-5 border border-border">
         <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
           <div>
-            <h2 className="text-base font-semibold text-foreground">
-              {mode === "riding" ? "Pickup hotspots" : "Driver hotspots"}
-            </h2>
+            <h2 className="text-base font-semibold text-foreground">Driver hotspots</h2>
             <p className="text-sm text-muted-foreground">
               {hotspots.length} zones · {dayPartLabel(dayPart)}
-              {mapLit ? " · map lit for live demand" : ` · turn on ${mode === "riding" ? "Requesting a ride" : "Driving"} to light up`}
+              {mapLit ? " · map lit for live demand" : " · start driving to light up"}
             </p>
           </div>
           <Button type="button" size="sm" variant="outline" className="border-border" onClick={detectLocation}>

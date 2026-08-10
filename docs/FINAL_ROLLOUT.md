@@ -1,4 +1,4 @@
-# TitanOS 1.6.5 final rollout
+# TitanOS 1.6.6 final rollout
 
 ## Release candidate
 
@@ -10,7 +10,7 @@
 
 ## Play Console rollout
 
-1. Upload version code 28 to Internal testing and resolve every pre-launch report issue.
+1. Upload version code 29 to Internal testing and resolve every pre-launch report issue.
 2. Promote the identical AAB to Closed testing for at least one full business day.
 3. Start Production at 10% after crash-free startup, ANR, authentication, and core workflow checks are green.
 4. Hold at 10% for 24 hours, then move to 25%, 50%, and 100% with a 24-hour observation window at each stage.
@@ -19,5 +19,5 @@
 ## Rollback readiness
 
 - Keep the prior production AAB, signing material, database migration record, R8 mapping, and web deployment identifier available.
-- Use Play Console rollout halt for native regressions. Use a forward-fix release with a new version code; never reuse version code 28.
+- Use Play Console rollout halt for native regressions. Use a forward-fix release with a new version code; never reuse version code 29.
 - Do not ship schema changes that cannot coexist with both the prior and current app versions during the staged rollout.

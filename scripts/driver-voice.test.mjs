@@ -54,6 +54,13 @@ describe("Driver voice commands", () => {
     assert.match(cmd.reply, /decide/i);
   });
 
+  it("records spoken accepted and declined actions separately from recommendations", () => {
+    assert.deepEqual(parseVoiceCommand("I accepted it").payload, { action: "ACCEPT" });
+    assert.equal(parseVoiceCommand("I accepted it").intent, "record_offer_action");
+    assert.deepEqual(parseVoiceCommand("I declined it").payload, { action: "DENY" });
+    assert.equal(parseVoiceCommand("should I accept 12 dollars 5 miles 20 minutes").intent, "decide_offer");
+  });
+
   it("extracts loose offers from mixed speech", () => {
     const o = extractLooseOffer("offer is 9 dollars for 6 miles in 25 minutes zip 75201");
     assert.equal(o.pay, 9);

@@ -161,31 +161,79 @@ export function acceptDenyMileStats(userId) {
       denied_count: 0,
       avg_accepted_per_mile: null,
       avg_denied_per_mile: null,
+      avg_accepted_per_hour: null,
+      avg_denied_per_hour: null,
       personal_floor_per_mile: null,
+      personal_floor_per_hour: null,
+      agreement_rate: null,
     };
   }
   const raw = readLocal(PREFIX, userId, DECISIONS_KEY, []);
   const rows = (Array.isArray(raw) ? raw : []).slice(0, 100);
   const accepted = [];
   const denied = [];
+  const acceptedHourly = [];
+  const deniedHourly = [];
+  let agreements = 0;
+  let acted = 0;
   for (const r of rows) {
-    const pay = num(r.pay);
-    const miles = num(r.miles);
-    if (pay <= 0 || miles <= 0) continue;
-    const pm = pay / miles;
-    if (r.verdict === "ACCEPT") accepted.push(pm);
-    if (r.verdict === "DENY") denied.push(pm);
+    // Recommendation-only rows are never training data. Titan learns from what
+    // the driver actually tapped or said, not from its own previous verdicts.
+    const action = String(r.user_action || "").toUpperCase();
+    if (r.record_type !== "action" || !["ACCEPT", "DENY"].includes(action)) continue;
+    acted += 1;
+    if (r.followed_recommendation === true) agreements += 1;
+
+    const pay = num(r.gross, num(r.pay) + num(r.tip));
+    const miles = num(r.total_miles, num(r.miles));
+    const pm = num(r.gross_per_mile, miles > 0 ? pay / miles : 0);
+    const hourly = num(r.hourly_net);
+    if (pm > 0) (action === "ACCEPT" ? accepted : denied).push(pm);
+    if (hourly > 0) (action === "ACCEPT" ? acceptedHourly : deniedHourly).push(hourly);
   }
-  const avg = (arr) =>
-    arr.length ? Math.round((arr.reduce((s, n) => s + n, 0) / arr.length) * 100) / 100 : null;
+
+  const round = (n) => Math.round(num(n) * 100) / 100;
+  const avg = (arr) => (arr.length ? round(arr.reduce((s, n) => s + n, 0) / arr.length) : null);
+  const percentile = (arr, p) => {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const index = (sorted.length - 1) * p;
+    const lo = Math.floor(index);
+    const hi = Math.ceil(index);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (index - lo);
+  };
+  // Rows are newest-first. Exponential weighting adapts quickly while a lower
+  // quartile anchor prevents one unusually good offer from inflating the floor.
+  const recentWeighted = (arr) => {
+    if (!arr.length) return null;
+    let total = 0;
+    let weightTotal = 0;
+    arr.forEach((value, index) => {
+      const weight = 0.82 ** index;
+      total += value * weight;
+      weightTotal += weight;
+    });
+    return total / weightTotal;
+  };
+  const learnedFloor = (arr) => {
+    if (arr.length < 3) return null;
+    const lowerQuartile = percentile(arr, 0.25);
+    const median = percentile(arr, 0.5);
+    const recent = recentWeighted(arr);
+    return round(lowerQuartile * 0.5 + median * 0.3 + recent * 0.2);
+  };
+
   return {
     accepted_count: accepted.length,
     denied_count: denied.length,
     avg_accepted_per_mile: avg(accepted),
     avg_denied_per_mile: avg(denied),
-    /** Soft floor: don't accept below your own accept average * 0.9 when enough samples */
-    personal_floor_per_mile:
-      accepted.length >= 3 ? Math.round(avg(accepted) * 0.9 * 100) / 100 : null,
+    avg_accepted_per_hour: avg(acceptedHourly),
+    avg_denied_per_hour: avg(deniedHourly),
+    personal_floor_per_mile: learnedFloor(accepted),
+    personal_floor_per_hour: learnedFloor(acceptedHourly),
+    agreement_rate: acted ? round((agreements / acted) * 100) : null,
   };
 }
 

@@ -6,8 +6,15 @@ import {
   decideOfferSetForget,
   getAutopilotProfile,
   resolveAutopilotThresholds,
+  logAutopilotDecision,
+  recordAutopilotAction,
+  listAutopilotActions,
   AUTOPILOT_PROFILES,
 } from "../src/lib/driverActivity/autopilot.js";
+import {
+  acceptDenyMileStats,
+  ultimateWorthPerMile,
+} from "../src/lib/driverActivity/trueCostPerMile.js";
 import { buildZipBenchmarks } from "../src/lib/driverActivity/zipBenchmarks.js";
 
 describe("Set-&-forget autopilot", () => {
@@ -108,6 +115,7 @@ describe("Set-&-forget autopilot", () => {
     assert.equal(d.verdict, "ACCEPT");
     assert.equal(d.moneyFirst, true);
     assert.ok(d.money);
+    assert.ok(d.minimum_offer_pay > 0);
   });
 
   it("DENY weak offers under strict profile", () => {
@@ -214,5 +222,54 @@ describe("Set-&-forget autopilot", () => {
     });
     assert.ok(s.overall <= 100);
     assert.ok(s.hourly >= 70);
+  });
+
+  it("learns minimums only from the driver's real actions", () => {
+    const userId = `adaptive-${Date.now()}`;
+    const decision = {
+      verdict: "ACCEPT",
+      spectrum: { overall: 82 },
+      money: { delta_per_hour: 5 },
+      breakdown: {
+        gross: 12,
+        totalMiles: 6,
+        perMileGross: 2,
+        perMileNet: 1.4,
+        hourlyNet: 24,
+      },
+      filled: { pay: 12, tip: 0, miles: 6, minutes: 30 },
+      profileId: "balanced",
+    };
+
+    logAutopilotDecision(userId, decision, decision.filled);
+    assert.equal(acceptDenyMileStats(userId).accepted_count, 0);
+
+    for (const pay of [12, 13.2, 14.4]) {
+      const perMile = pay / 6;
+      recordAutopilotAction(
+        userId,
+        {
+          ...decision,
+          breakdown: {
+            ...decision.breakdown,
+            gross: pay,
+            perMileGross: perMile,
+            hourlyNet: pay * 2,
+          },
+        },
+        { ...decision.filled, pay },
+        "ACCEPT"
+      );
+    }
+
+    const learned = acceptDenyMileStats(userId);
+    assert.equal(learned.accepted_count, 3);
+    assert.ok(learned.personal_floor_per_mile >= 2);
+    assert.ok(learned.personal_floor_per_hour >= 24);
+    assert.equal(listAutopilotActions(userId, 10).length, 3);
+    const thresholds = resolveAutopilotThresholds(userId, { profileId: "chill" });
+    assert.ok(thresholds.minHourlyAccept >= learned.personal_floor_per_hour);
+    const worth = ultimateWorthPerMile({ userId, mpg: 24, gasUsd: 3.5, totalMiles: 5 });
+    assert.ok(worth.recommended_min_gross_per_mile >= learned.personal_floor_per_mile);
   });
 });

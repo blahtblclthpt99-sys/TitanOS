@@ -184,6 +184,15 @@ export function parseVoiceCommand(utterance = "") {
     return { intent: "repeat_decision", reply: null };
   }
 
+  // Record what happened after the driver acts in the delivery app. Past-tense
+  // wording avoids colliding with questions such as "should I accept?".
+  if (/\b(i\s+)?(accepted|took|picked up)\b|\bi took it\b|\baccepted it\b/.test(text)) {
+    return { intent: "record_offer_action", payload: { action: "ACCEPT" }, reply: null };
+  }
+  if (/\b(i\s+)?(declined|denied|skipped|passed)\b|\bi passed on it\b|\bdeclined it\b/.test(text)) {
+    return { intent: "record_offer_action", payload: { action: "DENY" }, reply: null };
+  }
+
   // Export
   if (/\b(export|download)\b.*\b(excel|spreadsheet|report|csv)\b/.test(text)) {
     return { intent: "export_report", reply: "Open logbook and download your Excel report — I can’t force the download from voice alone." };
@@ -309,5 +318,7 @@ export function getSpeechRecognitionCtor() {
 }
 
 export function isVoiceSupported() {
-  return Boolean(getSpeechRecognitionCtor()) && typeof window !== "undefined" && !!window.speechSynthesis;
+  // Recognition is required. Spoken feedback already falls back to on-screen
+  // text on devices that do not expose speech synthesis.
+  return Boolean(getSpeechRecognitionCtor());
 }

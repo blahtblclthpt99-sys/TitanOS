@@ -227,10 +227,10 @@ export default function SetForgetOfferPanel({
   const coachCard = useMemo(() => formatOfferCoachCard(decision), [decision]);
   const verdictStyle =
     decision?.verdict === "ACCEPT"
-      ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
+      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100"
       : decision?.verdict === "DENY"
-        ? "border-red-500/50 bg-red-500/20 text-red-300"
-        : "border-titan-amber/40 bg-titan-amber/10 text-titan-amber";
+        ? "border-red-500/50 bg-red-500/15 text-red-950 dark:bg-red-500/20 dark:text-red-100"
+        : "border-amber-500/50 bg-amber-500/15 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100";
   const VerdictIcon =
     decision?.verdict === "ACCEPT"
       ? CheckCircle2

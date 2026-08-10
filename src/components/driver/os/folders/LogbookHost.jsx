@@ -7,7 +7,7 @@ import {
 } from "@/lib/driverHubApi";
 
 /** Shared logbook host — Vehicle / Expenses / Tax / Reports folders. */
-export default function LogbookHost({ user }) {
+export default function LogbookHost({ user, mode }) {
   const data = useMemo(() => {
     if (!user?.id) return { history: [], session: null, stops: [] };
     return {
@@ -27,6 +27,7 @@ export default function LogbookHost({ user }) {
       history={data.history}
       liveSession={data.session?.active ? data.session : null}
       stops={data.stops}
+      mode={mode}
     />
   );
 }

@@ -14,7 +14,6 @@ import {
 import { classifyRushWindow, detectRushIntensity } from "@/lib/driverActivity/intelligence.js";
 import { readActiveDelivery, liveSnapshot, DD_STAGE_META, readDoorDashHistory } from "@/lib/driverActivity/doorDashWorkflow.js";
 import { composeSmartCoachTip } from "@/lib/driverActivity/driverCoach.js";
-import { readDriverGoals } from "@/lib/driverActivity/goals.js";
 import { resolveWorkflowPhase, phaseLabel } from "@/lib/driverOs/workflowEngine.js";
 
 function batteryStatus() {
@@ -95,16 +94,6 @@ export function buildMissionSnapshot(userId, extra = {}) {
   const workflowPhase = resolveWorkflowPhase({ session, delivery: dd });
   const idleSec = Number(session?.idle_sec || 0) || 0;
   const driveSec = Number(session?.drive_sec || 0) || 0;
-  let goals = {};
-  try {
-    goals = readDriverGoals(userId) || {};
-  } catch {
-    goals = {};
-  }
-  const goalEarn = Number(goals?.daily_earnings || 0) || 0;
-  const earnNow = Number(dash?.earnings?.gross || 0) || 0;
-  const goalPct = goalEarn > 0 ? Math.min(100, Math.round((earnNow / goalEarn) * 100)) : null;
-
   const apps = Array.isArray(session?.apps) ? session.apps : prefs.connectedApps || [];
   const platform =
     dd?.orderTypeLabel ||
@@ -139,7 +128,6 @@ export function buildMissionSnapshot(userId, extra = {}) {
   const net = netStatus();
   const bat = extra.battery || batteryStatus();
   const miles = Number(dash?.miles ?? session?.miles ?? 0) || 0;
-  const profit = Number(dash?.profit ?? 0) || 0;
 
   return {
     active: Boolean(session?.active),
@@ -147,16 +135,12 @@ export function buildMissionSnapshot(userId, extra = {}) {
     platform: String(platform || "Idle"),
     stage: String(stage || "Off shift"),
     stageMeta: ddLive?.stage || DD_STAGE_META?.[ddLive?.screen] || null,
-    earnings: earnNow,
-    earningsLabel: `$${earnNow.toFixed(2)}`,
     shiftTimeSec: dash?.elapsedSec || 0,
     shiftTimeLabel: formatDuration(dash?.elapsedSec || 0),
     tripTimerLabel: ddLive?.primaryHms || formatDuration(dash?.driveSec || 0),
     miles,
     speedMph: Number(session?.avg_speed_mph || 0) || 0,
     maxSpeedMph: Number(session?.max_speed_mph || 0) || 0,
-    profit,
-    profitLabel: `$${profit.toFixed(2)}`,
     gpsOk: dd ? dd.gpsAvailable !== false : Boolean(prefs.autoTrack !== false && session?.active),
     gpsLabel: (dd ? dd.gpsAvailable !== false : session?.active) ? "GPS live" : "GPS idle",
     battery: bat,
@@ -177,8 +161,6 @@ export function buildMissionSnapshot(userId, extra = {}) {
     idleLabel: formatDuration(idleSec),
     driveSec,
     driveLabel: formatDuration(driveSec),
-    goalPct,
-    goalLabel: goalPct != null ? `${goalPct}% of $${goalEarn}` : "No daily goal set",
     aiTip: String(aiTip).slice(0, 220),
     driverStatus: !session?.active
       ? "Off shift"

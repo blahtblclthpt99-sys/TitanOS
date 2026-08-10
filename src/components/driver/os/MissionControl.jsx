@@ -10,7 +10,6 @@ import {
   Signal,
   Sparkles,
   Timer,
-  Wallet,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,23 +60,31 @@ export default function MissionControl({ userId, onOpenFolder }) {
   const [snap, setSnap] = useState(() => (userId ? safeSnapshot(userId) : null));
   const [battery, setBattery] = useState(null);
   const [systemsOpen, setSystemsOpen] = useState(false);
+  const isLive = Boolean(snap?.active);
 
   useEffect(() => {
     let cancelled = false;
+    let batteryManager = null;
+    let syncBattery = null;
     if (typeof navigator !== "undefined" && navigator.getBattery) {
       navigator
         .getBattery()
         .then((b) => {
           if (cancelled) return;
-          const sync = () => setBattery({ level: b.level, charging: b.charging });
-          sync();
-          b.addEventListener("levelchange", sync);
-          b.addEventListener("chargingchange", sync);
+          batteryManager = b;
+          syncBattery = () => setBattery({ level: b.level, charging: b.charging });
+          syncBattery();
+          b.addEventListener("levelchange", syncBattery);
+          b.addEventListener("chargingchange", syncBattery);
         })
         .catch(() => {});
     }
     return () => {
       cancelled = true;
+      if (batteryManager && syncBattery) {
+        batteryManager.removeEventListener("levelchange", syncBattery);
+        batteryManager.removeEventListener("chargingchange", syncBattery);
+      }
     };
   }, []);
 
@@ -95,7 +102,8 @@ export default function MissionControl({ userId, onOpenFolder }) {
     window.addEventListener("online", refresh);
     window.addEventListener("offline", refresh);
     window.addEventListener("focus", refresh);
-    let id = window.setInterval(refresh, 1000);
+    const refreshInterval = isLive ? 1000 : 15_000;
+    let id = window.setInterval(refresh, refreshInterval);
     const onVis = () => {
       if (document.visibilityState === "hidden") {
         window.clearInterval(id);
@@ -103,7 +111,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
         return;
       }
       refresh();
-      if (!id) id = window.setInterval(refresh, 1000);
+      if (!id) id = window.setInterval(refresh, refreshInterval);
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -114,7 +122,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
       document.removeEventListener("visibilitychange", onVis);
       if (id) window.clearInterval(id);
     };
-  }, [userId, battery]);
+  }, [userId, battery, isLive]);
 
   if (!userId) {
     return (
@@ -136,7 +144,7 @@ export default function MissionControl({ userId, onOpenFolder }) {
   }
 
   const intent = resolveDriverIntent(snap);
-  const live = Boolean(snap.active);
+  const live = isLive;
 
   return (
     <section
@@ -177,21 +185,21 @@ export default function MissionControl({ userId, onOpenFolder }) {
       <p className="text-xs text-muted-foreground -mt-1">{intent.nextHint}</p>
 
       {/* Essential metrics only */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <McCard icon={Activity} label="Stage" value={snap.stage} sub={snap.workflowPhaseLabel} accent="amber" />
-        <McCard
-          icon={Wallet}
-          label="Earnings"
-          value={snap.earningsLabel}
-          sub={snap.profitLabel}
-          accent="emerald"
-        />
         <McCard
           icon={Timer}
           label="Shift"
           value={snap.shiftTimeLabel}
           sub={snap.active ? `Idle ${snap.idleLabel}` : undefined}
           accent="cyan"
+        />
+        <McCard
+          icon={MapPin}
+          label="Miles"
+          value={Number(snap.miles || 0).toFixed(1)}
+          sub={snap.gpsLabel}
+          accent={snap.gpsOk ? "emerald" : "slate"}
         />
       </div>
 
@@ -204,7 +212,6 @@ export default function MissionControl({ userId, onOpenFolder }) {
         <span className="text-xs text-muted-foreground truncate">
           Systems · {snap.rushLabel}
           {snap.rushIntensityLabel ? ` · ${snap.rushIntensityLabel}` : ""} · {snap.gpsLabel} · {snap.netLabel}
-          {snap.goalPct != null ? ` · ${snap.goalPct}% goal` : ""}
         </span>
         <ChevronDown
           className={cn(
@@ -238,13 +245,6 @@ export default function MissionControl({ userId, onOpenFolder }) {
             label="Network"
             value={snap.netLabel}
             accent={snap.net?.online ? "emerald" : "rose"}
-          />
-          <McCard
-            icon={Activity}
-            label="Goal"
-            value={snap.goalPct != null ? `${snap.goalPct}%` : "—"}
-            sub={snap.goalLabel}
-            accent="cyan"
           />
           <McCard icon={Timer} label="Trip timer" value={snap.tripTimerLabel} accent="cyan" />
           <McCard

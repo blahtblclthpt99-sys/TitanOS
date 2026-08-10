@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
+import { readFile } from "node:fs/promises";
 import {
   applyTagRules,
   purposeMeta,
@@ -73,5 +74,22 @@ describe("Vehicle Logbook", () => {
     assert.equal(t.work_miles, 10);
     assert.equal(t.personal_miles, 7);
     assert.equal(t.needs_review, 1);
+  });
+
+  it("gives each Driver Hub folder one distinct logbook responsibility", async () => {
+    const [reports, expenses, vehicle, panel, mission] = await Promise.all([
+      readFile(new URL("../src/components/driver/os/folders/ReportsFolder.jsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/components/driver/os/folders/ExpensesFolder.jsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/components/driver/os/folders/VehicleFolder.jsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/components/driver/activity/VehicleLogbookPanel.jsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/components/driver/os/MissionControl.jsx", import.meta.url), "utf8"),
+    ]);
+    assert.match(reports, /mode="reports"/);
+    assert.match(expenses, /mode="expenses"/);
+    assert.match(vehicle, /mode="vehicle"/);
+    assert.match(panel, /reports: \{ report: true, mileage: false/);
+    assert.match(panel, /expenses: \{ report: false, mileage: true/);
+    assert.match(panel, /vehicle: \{ report: false, mileage: false, fuel: true/);
+    assert.doesNotMatch(mission, /label="Earnings"|earningsLabel|profitLabel/);
   });
 });

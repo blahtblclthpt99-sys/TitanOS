@@ -34,6 +34,7 @@ export default function DriverHub() {
   const qParam = params.get("q") || "";
   const [refreshTick, setRefreshTick] = useState(0);
   const [forceOpenId, setForceOpenId] = useState(null);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine !== false);
 
   const explorer = useMemo(() => {
     void refreshTick;
@@ -48,6 +49,16 @@ export default function DriverHub() {
     setSearch(explorer.search || "");
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per user
 
+  useEffect(() => {
+    const syncOnline = () => setOnline(navigator.onLine !== false);
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOnline);
+    };
+  }, []);
+
   // Deep-link: ?folder= or legacy ?tab=
   useEffect(() => {
     const target =
@@ -56,8 +67,8 @@ export default function DriverHub() {
       null;
     if (!target) return;
     setForceOpenId(target);
-    setOpenMap((prev) => {
-      const next = { ...prev, [target]: true };
+    setOpenMap(() => {
+      const next = { [target]: true };
       if (user?.id) writeExplorerState(user.id, { open: next, search });
       return next;
     });
@@ -68,7 +79,7 @@ export default function DriverHub() {
     setSearch(qParam);
     if (user?.id) setExplorerSearch(user.id, qParam);
     setForceOpenId("directory");
-    setOpenMap((prev) => ({ ...prev, directory: true }));
+    setOpenMap({ directory: true });
   }, [qParam, user?.id]);
 
   // Debounced persist of search text
@@ -100,7 +111,7 @@ export default function DriverHub() {
   const onToggle = useCallback(
     (id) => {
       if (!user?.id) {
-        setOpenMap((prev) => ({ ...prev, [id]: !prev[id] }));
+        setOpenMap((prev) => (prev[id] ? {} : { [id]: true }));
         setForceOpenId(null);
         return;
       }
@@ -123,11 +134,15 @@ export default function DriverHub() {
   const onOpenFolder = useCallback(
     (id) => {
       setForceOpenId(id);
-      setOpenMap((prev) => {
-        const next = { ...prev, [id]: true };
+      setOpenMap(() => {
+        const next = { [id]: true };
         if (user?.id) writeExplorerState(user.id, { open: next, search });
         return next;
       });
+      const p = new URLSearchParams(params);
+      p.set("folder", id);
+      p.delete("tab");
+      setParams(p, { replace: true });
       requestAnimationFrame(() => {
         document.getElementById(`driver-os-folder-${id}`)?.scrollIntoView({
           behavior: "smooth",
@@ -135,7 +150,7 @@ export default function DriverHub() {
         });
       });
     },
-    [user?.id, search]
+    [user?.id, search, params, setParams]
   );
 
   const refresh = useCallback(async () => {
@@ -183,7 +198,7 @@ export default function DriverHub() {
           </div>
         </header>
 
-        {false ? (
+        {!online ? (
           <div
             role="status"
             className="flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100"

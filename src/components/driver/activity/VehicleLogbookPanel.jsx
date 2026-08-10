@@ -50,11 +50,20 @@ import {
 } from "@/lib/driverActivity/vehicleLogbook";
 import { cn } from "@/lib/utils";
 
+const LOGBOOK_MODES = Object.freeze({
+  all: { report: true, mileage: true, fuel: true, expenses: true, service: true },
+  reports: { report: true, mileage: false, fuel: false, expenses: false, service: false },
+  expenses: { report: false, mileage: true, fuel: false, expenses: true, service: false },
+  vehicle: { report: false, mileage: false, fuel: true, expenses: false, service: true },
+  tax: { report: false, mileage: true, fuel: false, expenses: false, service: false },
+});
+
 /**
  * Titan Vehicle Logbook — classify miles, fuel, expenses, reminders.
  * Original TitanOS design; not affiliated with any third-party mileage app.
  */
-export default function VehicleLogbookPanel({ userId, history = [], liveSession = null, stops = [] }) {
+export default function VehicleLogbookPanel({ userId, history = [], liveSession = null, stops = [], mode = "all" }) {
+  const sections = LOGBOOK_MODES[mode] || LOGBOOK_MODES.all;
   const [tick, setTick] = useState(0);
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [fuelForm, setFuelForm] = useState({
@@ -186,6 +195,20 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
     toast({ title: "Expense saved" });
   };
 
+  const removeFuel = (id) => {
+    if (!window.confirm("Remove this fuel entry?")) return;
+    deleteFuelLog(userId, id);
+    setTick((t) => t + 1);
+    toast({ title: "Fuel entry removed" });
+  };
+
+  const removeExpense = (id) => {
+    if (!window.confirm("Remove this expense?")) return;
+    deleteVehicleExpense(userId, id);
+    setTick((t) => t + 1);
+    toast({ title: "Expense removed" });
+  };
+
   const addReminder = (e) => {
     e.preventDefault();
     if (!userId || !reminderTitle.trim()) return;
@@ -210,20 +233,27 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
   return (
     <div className="space-y-4">
       <FeatureHonestyBanner tone="info">
-        <strong>Titan Vehicle Logbook</strong> keeps drive timer and idle timer separate on every
-        trip. Download the Excel spreadsheet for your day. Not tax advice — and not affiliated with
-        any other mileage brand.
+        {mode === "reports" ? (
+          <><strong>One daily report.</strong> Review every timer here, then export Excel or CSV.</>
+        ) : mode === "vehicle" ? (
+          <><strong>Vehicle care.</strong> Track fuel economy and keep service reminders together.</>
+        ) : (
+          <><strong>Mileage and expenses.</strong> Classify trips and keep deductible records organized. Not tax advice.</>
+        )}
       </FeatureHonestyBanner>
 
-      <section className="titan-surface p-4 space-y-3 border border-titan-cyan/20">
+      {sections.report ? <section className="titan-surface p-4 space-y-3 border border-titan-cyan/20">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">End-of-day trip report</h2>
-          <Input
-            type="date"
-            value={reportDate}
-            onChange={(e) => setReportDate(e.target.value)}
-            className="h-9 w-[160px] bg-muted border-border"
-          />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Date</span>
+            <Input
+              type="date"
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+              className="h-10 w-[160px] bg-muted border-border"
+            />
+          </label>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <div className="rounded-xl border border-border bg-card/60 px-3 py-2.5">
@@ -292,9 +322,9 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             No trips for this date yet. Drive with Auto GPS — each stop saves its own trip timers.
           </p>
         )}
-      </section>
+      </section> : null}
 
-      <section className="titan-surface p-4 space-y-3">
+      {sections.mileage ? <section className="titan-surface p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-titan-cyan" /> Mileage logbook
@@ -330,9 +360,9 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             {rules[0]?.enabled ? "On" : "Off"}
           </Button>
         </div>
-      </section>
+      </section> : null}
 
-      <section className="titan-surface p-4 space-y-2">
+      {sections.mileage ? <section className="titan-surface p-4 space-y-2">
         <h3 className="text-sm font-semibold">Trips — tap to classify</h3>
         {enriched.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -375,7 +405,7 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
                       type="button"
                       onClick={() => classify(t.id, p.id)}
                       className={cn(
-                        "text-[11px] rounded-lg border px-2.5 py-1.5 min-h-[36px]",
+                        "text-[11px] rounded-lg border px-3 py-2 min-h-[44px]",
                         t.purpose === p.id
                           ? "border-primary bg-primary/15 text-foreground"
                           : "border-border text-muted-foreground hover:text-foreground"
@@ -390,10 +420,10 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             ))}
           </ul>
         )}
-      </section>
+      </section> : null}
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <section className="titan-surface p-4 space-y-3">
+      {sections.fuel || sections.expenses ? <div className="grid md:grid-cols-2 gap-4">
+        {sections.fuel ? <section className="titan-surface p-4 space-y-3">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Fuel className="w-4 h-4 text-titan-cyan" /> Fuel log
           </h3>
@@ -404,7 +434,9 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
           <form onSubmit={addFuel} className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Gallons"
+              aria-label="Gallons"
               type="number"
+              min="0"
               step="0.01"
               value={fuelForm.gallons}
               onChange={(e) => setFuelForm((f) => ({ ...f, gallons: e.target.value }))}
@@ -412,7 +444,9 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             />
             <Input
               placeholder="Total $"
+              aria-label="Fuel total cost"
               type="number"
+              min="0"
               step="0.01"
               value={fuelForm.total_cost}
               onChange={(e) => setFuelForm((f) => ({ ...f, total_cost: e.target.value }))}
@@ -420,13 +454,16 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             />
             <Input
               placeholder="Odometer"
+              aria-label="Odometer"
               type="number"
+              min="0"
               value={fuelForm.odometer}
               onChange={(e) => setFuelForm((f) => ({ ...f, odometer: e.target.value }))}
               className="h-9 bg-muted border-border"
             />
             <Input
               placeholder="Station"
+              aria-label="Fuel station"
               value={fuelForm.station}
               onChange={(e) => setFuelForm((f) => ({ ...f, station: e.target.value }))}
               className="h-9 bg-muted border-border"
@@ -444,25 +481,24 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    deleteFuelLog(userId, f.id);
-                    setTick((t) => t + 1);
-                  }}
+                  aria-label={`Remove fuel entry from ${f.date}`}
+                  onClick={() => removeFuel(f.id)}
                 >
                   Remove
                 </button>
               </li>
             ))}
           </ul>
-        </section>
+        </section> : null}
 
-        <section className="titan-surface p-4 space-y-3">
+        {sections.expenses ? <section className="titan-surface p-4 space-y-3">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Receipt className="w-4 h-4 text-titan-cyan" /> Vehicle expenses
           </h3>
           <form onSubmit={addExpense} className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <select
+                aria-label="Expense category"
                 value={expForm.category}
                 onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}
                 className="h-9 rounded-md bg-muted border border-border text-sm px-2"
@@ -475,8 +511,11 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
               </select>
               <Input
                 placeholder="Amount $"
+                aria-label="Expense amount"
                 type="number"
+                min="0"
                 step="0.01"
+                required
                 value={expForm.amount}
                 onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))}
                 className="h-9 bg-muted border-border"
@@ -484,6 +523,7 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             </div>
             <Input
               placeholder="Vendor / note"
+              aria-label="Expense vendor or note"
               value={expForm.vendor}
               onChange={(e) => setExpForm((f) => ({ ...f, vendor: e.target.value }))}
               className="h-9 bg-muted border-border"
@@ -501,20 +541,18 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    deleteVehicleExpense(userId, x.id);
-                    setTick((t) => t + 1);
-                  }}
+                  aria-label={`Remove ${x.category} expense from ${x.date}`}
+                  onClick={() => removeExpense(x.id)}
                 >
                   Remove
                 </button>
               </li>
             ))}
           </ul>
-        </section>
-      </div>
+        </section> : null}
+      </div> : null}
 
-      <section className="titan-surface p-4 space-y-3">
+      {sections.service ? <section className="titan-surface p-4 space-y-3">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Wrench className="w-4 h-4 text-titan-cyan" /> Service reminders
         </h3>
@@ -522,12 +560,14 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
           <Input
             placeholder="Oil change, tires…"
             value={reminderTitle}
+            aria-label="Service reminder"
             onChange={(e) => setReminderTitle(e.target.value)}
             className="h-9 bg-muted border-border flex-1 min-w-[140px]"
           />
           <Input
             type="date"
             value={reminderDue}
+            aria-label="Service reminder due date"
             onChange={(e) => setReminderDue(e.target.value)}
             className="h-9 bg-muted border-border w-[150px]"
           />
@@ -537,7 +577,7 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
         </form>
         <ul className="space-y-1">
           {reminders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No reminders yet.</p>
+            <li className="text-sm text-muted-foreground">No reminders yet.</li>
           ) : (
             reminders.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 text-sm py-1.5 border-b border-border">
@@ -559,7 +599,7 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             ))
           )}
         </ul>
-      </section>
+      </section> : null}
     </div>
   );
 }

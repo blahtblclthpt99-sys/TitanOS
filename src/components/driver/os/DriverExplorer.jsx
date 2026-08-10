@@ -84,6 +84,20 @@ const FOLDER_BODY = {
   doordash: DoorDashFolder,
 };
 
+const ACTIVE_FOLDER_IDS = new Set([
+  "live-shift",
+  "doordash",
+  "todays-orders",
+  "trip-history",
+  "analytics",
+  "expenses",
+  "goals",
+  "vehicle",
+  "reports",
+  "settings",
+  "directory",
+]);
+
 function FolderRow({ folder, open, summary, onToggle, children }) {
   const Icon = ICONS[folder.icon] || Folder;
   return (
@@ -143,12 +157,8 @@ export default function DriverExplorer({
   refreshTick = 0,
 }) {
   const q = String(search || "").trim().toLowerCase();
-  const activeFolderIds = new Set([
-    "live-shift", "todays-orders", "trip-history", "expenses", "goals", "vehicle", "reports", "settings",
-  ]);
-
   const folders = useMemo(() => {
-    const active = DRIVER_OS_FOLDERS.filter((folder) => activeFolderIds.has(folder.id));
+    const active = DRIVER_OS_FOLDERS.filter((folder) => ACTIVE_FOLDER_IDS.has(folder.id));
     if (!q) return active;
     return active.filter(
       (f) =>
@@ -161,9 +171,19 @@ export default function DriverExplorer({
 
   const grouped = useMemo(() => {
     if (q) return [{ id: "search", label: "Results", folders }];
+    const groupIds = {
+      drive: ["live-shift", "doordash"],
+      today: ["todays-orders"],
+      records: ["trip-history", "expenses", "reports"],
+      insights: ["analytics", "goals"],
+      setup: ["vehicle", "directory", "settings"],
+    };
     return [
-      { id: "drive", label: "Drive", folders: folders.filter((f) => f.id === "live-shift") },
-      { id: "details", label: "Details", folders: folders.filter((f) => f.id !== "live-shift") },
+      { id: "drive", label: "Drive", folders: folders.filter((f) => groupIds.drive.includes(f.id)) },
+      { id: "today", label: "Today", folders: folders.filter((f) => groupIds.today.includes(f.id)) },
+      { id: "records", label: "Records", folders: folders.filter((f) => groupIds.records.includes(f.id)) },
+      { id: "insights", label: "Insights", folders: folders.filter((f) => groupIds.insights.includes(f.id)) },
+      { id: "setup", label: "Setup", folders: folders.filter((f) => groupIds.setup.includes(f.id)) },
     ].filter((group) => group.folders.length > 0);
   }, [folders, q]);
 
@@ -197,11 +217,12 @@ export default function DriverExplorer({
                 {group.label}
               </h3>
             ) : null}
-            {group.folders.map((folder) => {
-              const open = Boolean(openMap?.[folder.id] || (forceOpenId && forceOpenId === folder.id));
-              const Body = FOLDER_BODY[folder.id];
-              return (
-                <div key={folder.id} id={`driver-os-folder-${folder.id}`}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {group.folders.map((folder) => {
+                const open = Boolean(openMap?.[folder.id] || (forceOpenId && forceOpenId === folder.id));
+                const Body = FOLDER_BODY[folder.id];
+                return (
+                <div key={folder.id} id={`driver-os-folder-${folder.id}`} className={cn(open && "sm:col-span-2")}>
                   <FolderRow
                     folder={folder}
                     open={open}
@@ -217,12 +238,16 @@ export default function DriverExplorer({
                     ) : null}
                   </FolderRow>
                 </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ))}
         {folders.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No folders match that search.</p>
+          <div className="rounded-xl border border-dashed border-border p-6 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">No folders match “{search.trim()}”.</p>
+            <button type="button" className="text-sm font-semibold text-primary min-h-[44px] px-3" onClick={() => onSearchChange?.("")}>Clear search</button>
+          </div>
         ) : null}
       </div>
     </section>

@@ -75,6 +75,7 @@ const Leads = lazy(() => import("@/pages/Leads"));
 const GrowthCoach = lazy(() => import("@/pages/GrowthCoach"));
 const TitanScore = lazy(() => import("@/pages/TitanScore"));
 const MarketingStudio = lazy(() => import("@/pages/MarketingStudio"));
+const LeadOutreach = lazy(() => import("@/pages/LeadOutreach"));
 const LocalDeals = lazy(() => import("@/pages/LocalDeals"));
 const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
 const Escrow = lazy(() => import("@/pages/Escrow"));
@@ -122,6 +123,7 @@ const NON_TAB_ROUTES = {
   "/growth-coach": GrowthCoach,
   "/titan-score": TitanScore,
   "/marketing": MarketingStudio,
+  "/lead-outreach": LeadOutreach,
   "/deals": LocalDeals,
   "/emergency": EmergencyJobs,
   "/escrow": Escrow,

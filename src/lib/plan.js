@@ -178,6 +178,7 @@ export const PRO_FEATURES = Object.freeze({
   unlimitedInvoices: "unlimited_invoices",
   driverAddons: "driver_addons",
   titanComPersist: "titancom_persist",
+  leadOutreach: "lead_outreach",
 });
 
 /** Features unlocked on Starter ($4.99) — Pro adds the rest of PAID_WORKER_FEATURES. */
@@ -207,6 +208,7 @@ const PAID_WORKER_FEATURES = new Set([
   // driverAddons intentionally free — Driver Hub is not a paid add-on
   PRO_FEATURES.titanComPersist,
   PRO_FEATURES.gpsCheckIn,
+  PRO_FEATURES.leadOutreach,
 ]);
 
 const PLAN_ALIASES = Object.freeze({

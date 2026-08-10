@@ -43,6 +43,7 @@
     "test:hardening": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/production-hardening.test.mjs",
     "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs",
     "test:api": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/api-error.test.mjs",
+    "test:lead-outreach": "node --test scripts/lead-outreach.test.mjs",
     "test:comms": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/titancom-channels.test.mjs",
     "test:export": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/export-stack.test.mjs",
     "test:search": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/search-index.test.mjs",

@@ -44,6 +44,7 @@ import {
   Landmark,
   Radio,
   Workflow,
+  Radar,
 } from "lucide-react";
 
 /**
@@ -90,6 +91,7 @@ export const APP_NAV_ITEMS = [
   // —— AI
   { icon: Bot, label: "Titan AI", path: "/assistant", group: "ai" },
   { icon: Megaphone, label: "AI Marketing", path: "/marketing", group: "ai" },
+  { icon: Radar, label: "Lead Workers", path: "/lead-outreach", group: "ai" },
   { icon: Sparkles, label: "Growth Coach", path: "/growth-coach", group: "ai" },
   { icon: Workflow, label: "Titan Autopilot", path: "/autopilot", group: "ai" },
 
@@ -186,7 +188,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "AI",
     description: "Assistants and coaching",
-    paths: ["/assistant", "/marketing", "/growth-coach", "/autopilot"],
+    paths: ["/assistant", "/marketing", "/lead-outreach", "/growth-coach", "/autopilot"],
   },
   {
     title: "Configuration",

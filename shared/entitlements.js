@@ -23,6 +23,7 @@ export const FEATURES = Object.freeze({
   unlimitedInvoices: "unlimited_invoices",
   driverAddons: "driver_addons",
   titanComPersist: "titancom_persist",
+  leadOutreach: "lead_outreach",
 });
 
 const STARTER_FEATURES = new Set([
@@ -51,6 +52,7 @@ const PAID_WORKER_FEATURES = new Set([
   // driverAddons intentionally free — Driver Hub is not a paid add-on
   FEATURES.titanComPersist,
   FEATURES.gpsCheckIn,
+  FEATURES.leadOutreach,
 ]);
 
 const PLAN_ALIASES = Object.freeze({

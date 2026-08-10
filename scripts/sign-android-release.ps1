@@ -89,6 +89,10 @@ if (Test-Path $apkSource) {
 # Verify the certificate embedded in the exact artifact handed to Play. This
 # catches stale Gradle outputs and signing-config regressions after the build.
 $keytool = Join-Path $javaHome "bin\keytool.exe"
+# JAVA_TOOL_OPTIONS is needed by Gradle on Windows, but keytool echoes it to
+# stderr. With ErrorActionPreference=Stop PowerShell converts that harmless
+# notice into a NativeCommandError before the certificate can be evaluated.
+Remove-Item Env:JAVA_TOOL_OPTIONS -ErrorAction SilentlyContinue
 $certificate = & $keytool -printcert -jarfile $aabDest 2>&1
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Could not inspect the certificate embedded in $aabDest."

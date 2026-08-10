@@ -27,8 +27,8 @@ export default function AppDownloadBanner() {
   };
 
   return (
-    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+11.5rem)] md:bottom-3 left-0 right-0 z-30 px-3 pointer-events-none">
-      <div className="max-w-lg mx-auto pointer-events-auto">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+11.5rem)] left-0 right-0 z-30 px-3 pointer-events-none md:bottom-3 md:left-[calc(var(--sidebar-width,72px)+0.75rem)] md:right-auto md:px-0">
+      <div className="max-w-lg mx-auto pointer-events-auto md:w-96 md:max-w-[calc(100vw-var(--sidebar-width,72px)-7rem)]">
         <div className="rounded-2xl border border-border bg-card/95 px-4 py-3 flex items-center gap-3 shadow-lift backdrop-blur-xl">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-titan-orbit flex items-center justify-center flex-shrink-0">
             <Smartphone className="w-4 h-4 text-primary-foreground" />

@@ -47,6 +47,16 @@ test("API handlers require auth, ownership, compliance, and bounded sends", asyn
   assert.match(sendSource, /List-Unsubscribe/);
 });
 
+test("outreach UI paces all eligible leads in bounded minute batches", async () => {
+  const source = await readFile(new URL("../src/pages/LeadOutreach.jsx", import.meta.url), "utf8");
+  assert.match(source, /const BATCH_SIZE = 25/);
+  assert.match(source, /const BATCH_DELAY_SECONDS = 60/);
+  assert.match(source, /queued\.slice\(processed, processed \+ BATCH_SIZE\)/);
+  assert.match(source, /Email all ready/);
+  assert.match(source, /Keep TitanOS open/);
+  assert.match(source, /stopSendingRef/);
+});
+
 test("database migration preserves owner-only RLS and outreach indexes", async () => {
   const sql = await readFile(new URL("../supabase/migrations/20260810000129_titan_auto_lead_outreach.sql", import.meta.url), "utf8");
   assert.match(sql, /ENABLE ROW LEVEL SECURITY|Existing leads_own policy/i);

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Mail, Radar, RefreshCw, Search, Send, ShieldCheck, Trash2, XCircle } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Mail, PauseCircle, Radar, RefreshCw, Search, Send, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { api } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import PageShell from "@/components/shared/PageShell";
@@ -15,6 +15,8 @@ import PremiumGate from "@/components/shared/PremiumGate";
 import { canAccessFeature, PRO_FEATURES } from "@/lib/plan";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const BATCH_SIZE = 25;
+const BATCH_DELAY_SECONDS = 60;
 
 export default function LeadOutreach() {
   const { user, authChecked } = useAuth();
@@ -29,6 +31,8 @@ export default function LeadOutreach() {
   const [loading, setLoading] = useState(true);
   const [finding, setFinding] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState(null);
+  const stopSendingRef = useRef(false);
   const hasAccess = canAccessFeature(user, PRO_FEATURES.leadOutreach);
 
   const load = async () => {
@@ -36,7 +40,7 @@ export default function LeadOutreach() {
     setLoading(true);
     try {
       const rows = await api.entities.Lead.list("-created_date", 250);
-      setLeads(rows.filter((lead) => lead.source === "titan_lead_worker"));
+      setLeads(rows.filter((lead) => EMAIL_RE.test(lead.email || "")));
     } catch (error) {
       toast({ variant: "destructive", title: "Couldn't load lead outreach", description: error?.message });
     } finally {
@@ -49,6 +53,8 @@ export default function LeadOutreach() {
     if (!user?.id || !hasAccess) { setLoading(false); return; }
     load();
   }, [authChecked, user?.id, hasAccess]);
+
+  useEffect(() => () => { stopSendingRef.current = true; }, []);
 
   const ready = useMemo(
     () => leads.filter((lead) => selected.has(lead.id) && EMAIL_RE.test(lead.email || "") && lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed"),
@@ -72,24 +78,52 @@ export default function LeadOutreach() {
 
   const sendSelected = async () => {
     if (!ready.length || !confirmed) return;
-    if (!window.confirm(`Send ${ready.length} real email${ready.length === 1 ? "" : "s"}?`)) return;
+    if (!window.confirm(`Queue ${ready.length} real email${ready.length === 1 ? "" : "s"} at up to ${BATCH_SIZE} per minute? Keep TitanOS open until the queue finishes.`)) return;
     setSending(true);
+    stopSendingRef.current = false;
+    const queued = [...ready];
+    let processed = 0;
+    let sent = 0;
+    let failed = 0;
     try {
-      const result = await api.functions.invoke("leadWorkerSend", {
-        leadIds: ready.map((lead) => lead.id),
-        subject,
-        message,
-        confirmCompliant: true,
-      });
-      setSelected(new Set());
-      setConfirmed(false);
-      await load();
-      toast({ title: `${result.sent || 0} emails sent`, description: result.failed ? `${result.failed} deliveries failed. Open the lead rows for status.` : "Provider delivery IDs were saved." });
+      while (processed < queued.length && !stopSendingRef.current) {
+        const batch = queued.slice(processed, processed + BATCH_SIZE);
+        setSendProgress({ processed, total: queued.length, sent, failed, waiting: false });
+        const result = await api.functions.invoke("leadWorkerSend", { leadIds: batch.map((lead) => lead.id), subject, message, confirmCompliant: true });
+        sent += result.sent || 0;
+        failed += result.failed || 0;
+        processed += batch.length;
+        setSelected((current) => {
+          const next = new Set(current);
+          batch.forEach((lead) => next.delete(lead.id));
+          return next;
+        });
+        setSendProgress({ processed, total: queued.length, sent, failed, waiting: processed < queued.length, nextIn: BATCH_DELAY_SECONDS });
+        await load();
+        if (processed < queued.length && !stopSendingRef.current) {
+          for (let remaining = BATCH_DELAY_SECONDS; remaining > 0 && !stopSendingRef.current; remaining -= 1) {
+            setSendProgress((current) => current ? { ...current, nextIn: remaining } : current);
+            await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          }
+        }
+      }
+      if (processed >= queued.length) {
+        setConfirmed(false);
+        toast({ title: `${sent} emails sent`, description: failed ? `${failed} deliveries failed and remain available for review.` : "The outreach queue finished." });
+      } else {
+        toast({ title: "Email queue stopped", description: `${queued.length - processed} leads remain selected.` });
+      }
     } catch (error) {
       toast({ variant: "destructive", title: "Email send failed", description: error?.message });
     } finally {
       setSending(false);
+      setSendProgress(null);
     }
+  };
+
+  const stopSending = () => {
+    stopSendingRef.current = true;
+    setSendProgress((current) => current ? { ...current, waiting: false } : current);
   };
 
   const removeLead = async (lead) => {
@@ -121,12 +155,12 @@ export default function LeadOutreach() {
       <PageHeader
         eyebrow="AI / Outreach"
         title="Lead Workers"
-        subtitle="Find verified public business contacts, review them, and send real personalized email from TitanOS."
+        subtitle="Find or upload business contacts, review them, and send personalized email in paced batches."
         actions={<Button variant="outline" size="icon" onClick={load} aria-label="Refresh leads"><RefreshCw /></Button>}
       />
 
       <section className="grid grid-cols-3 gap-3 mb-5" aria-label="Outreach summary">
-        {[{ label: "Worker leads", value: leads.length }, { label: "Ready", value: leads.length - sentCount }, { label: "Sent", value: sentCount }].map((metric) => (
+        {[{ label: "Email leads", value: leads.length }, { label: "Ready", value: leads.length - sentCount }, { label: "Sent", value: sentCount }].map((metric) => (
           <div key={metric.label} className="titan-surface p-4 text-center">
             <strong className="block text-2xl text-foreground">{metric.value}</strong>
             <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{metric.label}</span>
@@ -152,10 +186,10 @@ export default function LeadOutreach() {
         <section className="titan-surface overflow-hidden min-h-[440px]">
           <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
             <div><h2 className="font-semibold text-foreground">Lead review</h2><p className="text-xs text-muted-foreground">{ready.length} selected for outreach</p></div>
-            {leads.length > 0 && <Button variant="outline" size="sm" onClick={() => setSelected(selected.size ? new Set() : new Set(leads.filter((lead) => lead.outreach_status !== "sent").map((lead) => lead.id)))}>{selected.size ? "Clear selection" : "Select ready"}</Button>}
+            {leads.length > 0 && <Button variant="outline" size="sm" disabled={sending} onClick={() => setSelected(selected.size ? new Set() : new Set(leads.filter((lead) => lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed").map((lead) => lead.id)))}>{selected.size ? "Clear selection" : "Email all ready"}</Button>}
           </div>
           {leads.length === 0 ? (
-            <EmptyState icon={Mail} title="No worker leads yet" description="Run a focused search. New contacts appear here for review before any email is sent." />
+            <EmptyState icon={Mail} title="No email leads yet" description="Run a focused search or upload a lead file from Leads. Contacts appear here for review before email is sent." />
           ) : (
             <div className="divide-y divide-border max-h-[650px] overflow-y-auto">
               {leads.map((lead) => {
@@ -190,9 +224,8 @@ export default function LeadOutreach() {
             <Checkbox checked={confirmed} onCheckedChange={(value) => setConfirmed(Boolean(value))} className="mt-0.5" />
             <span>I confirm these are relevant business contacts I am legally permitted to email, and I will honor opt-out requests.</span>
           </label>
-          <Button variant="success" className="w-full" onClick={sendSelected} disabled={sending || !ready.length || !confirmed}>
-            {sending ? <><RefreshCw className="animate-spin" /> Sending</> : <><Send /> Send {ready.length || "selected"}</>}
-          </Button>
+          {sendProgress && <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" role="status"><div className="flex items-center justify-between text-xs"><span className="font-semibold text-foreground">{sendProgress.processed} of {sendProgress.total} processed</span><span className="text-muted-foreground">{sendProgress.sent} sent · {sendProgress.failed} failed</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${Math.round((sendProgress.processed / sendProgress.total) * 100)}%` }} /></div>{sendProgress.waiting && <p className="mt-2 text-[11px] text-muted-foreground">Next batch sends in {sendProgress.nextIn} seconds. Keep TitanOS open.</p>}</div>}
+          {sending ? <Button variant="outline" className="w-full" onClick={stopSending}><PauseCircle /> Stop after current batch</Button> : <Button variant="success" className="w-full" onClick={sendSelected} disabled={!ready.length || !confirmed}><Send /> Send {ready.length || "selected"} · {BATCH_SIZE}/minute</Button>}
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><ShieldCheck className="w-4 h-4 text-success" /> Delivery credentials stay on the TitanOS server.</div>
         </section>
       </div>

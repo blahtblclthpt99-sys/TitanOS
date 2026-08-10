@@ -241,14 +241,14 @@ export default function SetForgetOfferPanel({
   return (
     <section
       className={cn(
-        "mt-4 rounded-2xl border p-4 space-y-3",
+        "mt-4 min-w-0 rounded-2xl border p-3 sm:p-4 space-y-3",
         settings.enabled
           ? "border-titan-cyan/40 bg-titan-cyan/5"
           : "border-border bg-card/40"
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-widest text-titan-cyan flex items-center gap-1">
             <Zap className="w-3.5 h-3.5" /> Make more money
           </p>
@@ -263,12 +263,19 @@ export default function SetForgetOfferPanel({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button type="button" size="sm" variant="ghost" onClick={() => setShowSetup((v) => !v)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Configure money autopilot"
+            onClick={() => setShowSetup((v) => !v)}
+          >
             <Settings2 className="w-4 h-4" />
           </Button>
           <button
             type="button"
             role="switch"
+            aria-label="Money autopilot"
             aria-checked={settings.enabled}
             onClick={() => persist({ enabled: !settings.enabled })}
             className={cn(
@@ -470,15 +477,15 @@ export default function SetForgetOfferPanel({
           </Button>
 
           {decision ? (
-            <div className={cn("rounded-2xl border p-4 space-y-3", verdictStyle)}>
-              <div className="flex items-center gap-3">
-                <VerdictIcon className="w-10 h-10 shrink-0" />
+            <div className={cn("min-w-0 rounded-2xl border p-2.5 sm:p-4 space-y-3", verdictStyle)}>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
+                <VerdictIcon className="w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-3xl font-black tracking-tight">{decision.verdict}</p>
+                  <p className="text-2xl sm:text-3xl font-black tracking-tight">{decision.verdict}</p>
                   <p className="text-sm font-semibold leading-snug opacity-95">{coachCard.headline}</p>
                   <p className="text-sm opacity-90 leading-snug mt-0.5">{decision.action}</p>
                 </div>
-                <div className="ml-auto text-right shrink-0">
+                <div className="col-span-2 sm:col-span-1 flex items-center justify-between sm:block sm:text-right rounded-lg bg-black/10 px-2 py-1 sm:bg-transparent sm:p-0 shrink-0">
                   <p className="text-[10px] uppercase opacity-70">Money score</p>
                   <p className="text-2xl font-bold tabular-nums">{decision.spectrum.overall}</p>
                 </div>
@@ -493,7 +500,7 @@ export default function SetForgetOfferPanel({
                 </p>
               ) : null}
               {decision.minimum_offer_pay > 0 ? (
-                <div className="rounded-xl border border-current/25 bg-black/10 px-3 py-2 flex items-center justify-between gap-3">
+                <div className="rounded-xl border border-current/25 bg-black/10 px-3 py-2 flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3">
                   <span className="text-xs font-semibold">Minimum needed for this delivery</span>
                   <span className="text-xl font-black tabular-nums">
                     ${Number(decision.minimum_offer_pay).toFixed(2)}

@@ -49,7 +49,7 @@
     "test:search": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/search-index.test.mjs",
     "test:settings": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/settings-catalog.test.mjs",
     "test:ai": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/ai-intents.test.mjs scripts/titan-ai-workflows.test.mjs scripts/titan-ai-summary.test.mjs scripts/titan-ai-api-contract.test.mjs",
-    "test:gps": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/gps-owner.test.mjs",
+    "test:gps": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/gps-owner.test.mjs scripts/gps-reliability.test.mjs",
     "test:offline": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/offline-local.test.mjs scripts/integration-offline.test.mjs",
     "test:a11y": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/a11y-smoke.test.mjs",
     "test:security": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/security-regression.test.mjs scripts/entitlements.test.mjs",

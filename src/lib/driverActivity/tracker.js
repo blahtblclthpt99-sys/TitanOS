@@ -3,11 +3,15 @@
  * Minimizes battery: moderate update cadence, distance filter, no background collection.
  */
 
-import { haversineMeters, metersToMiles, round1, speedMphBetween } from "./geo.js";
+import { haversineMeters, metersToMiles, speedMphBetween } from "./geo.js";
 import { DEFAULT_STOP_CONFIG, stepStopDetection } from "./stopDetection.js";
 
 const MAX_POINTS = 400;
 const MIN_MOVE_M = 12;
+const HEARTBEAT_MS = 1000;
+const MAX_ACCOUNTING_GAP_SEC = 24 * 60 * 60;
+
+const preciseMiles = (value) => Math.round((Number(value) || 0) * 1000) / 1000;
 
 export function createBrowserTracker(handlers = {}, options = {}) {
   const cfg = {
@@ -30,9 +34,62 @@ export function createBrowserTracker(handlers = {}, options = {}) {
   let speedN = 0;
   let points = [];
   let paused = false;
+  let heartbeatId = null;
+  let lastAccountingAt = null;
+  let motionState = "unknown";
+  let latestTelemetry = { lat: null, lng: null, accuracy: null, speedMph: 0 };
 
   function emit(type, payload) {
     handlers.onEvent?.(type, payload);
+  }
+
+  function snapshot() {
+    return {
+      miles: preciseMiles(miles),
+      driveSec: Math.round(driveSec),
+      idleSec: Math.round(idleSec),
+      maxSpeedMph: maxSpeed,
+      avgSpeedMph: speedN ? Math.round((speedSum / speedN) * 10) / 10 : 0,
+      speedMph: latestTelemetry.speedMph,
+      lat: latestTelemetry.lat,
+      lng: latestTelemetry.lng,
+      accuracy: latestTelemetry.accuracy,
+      stopPhase: stopState.phase,
+      points: [...points],
+      paused,
+    };
+  }
+
+  function accountUntil(now = Date.now()) {
+    if (paused) {
+      lastAccountingAt = now;
+      return;
+    }
+    if (lastAccountingAt == null) {
+      lastAccountingAt = now;
+      return;
+    }
+    const dt = Math.min(MAX_ACCOUNTING_GAP_SEC, Math.max(0, (now - lastAccountingAt) / 1000));
+    lastAccountingAt = now;
+    if (motionState === "driving") driveSec += dt;
+    if (motionState === "idle") idleSec += dt;
+  }
+
+  function emitTelemetry() {
+    handlers.onTelemetry?.(snapshot());
+  }
+
+  function startHeartbeat() {
+    if (heartbeatId != null || typeof window === "undefined") return;
+    heartbeatId = window.setInterval(() => {
+      accountUntil(Date.now());
+      emitTelemetry();
+    }, HEARTBEAT_MS);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatId != null && typeof window !== "undefined") window.clearInterval(heartbeatId);
+    heartbeatId = null;
   }
 
   function handlePosition(pos) {
@@ -50,22 +107,22 @@ export function createBrowserTracker(handlers = {}, options = {}) {
           : undefined,
     };
 
+    accountUntil(Date.now());
     if (prev) {
       const distM = haversineMeters(prev, point);
-      const dt = Math.max(0, (point.ts - prev.ts) / 1000);
       const speed = point.speedMph ?? speedMphBetween(prev, point);
 
       if (distM >= MIN_MOVE_M) {
-        miles = round1(miles + metersToMiles(distM));
-        handlers.onMiles?.(miles);
+        miles += metersToMiles(distM);
+        handlers.onMiles?.(preciseMiles(miles));
       }
 
       if (speed >= cfg.resumeSpeedMph && distM >= MIN_MOVE_M) {
-        driveSec += dt;
+        motionState = "driving";
       } else if (speed < cfg.stopSpeedMph) {
-        idleSec += dt;
+        motionState = "idle";
       } else {
-        driveSec += dt;
+        motionState = "driving";
       }
 
       if (speed > maxSpeed) maxSpeed = Math.round(speed * 10) / 10;
@@ -74,17 +131,12 @@ export function createBrowserTracker(handlers = {}, options = {}) {
         speedN += 1;
       }
 
-      handlers.onTelemetry?.({
-        miles,
-        driveSec: Math.round(driveSec),
-        idleSec: Math.round(idleSec),
-        maxSpeedMph: maxSpeed,
-        avgSpeedMph: speedN ? Math.round((speedSum / speedN) * 10) / 10 : 0,
-        speedMph: Math.round(speed * 10) / 10,
-        lat: point.lat,
-        lng: point.lng,
-        accuracy: point.accuracy,
-      });
+      latestTelemetry = { lat: point.lat, lng: point.lng, accuracy: point.accuracy, speedMph: Math.round(speed * 10) / 10 };
+      emitTelemetry();
+    } else {
+      latestTelemetry = { lat: point.lat, lng: point.lng, accuracy: point.accuracy, speedMph: point.speedMph || 0 };
+      motionState = point.speedMph != null && point.speedMph >= cfg.resumeSpeedMph ? "driving" : "idle";
+      emitTelemetry();
     }
 
     const { state, events } = stepStopDetection(stopState, point, prev, cfg);
@@ -113,20 +165,24 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       }
       if (watchId != null) return true;
       paused = false;
+      lastAccountingAt = Date.now();
       watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
         enableHighAccuracy: cfg.enableHighAccuracy,
         maximumAge: cfg.maximumAge,
         timeout: cfg.timeout,
       });
       emit("tracking_started", {});
+      startHeartbeat();
       return true;
     },
     pause() {
+      accountUntil(Date.now());
       paused = true;
       emit("tracking_paused", {});
     },
     resume() {
       paused = false;
+      lastAccountingAt = Date.now();
       emit("tracking_resumed", {});
     },
     /** Stop GNSS hardware (keeps counters). Use when tab is hidden to save battery. */
@@ -141,6 +197,7 @@ export function createBrowserTracker(handlers = {}, options = {}) {
     resumeHardware() {
       if (watchId != null) return true;
       if (typeof navigator === "undefined" || !navigator.geolocation) return false;
+      accountUntil(Date.now());
       watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
         enableHighAccuracy: cfg.enableHighAccuracy,
         maximumAge: cfg.maximumAge,
@@ -150,34 +207,21 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       return true;
     },
     stop() {
+      accountUntil(Date.now());
       if (watchId != null && navigator.geolocation?.clearWatch) {
         navigator.geolocation.clearWatch(watchId);
       }
       watchId = null;
+      stopHeartbeat();
       paused = false;
-      emit("tracking_stopped", {
-        miles,
-        driveSec: Math.round(driveSec),
-        idleSec: Math.round(idleSec),
-        maxSpeedMph: maxSpeed,
-        avgSpeedMph: speedN ? Math.round((speedSum / speedN) * 10) / 10 : 0,
-        points: [...points],
-      });
+      emit("tracking_stopped", snapshot());
     },
     getSnapshot() {
-      return {
-        miles,
-        driveSec: Math.round(driveSec),
-        idleSec: Math.round(idleSec),
-        maxSpeedMph: maxSpeed,
-        avgSpeedMph: speedN ? Math.round((speedSum / speedN) * 10) / 10 : 0,
-        stopPhase: stopState.phase,
-        points: [...points],
-        paused,
-      };
+      accountUntil(Date.now());
+      return snapshot();
     },
     seedMiles(n) {
-      miles = round1(Math.max(0, Number(n) || 0));
+      miles = Math.max(0, Number(n) || 0);
     },
     /**
      * Restore counters after page refresh so GPS continues from last saved totals.
@@ -192,10 +236,11 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       openStopId,
       stopPhase,
     } = {}) {
-      if (seedMi != null) miles = round1(Math.max(0, Number(seedMi) || 0));
+      if (seedMi != null) miles = Math.max(0, Number(seedMi) || 0);
       if (seedDrive != null) driveSec = Math.max(0, Number(seedDrive) || 0);
       if (seedIdle != null) idleSec = Math.max(0, Number(seedIdle) || 0);
       if (seedMax != null) maxSpeed = Math.max(0, Number(seedMax) || 0);
+      lastAccountingAt = Date.now();
       if (lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
         prev = {
           lat: Number(lat),
@@ -205,6 +250,7 @@ export function createBrowserTracker(handlers = {}, options = {}) {
         };
       }
       if (openStopId || stopPhase === "stopped" || stopPhase === "potential") {
+        motionState = "idle";
         stopState = {
           phase: stopPhase === "potential" ? "potential" : "stopped",
           stationarySec: stopPhase === "potential" ? Math.max(1, cfg.confirmStopSec * 0.5) : cfg.confirmStopSec + 1,

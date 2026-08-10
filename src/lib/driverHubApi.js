@@ -594,15 +594,13 @@ export async function stopDrivingSession(userId, snapshot = {}) {
   const miles = Number(
     snapshot.miles != null ? snapshot.miles : session.miles || 0
   );
-  const elapsedSec =
-    snapshot.elapsedSec != null
-      ? Number(snapshot.elapsedSec)
-      : Math.max(
-          0,
-          Math.round(
-            (Date.now() - new Date(session.started_at || Date.now()).getTime()) / 1000
-          )
-        );
+  const pausedNowSec = session.paused && session.paused_at
+    ? Math.max(0, Math.round((Date.now() - new Date(session.paused_at).getTime()) / 1000))
+    : 0;
+  const pauseSec = Number(session.pause_accum_sec || 0) + pausedNowSec;
+  const elapsedSec = snapshot.elapsedSec != null
+    ? Number(snapshot.elapsedSec)
+    : Math.max(0, Math.round((Date.now() - new Date(session.started_at || Date.now()).getTime()) / 1000) - pauseSec);
   const jobsCompleted =
     snapshot.jobsCompleted != null
       ? Number(snapshot.jobsCompleted)

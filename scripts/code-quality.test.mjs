@@ -8,6 +8,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sanitizeAppPath, isUuid } from "../shared/safePath.js";
 import { formatCurrency, formatMoney } from "../src/lib/formatCurrency.js";
+import { isIosDevice } from "../src/lib/app-download.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
@@ -28,6 +29,12 @@ describe("code quality: dead code removed", () => {
 });
 
 describe("code quality: shared utilities", () => {
+  it("does not advertise the Android install banner to iOS browsers", () => {
+    assert.equal(isIosDevice("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"), true);
+    assert.equal(isIosDevice("Mozilla/5.0", "MacIntel", 5), true);
+    assert.equal(isIosDevice("Mozilla/5.0 (Linux; Android 15)"), false);
+  });
+
   it("safePath is single-sourced via shared/", () => {
     assert.match(read("src/lib/safePath.js"), /@shared\/safePath/);
     assert.match(read("api/_lib/safePath.js"), /shared\/safePath/);

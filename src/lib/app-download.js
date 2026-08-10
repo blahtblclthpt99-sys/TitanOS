@@ -1,22 +1,31 @@
+import { envString } from "@/lib/viteEnv";
+
 /** Google Play listing for the official Capacitor app */
 export const TITANOS_PLAY_STORE_URL =
-  import.meta.env.VITE_TITANOS_PLAY_STORE_URL ||
+  envString("VITE_TITANOS_PLAY_STORE_URL") ||
   "https://play.google.com/store/apps/details?id=com.titanos.myapp";
 
 /** Closed / open testing opt-in (testers must open this once while signed into Google) */
 export const TITANOS_PLAY_TESTING_URL =
-  import.meta.env.VITE_TITANOS_PLAY_TESTING_URL ||
+  envString("VITE_TITANOS_PLAY_TESTING_URL") ||
   "https://play.google.com/apps/testing/com.titanos.myapp";
 
 /** Direct APK/AAB download URLs — override with VITE_TITANOS_APK_URL / VITE_TITANOS_AAB_URL */
 export const TITANOS_APK_URL =
-  import.meta.env.VITE_TITANOS_APK_URL || "/static/TitanOS.apk";
+  envString("VITE_TITANOS_APK_URL") || "/static/TitanOS.apk";
 
 export const TITANOS_AAB_URL =
-  import.meta.env.VITE_TITANOS_AAB_URL || "/static/TitanOS.aab";
+  envString("VITE_TITANOS_AAB_URL") || "/static/TitanOS.aab";
 
 export const TITANOS_APK_FILENAME = "TitanOS.apk";
 export const TITANOS_AAB_FILENAME = "TitanOS.aab";
+
+/** Detect iPhone/iPad browsers, including modern iPadOS desktop-mode UAs. */
+export function isIosDevice(userAgent = "", platform = "", maxTouchPoints = 0) {
+  const ua = String(userAgent || "");
+  const os = String(platform || "");
+  return /iPad|iPhone|iPod/i.test(ua) || (os === "MacIntel" && Number(maxTouchPoints) > 1);
+}
 
 function triggerDownload(href, filename) {
   const link = document.createElement("a");

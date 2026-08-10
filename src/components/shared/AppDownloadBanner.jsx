@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Smartphone, X, ExternalLink } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { openPlayStore, TITANOS_PLAY_TESTING_URL } from "@/lib/app-download";
+import { isIosDevice, openPlayStore, TITANOS_PLAY_TESTING_URL } from "@/lib/app-download";
 
 /**
  * Android install banner — Play Store first (testers), dismissible per session.
@@ -11,8 +11,14 @@ export default function AppDownloadBanner() {
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem("titanos_app_banner_dismissed") === "1"
   );
+  const iosBrowser =
+    typeof navigator !== "undefined" &&
+    isIosDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
 
   if (Capacitor.isNativePlatform()) return null;
+  // TitanOS currently ships through Google Play; never advertise an Android
+  // install action to iPhone or iPad users.
+  if (iosBrowser) return null;
   if (dismissed) return null;
 
   const dismiss = () => {

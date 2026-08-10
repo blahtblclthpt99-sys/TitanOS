@@ -5,8 +5,9 @@
 import * as Sentry from "@sentry/react";
 import { envFlag, envString, isViteProd, readViteEnv } from "@/lib/viteEnv";
 import { getObservabilityPrefs } from "@/lib/observabilityPrefs";
+import { normalizeSentryDsn } from "@/lib/sentryDsn";
 
-const dsn = envString("VITE_SENTRY_DSN");
+const dsn = normalizeSentryDsn(envString("VITE_SENTRY_DSN"));
 let initialized = false;
 let replayEnabled = false;
 

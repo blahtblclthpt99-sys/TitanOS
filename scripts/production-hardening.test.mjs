@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { normalizeSentryDsn } from "../src/lib/sentryDsn.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -15,6 +16,15 @@ function read(rel) {
 }
 
 describe("Sentry wiring", () => {
+  it("rejects malformed DSNs before either runtime initializes Sentry", () => {
+    assert.equal(normalizeSentryDsn("not-a-dsn"), "");
+    assert.equal(normalizeSentryDsn("https://ingest.sentry.io/123"), "");
+    assert.equal(
+      normalizeSentryDsn("https://public-key@o0.ingest.sentry.io/123"),
+      "https://public-key@o0.ingest.sentry.io/123"
+    );
+  });
+
   it("client sentry sets release/environment, tracing, and privacy-safe replay hooks", () => {
     const src = read("src/lib/sentry.js");
     assert.match(src, /release:/);

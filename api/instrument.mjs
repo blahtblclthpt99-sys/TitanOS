@@ -7,12 +7,13 @@
  */
 import * as Sentry from "@sentry/node";
 import { createRequire } from "node:module";
+import { normalizeSentryDsn } from "../src/lib/sentryDsn.js";
 
 const require = createRequire(import.meta.url);
 
 function resolveDsn() {
   const dsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN || "";
-  return typeof dsn === "string" ? dsn.trim() : "";
+  return normalizeSentryDsn(dsn);
 }
 
 function resolveEnvironment() {

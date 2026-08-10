@@ -1,5 +1,6 @@
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { secretsEqual } from "../_lib/secureCompare.js";
+import { normalizeSentryDsn } from "../../src/lib/sentryDsn.js";
 
 /**
  * Liveness + readiness probe for load balancers and outage drills.
@@ -31,7 +32,9 @@ export default async function handler(req, res) {
       (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
         process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
-    sentryConfigured: Boolean(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN),
+    sentryConfigured: Boolean(
+      normalizeSentryDsn(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN)
+    ),
     opsAlertConfigured: Boolean(
       process.env.OPS_ALERT_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
     ),

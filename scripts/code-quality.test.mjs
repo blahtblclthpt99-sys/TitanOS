@@ -52,12 +52,17 @@ describe("code quality: shared utilities", () => {
     for (const rel of [
       "src/components/driver/os/MissionControl.jsx",
       "src/components/driver/DriverShiftPanel.jsx",
-      "src/components/layout/MobileActionDock.jsx",
     ]) {
       const src = read(rel);
       assert.match(src, /@\/lib\/driverOs/);
       assert.doesNotMatch(src, /DriverSessionKeepAlive/);
     }
+
+    // The dock is always absent on Driver Hub, so it must not subscribe to
+    // driving-session events or duplicate Mission Control state.
+    const dock = read("src/components/layout/MobileActionDock.jsx");
+    assert.match(dock, /pathname\s*===\s*["']\/driver["']/);
+    assert.doesNotMatch(dock, /DriverSessionKeepAlive|DRIVER_SESSION_EVENT/);
   });
 
   it("editorconfig + code-quality rule exist", () => {

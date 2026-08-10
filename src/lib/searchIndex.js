@@ -78,6 +78,7 @@ function scoreHay(haystack, label, query) {
   const words = l.split(/\s+/);
   let best = 0;
   for (const w of words) {
+    if (Math.abs(w.length - q.length) > 2) continue;
     const d = editDistance(w, q);
     if (d <= 1) best = Math.max(best, 48);
     else if (d <= 2 && q.length > 4) best = Math.max(best, 34);
@@ -311,7 +312,9 @@ export function querySearchIndex(userId, query, { limit = 20 } = {}) {
   const hits = [];
   for (const doc of docs.values()) {
     const score = scoreHay(doc.haystack, doc.label, q) + (doc.boost || 0);
-    if (score >= 34 || fuzzyMatch(doc.label, q) || fuzzyMatch(doc.haystack, q)) {
+    // scoreHay already performs fuzzy matching. Re-running it here multiplies
+    // Levenshtein work for every non-match in large local indexes.
+    if (score >= 34) {
       hits.push({
         id: doc.id,
         label: doc.label,

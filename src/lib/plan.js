@@ -371,7 +371,6 @@ export function isMarketplaceFree(_user) {
 }
 
 export function betaBadgeLabel(user) {
-  if (isFreeDuringBeta()) return "Free during beta";
   if (isFoundingUser(user)) {
     const n = user.founding_number;
     const prefix = n != null && n !== "" ? `Founding #${n}` : "Founding 100";
@@ -384,6 +383,7 @@ export function betaBadgeLabel(user) {
     const locked = getFoundingLockedPrice(user);
     return `${prefix} · $${locked}/mo price lock`;
   }
+  if (isFreeDuringBeta()) return "Free during beta";
   const launch = getLaunchStatus();
   if (launch.betaActive && launch.spotsRemaining > 0) {
     return `Founding 100 · ${launch.spotsRemaining} spots left · first month free`;

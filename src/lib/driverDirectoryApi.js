@@ -245,9 +245,12 @@ export function fuzzyMatch(haystack, needle) {
   if (!n) return true;
   if (h.includes(n)) return true;
   const words = h.split(/[^a-z0-9]+/).filter(Boolean);
+  const maxDist = n.length <= 4 ? 1 : 2;
   return words.some((w) => {
     if (w.startsWith(n) || n.startsWith(w)) return true;
-    const maxDist = n.length <= 4 ? 1 : 2;
+    // Levenshtein distance cannot be within the threshold when lengths differ
+    // by more than the threshold. Avoid allocating a matrix for obvious misses.
+    if (Math.abs(w.length - n.length) > maxDist) return false;
     return editDistance(w, n) <= maxDist;
   });
 }

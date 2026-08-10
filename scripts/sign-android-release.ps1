@@ -76,6 +76,7 @@ $apkSource = Join-Path $androidDir "app\build\outputs\apk\release\app-release.ap
 $aabDest = Join-Path $Root "release\TitanOS.aab"
 $apkDest = Join-Path $Root "release\TitanOS.apk"
 $publicApk = Join-Path $Root "public\downloads\TitanOS.apk"
+$expectedPlaySha1 = "27:1D:F7:34:AD:18:7E:81:72:F2:06:59:08:E5:31:48:01:4D:B2:8C"
 
 New-Item -ItemType Directory -Force -Path (Split-Path $aabDest) | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path $publicApk) | Out-Null
@@ -85,11 +86,25 @@ if (Test-Path $apkSource) {
   Copy-Item $apkSource $publicApk -Force
 }
 
+# Verify the certificate embedded in the exact artifact handed to Play. This
+# catches stale Gradle outputs and signing-config regressions after the build.
+$keytool = Join-Path $javaHome "bin\keytool.exe"
+$certificate = & $keytool -printcert -jarfile $aabDest 2>&1
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Could not inspect the certificate embedded in $aabDest."
+}
+$shaLine = $certificate | Select-String -Pattern 'SHA1:\s*([0-9A-F:]+)' | Select-Object -First 1
+$artifactSha1 = if ($shaLine -and $shaLine.Matches.Count) { $shaLine.Matches[0].Groups[1].Value.ToUpperInvariant() } else { '' }
+if ($artifactSha1 -ne $expectedPlaySha1) {
+  Write-Error "Signed AAB certificate mismatch. Expected SHA1 $expectedPlaySha1 but artifact is $artifactSha1."
+}
+Write-Host "Verified signed AAB certificate: SHA1 $expectedPlaySha1"
+
 Write-Host "`nPlay Store upload (AAB):"
 Write-Host "  $aabDest"
 if (Test-Path $apkDest) {
   Write-Host "Tester / sideload APK:"
   Write-Host "  $apkDest"
 }
-Write-Host "Upload key credentials:"
-Write-Host "  $(Join-Path $androidDir 'UPLOAD_KEY_CREDENTIALS.txt')"
+Write-Host "Signing key:"
+Write-Host "  $(Join-Path $androidDir 'titanos-upload.jks') (Play certificate verified before build)"

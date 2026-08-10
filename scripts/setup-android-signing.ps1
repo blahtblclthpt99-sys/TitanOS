@@ -3,7 +3,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 $AndroidDir = Join-Path $Root "android"
 $KeystorePath = Join-Path $AndroidDir "titanos-upload.jks"
 $PropsPath = Join-Path $AndroidDir "keystore.properties"
-$CredsPath = Join-Path $AndroidDir "UPLOAD_KEY_CREDENTIALS.txt"
+$ExpectedSha1 = "27:1D:F7:34:AD:18:7E:81:72:F2:06:59:08:E5:31:48:01:4D:B2:8C"
 
 function Find-JavaHome {
   $candidates = @(
@@ -21,14 +21,6 @@ function Find-JavaHome {
   return $null
 }
 
-if (Test-Path $KeystorePath) {
-  if (-not (Test-Path $PropsPath)) {
-    Write-Error "Keystore exists but keystore.properties is missing. Restore keystore.properties or delete $KeystorePath to regenerate."
-  }
-  Write-Host "Release keystore already configured: $KeystorePath"
-  exit 0
-}
-
 $javaHome = Find-JavaHome
 if (-not $javaHome) {
   Write-Host "JDK not found. Downloading portable JDK 21..."
@@ -41,53 +33,51 @@ if (-not $javaHome) {
   Write-Error "JDK with keytool not found."
 }
 
-$keyAlias = "titanos-upload"
-$storePassword = [Convert]::ToBase64String((1..24 | ForEach-Object { Get-Random -Maximum 256 }))
-$keyPassword = $storePassword
-$keytool = Join-Path $javaHome "bin\keytool.exe"
-$dname = "CN=TitanOS, OU=Mobile, O=TitanOS, L=Unknown, ST=Unknown, C=US"
+function Read-KeystoreProperties {
+  param([string]$Path)
+  $values = @{}
+  Get-Content -LiteralPath $Path | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+?)\s*=\s*(.*)\s*$') {
+      $values[$Matches[1]] = $Matches[2]
+    }
+  }
+  return $values
+}
 
-Write-Host "Creating Play Store upload keystore..."
-& $keytool -genkeypair -v `
-  -storetype PKCS12 `
-  -keystore $KeystorePath `
-  -alias $keyAlias `
-  -keyalg RSA `
-  -keysize 2048 `
-  -validity 10000 `
-  -storepass $storePassword `
-  -keypass $keyPassword `
-  -dname $dname
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+function Assert-ExpectedUploadKey {
+  if (-not (Test-Path $PropsPath)) {
+    Write-Error "Play upload keystore exists but keystore.properties is missing. Restore both files from the same signing backup."
+  }
 
-@"
-storeFile=titanos-upload.jks
-storePassword=$storePassword
-keyAlias=$keyAlias
-keyPassword=$keyPassword
-"@ | Set-Content $PropsPath -Encoding ASCII
+  $props = Read-KeystoreProperties $PropsPath
+  foreach ($required in @('storePassword', 'keyAlias', 'keyPassword')) {
+    if (-not $props[$required]) {
+      Write-Error "keystore.properties is missing $required. Restore the enrolled Play signing backup."
+    }
+  }
 
-$credentials = @"
-TitanOS Google Play upload key
-==============================
+  $keytool = Join-Path $javaHome "bin\keytool.exe"
+  $details = & $keytool -list -v `
+    -keystore $KeystorePath `
+    -alias $props['keyAlias'] `
+    -storepass $props['storePassword'] 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Could not open the configured upload keystore. Verify that the keystore and properties came from the same backup."
+  }
 
-Keep this file safe. You need it for every future Play Store update.
+  $shaLine = $details | Select-String -Pattern 'SHA1:\s*([0-9A-F:]+)' | Select-Object -First 1
+  $actualSha1 = if ($shaLine -and $shaLine.Matches.Count) { $shaLine.Matches[0].Groups[1].Value.ToUpperInvariant() } else { '' }
+  if ($actualSha1 -ne $ExpectedSha1) {
+    Write-Error "Wrong Google Play upload key. Expected SHA1 $ExpectedSha1 but configured key is $actualSha1. Build stopped before producing an invalid AAB."
+  }
 
-Keystore file: android/titanos-upload.jks
-Key alias:     $keyAlias
-Store password: $storePassword
-Key password:   $keyPassword
+  Write-Host "Verified Google Play upload certificate: SHA1 $ExpectedSha1"
+}
 
-Google Play setup:
-1. Create the app in Google Play Console.
-2. Upload release/TitanOS.aab.
-3. Choose "Google Play App Signing" when prompted (recommended).
-4. Back up android/titanos-upload.jks and this credentials file offline.
+if (Test-Path $KeystorePath) {
+  Assert-ExpectedUploadKey
+  Write-Host "Release keystore already configured: $KeystorePath"
+  exit 0
+}
 
-"@
-$credentials | Set-Content $CredsPath -Encoding UTF8
-
-Write-Host "Upload keystore created:"
-Write-Host "  $KeystorePath"
-Write-Host "  $PropsPath"
-Write-Host "  $CredsPath"
+Write-Error "The enrolled Google Play upload keystore is missing. Restore android/titanos-upload.jks and android/keystore.properties from the signing backup. Do not generate a replacement key for an existing Play app."

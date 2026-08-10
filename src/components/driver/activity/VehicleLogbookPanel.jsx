@@ -422,7 +422,8 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
         )}
       </section> : null}
 
-      {sections.fuel || sections.expenses ? <div className="grid md:grid-cols-2 gap-4">
+      {sections.fuel || sections.expenses ? (
+        <div className={cn("grid gap-4", sections.fuel && sections.expenses && "md:grid-cols-2")}>
         {sections.fuel ? <section className="titan-surface p-4 space-y-3">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Fuel className="w-4 h-4 text-titan-cyan" /> Fuel log
@@ -550,7 +551,8 @@ export default function VehicleLogbookPanel({ userId, history = [], liveSession 
             ))}
           </ul>
         </section> : null}
-      </div> : null}
+        </div>
+      ) : null}
 
       {sections.service ? <section className="titan-surface p-4 space-y-3">
         <h3 className="text-sm font-semibold flex items-center gap-2">

@@ -66,6 +66,9 @@ export default async function handler(req, res) {
       source: "titan_lead_worker",
       status: "new",
       outreach_status: "ready",
+      email_quality_status: "verified",
+      email_verified_at: new Date().toISOString(),
+      email_source_url: lead.website,
       notes: [lead.website && `Website: ${lead.website}`, lead.reason].filter(Boolean).join(" | "),
     }));
     const { data: inserted = [], error } = newRows.length

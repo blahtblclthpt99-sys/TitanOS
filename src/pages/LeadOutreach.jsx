@@ -15,7 +15,7 @@ import PremiumGate from "@/components/shared/PremiumGate";
 import { canAccessFeature, PRO_FEATURES } from "@/lib/plan";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const BATCH_SIZE = 25;
+const BATCH_SIZE = 5;
 const BATCH_DELAY_SECONDS = 60;
 
 export default function LeadOutreach() {
@@ -57,7 +57,7 @@ export default function LeadOutreach() {
   useEffect(() => () => { stopSendingRef.current = true; }, []);
 
   const ready = useMemo(
-    () => leads.filter((lead) => selected.has(lead.id) && EMAIL_RE.test(lead.email || "") && lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed"),
+    () => leads.filter((lead) => selected.has(lead.id) && EMAIL_RE.test(lead.email || "") && lead.email_quality_status === "verified" && lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed").slice(0, BATCH_SIZE),
     [leads, selected]
   );
   const sentCount = leads.filter((lead) => lead.outreach_status === "sent").length;
@@ -78,7 +78,7 @@ export default function LeadOutreach() {
 
   const sendSelected = async () => {
     if (!ready.length || !confirmed) return;
-    if (!window.confirm(`Queue ${ready.length} real email${ready.length === 1 ? "" : "s"} at up to ${BATCH_SIZE} per minute? Keep TitanOS open until the queue finishes.`)) return;
+    if (!window.confirm(`Send a maximum of ${BATCH_SIZE} verified business email${BATCH_SIZE === 1 ? "" : "s"} in this pilot? TitanOS enforces the daily limit on the server.`)) return;
     setSending(true);
     stopSendingRef.current = false;
     const queued = [...ready];
@@ -155,7 +155,7 @@ export default function LeadOutreach() {
       <PageHeader
         eyebrow="AI / Outreach"
         title="Lead Workers"
-        subtitle="Find or upload business contacts, review them, and send personalized email in paced batches."
+        subtitle="Find or upload business contacts, verify them, and begin with a protected five-message pilot."
         actions={<Button variant="outline" size="icon" onClick={load} aria-label="Refresh leads"><RefreshCw /></Button>}
       />
 
@@ -186,7 +186,7 @@ export default function LeadOutreach() {
         <section className="titan-surface overflow-hidden min-h-[440px]">
           <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
             <div><h2 className="font-semibold text-foreground">Lead review</h2><p className="text-xs text-muted-foreground">{ready.length} selected for outreach</p></div>
-            {leads.length > 0 && <Button variant="outline" size="sm" disabled={sending} onClick={() => setSelected(selected.size ? new Set() : new Set(leads.filter((lead) => lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed").map((lead) => lead.id)))}>{selected.size ? "Clear selection" : "Email all ready"}</Button>}
+            {leads.length > 0 && <Button variant="outline" size="sm" disabled={sending} onClick={() => setSelected(selected.size ? new Set() : new Set(leads.filter((lead) => lead.email_quality_status === "verified" && lead.outreach_status !== "sent" && lead.outreach_status !== "suppressed").slice(0, BATCH_SIZE).map((lead) => lead.id)))}>{selected.size ? "Clear selection" : "Select verified pilot"}</Button>}
           </div>
           {leads.length === 0 ? (
             <EmptyState icon={Mail} title="No email leads yet" description="Run a focused search or upload a lead file from Leads. Contacts appear here for review before email is sent." />
@@ -194,10 +194,11 @@ export default function LeadOutreach() {
             <div className="divide-y divide-border max-h-[650px] overflow-y-auto">
               {leads.map((lead) => {
                 const isSent = lead.outreach_status === "sent";
+                const isVerified = lead.email_quality_status === "verified";
                 const isFailed = lead.outreach_status === "failed";
                 return (
                   <article key={lead.id} className="grid grid-cols-[44px_minmax(0,1fr)_auto_44px] items-center gap-2 p-3 hover:bg-muted/40">
-                    <div className="flex justify-center"><Checkbox checked={selected.has(lead.id)} disabled={isSent} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(lead.id); else next.delete(lead.id); return next; })} aria-label={`Select ${lead.email}`} /></div>
+                    <div className="flex justify-center"><Checkbox checked={selected.has(lead.id)} disabled={isSent || !isVerified} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(lead.id); else next.delete(lead.id); return next; })} aria-label={`Select ${lead.email}`} /></div>
                     <div className="min-w-0">
                       <p className="font-medium text-sm text-foreground truncate">{lead.company || lead.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{lead.email}</p>
@@ -205,7 +206,7 @@ export default function LeadOutreach() {
                       {isFailed && lead.outreach_error && <p className="text-[11px] text-destructive truncate mt-1">{lead.outreach_error}</p>}
                     </div>
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${isSent ? "bg-success/15 text-success" : isFailed ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>
-                      {isSent ? <CheckCircle2 className="w-3 h-3" /> : isFailed ? <XCircle className="w-3 h-3" /> : null}{lead.outreach_status || "ready"}
+                      {isSent ? <CheckCircle2 className="w-3 h-3" /> : isFailed ? <XCircle className="w-3 h-3" /> : null}{!isVerified ? "review" : (lead.outreach_status || "ready")}
                     </span>
                     <Button variant="ghost" size="icon" onClick={() => removeLead(lead)} aria-label={`Remove ${lead.email}`}><Trash2 className="text-destructive" /></Button>
                   </article>
@@ -219,13 +220,13 @@ export default function LeadOutreach() {
           <div className="flex items-center gap-3"><Mail className="w-5 h-5 text-primary" /><div><h2 className="font-semibold text-foreground">Email compose</h2><p className="text-xs text-muted-foreground">Personalized for every selected lead</p></div></div>
           <label className="block text-xs font-medium text-muted-foreground">Subject<Input className="mt-1.5" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
           <label className="block text-xs font-medium text-muted-foreground">Message<Textarea className="mt-1.5 min-h-[260px]" value={message} onChange={(event) => setMessage(event.target.value)} /></label>
-          <p className="text-[11px] text-muted-foreground">Use <code className="text-primary">{"{{company}}"}</code> for the business name. TitanOS adds an opt-out footer and List-Unsubscribe header.</p>
+          <p className="text-[11px] text-muted-foreground">Use <code className="text-primary">{"{{company}}"}</code> for the business name. TitanOS adds the advertisement disclosure, postal identity, and one-click unsubscribe.</p>
           <label className="flex items-start gap-3 rounded-lg border border-border p-3 text-xs text-muted-foreground cursor-pointer">
             <Checkbox checked={confirmed} onCheckedChange={(value) => setConfirmed(Boolean(value))} className="mt-0.5" />
             <span>I confirm these are relevant business contacts I am legally permitted to email, and I will honor opt-out requests.</span>
           </label>
           {sendProgress && <div className="rounded-xl border border-primary/30 bg-primary/5 p-3" role="status"><div className="flex items-center justify-between text-xs"><span className="font-semibold text-foreground">{sendProgress.processed} of {sendProgress.total} processed</span><span className="text-muted-foreground">{sendProgress.sent} sent · {sendProgress.failed} failed</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${Math.round((sendProgress.processed / sendProgress.total) * 100)}%` }} /></div>{sendProgress.waiting && <p className="mt-2 text-[11px] text-muted-foreground">Next batch sends in {sendProgress.nextIn} seconds. Keep TitanOS open.</p>}</div>}
-          {sending ? <Button variant="outline" className="w-full" onClick={stopSending}><PauseCircle /> Stop after current batch</Button> : <Button variant="success" className="w-full" onClick={sendSelected} disabled={!ready.length || !confirmed}><Send /> Send {ready.length || "selected"} · {BATCH_SIZE}/minute</Button>}
+          {sending ? <Button variant="outline" className="w-full" onClick={stopSending}><PauseCircle /> Stop after current batch</Button> : <Button variant="success" className="w-full" onClick={sendSelected} disabled={!ready.length || !confirmed}><Send /> Send verified pilot · max {BATCH_SIZE}</Button>}
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><ShieldCheck className="w-4 h-4 text-success" /> Delivery credentials stay on the TitanOS server.</div>
         </section>
       </div>

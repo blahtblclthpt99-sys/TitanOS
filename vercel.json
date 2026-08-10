@@ -12,6 +12,7 @@
     "api/functions/titanAI.js": { "maxDuration": 60 },
     "api/functions/leadWorkerFind.js": { "maxDuration": 60 },
     "api/functions/leadWorkerSend.js": { "maxDuration": 60 },
+    "api/functions/resendWebhook.js": { "maxDuration": 30 },
     "api/functions/aiExecuteAction.js": { "maxDuration": 30 },
     "api/functions/receiptVisionOcr.js": { "maxDuration": 60 },
     "api/functions/portalRequestOtp.js": { "maxDuration": 20 },

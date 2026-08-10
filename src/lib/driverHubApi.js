@@ -918,14 +918,14 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
   const year = new Date(session.started_at || Date.now()).getFullYear();
   const fuel = calcFuelCost({ miles, mpg, gasPriceLocal, currency });
   const date = (session.started_at || todayISO()).slice(0, 10);
-  const notes = `Auto-logged from Driver Hub${vehicleName ? ` · ${vehicleName}` : ""} · ${fuel.gallons} gal est · ${currencySymbol(currency)}${fuel.cost}${session.active ? " · in progress" : ""}`;
+  const notes = `Auto-logged from Profit Calculator${vehicleName ? ` · ${vehicleName}` : ""} · ${fuel.gallons} gal est · ${currencySymbol(currency)}${fuel.cost}${session.active ? " · in progress" : ""}`;
   const tripPayload = {
     date,
     purpose: "Rideshare / delivery driving",
-    from_location: session.city || "Driver hub start",
-    to_location: session.active ? "In progress" : "Driver hub end",
+    from_location: session.city || "Driving session start",
+    to_location: session.active ? "In progress" : "Driving session end",
     miles,
-    customer_name: "Driver Hub",
+    customer_name: "Profit Calculator",
     notes,
     tax_year: year,
     created_by_id: user.id,
@@ -950,14 +950,14 @@ export async function syncSessionToTax(user, session, { mpg, gasPriceLocal, curr
   let expense = null;
   if (fuel.cost > 0) {
     const expensePayload = {
-      description: `Fuel · Driver Hub (${vehicleName || "vehicle"})`,
+      description: `Fuel · Profit Calculator (${vehicleName || "vehicle"})`,
       vendor: "Fuel",
       amount: fuel.cost,
       date: (session.ended_at || session.started_at || todayISO()).slice(0, 10),
       category: "fuel",
       is_tax_deductible: true,
       business_use_percent: 100,
-      notes: `Auto from Driver Hub · ${miles} mi · ~${fuel.gallons} gal @ ${currencySymbol(currency)}${gasPriceLocal}/${currency === "USD" ? "gal" : "unit"}`,
+      notes: `Auto from Profit Calculator · ${miles} mi · ~${fuel.gallons} gal @ ${currencySymbol(currency)}${gasPriceLocal}/${currency === "USD" ? "gal" : "unit"}`,
       created_by_id: user.id,
     };
     try {

@@ -1,5 +1,5 @@
 /**
- * Resolve plain-language status + primary next action for Driver Hub.
+ * Resolve plain-language status + primary next action for the profit calculator.
  * Supports the three-question UI: happening / next / more.
  */
 
@@ -9,7 +9,7 @@
 export function resolveDriverIntent(snap) {
   if (!snap) {
     return {
-      happening: "Driver Hub isn’t ready yet.",
+      happening: "The profit calculator isn’t ready yet.",
       nextLabel: "Refresh",
       nextFolder: "live-shift",
       nextHint: "Pull to refresh or try again.",

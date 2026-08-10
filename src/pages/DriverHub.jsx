@@ -181,7 +181,7 @@ export default function DriverHub() {
 
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight truncate">
-            Driver Hub
+            Rideshare &amp; Delivery Profit Calculator
           </h1>
           <div className="flex items-center gap-1.5 shrink-0">
             <Button

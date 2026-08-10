@@ -87,8 +87,8 @@ export const DRIVER_OS_FOLDERS = Object.freeze([
   },
   {
     id: "performance",
-    label: "Performance",
-    description: "Daily score & trends",
+    label: "Performance Score",
+    description: "Upload records, calculate profit, compare",
     premium: false,
     icon: "trophy",
     group: "analytics",

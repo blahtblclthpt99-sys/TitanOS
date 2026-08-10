@@ -94,6 +94,7 @@ const ACTIVE_FOLDER_IDS = new Set([
   "goals",
   "vehicle",
   "reports",
+  "performance",
   "settings",
   "directory",
 ]);
@@ -175,7 +176,7 @@ export default function DriverExplorer({
       drive: ["live-shift", "doordash"],
       today: ["todays-orders"],
       records: ["trip-history", "expenses", "reports"],
-      insights: ["analytics", "goals"],
+      insights: ["performance", "analytics", "goals"],
       setup: ["vehicle", "directory", "settings"],
     };
     return [

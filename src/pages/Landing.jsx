@@ -55,7 +55,7 @@ const ICONS = {
 const FEATURES = [
   { icon: "sparkles", title: "Titan AI", slug: "titan-ai", desc: "Briefs, notes, and follow-ups written for you between stops." },
   { icon: "calc", title: "Mileage & expenses", slug: "expenses", desc: "Track miles, receipts, and write-offs without digging through paper records." },
-  { icon: "car", title: "Driver Hub", slug: "driver-hub", desc: "Driver OS — Mission Control for live shifts, Explorer for analytics." },
+  { icon: "car", title: "Rideshare & Delivery Profit Calculator", slug: "driver-hub", desc: "Import platform records, calculate real profit, score performance, and compare results privately." },
 ];
 
 const AUDIENCES = [
@@ -93,7 +93,7 @@ const WHY = [
   {
     icon: "shield",
     title: "Plans that scale with you",
-    desc: "Run shifts, listings, Driver Hub, apps, and team workflows in one workspace.",
+    desc: "Run shifts, listings, profit calculations, apps, and team workflows in one workspace.",
   },
 ];
 
@@ -128,7 +128,7 @@ const INCLUDED = [
   "Expense & tax tracking",
   "Mile tracker",
   "Shift profit tracking",
-  "Driver Hub (shift miles)",
+  "Rideshare & delivery profit calculator",
   "Mobile-first app",
   "Pay-ready reporting",
 ];

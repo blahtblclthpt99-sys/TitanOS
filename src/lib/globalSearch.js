@@ -151,7 +151,7 @@ export function runGlobalSearch(query, options = {}) {
   const intents = [
     { re: /invoice|bill|overdue/i, label: "Invoices", path: "/invoices", hint: "Billing" },
     { re: /estimate|quote/i, label: "Estimates", path: "/estimates", hint: "Quotes" },
-    { re: /driver|cdl|truck|van|otr|hazmat|trip/i, label: "Find drivers / trips", path: "/driver", hint: "Driver Hub" },
+    { re: /driver|cdl|truck|van|otr|hazmat|trip|rideshare|profit/i, label: "Open driver profit calculator", path: "/driver", hint: "Rideshare & delivery" },
     { re: /tax|1099|mileage/i, label: "Tax Center", path: "/tax-center", hint: "Taxes" },
     { re: /ai|assistant|help/i, label: "Titan AI", path: "/assistant", hint: "Ask Titan" },
     { re: /message|chat|inbox|dm/i, label: "Messages", path: "/messages", hint: "Inbox" },
@@ -229,7 +229,7 @@ export function getAiSearchTips(query) {
   const assist = getSearchAssistance(query);
   const tips = [assist.tip];
   const q = String(query || "").toLowerCase();
-  if (/driver|truck|cdl|van|trip/.test(q)) tips.push("Open Driver Hub → Find Drivers or Trip History.");
+  if (/driver|truck|cdl|van|trip|rideshare|profit/.test(q)) tips.push("Open Profit Calculator → Performance Score or Trip History.");
   if (/invoice|pay/.test(q)) tips.push("Check Invoices for overdue balances and send reminders.");
   if (/job|schedule/.test(q)) tips.push("Jump to Jobs or Schedule to manage today's work.");
   if (/message|chat|inbox/.test(q)) tips.push("Open Messages to search conversations, send photos, or voice notes.");

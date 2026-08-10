@@ -112,11 +112,11 @@ export default function DriverTripDetail() {
   if (!trip) {
     return (
       <PageShell maxWidth="md">
-        <PageHeader eyebrow="Driver Hub" title="Trip not found" />
+        <PageHeader eyebrow="Profit Calculator" title="Trip not found" />
         <EmptyState
           title="No trip with that id"
           description="It may have been cleared from local history."
-          actionLabel="Back to Driver Hub"
+          actionLabel="Back to Profit Calculator"
           onAction={() => {
             window.location.href = "/driver?tab=intel";
           }}
@@ -172,7 +172,7 @@ export default function DriverTripDetail() {
         </Link>
       </Button>
       <PageHeader
-        eyebrow="Driver Hub · Trip"
+        eyebrow="Profit Calculator · Trip"
         title={`Trip #${trip.trip_number ?? "—"}`}
         subtitle={`${trip.date || "—"} · ${trip.rush_label || "Unclassified"} · ${trip.platform}`}
       />

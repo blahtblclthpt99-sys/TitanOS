@@ -108,9 +108,9 @@ export default function Fleet() {
     <div className="page-pad max-w-6xl mx-auto">
       <PageHeader title="Fleet & equipment" subtitle={`${rows.length} assets tracked`} />
       <p className="text-sm text-muted-foreground -mt-3 mb-4">
-        Add make & model for vehicles — Driver Hub uses them for fuel estimates and tax mileage.{" "}
+        Add make & model for vehicles — the Profit Calculator uses them for fuel estimates and tax mileage.{" "}
         <Link to="/driver" className="text-titan-cyan hover:underline">
-          Open Driver Hub →
+          Open Profit Calculator →
         </Link>
       </p>
       <div className="grid lg:grid-cols-[.85fr_1.15fr] gap-5">
@@ -242,7 +242,7 @@ export default function Fleet() {
             <EmptyState
               icon={Truck}
               title="No fleet yet"
-              description="Add a vehicle with make & model to use it in Driver Hub."
+              description="Add a vehicle with make & model to use it in the Profit Calculator."
             />
           )}
           {rows.map((row) => (

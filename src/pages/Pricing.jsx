@@ -7,7 +7,7 @@ import { openPlayStore } from "@/lib/app-download";
 
 const INCLUDED = [
   "Jobs, scheduling, customers, estimates, and invoices",
-  "Driver Hub, mileage, expenses, and field workflows",
+  "Rideshare and delivery profit calculator, mileage, expenses, and field workflows",
   "Titan AI, reports, communication, and marketplace tools",
   "Teams, fleet, files, settings, and administration",
 ];

@@ -54,7 +54,7 @@ import {
  */
 export const APP_NAV_ITEMS = [
   // —— Live — what is happening now
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "live" },
+  { icon: Car, label: "Rideshare & Delivery Profit Calculator", path: "/driver", group: "live" },
   { icon: LayoutDashboard, label: "Command Center", path: "/", group: "live" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "live" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "live" },
@@ -271,7 +271,7 @@ export function resolvePageTitle(pathname = "/") {
   if (exact) return exact.label.replace(/\s·\sSoon$/, "");
 
   const tab = MOBILE_TAB_ITEMS.find((item) => item.path === path);
-  if (tab) return tab.label === "Driver" ? "Driver Hub" : tab.label;
+  if (tab) return tab.label === "Driver" ? "Rideshare & Delivery Profit Calculator" : tab.label;
 
   const prefix = APP_NAV_ITEMS.find(
     (item) => item.path !== "/" && path.startsWith(`${item.path}/`)
@@ -284,7 +284,7 @@ export function resolvePageTitle(pathname = "/") {
 /** Parent crumb for nested routes — domain list or section root. */
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
-  if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
+  if (path.startsWith("/driver")) return { label: "Profit Calculator", path: "/driver" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
   if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };

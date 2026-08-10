@@ -39,8 +39,8 @@ const FEATURES = {
     desc: "Automatic mileage logging for every job run — audit-ready when you need it.",
   },
   "driver-hub": {
-    title: "Driver Hub",
-    desc: "Find verified drivers by CDL, vehicle, route, and rating — plus track your own shift, miles, and tax sync.",
+    title: "Rideshare & Delivery Profit Calculator",
+    desc: "Import Uber, DoorDash, Lyft, and delivery records to calculate real profit, performance score, platform rankings, and private cohort comparisons.",
   },
 };
 

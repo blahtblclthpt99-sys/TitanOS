@@ -428,7 +428,7 @@ export default function Messages() {
                   </button>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground px-1">No contacts found. Open Driver Hub to message drivers.</p>
+                <p className="text-sm text-muted-foreground px-1">No contacts found. Open the Profit Calculator directory to message drivers.</p>
               )}
             </div>
           </div>

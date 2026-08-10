@@ -60,7 +60,7 @@ const DEFAULT_FAVORITES = [
   { id: "jobs", label: "Jobs", path: "/jobs" },
   { id: "customers", label: "Customers", path: "/customers" },
   { id: "invoices", label: "Invoices", path: "/invoices" },
-  { id: "driver", label: "Driver Hub", path: "/driver" },
+  { id: "driver", label: "Profit Calculator", path: "/driver" },
   { id: "assistant", label: "Titan AI", path: "/assistant" },
 ];
 

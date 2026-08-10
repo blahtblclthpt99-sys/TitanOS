@@ -16,7 +16,7 @@ const RULES = [
   { re: /titan score|credit score|score/i, path: "/titan-score", label: "Open Titan Score" },
   { re: /marketing|facebook|instagram/i, path: "/marketing", label: "Open Marketing Studio" },
   { re: /doordash|door\s*dash/i, path: "/driver?tab=doordash", label: "Open DoorDash workflow" },
-  { re: /driver|uber|delivery|rideshare/i, path: "/driver", label: "Open Driver Hub" },
+  { re: /driver|uber|delivery|rideshare|profit calculator/i, path: "/driver", label: "Open profit calculator" },
   { re: /emergency|same.?day/i, path: "/emergency", label: "Open Emergency Jobs" },
   { re: /escrow|job hold|payment protection/i, path: "/escrow", label: "Open Job Holds" },
   { re: /route|directions/i, path: "/routes", label: "Open Route Planner" },

@@ -21,6 +21,7 @@ export async function syncDriverPerformanceSummary(userId, summary) {
 }
 
 export function percentileLabel(percentile) {
+  if (percentile == null || percentile === "") return null;
   const value = Number(percentile);
   if (!Number.isFinite(value)) return null;
   if (value >= 90) return "Top 10%";

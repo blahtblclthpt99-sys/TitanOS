@@ -6,8 +6,16 @@ import {
   parseDriverText,
   summarizeDriverPerformance,
 } from "../src/lib/driverActivity/recordImport.js";
+import { percentileLabel } from "../src/lib/driverActivity/performanceBenchmark.js";
 
 describe("rideshare and delivery record imports", () => {
+  it("hides percentile language until the private cohort is large enough", () => {
+    assert.equal(percentileLabel(null), null);
+    assert.equal(percentileLabel(undefined), null);
+    assert.equal(percentileLabel(""), null);
+    assert.equal(percentileLabel(82), "Top 25%");
+  });
+
   it("normalizes an Uber-style CSV without double-counting tips", () => {
     const rows = parseDriverCsv(
       "Trip Date,Net Earnings,Tips,Trip Distance,Trip Duration\n2026-08-01,$24.50,$5.00,12.5 mi,01:10:00",

@@ -197,6 +197,10 @@ $RECYCLE.BIN/
 
 # TitanOS — secrets & local tooling
 .tools/
+*.jks
+*.keystore
+keystore.properties
+UPLOAD_KEY_CREDENTIALS.txt
 android/*.jks
 android/*.keystore
 android/keystore.properties

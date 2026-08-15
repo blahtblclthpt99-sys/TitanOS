@@ -32,7 +32,7 @@ export async function resolvePortalSession(admin, rawToken) {
   if (hashErr) throw hashErr;
   if (byHash?.[0]) return byHash[0];
 
-  const allowLegacy = String(process.env.PORTAL_TOKEN_ALLOW_LEGACY || "1") !== "0";
+  const allowLegacy = String(process.env.PORTAL_TOKEN_ALLOW_LEGACY || "0") === "1";
   if (!allowLegacy) return null;
 
   const { data: legacy, error: legErr } = await admin

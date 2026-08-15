@@ -70,14 +70,24 @@ export default async function handler(req, res) {
       });
     }
 
-    let customer = null;
+    // Collect all customer records matching this email (any case variant) to detect cross-tenant ambiguity.
+    const allMatches = [];
     for (const variant of [trimmedEmail, trimmedEmail.toLowerCase(), trimmedEmail.toUpperCase()]) {
-      const { data } = await admin.from("customers").select("*").eq("email", variant).limit(1);
+      const { data } = await admin
+        .from("customers")
+        .select("id, email, first_name, last_name, created_by_id")
+        .eq("email", variant);
       if (data?.length) {
-        customer = data[0];
-        break;
+        for (const row of data) {
+          if (!allMatches.some((m) => m.id === row.id)) allMatches.push(row);
+        }
       }
     }
+
+    // Fail closed: if the email maps to customers in multiple tenants (distinct created_by_id),
+    // do not create a session. This prevents cross-tenant portal access.
+    const tenantIds = [...new Set(allMatches.map((m) => m.created_by_id).filter(Boolean))];
+    const customer = tenantIds.length === 1 ? allMatches[0] : null;
 
     if (customer) {
       const normalizedEmail = trimmedEmail.toLowerCase();
@@ -89,6 +99,7 @@ export default async function handler(req, res) {
       await admin.from("portal_sessions").insert({
         email: normalizedEmail,
         customer_id: customer.id,
+        business_owner_id: customer.created_by_id || null,
         otp_code: otpHash,
         otp_expires_at: otpExpiresAt,
         verified: false,

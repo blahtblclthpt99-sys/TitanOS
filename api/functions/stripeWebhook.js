@@ -190,7 +190,9 @@ export default async function handler(req, res) {
     const invoiceId =
       session.metadata?.invoice_id || session.client_reference_id || null;
     const paymentId = session.metadata?.payment_id || null;
-    const expectedUserId = session.metadata?.user_id || null;
+    // Prefer the dedicated invoice_owner_id metadata field (set by createPaymentLink post-hardening).
+    // Fall back to user_id for sessions created before this change.
+    const expectedUserId = session.metadata?.invoice_owner_id || session.metadata?.user_id || null;
     const sessionId = session.id || null;
     const amountTotal = (session.amount_total || 0) / 100;
     const expectedBaseAmount =

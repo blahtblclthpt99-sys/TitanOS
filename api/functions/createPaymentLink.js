@@ -57,6 +57,9 @@ export default async function handler(req, res) {
     // When charging an invoice, ALWAYS use server balance_due — ignore client amount.
     let invoiceId = body.invoice_id || null;
     let amount = Number(body.amount);
+    // Track the invoice owner separately from the authenticated actor (they may differ
+    // for admin-assisted payments — both must be preserved in Stripe metadata).
+    let invoiceOwnerId = null;
     if (invoiceId) {
       const { data: invoice, error: invErr } = await admin
         .from("invoices")
@@ -78,6 +81,7 @@ export default async function handler(req, res) {
       }
       amount = due;
       invoiceId = invoice.id;
+      invoiceOwnerId = invoice.created_by_id || user.id;
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -245,6 +249,9 @@ export default async function handler(req, res) {
       params.set("metadata[fee_version]", String(feeResult.feeVersion ?? ""));
       params.set("metadata[fee_config_source]", feeResult.configSource || "seed");
       params.set("metadata[user_id]", user.id);
+      // Separate the authenticated actor (user_id) from the invoice owner (invoice_owner_id).
+      // The webhook uses invoice_owner_id to verify ownership; user_id records who initiated checkout.
+      if (invoiceOwnerId) params.set("metadata[invoice_owner_id]", invoiceOwnerId);
 
       const stripeHeaders = {
         Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,

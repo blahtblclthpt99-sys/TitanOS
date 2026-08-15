@@ -16,16 +16,21 @@ export default async function handler(req, res) {
     const { token, invoice_id: invoiceId } = readJson(req);
     const auth = await requirePortalSession(admin, token);
     if (auth.error) return res.status(auth.status).json({ error: auth.error });
+    if (!auth.session.created_by_id) return res.status(401).json({ error: "Invalid or expired session" });
     if (!invoiceId) return res.status(400).json({ error: "invoice_id is required" });
 
     const { data: invoice, error: findErr } = await admin
       .from("invoices")
-      .select("*")
+      .select("id,invoice_number,customer_id,created_by_id,status,total,balance_due")
       .eq("id", invoiceId)
       .eq("customer_id", auth.session.customer_id)
+      .eq("created_by_id", auth.session.created_by_id)
       .maybeSingle();
     if (findErr) throw findErr;
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (["paid", "void", "cancelled", "refunded"].includes(String(invoice.status || "").toLowerCase())) {
+      return res.status(409).json({ error: "Invoice is not payable" });
+    }
 
     const amount = Number(invoice.balance_due || invoice.total || 0);
     const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -40,8 +45,8 @@ export default async function handler(req, res) {
         setupRequired: true,
       });
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ error: "Invoice has no balance due" });
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
+      return res.status(400).json({ error: "Invoice has no valid balance due" });
     }
 
     const params = new URLSearchParams();
@@ -53,9 +58,10 @@ export default async function handler(req, res) {
     params.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
     params.append("line_items[0][quantity]", "1");
     params.append("metadata[invoice_id]", invoiceId);
-    params.append("client_reference_id", invoiceId);
-    params.append("metadata[customer_id]", auth.session.customer_id);
+    params.append("metadata[invoice_owner_id]", String(auth.session.created_by_id));
+    params.append("metadata[customer_id]", String(auth.session.customer_id));
     params.append("metadata[source]", "portal");
+    params.append("client_reference_id", invoiceId);
 
     const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
@@ -78,7 +84,7 @@ export default async function handler(req, res) {
       action: "pay_invoice_checkout",
       entity_type: "invoice",
       entity_id: invoiceId,
-      meta: { amount, checkout_id: session.id },
+      meta: { amount, checkout_id: session.id, owner_id: auth.session.created_by_id },
     });
 
     // Never mark paid here — only Stripe webhook / verified payment may close the invoice.

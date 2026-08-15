@@ -1,0 +1,36 @@
+name: TitanOS 5000X full ship gate
+
+on:
+  push:
+    branches:
+      - security/titanos-5000x-full-system-audit
+    paths:
+      - .github/workflows/titanos-5000x-ship-gate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  ship-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/titanos-5000x-full-system-audit
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Full TitanOS ship gate
+        run: npm run gate:ship
+      - name: Record successful gate and remove temporary workflow
+        run: |
+          rm .github/workflows/titanos-5000x-ship-gate.yml
+          git config user.name "TitanOS Release Guardian"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci: verify TitanOS 5000X full ship gate"
+          git push origin HEAD:security/titanos-5000x-full-system-audit

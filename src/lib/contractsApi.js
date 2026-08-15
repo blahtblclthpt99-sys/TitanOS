@@ -1,4 +1,5 @@
 import { api } from "@/api/apiClient";
+import { createFunctionsModule } from "@/api/functions";
 import { readLocal, writeLocal, uid } from "@/lib/localStore";
 import { notifyUser } from "@/lib/notify";
 
@@ -25,12 +26,6 @@ export async function listContracts(ownerId) {
 }
 
 export async function createContract(user, data) {
-  const token =
-    typeof crypto !== "undefined" && crypto.getRandomValues
-      ? Array.from(crypto.getRandomValues(new Uint8Array(24)))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("")
-      : uid().replace(/-/g, "") + uid().replace(/-/g, "");
   const payload = {
     owner_id: user.id,
     customer_id: data.customer_id || null,
@@ -39,7 +34,7 @@ export async function createContract(user, data) {
     title: data.title || "Service Agreement",
     body: data.body || DEFAULT_BODY,
     status: "sent",
-    share_token: token,
+    share_token: null,
     created_by_id: user.id,
   };
   try {
@@ -53,61 +48,46 @@ export async function createContract(user, data) {
   }
 }
 
+export async function createContractShareToken(contractId) {
+  const result = await createFunctionsModule().invoke("contractShareToken", { contract_id: contractId });
+  if (!result?.token) throw new Error("Could not create a signing link.");
+  return result.token;
+}
+
 export async function getContractByToken(token) {
-  if (!token || String(token).length < 16) return null;
+  if (!token || String(token).length < 32) return null;
   try {
-    const { supabase } = await import("@/api/supabaseClient");
-    const { data, error } = await supabase.rpc("get_contract_by_share_token", { p_token: token });
-    if (!error && data) {
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row) return row;
-    }
-  } catch {
-    /* fall through */
-  }
-  try {
-    // Fallback for environments without migration 012 yet (owner-authenticated only)
-    const rows = await api.entities.Contract.filter({ share_token: token });
-    return rows[0] || null;
+    const result = await createFunctionsModule().invoke("publicContract", {
+      action: "get",
+      token: String(token),
+    });
+    return result?.contract || null;
   } catch {
     return null;
   }
 }
 
-export async function signContract(contract, { role, signature, signatureImage = "" }) {
-  if (role === "customer" && contract.share_token) {
-    try {
-      const { supabase } = await import("@/api/supabaseClient");
-      const { data, error } = await supabase.rpc("sign_contract_by_share_token", {
-        p_token: contract.share_token,
-        p_signature: signature,
-        p_signature_image: signatureImage || null,
-      });
-      if (!error && data) {
-        const row = Array.isArray(data) ? data[0] : data;
-        if (row) return row;
-      }
-    } catch {
-      /* fall through to entity update */
-    }
+export async function signContract(contract, { role, signature, signatureImage = "", shareToken = "" }) {
+  if (role === "customer") {
+    const token = String(shareToken || contract?.share_token || "");
+    if (!token) throw new Error("Signing link is missing.");
+    const result = await createFunctionsModule().invoke("publicContract", {
+      action: "sign",
+      token,
+      signature,
+      signature_image: signatureImage || null,
+    });
+    if (!result?.contract) throw new Error("Contract could not be signed.");
+    return result.contract;
   }
 
-  const updates =
-    role === "customer"
-      ? {
-          customer_signature: signature,
-          customer_signature_image: signatureImage || null,
-          status: contract.owner_signature ? "signed" : "sent",
-          signed_at: contract.owner_signature ? new Date().toISOString() : null,
-          signed_user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
-        }
-      : {
-          owner_signature: signature,
-          owner_signature_image: signatureImage || null,
-          status: contract.customer_signature ? "signed" : "sent",
-          signed_at: contract.customer_signature ? new Date().toISOString() : null,
-          signed_user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
-        };
+  const updates = {
+    owner_signature: signature,
+    owner_signature_image: signatureImage || null,
+    status: contract.customer_signature ? "signed" : "sent",
+    signed_at: contract.customer_signature ? new Date().toISOString() : null,
+    signed_user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
+  };
 
   try {
     const row = await api.entities.Contract.update(contract.id, updates);

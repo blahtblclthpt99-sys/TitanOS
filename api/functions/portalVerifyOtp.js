@@ -38,13 +38,15 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { data: sessions } = await admin
+    const { data: sessions, error: sessionError } = await admin
       .from("portal_sessions")
-      .select("*")
-      .eq("email", normalizedEmail);
+      .select("id,email,customer_id,created_by_id,otp_code,otp_expires_at,verified")
+      .eq("email", normalizedEmail)
+      .limit(5);
+    if (sessionError) throw sessionError;
 
     const session = (sessions || []).find(
-      (item) => !item.verified && portalOtpMatches(item.otp_code, normalizedEmail, submittedCode)
+      (item) => !item.verified && item.created_by_id && portalOtpMatches(item.otp_code, normalizedEmail, submittedCode)
     );
 
     if (!session) {
@@ -56,18 +58,19 @@ export default async function handler(req, res) {
 
     const { data: customer, error: customerError } = await admin
       .from("customers")
-      .select("*")
+      .select("id,first_name,last_name,email,created_by_id")
       .eq("id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
       .maybeSingle();
     if (customerError) throw customerError;
-    if (!customer) {
-      return res.status(404).json({ error: "Account not found" });
+    if (!customer || String(customer.email || "").trim().toLowerCase() !== normalizedEmail) {
+      return res.status(401).json({ error: "Invalid verification code" });
     }
 
     const rawToken = crypto.randomUUID() + crypto.randomUUID();
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    await admin
+    const { error: updateError } = await admin
       .from("portal_sessions")
       .update({
         verified: true,
@@ -75,7 +78,10 @@ export default async function handler(req, res) {
         token_expires_at: tokenExpiresAt,
         otp_code: null,
       })
-      .eq("id", session.id);
+      .eq("id", session.id)
+      .eq("created_by_id", session.created_by_id)
+      .eq("verified", false);
+    if (updateError) throw updateError;
 
     return res.status(200).json({
       token: rawToken,

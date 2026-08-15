@@ -96,20 +96,25 @@ export default function Customers({ isActive = true }) {
 
   const renderCustomerRow = (c) => {
     const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Customer";
-    const open = () => navigate(`/customers/${c.id}`, { state: { customer: c } });
+    const isTemporary = String(c.id || "").startsWith("temp_");
+    const open = () => {
+      if (isTemporary) return;
+      navigate(`/customers/${c.id}`, { state: { customer: c } });
+    };
     return (
       <div
         role="link"
-        tabIndex={0}
-        aria-label={`Open ${name}`}
+        tabIndex={isTemporary ? -1 : 0}
+        aria-disabled={isTemporary || undefined}
+        aria-label={isTemporary ? `${name} is still saving` : `Open ${name}`}
         onClick={open}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
+          if (!isTemporary && (e.key === "Enter" || e.key === " ")) {
             e.preventDefault();
             open();
           }
         }}
-        className="titan-surface p-4 titan-surface-interactive cursor-pointer focus-ring titan-surface-interactive"
+        className={`titan-surface p-4 focus-ring ${isTemporary ? "opacity-70 cursor-wait" : "titan-surface-interactive cursor-pointer"}`}
       >
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 rounded-md bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center flex-shrink-0" aria-hidden="true">
@@ -122,6 +127,7 @@ export default function Customers({ isActive = true }) {
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <p className="text-sm font-semibold text-foreground truncate">{name}</p>
               <StatusBadge status={c.status} />
+              {isTemporary && <span className="text-xs text-muted-foreground">Saving…</span>}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               {c.phone && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" aria-hidden="true" />{c.phone}</span>}
@@ -137,14 +143,16 @@ export default function Customers({ isActive = true }) {
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            <DeleteButton
-              label={name}
-              onDelete={async () => {
-                await api.entities.Customer.delete(c.id);
-                setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
-                reload();
-              }}
-            />
+            {!isTemporary && (
+              <DeleteButton
+                label={name}
+                onDelete={async () => {
+                  await api.entities.Customer.delete(c.id);
+                  setLocal((prev) => (prev ?? customers).filter((row) => row.id !== c.id));
+                  reload();
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

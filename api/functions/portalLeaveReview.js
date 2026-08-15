@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     if (auth.error) return res.status(auth.status).json({ error: auth.error });
     if (!auth.session.created_by_id) return res.status(401).json({ error: "Invalid or expired session" });
     if (!jobId) return res.status(400).json({ error: "job_id is required" });
-    const stars = Math.min(5, Math.max(1, Number(rating) || 5));
+    const stars = Math.min(5, Math.max(1, Math.round(Number(rating) || 5)));
 
     const { data: job, error: jobError } = await admin
       .from("jobs")
@@ -33,17 +33,18 @@ export default async function handler(req, res) {
     const payload = {
       job_id: jobId,
       rating: stars,
-      comment: String(comment).trim().slice(0, 2000),
+      body: String(comment).trim().slice(0, 2000),
       reviewer_role: "customer",
+      reviewer_id: String(auth.session.customer_id),
       reviewee_id: String(auth.session.created_by_id),
-      customer_id: auth.session.customer_id,
       created_by_id: auth.session.created_by_id,
+      badges: [],
     };
 
     const { data: review, error } = await admin
       .from("job_reviews")
       .insert(payload)
-      .select("id,created_at,updated_at,job_id,rating,comment,reviewer_role,reviewee_id,customer_id")
+      .select("id,created_at,updated_at,job_id,reviewer_id,reviewee_id,reviewer_role,rating,body,badges")
       .maybeSingle();
     if (error) throw error;
 

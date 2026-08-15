@@ -51,13 +51,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    const trimmedEmail = email.trim();
-    const emailKey = trimmedEmail.toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
     if (
       !assertRateLimit(req, res, {
         limit: 3,
         windowMs: 10 * 60_000,
-        key: `portalOtp:${emailKey}`,
+        key: `portalOtp:${normalizedEmail}`,
       })
     ) {
       return;
@@ -70,17 +69,19 @@ export default async function handler(req, res) {
       });
     }
 
-    let customer = null;
-    for (const variant of [trimmedEmail, trimmedEmail.toLowerCase(), trimmedEmail.toUpperCase()]) {
-      const { data } = await admin.from("customers").select("*").eq("email", variant).limit(1);
-      if (data?.length) {
-        customer = data[0];
-        break;
-      }
-    }
+    // A portal identity must map to exactly one owner/customer relationship.
+    // Do not silently bind a shared email address to whichever tenant happens to sort first.
+    const { data: matches, error: customerError } = await admin
+      .from("customers")
+      .select("id,email,created_by_id,company_id")
+      .ilike("email", normalizedEmail)
+      .limit(3);
+    if (customerError) throw customerError;
+
+    const candidates = matches || [];
+    const customer = candidates.length === 1 && candidates[0].created_by_id ? candidates[0] : null;
 
     if (customer) {
-      const normalizedEmail = trimmedEmail.toLowerCase();
       const otp = randomOtp();
       const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       const otpHash = hashPortalOtp(normalizedEmail, otp);
@@ -89,6 +90,7 @@ export default async function handler(req, res) {
       await admin.from("portal_sessions").insert({
         email: normalizedEmail,
         customer_id: customer.id,
+        created_by_id: customer.created_by_id,
         otp_code: otpHash,
         otp_expires_at: otpExpiresAt,
         verified: false,
@@ -103,7 +105,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Always succeed for unknown emails (no account enumeration)
+    // Always succeed for unknown OR ambiguous emails to prevent account/tenant enumeration.
     return res.status(200).json({ success: true });
   } catch (error) {
     logError("portalRequestOtp", error);

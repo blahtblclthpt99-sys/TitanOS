@@ -7,6 +7,7 @@ import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.j
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 import { buildInvisibleInterface, buildConfirmationInterface } from "../_lib/invisibleInterface.js";
+import { loadTitanMemoryContext } from "../_lib/titanMemoryContext.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -746,6 +747,7 @@ export default async function handler(req, res) {
       messages.filter((m) => m.role === "user").slice(-1)[0]?.content || body.message || "";
     // Never trust client-supplied businessData (prompt injection). Load owned snapshot.
     const summary = await loadOwnedBusinessSummary(admin, userData.user.id);
+    const memoryContext = await loadTitanMemoryContext(admin, userData.user.id, lastMessage);
 
     const confirm = detectConfirmIntent(lastMessage);
     if (confirm) {
@@ -809,6 +811,7 @@ export default async function handler(req, res) {
       summary,
       pageContext,
       lawMastermind: Boolean(lawMastermind),
+      memoryContext,
     });
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

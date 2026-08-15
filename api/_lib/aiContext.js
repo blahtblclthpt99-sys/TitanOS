@@ -1,3 +1,5 @@
+import { formatTitanMemoryForPrompt } from "./titanMemoryContext.js";
+
 /**
  * Titan AI context — page catalog, allowlisted pageContext, grounded system prompts.
  * Business facts must come from server-owned snapshots only.
@@ -90,6 +92,7 @@ export function buildTitanSystemPrompt({
   summary,
   pageContext = null,
   lawMastermind = false,
+  memoryContext = [],
 } = {}) {
   const pageBlock = pageContext
     ? `CURRENT PAGE CONTEXT (user is here now):\n${JSON.stringify(pageContext)}\n`
@@ -103,6 +106,8 @@ DATA RULES (mandatory):
 - Clearly separate YOUR DATA from GENERAL KNOWLEDGE in answers when both appear.
 - Snapshot rows are capped samples — if asked "how many", say counts are from the current snapshot sample.
 - When the snapshot includes a Priority signal, treat it as the highest-priority operational guidance for your answer.
+- DURABLE MEMORY is user-owned, provenance-tagged context. Use only supplied memory; do not infer missing memories.
+- If durable memory conflicts with an authoritative current business record, prefer the current authoritative record and disclose the conflict.
 `.trim();
 
   if (lawMastermind) {
@@ -116,6 +121,7 @@ DATA RULES (mandatory):
       grounding,
       TITAN_PAGE_CATALOG,
       pageBlock,
+      `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
       `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
     ].join("\n\n");
   }
@@ -129,6 +135,7 @@ DATA RULES (mandatory):
     grounding,
     TITAN_PAGE_CATALOG,
     pageBlock,
-    `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
+    `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
+      `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
   ].join("\n\n");
 }

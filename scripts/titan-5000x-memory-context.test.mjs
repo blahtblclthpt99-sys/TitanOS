@@ -1,0 +1,13 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+const helper = fs.readFileSync("api/_lib/titanMemoryContext.js", "utf8");
+const server = fs.readFileSync("api/functions/titanAI.js", "utf8");
+const context = fs.readFileSync("api/_lib/aiContext.js", "utf8");
+assert(helper.includes('.eq("user_id", userId)'), "memory query must scope user_id");
+assert(helper.includes('.eq("created_by_id", userId)'), "memory query must scope owner");
+assert(helper.includes('.eq("archived", false)'), "archived memory must not enter context");
+assert(helper.includes('.slice(0, 8)'), "memory context must be bounded");
+assert(server.includes('loadTitanMemoryContext(admin, userData.user.id, lastMessage)'), "Titan must load durable memory server-side");
+assert(context.includes('DURABLE MEMORY (AUTHORIZED USER DATA)'), "system prompt must distinguish durable memory");
+assert(context.includes('prefer the current authoritative record'), "conflict policy must prefer authoritative current records");
+console.log("Titan 5000X durable memory context assertions passed");

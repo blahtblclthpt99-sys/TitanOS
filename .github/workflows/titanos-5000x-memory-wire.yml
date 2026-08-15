@@ -1,0 +1,88 @@
+name: TitanOS 5000X memory wiring
+
+on:
+  push:
+    branches:
+      - security/titanos-5000x-full-system-audit
+    paths:
+      - .github/workflows/titanos-5000x-memory-wire.yml
+
+permissions:
+  contents: write
+
+jobs:
+  wire-memory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/titanos-5000x-full-system-audit
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Wire bounded durable memory into Titan context
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ctx = Path('api/_lib/aiContext.js')
+          c = ctx.read_text()
+          if not c.startswith('/**'):
+              raise SystemExit('Unexpected aiContext header')
+          c = 'import { formatTitanMemoryForPrompt } from "./titanMemoryContext.js";\n\n' + c
+          old = '''export function buildTitanSystemPrompt({\n  summary,\n  pageContext = null,\n  lawMastermind = false,\n} = {}) {'''
+          new = '''export function buildTitanSystemPrompt({\n  summary,\n  pageContext = null,\n  lawMastermind = false,\n  memoryContext = [],\n} = {}) {'''
+          if old not in c:
+              raise SystemExit('buildTitanSystemPrompt signature not found')
+          c = c.replace(old, new, 1)
+          rule = '- When the snapshot includes a Priority signal, treat it as the highest-priority operational guidance for your answer.\n'
+          replacement = rule + '- DURABLE MEMORY is user-owned, provenance-tagged context. Use only supplied memory; do not infer missing memories.\n- If durable memory conflicts with an authoritative current business record, prefer the current authoritative record and disclose the conflict.\n'
+          if rule not in c:
+              raise SystemExit('grounding rule marker not found')
+          c = c.replace(rule, replacement, 1)
+          snap = '`BUSINESS SNAPSHOT (YOUR DATA):\\n${formatSummaryForPrompt(summary)}`,'
+          mem = '`DURABLE MEMORY (AUTHORIZED USER DATA):\\n${formatTitanMemoryForPrompt(memoryContext)}`,\n      ' + snap
+          if c.count(snap) != 2:
+              raise SystemExit(f'Expected 2 snapshot prompt insertions, got {c.count(snap)}')
+          c = c.replace(snap, mem)
+          ctx.write_text(c)
+
+          titan = Path('api/functions/titanAI.js')
+          t = titan.read_text()
+          import_marker = 'import { buildInvisibleInterface, buildConfirmationInterface } from "../_lib/invisibleInterface.js";'
+          if import_marker not in t:
+              raise SystemExit('Invisible Interface import marker missing')
+          t = t.replace(import_marker, import_marker + '\nimport { loadTitanMemoryContext } from "../_lib/titanMemoryContext.js";', 1)
+          summary_marker = '    const summary = await loadOwnedBusinessSummary(admin, userData.user.id);\n'
+          if summary_marker not in t:
+              raise SystemExit('summary marker missing')
+          t = t.replace(summary_marker, summary_marker + '    const memoryContext = await loadTitanMemoryContext(admin, userData.user.id, lastMessage);\n', 1)
+          prompt_marker = '''    const systemPrompt = buildTitanSystemPrompt({\n      summary,\n      pageContext,\n      lawMastermind: Boolean(lawMastermind),\n    });'''
+          prompt_new = '''    const systemPrompt = buildTitanSystemPrompt({\n      summary,\n      pageContext,\n      lawMastermind: Boolean(lawMastermind),\n      memoryContext,\n    });'''
+          if prompt_marker not in t:
+              raise SystemExit('system prompt marker missing')
+          t = t.replace(prompt_marker, prompt_new, 1)
+          titan.write_text(t)
+
+          test = Path('scripts/titan-5000x-memory-context.test.mjs')
+          test.write_text('''import fs from "node:fs";\nimport assert from "node:assert/strict";\nconst helper = fs.readFileSync("api/_lib/titanMemoryContext.js", "utf8");\nconst server = fs.readFileSync("api/functions/titanAI.js", "utf8");\nconst context = fs.readFileSync("api/_lib/aiContext.js", "utf8");\nassert(helper.includes('.eq("user_id", userId)'), "memory query must scope user_id");\nassert(helper.includes('.eq("created_by_id", userId)'), "memory query must scope owner");\nassert(helper.includes('.eq("archived", false)'), "archived memory must not enter context");\nassert(helper.includes('.slice(0, 8)'), "memory context must be bounded");\nassert(server.includes('loadTitanMemoryContext(admin, userData.user.id, lastMessage)'), "Titan must load durable memory server-side");\nassert(context.includes('DURABLE MEMORY (AUTHORIZED USER DATA)'), "system prompt must distinguish durable memory");\nassert(context.includes('prefer the current authoritative record'), "conflict policy must prefer authoritative current records");\nconsole.log("Titan 5000X durable memory context assertions passed");\n''')
+          PY
+      - run: npm ci
+      - name: Verify memory + AI/security gates
+        run: |
+          node scripts/titan-5000x-memory-context.test.mjs
+          npm run test:security
+          npm run test:ai
+          npm run typecheck
+          npm run build
+      - name: Commit verified memory wiring and remove temporary workflow
+        run: |
+          rm .github/workflows/titanos-5000x-memory-wire.yml
+          git config user.name "TitanOS Release Guardian"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat: ground Titan in bounded durable memory context"
+          git push origin HEAD:security/titanos-5000x-full-system-audit

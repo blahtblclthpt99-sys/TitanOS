@@ -28,7 +28,12 @@ export default function PublicSign() {
     if (saving || !signature.trim()) return;
     setSaving(true);
     try {
-      await signContract(contract, { role: "customer", signature: signature.trim(), signatureImage });
+      await signContract(contract, {
+        role: "customer",
+        signature: signature.trim(),
+        signatureImage,
+        shareToken: token,
+      });
       setStatus("success");
     } catch {
       setStatus("error");

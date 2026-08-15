@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
     const { data: sessions } = await admin
       .from("portal_sessions")
-      .select("*")
+      .select("id, email, customer_id, otp_code, otp_expires_at, verified")
       .eq("email", normalizedEmail);
 
     const session = (sessions || []).find(
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     const { data: customer, error: customerError } = await admin
       .from("customers")
-      .select("*")
+      .select("id, first_name, last_name, email")
       .eq("id", session.customer_id)
       .maybeSingle();
     if (customerError) throw customerError;

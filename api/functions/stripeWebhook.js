@@ -73,11 +73,11 @@ async function markInvoicePaid(
   if (!invoiceId) return;
   const { data: inv } = await admin
     .from("invoices")
-    .select("id, status, balance_due, total, created_by_id")
+    .select("id, status, balance_due, total, amount_paid, created_by_id")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!inv || inv.status === "paid") return;
-  if (expectedUserId && inv.created_by_id && inv.created_by_id !== expectedUserId) {
+  if (expectedUserId && inv.created_by_id && String(inv.created_by_id) !== String(expectedUserId)) {
     logError("stripeWebhook:invoice_owner_mismatch", {
       invoiceId,
       expectedUserId,
@@ -95,20 +95,31 @@ async function markInvoicePaid(
         (expectedPlatformFee != null && Number.isFinite(Number(expectedPlatformFee))
           ? Number(expectedPlatformFee)
           : 0);
+  if (!Number.isFinite(basePaid) || basePaid <= 0) {
+    logError("stripeWebhook:invalid_settlement_amount", { invoiceId, amountTotal, basePaid });
+    return;
+  }
   if (due > 0 && basePaid + 0.01 < due) {
     logError("stripeWebhook:underpayment", { invoiceId, amountTotal, basePaid, due });
     return;
   }
-  await admin
+
+  const previousPaid = Number(inv.amount_paid || 0);
+  const invoiceTotal = Number(inv.total || previousPaid + basePaid);
+  const authoritativePaid = Math.min(invoiceTotal, previousPaid + basePaid);
+  let update = admin
     .from("invoices")
     .update({
       status: "paid",
       balance_due: 0,
-      amount_paid: amountTotal,
+      amount_paid: authoritativePaid,
       paid_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", invoiceId);
+  if (expectedUserId) update = update.eq("created_by_id", expectedUserId);
+  const { error: updateError } = await update;
+  if (updateError) throw updateError;
 }
 
 export default async function handler(req, res) {
@@ -186,90 +197,93 @@ export default async function handler(req, res) {
     }
 
     try {
-    const session = event.data?.object || {};
-    const invoiceId =
-      session.metadata?.invoice_id || session.client_reference_id || null;
-    const paymentId = session.metadata?.payment_id || null;
-    const expectedUserId = session.metadata?.user_id || null;
-    const sessionId = session.id || null;
-    const amountTotal = (session.amount_total || 0) / 100;
-    const expectedBaseAmount =
-      session.metadata?.base_amount != null ? Number(session.metadata.base_amount) : null;
-    const expectedPlatformFee =
-      session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
+      const session = event.data?.object || {};
+      const invoiceId = session.metadata?.invoice_id || session.client_reference_id || null;
+      const paymentId = session.metadata?.payment_id || null;
+      const expectedUserId = session.metadata?.invoice_owner_id || session.metadata?.user_id || null;
+      const sessionId = session.id || null;
+      const amountTotal = (session.amount_total || 0) / 100;
+      const expectedBaseAmount =
+        session.metadata?.base_amount != null ? Number(session.metadata.base_amount) : null;
+      const expectedPlatformFee =
+        session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
-    if (event.type === "checkout.session.completed" && session.mode === "subscription") {
-      const stripe = new (await import("stripe")).default(stripeKey);
-      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-      if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-          expand: ["items.data.price"],
-        });
-        await syncStripeSubscription(admin, subscription);
-      }
-    } else if (
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated" ||
-      event.type === "customer.subscription.deleted"
-    ) {
-      await syncStripeSubscription(admin, session);
-    } else if (event.type === "checkout.session.completed") {
-      if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
-        return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
-      }
-      // Prefer payment row linkage; verify ownership before marking invoice
-      if (paymentId) {
-        const { data: payRow } = await admin
-          .from("payments")
-          .select("id, user_id, created_by_id, invoice_id, amount, amount_total, status")
-          .eq("id", paymentId)
-          .maybeSingle();
-        if (payRow && expectedUserId && payRow.user_id !== expectedUserId && payRow.created_by_id !== expectedUserId) {
-          logError("stripeWebhook:payment_user_mismatch", { paymentId, expectedUserId });
-          return res.status(200).json({ received: true, type: event.type, ignored: "ownership" });
+      if (event.type === "checkout.session.completed" && session.mode === "subscription") {
+        const stripe = new (await import("stripe")).default(stripeKey);
+        const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ["items.data.price"],
+          });
+          await syncStripeSubscription(admin, subscription);
         }
+      } else if (
+        event.type === "customer.subscription.created" ||
+        event.type === "customer.subscription.updated" ||
+        event.type === "customer.subscription.deleted"
+      ) {
+        await syncStripeSubscription(admin, session);
+      } else if (event.type === "checkout.session.completed") {
+        if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
+          return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
+        }
+        // Prefer payment row linkage; verify ownership before marking invoice.
+        if (paymentId) {
+          const { data: payRow } = await admin
+            .from("payments")
+            .select("id, user_id, created_by_id, invoice_id, amount, amount_total, status")
+            .eq("id", paymentId)
+            .maybeSingle();
+          if (payRow && expectedUserId && String(payRow.user_id) !== String(expectedUserId) && String(payRow.created_by_id) !== String(expectedUserId)) {
+            logError("stripeWebhook:payment_user_mismatch", { paymentId, expectedUserId });
+            return res.status(200).json({ received: true, type: event.type, ignored: "ownership" });
+          }
+          if (payRow?.invoice_id && invoiceId && String(payRow.invoice_id) !== String(invoiceId)) {
+            logError("stripeWebhook:payment_invoice_mismatch", { paymentId, invoiceId, paymentInvoiceId: payRow.invoice_id });
+            return res.status(200).json({ received: true, type: event.type, ignored: "invoice_linkage" });
+          }
+        }
+        await markInvoicePaid(admin, invoiceId, amountTotal, expectedUserId, {
+          expectedBaseAmount,
+          expectedPlatformFee,
+        });
+        await markPaymentStatus(admin, {
+          paymentId,
+          sessionId,
+          status: "succeeded",
+        });
+      } else if (
+        event.type === "checkout.session.expired" ||
+        event.type === "checkout.session.async_payment_failed"
+      ) {
+        await markPaymentStatus(admin, {
+          paymentId,
+          sessionId,
+          status: "canceled",
+          extraNote: `Stripe ${event.type}`,
+        });
+      } else if (
+        event.type === "payment_intent.payment_failed" ||
+        event.type === "charge.failed"
+      ) {
+        const piMeta = session.metadata || {};
+        await markPaymentStatus(admin, {
+          paymentId: piMeta.payment_id || paymentId,
+          sessionId: null,
+          status: "failed",
+          extraNote: `Stripe ${event.type}: ${session.last_payment_error?.message || "failed"}`,
+        });
+      } else if (event.type === "charge.refunded") {
+        const piMeta = session.metadata || {};
+        await markPaymentStatus(admin, {
+          paymentId: piMeta.payment_id || paymentId,
+          sessionId: sessionId || session.payment_intent || null,
+          status: "refunded",
+          extraNote: `Stripe ${event.type}`,
+        });
       }
-      await markInvoicePaid(admin, invoiceId, amountTotal, expectedUserId, {
-        expectedBaseAmount,
-        expectedPlatformFee,
-      });
-      await markPaymentStatus(admin, {
-        paymentId,
-        sessionId,
-        status: "succeeded",
-      });
-    } else if (
-      event.type === "checkout.session.expired" ||
-      event.type === "checkout.session.async_payment_failed"
-    ) {
-      await markPaymentStatus(admin, {
-        paymentId,
-        sessionId,
-        status: "canceled",
-        extraNote: `Stripe ${event.type}`,
-      });
-    } else if (
-      event.type === "payment_intent.payment_failed" ||
-      event.type === "charge.failed"
-    ) {
-      const piMeta = session.metadata || {};
-      await markPaymentStatus(admin, {
-        paymentId: piMeta.payment_id || paymentId,
-        sessionId: null,
-        status: "failed",
-        extraNote: `Stripe ${event.type}: ${session.last_payment_error?.message || "failed"}`,
-      });
-    } else if (event.type === "charge.refunded") {
-      const piMeta = session.metadata || {};
-      await markPaymentStatus(admin, {
-        paymentId: piMeta.payment_id || paymentId,
-        sessionId: sessionId || session.payment_intent || null,
-        status: "refunded",
-        extraNote: `Stripe ${event.type}`,
-      });
-    }
 
-    return res.status(200).json({ received: true, type: event.type });
+      return res.status(200).json({ received: true, type: event.type });
     } catch (processErr) {
       if (idempotencyClaimed && event.id) {
         try {

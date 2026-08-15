@@ -26,6 +26,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
       - name: Align TitanOS Node runtime with current dependencies
         run: |
           node - <<'NODE'
@@ -39,9 +42,7 @@ jobs:
         run: npm run cap:sync
       - name: Android release bundle compile
         working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+        run: gradle bundleRelease --no-daemon
       - name: Verify AAB exists
         run: |
           test -f android/app/build/outputs/bundle/release/app-release.aab

@@ -86,8 +86,18 @@ export default async function handler(req, res) {
 
     // Fail closed: if the email maps to customers in multiple tenants (distinct created_by_id),
     // do not create a session. This prevents cross-tenant portal access.
+    // Customers with null created_by_id are legacy/unowned records; they are only served when
+    // there is exactly one matching record so the identity is still unambiguous.
     const tenantIds = [...new Set(allMatches.map((m) => m.created_by_id).filter(Boolean))];
-    const customer = tenantIds.length === 1 ? allMatches[0] : null;
+    let customer = null;
+    if (tenantIds.length === 1) {
+      // Exactly one tenant — unambiguous.
+      customer = allMatches[0];
+    } else if (tenantIds.length === 0 && allMatches.length === 1) {
+      // Single legacy record with no tenant binding — still unambiguous.
+      customer = allMatches[0];
+    }
+    // tenantIds.length > 1 or (tenantIds.length === 0 and allMatches.length > 1): fail closed.
 
     if (customer) {
       const normalizedEmail = trimmedEmail.toLowerCase();

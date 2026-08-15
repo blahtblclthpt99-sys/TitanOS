@@ -81,7 +81,10 @@ export default async function handler(req, res) {
       }
       amount = due;
       invoiceId = invoice.id;
-      invoiceOwnerId = invoice.created_by_id || user.id;
+      // Only set invoiceOwnerId when the record has an explicit owner.
+      // If created_by_id is absent, leave it null so the webhook does not
+      // incorrectly treat the authenticated actor as the invoice owner.
+      invoiceOwnerId = invoice.created_by_id || null;
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {

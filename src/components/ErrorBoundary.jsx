@@ -5,6 +5,7 @@ import { trackEvent } from "@/lib/productAnalytics";
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
+const CHUNK_RELOAD_COOLDOWN_MS = 30_000;
 
 function isChunkLoadError(error) {
   const msg = String(error?.message || error || "");
@@ -32,7 +33,10 @@ async function purgeShellCaches() {
 
 function markAndReloadOnce() {
   try {
-    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return;
+    const previousAt = Number(sessionStorage.getItem(CHUNK_RELOAD_TS) || 0);
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1" && Date.now() - previousAt < CHUNK_RELOAD_COOLDOWN_MS) {
+      return;
+    }
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
     sessionStorage.setItem(CHUNK_RELOAD_TS, String(Date.now()));
   } catch {
@@ -61,7 +65,8 @@ export default class ErrorBoundary extends React.Component {
     });
     trackEvent("error_boundary");
 
-    // After a deploy, stale tabs often fail on missing hashed chunks — one hard reload usually fixes it.
+    // After a deploy, stale tabs can reference missing hashed chunks. Recover at
+    // most once per short incident window, not just once for the whole session.
     if (isChunkLoadError(error) && typeof window !== "undefined") {
       markAndReloadOnce();
     }

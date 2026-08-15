@@ -6,7 +6,7 @@ import { logError } from "../_lib/safeLog.js";
 import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.js";
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
-import { isOwnerEmail } from "../../shared/entitlements.js";
+import { buildInvisibleInterface, buildConfirmationInterface } from "../_lib/invisibleInterface.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -671,11 +671,9 @@ export default async function handler(req, res) {
       confirmedAction = null,
       rollbackAction = null,
       lawMastermind = false,
-      ownerAutopilot = false,
       guardrails = {},
     } = body;
     const pageContext = sanitizePageContext(body.pageContext);
-    const ownerMode = Boolean(ownerAutopilot) && isOwnerEmail(userData.user.email || "");
     const killSwitchOn = Boolean(guardrails?.killSwitch);
 
     if (rollbackAction) {
@@ -762,35 +760,12 @@ export default async function handler(req, res) {
           },
         });
       }
-      if (ownerMode && (confirm.intent === "run_workflow" || isAllowedAiIntent(confirm.intent))) {
-        try {
-          const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
-          const data =
-            confirm.intent === "run_workflow"
-              ? await executeWorkflow(admin, userData.user, confirm.params || {})
-              : await executeAiOfficeAction(
-                  admin,
-                  userData.user,
-                  confirm.intent,
-                  confirm.params || {}
-                );
-          return res.status(200).json({ data });
-        } catch (execErr) {
-          logError("titanAI:owner_autopilot_execute", execErr);
-          const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
-          if (status !== 200) {
-            return res.status(status).json({ error: execErr.message || "Action rejected" });
-          }
-          return res.status(200).json({
-            data: {
-              type: "error",
-              message:
-                "Owner autopilot could not complete that action. Open the related screen to finish in one tap.",
-            },
-          });
-        }
-      }
-      return res.status(200).json({ data: confirm });
+      return res.status(200).json({
+        data: {
+          ...confirm,
+          interface: buildConfirmationInterface(confirm),
+        },
+      });
     }
 
     const local = answerLocally(lastMessage, summary);
@@ -802,6 +777,7 @@ export default async function handler(req, res) {
           source: "local",
           dataBasis: "server_snapshot",
           generalKnowledge: false,
+          interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
         },
       });
     }
@@ -820,6 +796,7 @@ export default async function handler(req, res) {
           source: "local",
           dataBasis: "server_snapshot",
           generalKnowledge: false,
+          interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
           message:
             `**YOUR DATA** (live snapshot): **${c.customers || 0}** customers, **${c.jobs || 0}** jobs, **${c.invoices || 0}** invoices.\n\n` +
             `Outstanding AR **${money(summary.outstandingTotal)}**, collected this month **${money(summary.collectedThisMonth)}**.\n\n` +
@@ -863,6 +840,7 @@ export default async function handler(req, res) {
           source: "local",
           dataBasis: "server_snapshot",
           generalKnowledge: false,
+          interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
           message:
             local ||
             `AI provider is briefly unavailable. **YOUR DATA:** **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. Try "today's jobs" or "who owes money?".`,
@@ -880,6 +858,7 @@ export default async function handler(req, res) {
         source: "openai",
         dataBasis: "server_snapshot",
         generalKnowledge: true,
+        interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
       },
     });
   } catch (error) {

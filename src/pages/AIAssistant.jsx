@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { api } from "@/api/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale, ShieldAlert } from "lucide-react";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import ReactMarkdown from "react-markdown";
 import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 import ConfirmationCard from "@/components/ai/ConfirmationCard";
+import InvisibleInterface from "@/components/ai/InvisibleInterface";
 import ActionResult from "@/components/ai/ActionResult";
 import { buildBusinessSummary } from "@/lib/ai-business-summary";
 import { buildAiPageContext } from "@/lib/aiPageContext";
@@ -53,6 +54,7 @@ const WORKFLOW_PROMPTS = Object.freeze({
 
 export default function AIAssistant() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const ownerMode = isOwnerAccount(user);
   const [params] = useSearchParams();
   const [messages, setMessages] = useState([]);
@@ -245,6 +247,7 @@ export default function AIAssistant() {
           source: data.source,
           dataBasis: data.dataBasis,
           generalKnowledge: data.generalKnowledge,
+          interface: data.interface || null,
         });
         if (user?.id && data.message) {
           appendAiConversationTurn(user.id, { role: "assistant", text: data.message });
@@ -255,6 +258,7 @@ export default function AIAssistant() {
           role: "assistant",
           content: "",
           type: "confirm",
+          interface: data.interface || null,
           meta: {
             intent: data.intent,
             params: data.params,
@@ -487,13 +491,16 @@ export default function AIAssistant() {
     if (msg.type === "confirm") {
       return (
         <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <ConfirmationCard
-            summary={msg.meta.summary}
-            details={msg.meta.details}
-            onConfirm={() => handleConfirm(i)}
-            onCancel={() => handleCancel(i)}
-            loading={confirming}
-          />
+          <div className="space-y-2 w-full max-w-2xl">
+            <InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage} />
+            <ConfirmationCard
+              summary={msg.meta.summary}
+              details={msg.meta.details}
+              onConfirm={() => handleConfirm(i)}
+              onCancel={() => handleCancel(i)}
+              loading={confirming}
+            />
+          </div>
         </motion.div>
       );
     }
@@ -531,6 +538,7 @@ export default function AIAssistant() {
               ) : null}
             </div>
           )}
+          <InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage} />
           <ReactMarkdown
             className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"
             components={safeMarkdownComponents}

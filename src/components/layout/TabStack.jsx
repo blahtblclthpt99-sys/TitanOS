@@ -83,6 +83,7 @@ const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
 const ShareReport = lazy(() => import("@/pages/ShareReport"));
@@ -129,6 +130,7 @@ const NON_TAB_ROUTES = {
   "/escrow": Escrow,
   "/phone": PhoneReceptionist,
   "/settings": Settings,
+  "/subscription": Subscription,
   "/trust-safety": TrustSafety,
   "/design-system": DesignSystem,
 };

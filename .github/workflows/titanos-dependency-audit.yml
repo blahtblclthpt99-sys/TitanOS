@@ -1,0 +1,26 @@
+name: TitanOS dependency audit
+
+on:
+  push:
+    branches:
+      - security/titanos-5000x-dependency-audit
+    paths:
+      - .github/workflows/titanos-dependency-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Full audit report
+        run: npm audit --json || true
+      - name: Non-breaking fix preview
+        run: npm audit fix --package-lock-only --dry-run || true

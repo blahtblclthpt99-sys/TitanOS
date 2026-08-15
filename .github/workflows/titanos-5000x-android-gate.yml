@@ -1,3 +1,4 @@
+# rerun: platform-neutral Gradle trust store + remediated npm graph
 name: TitanOS 5000X Android parity gate
 
 on:

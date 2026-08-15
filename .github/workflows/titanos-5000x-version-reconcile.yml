@@ -1,0 +1,78 @@
+name: TitanOS 5000X version reconciliation
+
+on:
+  push:
+    branches:
+      - security/titanos-5000x-full-system-audit
+    paths:
+      - .github/workflows/titanos-5000x-version-reconcile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/titanos-5000x-full-system-audit
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Reconcile package and Play metadata to TitanOS 2.0.0
+        run: |
+          npm version 2.0.0 --no-git-tag-version
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'android/app/build.gradle';
+          let text = fs.readFileSync(path, 'utf8');
+          if (!text.includes('versionCode 27') || !text.includes('versionName "1.6.2"')) {
+            throw new Error('Canonical Android version metadata no longer matches expected 27 / 1.6.2; refusing blind rewrite.');
+          }
+          text = text.replace('versionCode 27', 'versionCode 28').replace('versionName "1.6.2"', 'versionName "2.0.0"');
+          fs.writeFileSync(path, text);
+
+          const testing = 'PLAY_TESTING.md';
+          let docs = fs.readFileSync(testing, 'utf8');
+          docs = docs.replace(/Bump `versionCode` in `android\/app\/build\.gradle` before every upload \(current: \*\*15\*\* \/ \*\*1\.5\.0\*\*\)\./,
+            'Bump `versionCode` in `android/app/build.gradle` before every upload (current: **28** / **2.0.0**).');
+          fs.writeFileSync(testing, docs);
+          NODE
+      - name: Clean install and dependency audit
+        run: |
+          npm ci
+          npm audit --audit-level=high
+      - name: Full TitanOS ship gate
+        run: npm run gate:ship
+      - name: Capacitor sync
+        run: npm run cap:sync
+      - name: Build reconciled release AAB
+        working-directory: android
+        run: gradle bundleRelease --no-daemon
+      - name: Verify reconciled AAB and metadata
+        run: |
+          test -f android/app/build/outputs/bundle/release/app-release.aab
+          grep -q 'versionCode 28' android/app/build.gradle
+          grep -q 'versionName "2.0.0"' android/app/build.gradle
+          node -e "const p=require('./package.json'); if(p.version!=='2.0.0') process.exit(1)"
+          node -e "const p=require('./package-lock.json'); if(p.version!=='2.0.0'||p.packages[''].version!=='2.0.0') process.exit(1)"
+          sha256sum android/app/build/outputs/bundle/release/app-release.aab
+      - name: Commit verified TitanOS 2.0 metadata and remove temporary workflow
+        run: |
+          rm .github/workflows/titanos-5000x-version-reconcile.yml
+          git config user.name "TitanOS Release Guardian"
+          git config user.email "actions@users.noreply.github.com"
+          git add package.json package-lock.json android/app/build.gradle PLAY_TESTING.md .github/workflows/titanos-5000x-version-reconcile.yml
+          git diff --cached --check
+          git commit -m "release: reconcile TitanOS 2.0.0 Android metadata"
+          git push origin HEAD:security/titanos-5000x-full-system-audit

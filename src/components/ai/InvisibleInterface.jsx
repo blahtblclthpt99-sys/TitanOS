@@ -1,7 +1,13 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, CircleAlert, CircleDot, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { sanitizeInvisibleInterface } from "@/lib/invisibleInterface";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  buildInvisibleInterfacePrompt,
+  sanitizeInvisibleInterface,
+  validateInvisibleInterfaceForm,
+} from "@/lib/invisibleInterface";
 
 const STATUS_ICON = {
   success: CheckCircle2,
@@ -10,9 +16,38 @@ const STATUS_ICON = {
   info: CircleDot,
 };
 
+function buildInitialValues(fields) {
+  return Object.fromEntries(
+    fields.map((field) => [field.name, field.type === "boolean" ? Boolean(field.defaultValue) : field.defaultValue || ""])
+  );
+}
+
 export default function InvisibleInterface({ spec, onNavigate, onPrompt }) {
-  const ui = sanitizeInvisibleInterface(spec);
+  const ui = useMemo(() => sanitizeInvisibleInterface(spec), [spec]);
+  const [values, setValues] = useState(() => buildInitialValues(ui?.fields || []));
+  const [errors, setErrors] = useState({});
+
   if (!ui) return null;
+
+  const updateValue = (name, value) => {
+    setValues((current) => ({ ...current, [name]: value }));
+    setErrors((current) => {
+      if (!current[name]) return current;
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const submitAction = (action) => {
+    const nextErrors = validateInvisibleInterfaceForm(ui.fields, values);
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+    const prompt = buildInvisibleInterfacePrompt(action, ui.fields, values);
+    if (prompt) onPrompt?.(prompt);
+  };
 
   return (
     <section className="titan-surface border border-titan-cyan/20 rounded-2xl p-4 md:p-5 max-w-2xl w-full" aria-label={ui.title}>
@@ -49,6 +84,70 @@ export default function InvisibleInterface({ spec, onNavigate, onPrompt }) {
         </div>
       ) : null}
 
+      {ui.type === "form" && ui.fields.length ? (
+        <div className="space-y-3">
+          {ui.fields.map((field) => (
+            <div key={field.name}>
+              {field.type === "boolean" ? (
+                <label className="flex items-start gap-2.5 rounded-xl border border-border bg-background/40 p-3 cursor-pointer">
+                  <Checkbox
+                    checked={Boolean(values[field.name])}
+                    onCheckedChange={(checked) => updateValue(field.name, checked === true)}
+                    aria-describedby={field.help ? `${field.name}-help` : undefined}
+                  />
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-foreground">
+                      {field.label}{field.required ? " *" : ""}
+                    </span>
+                    {field.help ? (
+                      <span id={`${field.name}-help`} className="block text-xs text-muted-foreground mt-0.5">
+                        {field.help}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="text-xs font-semibold text-foreground">
+                    {field.label}{field.required ? " *" : ""}
+                  </span>
+                  {field.type === "textarea" ? (
+                    <textarea
+                      value={values[field.name] || ""}
+                      onChange={(event) => updateValue(field.name, event.target.value)}
+                      placeholder={field.placeholder}
+                      rows={3}
+                      className="mt-1.5 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  ) : field.type === "select" ? (
+                    <select
+                      value={values[field.name] || ""}
+                      onChange={(event) => updateValue(field.name, event.target.value)}
+                      className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">{field.placeholder || "Choose an option"}</option>
+                      {field.options.map((option) => (
+                        <option key={`${field.name}-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      type={field.type}
+                      value={values[field.name] || ""}
+                      onChange={(event) => updateValue(field.name, event.target.value)}
+                      placeholder={field.placeholder}
+                      className="mt-1.5"
+                    />
+                  )}
+                  {field.help ? <span className="block text-xs text-muted-foreground mt-1">{field.help}</span> : null}
+                </label>
+              )}
+              {errors[field.name] ? <p className="text-xs text-destructive mt-1" role="alert">{errors[field.name]}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {ui.actions.length ? (
         <div className="flex flex-wrap gap-2 mt-4">
           {ui.actions.map((action, index) => (
@@ -60,6 +159,7 @@ export default function InvisibleInterface({ spec, onNavigate, onPrompt }) {
               onClick={() => {
                 if (action.kind === "navigate") onNavigate?.(action.path);
                 if (action.kind === "prompt") onPrompt?.(action.prompt);
+                if (action.kind === "submit_prompt") submitAction(action);
               }}
             >
               {action.label}

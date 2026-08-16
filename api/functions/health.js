@@ -1,14 +1,76 @@
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { secretsEqual } from "../_lib/secureCompare.js";
+import { stripePlanCatalog } from "../_lib/stripeSubscriptions.js";
+
+const EXPECTED_SUBSCRIPTION_PRICES = Object.freeze({
+  starter: { unitAmount: 499, currency: "usd", interval: "month" },
+  worker_premium: { unitAmount: 999, currency: "usd", interval: "month" },
+  business: { unitAmount: 1999, currency: "usd", interval: "month" },
+});
+
+function subscriptionCatalogConfigured() {
+  const catalog = stripePlanCatalog();
+  return Object.keys(EXPECTED_SUBSCRIPTION_PRICES).every((plan) => Boolean(catalog[plan]));
+}
+
+async function validateStripeSubscriptionCatalog(stripeKey) {
+  const catalog = stripePlanCatalog();
+  const checks = {};
+  for (const [plan, expected] of Object.entries(EXPECTED_SUBSCRIPTION_PRICES)) {
+    const priceId = catalog[plan];
+    if (!priceId) {
+      checks[plan] = "missing";
+      continue;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch(
+        `https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}?expand[]=product`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${stripeKey}` },
+          signal: controller.signal,
+        }
+      );
+      if (!response.ok) {
+        checks[plan] = `http_${response.status}`;
+        continue;
+      }
+
+      const price = await response.json();
+      const productPlan = price?.product?.metadata?.plan_id || null;
+      const valid =
+        price?.active === true &&
+        price?.livemode === true &&
+        price?.type === "recurring" &&
+        price?.recurring?.interval === expected.interval &&
+        price?.currency === expected.currency &&
+        Number(price?.unit_amount) === expected.unitAmount &&
+        productPlan === plan;
+      checks[plan] = valid ? "ok" : "mismatch";
+    } catch {
+      checks[plan] = "unreachable";
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return {
+    ok: Object.values(checks).every((status) => status === "ok"),
+    plans: checks,
+  };
+}
 
 /**
  * Liveness + readiness probe for load balancers and outage drills.
- * Does not expose secrets.
+ * Does not expose secrets or configured Stripe price IDs.
  *
  * - Default: config presence checks (always 200 if process is up)
- * - ?deep=1: live Supabase query + optional Stripe balance ping
+ * - ?deep=1: live Supabase + Stripe balance/catalog verification
  *   (requires header x-titanos-ops: HEALTH_DEEP_SECRET or TITANOS_OPS_SECRET)
- * - readiness.ok=false when money path is incomplete (visible, not silent)
+ * - readiness.ok=false when a required money/subscription path is incomplete
  */
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -22,6 +84,7 @@ export default async function handler(req, res) {
     api: "ok",
     stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
     webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+    stripeSubscriptionPricesConfigured: subscriptionCatalogConfigured(),
     paypalConfigured: Boolean(
       process.env.PAYPAL_CLIENT_ID &&
         process.env.PAYPAL_CLIENT_SECRET &&
@@ -87,28 +150,42 @@ export default async function handler(req, res) {
       checks.stripe = "down";
       checks.stripeError = "unreachable";
     }
+
+    if (checks.stripeSubscriptionPricesConfigured) {
+      const catalog = await validateStripeSubscriptionCatalog(process.env.STRIPE_SECRET_KEY);
+      checks.stripeSubscriptionCatalog = catalog.ok ? "ok" : "degraded";
+      checks.stripeSubscriptionPlans = catalog.plans;
+    } else {
+      checks.stripeSubscriptionCatalog = "incomplete";
+    }
   }
 
   const moneyReady =
     checks.supabaseConfigured &&
     ((checks.stripeConfigured && checks.webhookConfigured) || checks.paypalConfigured);
+  const subscriptionReady =
+    checks.stripeConfigured && checks.webhookConfigured && checks.stripeSubscriptionPricesConfigured;
   const deepFail =
     checks.supabase === "degraded" ||
     checks.supabase === "down" ||
     checks.stripe === "degraded" ||
-    checks.stripe === "down";
+    checks.stripe === "down" ||
+    checks.stripeSubscriptionCatalog === "degraded" ||
+    checks.stripeSubscriptionCatalog === "incomplete";
 
   const readiness = {
-    ok: moneyReady && !deepFail,
+    ok: moneyReady && subscriptionReady && !deepFail,
     moneyPath: moneyReady ? "ready" : "incomplete",
+    subscriptionBilling: subscriptionReady ? "ready" : "incomplete",
     observability: {
       sentry: checks.sentryConfigured ? "configured" : "missing_dsn",
       opsAlert: checks.opsAlertConfigured ? "configured" : "missing_webhook",
       analyticsIngest: checks.analyticsIngestEnabled ? "on" : "off",
     },
-    notes: moneyReady
-      ? undefined
-      : "Need Supabase service role plus (Stripe secret+webhook) and/or (PayPal client+secret+webhook id).",
+    notes:
+      moneyReady && subscriptionReady
+        ? undefined
+        : "Need Supabase service role, Stripe secret+webhook, and all three active subscription price mappings (or PayPal for non-subscription money paths).",
   };
 
   const status = deep && deepFail ? 503 : 200;

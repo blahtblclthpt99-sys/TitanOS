@@ -40,4 +40,13 @@ describe("regression: test script wiring", () => {
     assert.match(setup, /register/);
     assert.match(setup, /localStorage/);
   });
+
+  it("Android release workflow tracks web source that Capacitor packages", () => {
+    const workflow = readFileSync(join(root, ".github/workflows/android-release.yml"), "utf8");
+    for (const source of ["src/**", "public/**", "index.html", "vite.config.*"]) {
+      assert.match(workflow, new RegExp(source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+    assert.match(workflow, /npm run cap:sync/);
+    assert.match(workflow, /bundleRelease/);
+  });
 });

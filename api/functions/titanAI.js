@@ -14,6 +14,7 @@ import {
   rollbackSecondMeMemoryAction,
 } from "../_lib/secondMeMemoryActions.js";
 import { executeCompensatingWorkflow } from "../_lib/compensatingWorkflow.js";
+import { executeIdempotentAction } from "../_lib/actionIdempotency.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -504,12 +505,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "That action is not available through 2nd Me." });
       }
       try {
-        return res.status(200).json({ data: await executeConfirmedAction(admin, userData.user, confirmedAction) });
+        const actionId = confirmedAction.actionId;
+        const data = await executeIdempotentAction({
+          admin,
+          userId: userData.user.id,
+          actionId,
+          intent: confirmedAction.intent,
+          params: confirmedAction.params || {},
+          execute: () => executeConfirmedAction(admin, userData.user, confirmedAction),
+        });
+        return res.status(200).json({ data });
       } catch (execErr) {
         logError("titanAI:action_execute", execErr);
-        const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
-        if (status !== 200) return res.status(status).json({ error: execErr.message || "Action rejected" });
-        return res.status(200).json({ data: { type: "error", message: "I couldn't save that action. Nothing was silently changed." } });
+        const allowedStatus = [400, 403, 409, 503].includes(execErr?.status) ? execErr.status : 200;
+        if (allowedStatus !== 200) return res.status(allowedStatus).json({ error: execErr.message || "Action rejected" });
+        return res.status(200).json({ data: { type: "error", message: execErr?.actionCompleted ? execErr.message : "I couldn't save that action. Nothing was silently changed." } });
       }
     }
 

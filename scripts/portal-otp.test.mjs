@@ -1,6 +1,45 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { hashPortalOtp, portalOtpMatches } from "../api/_lib/portalOtp.js";
+import { assertRateLimitAsync } from "../api/_lib/rateLimit.js";
+
+function mockReq(ip = "203.0.113.10") {
+  return {
+    headers: { "x-forwarded-for": ip },
+    socket: { remoteAddress: ip },
+    url: "/api/functions/portalVerifyOtp",
+  };
+}
+
+function mockRes() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: null,
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = String(value);
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+}
+
+function saveEnv(names) {
+  return Object.fromEntries(names.map((name) => [name, process.env[name]]));
+}
+
+function restoreEnv(saved) {
+  for (const [name, value] of Object.entries(saved)) {
+    if (value == null) delete process.env[name];
+    else process.env[name] = value;
+  }
+}
 
 describe("portal OTP hashing", () => {
   it("hashes and matches", () => {
@@ -22,5 +61,66 @@ describe("portal OTP hashing", () => {
     assert.equal(portalOtpMatches("654321", "b@example.com", "654321"), true);
     assert.equal(portalOtpMatches("654321", "b@example.com", "111111"), false);
     delete process.env.PORTAL_OTP_ALLOW_LEGACY;
+  });
+});
+
+describe("portal OTP durable throttling", () => {
+  it("fails closed in production when the durable limiter is unavailable", async () => {
+    const saved = saveEnv([
+      "VERCEL_ENV",
+      "NODE_ENV",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ]);
+    try {
+      process.env.VERCEL_ENV = "production";
+      process.env.NODE_ENV = "production";
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const res = mockRes();
+      const allowed = await assertRateLimitAsync(mockReq("203.0.113.21"), res, {
+        limit: 8,
+        windowMs: 60_000,
+        key: "portalOtpProductionTest",
+        requireDurable: true,
+      });
+
+      assert.equal(allowed, false);
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.headers["retry-after"], "60");
+      assert.match(String(res.body?.error || ""), /temporarily unavailable/i);
+    } finally {
+      restoreEnv(saved);
+    }
+  });
+
+  it("keeps the memory fallback for local/test usage", async () => {
+    const saved = saveEnv([
+      "VERCEL_ENV",
+      "NODE_ENV",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ]);
+    try {
+      process.env.VERCEL_ENV = "development";
+      process.env.NODE_ENV = "test";
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const res = mockRes();
+      const allowed = await assertRateLimitAsync(mockReq("203.0.113.22"), res, {
+        limit: 8,
+        windowMs: 60_000,
+        key: "portalOtpLocalTest",
+        requireDurable: true,
+      });
+
+      assert.equal(allowed, true);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body, null);
+    } finally {
+      restoreEnv(saved);
+    }
   });
 });

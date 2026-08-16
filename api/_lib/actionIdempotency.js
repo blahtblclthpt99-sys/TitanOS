@@ -28,6 +28,12 @@ function replayResult(row) {
     : null;
 }
 
+function conflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  return err;
+}
+
 export async function executeIdempotentAction({ admin, userId, actionId: rawActionId, intent, params, execute }) {
   if (!admin || !userId || typeof execute !== "function") {
     const err = new Error("Idempotency executor is not configured.");
@@ -66,9 +72,7 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
       throw err;
     }
     if (existing.data.payload_hash !== payloadHash) {
-      const err = new Error("That action ID was already used for a different request.");
-      err.status = 409;
-      throw err;
+      throw conflict("That action ID was already used for a different request.");
     }
     if (existing.data.status === "completed") {
       const replay = replayResult(existing.data);
@@ -81,16 +85,14 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
         .eq("user_id", userId)
         .eq("action_id", actionId)
         .eq("payload_hash", payloadHash)
-        .eq("status", "failed");
-      if (reset.error) {
-        const err = new Error("Titan could not safely retry that action.");
-        err.status = 409;
-        throw err;
+        .eq("status", "failed")
+        .select("action_id")
+        .maybeSingle();
+      if (reset.error || !reset.data) {
+        throw conflict("That action retry was already claimed by another request. Retry the same confirmation in a moment.");
       }
     } else {
-      const err = new Error("That action is already being processed. Retry the same confirmation in a moment.");
-      err.status = 409;
-      throw err;
+      throw conflict("That action is already being processed. Retry the same confirmation in a moment.");
     }
   }
 
@@ -101,8 +103,11 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
       .update({ status: "completed", result_json: result, error_message: null, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("action_id", actionId)
-      .eq("payload_hash", payloadHash);
-    if (saved.error) {
+      .eq("payload_hash", payloadHash)
+      .eq("status", "processing")
+      .select("action_id")
+      .maybeSingle();
+    if (saved.error || !saved.data) {
       const err = new Error("Action completed but Titan could not finalize its idempotency record. Do not resubmit with a new action ID.");
       err.status = 500;
       err.actionCompleted = true;

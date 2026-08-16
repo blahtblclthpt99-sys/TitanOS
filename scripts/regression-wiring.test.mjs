@@ -40,4 +40,12 @@ describe("regression: test script wiring", () => {
     assert.match(setup, /register/);
     assert.match(setup, /localStorage/);
   });
+
+  it("Android release follows material web bundle changes", () => {
+    const workflow = readFileSync(join(root, ".github/workflows/android-release.yml"), "utf8");
+    for (const path of ["src/**", "public/**", "index.html", "vite.config.*"]) {
+      assert.ok(workflow.includes(path), `Android release trigger must include ${path}`);
+    }
+    assert.match(pkg.scripts["cap:sync"] || "", /npm run build/);
+  });
 });

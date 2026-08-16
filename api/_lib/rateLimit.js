@@ -85,8 +85,18 @@ function deny(res, retryAfterSec) {
   return false;
 }
 
+function productionRuntime() {
+  return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+}
+
+function durableUnavailable(res) {
+  res.setHeader("Retry-After", "60");
+  res.status(503).json({ error: "Verification protection is temporarily unavailable. Please try again shortly." });
+  return false;
+}
+
 /**
- * Sync rate limit (memory). Prefer `assertRateLimitAsync` on money/AI routes when Upstash is set.
+ * Sync rate limit (memory). Prefer `assertRateLimitAsync` on money/AI/auth routes.
  * @returns {boolean}
  */
 export function assertRateLimit(req, res, opts = {}) {
@@ -100,7 +110,9 @@ export function assertRateLimit(req, res, opts = {}) {
 }
 
 /**
- * Async rate limit — Upstash when configured, otherwise memory.
+ * Async rate limit — Upstash when configured, otherwise memory for non-sensitive
+ * or non-production usage. Sensitive production routes can set requireDurable so
+ * a missing/outage limiter fails closed instead of silently becoming per-instance.
  * @returns {Promise<boolean>}
  */
 export async function assertRateLimitAsync(req, res, opts = {}) {
@@ -113,6 +125,10 @@ export async function assertRateLimitAsync(req, res, opts = {}) {
   if (remote) {
     if (!remote.ok) return deny(res, remote.retryAfterSec);
     return true;
+  }
+
+  if (opts.requireDurable && productionRuntime()) {
+    return durableUnavailable(res);
   }
 
   const mem = memoryAllow(bucketKey, limit, windowMs);

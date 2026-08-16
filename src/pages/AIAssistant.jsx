@@ -19,6 +19,7 @@ import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
 import { appendAiConversationTurn, listAiConversationDocs } from "@/lib/aiConversationStore";
 import { upsertSearchDocs } from "@/lib/searchIndex";
 import { confirmedActionErrorMessage, rollbackMessage, shouldRetainRollback } from "@/lib/secondMeActionUi";
+import { ensureSecondMeActionId } from "@/lib/secondMeActionId";
 import {
   appendTitanActionLog,
   clearTitanActionLogs,
@@ -290,6 +291,7 @@ export default function AIAssistant() {
             params: data.params,
             summary: data.confirmationSummary,
             details: data.confirmationDetails || [],
+            actionId: ensureSecondMeActionId({}),
           },
         });
         setConfirming(true);
@@ -352,14 +354,15 @@ export default function AIAssistant() {
     const confirmMsg = messages[msgIndex];
     if (!confirmMsg?.meta || actionInFlightRef.current) return;
     actionInFlightRef.current = true;
+    const actionId = ensureSecondMeActionId(confirmMsg.meta);
     setConfirming(true);
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, type: "executing" } : m)));
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, type: "executing", meta: { ...m.meta, actionId } } : m)));
 
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
-        confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params },
+        confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params, actionId },
         ownerAutopilot: ownerMode && ownerAutopilot,
         secondSelf: true,
         guardrails: { killSwitch: ownerMode && opsState.killSwitch },
@@ -385,9 +388,12 @@ export default function AIAssistant() {
     } catch (error) {
       const message = confirmedActionErrorMessage(error);
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+        ...m,
         role: "assistant",
-        content: message,
-        type: "error",
+        content: "",
+        type: "confirm",
+        retryError: message,
+        meta: { ...confirmMsg.meta, actionId },
       } : m));
       if (user?.id && ownerMode) {
         appendTitanActionLog(user.id, {
@@ -478,7 +484,7 @@ export default function AIAssistant() {
       return <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3"><div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0"/><span className="text-xs text-muted-foreground">Executing…</span></div></motion.div>;
     }
     if (msg.type === "confirm") {
-      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="space-y-2 w-full max-w-2xl"><InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/><ConfirmationCard summary={msg.meta.summary} details={msg.meta.details} onConfirm={() => handleConfirm(i)} onCancel={() => handleCancel(i)} loading={confirming}/></div></motion.div>;
+      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="space-y-2 w-full max-w-2xl"><InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/>{msg.retryError ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{msg.retryError} Retry uses the same protected action ID.</div> : null}<ConfirmationCard summary={msg.meta.summary} details={msg.meta.details} onConfirm={() => handleConfirm(i)} onCancel={() => handleCancel(i)} loading={confirming}/></div></motion.div>;
     }
     if (msg.type === "done" || msg.type === "error") {
       return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><ActionResult message={msg.content} isError={msg.type === "error"} onRollback={msg.rollback ? () => handleRollback(i) : null} rollbackLoading={rollbackingId === (msg?.rollback?.id || `msg-${i}`)}/></motion.div>;

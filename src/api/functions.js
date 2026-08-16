@@ -6,9 +6,25 @@ function apiError(message, status = 400) {
   return error;
 }
 
-async function getAccessToken() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token;
+async function getAccessToken({ forceRefresh = false } = {}) {
+  if (forceRefresh) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) return null;
+    return data.session?.access_token || null;
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) return null;
+
+  const expiresAtMs = Number(data.session.expires_at || 0) * 1000;
+  if (expiresAtMs && expiresAtMs - Date.now() < 60_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (!refreshed.error && refreshed.data.session?.access_token) {
+      return refreshed.data.session.access_token;
+    }
+  }
+
+  return data.session.access_token || null;
 }
 
 function functionsBaseUrl() {
@@ -51,7 +67,7 @@ async function localFallback(functionName, payload) {
         generalKnowledge: false,
         message:
           local ||
-          "Titan AI needs a connection for live YOUR DATA answers. Reconnect, or open Jobs / Invoices / Customers directly.",
+          "2nd Me can't reach Titan's live data service right now. Your session is still intact; retry in a moment or open Jobs / Invoices / Customers directly.",
       },
     };
   }
@@ -182,17 +198,36 @@ function candidateUrls(path) {
 export function createFunctionsModule() {
   return {
     async invoke(functionName, payload = {}) {
-      const token = await getAccessToken();
+      let token = await getAccessToken();
       const path = `/api/functions/${functionName}`;
       const candidates = candidateUrls(path);
 
       let lastError;
+      let refreshedAfter401 = false;
       for (const url of candidates) {
         try {
           return await postJson(url, payload, token);
         } catch (error) {
           lastError = error;
+
+          if (error?.status === 401 && !refreshedAfter401) {
+            refreshedAfter401 = true;
+            token = await getAccessToken({ forceRefresh: true });
+            if (token) {
+              try {
+                return await postJson(url, payload, token);
+              } catch (retryError) {
+                lastError = retryError;
+              }
+            }
+          }
         }
+      }
+
+      // A genuine authentication failure is not an offline condition. Surface it
+      // so the caller can request sign-in instead of showing a misleading data warning.
+      if (lastError?.status === 401) {
+        throw lastError;
       }
 
       try {

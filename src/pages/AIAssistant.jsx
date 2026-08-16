@@ -317,7 +317,7 @@ export default function AIAssistant() {
           role: "assistant",
           content: `${data.message || "Action completed."}${workflowDetails}`,
           type: "done",
-          rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || confirmMsg.meta.actionId } : null,
+          rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || null } : null,
         });
         if (user?.id && ownerMode) {
           appendTitanActionLog(user.id, {
@@ -386,7 +386,8 @@ export default function AIAssistant() {
         role: "assistant",
         content: data.message,
         type: isError ? "error" : "done",
-        rollback: data.rollback || null,
+        rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || actionId } : null,
+        correlationId: data.correlationId || data.actionId || actionId,
       } : m));
       if (user?.id && ownerMode) {
         appendTitanActionLog(user.id, {
@@ -414,6 +415,7 @@ export default function AIAssistant() {
           status: "error",
           title: "Confirmed action failed",
           detail: error?.message || message,
+          correlationId: actionId,
         });
         refreshOpsState();
       }

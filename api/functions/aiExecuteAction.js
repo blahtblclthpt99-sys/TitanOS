@@ -13,6 +13,7 @@ async function assertOwnedCustomer(admin, userId, customerId) {
     .select("id, first_name, last_name")
     .eq("id", customerId)
     .eq("created_by_id", userId)
+    .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return { ok: false, error: "Customer not found or not owned by you" };
@@ -37,8 +38,58 @@ function sanitizeText(value, max = 200) {
 
 function sanitizeIsoDate(value, fallback) {
   const raw = String(value || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  return fallback;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fallback;
+  const parsed = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== raw) return fallback;
+  const year = Number(raw.slice(0, 4));
+  if (year < 2000 || year > 2100) return fallback;
+  return raw;
+}
+
+function sanitizeTime(value, fallback = "09:00") {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return match ? `${match[1]}:${match[2]}` : fallback;
+}
+
+function sanitizeHttpUrl(value) {
+  const raw = sanitizeText(value, 1000);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString().slice(0, 1000) : null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeEmail(value) {
+  const email = sanitizeText(value, 200).toLowerCase();
+  if (!email) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function sanitizeLineItems(value, fallbackTotal = 0, fallbackDescription = "Service") {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [{ description: sanitizeText(fallbackDescription, 500) || "Service", qty: 1, unit_price: fallbackTotal, total: fallbackTotal }];
+  }
+
+  const items = [];
+  for (const raw of value.slice(0, 50)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const description = sanitizeText(raw.description || raw.name || raw.title || "Service", 500) || "Service";
+    const qtyRaw = Number(raw.qty ?? raw.quantity ?? 1);
+    const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 && qtyRaw <= 10_000 ? Math.round(qtyRaw * 100) / 100 : 1;
+    const unitPrice = sanitizeMoney(raw.unit_price ?? raw.unitPrice ?? raw.price ?? 0);
+    if (unitPrice == null) continue;
+    const computedTotal = Math.round(qty * unitPrice * 100) / 100;
+    const suppliedTotal = sanitizeMoney(raw.total ?? computedTotal);
+    items.push({ description, qty, unit_price: unitPrice, total: suppliedTotal == null ? computedTotal : suppliedTotal });
+  }
+
+  return items.length
+    ? items
+    : [{ description: sanitizeText(fallbackDescription, 500) || "Service", qty: 1, unit_price: fallbackTotal, total: fallbackTotal }];
 }
 
 const ENTITY_TABLE = Object.freeze({
@@ -50,7 +101,7 @@ const ENTITY_TABLE = Object.freeze({
 });
 
 /**
- * Shared AI office action executor (ownership + money sanitize).
+ * Shared AI office action executor (ownership + strict payload sanitization).
  * Used by aiExecuteAction HTTP handler and titanAI confirmedAction path.
  */
 export async function executeAiOfficeAction(admin, user, intent, params = {}) {
@@ -74,16 +125,17 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       err.status = 400;
       throw err;
     }
+    const today = new Date().toISOString().slice(0, 10);
     const row = {
-      title: String(params.title || `Job for ${params.customer_name || "Customer"}`).slice(0, 200),
-      customer_name: String(params.customer_name || "").slice(0, 200),
+      title: sanitizeText(params.title || `Job for ${params.customer_name || "Customer"}`, 200) || "New job",
+      customer_name: sanitizeText(params.customer_name, 200),
       customer_id: ownership.customerId,
-      scheduled_date: params.scheduled_date || new Date().toISOString().slice(0, 10),
-      scheduled_time: params.scheduled_time || "09:00",
+      scheduled_date: sanitizeIsoDate(params.scheduled_date, today),
+      scheduled_time: sanitizeTime(params.scheduled_time, "09:00"),
       status: "scheduled",
-      service_type: String(params.service_type || "General").slice(0, 100),
+      service_type: sanitizeText(params.service_type || "General", 100) || "General",
       amount,
-      notes: String(params.notes || "Created by Titan AI").slice(0, 2000),
+      notes: sanitizeText(params.notes || "Created by 2nd Me", 2000),
       created_by_id: user.id,
       user_id: user.id,
     };
@@ -107,15 +159,13 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       throw err;
     }
     const row = {
-      customer_name: String(params.customer_name || "").slice(0, 200),
+      customer_name: sanitizeText(params.customer_name, 200),
       customer_id: ownership.customerId,
-      service_type: String(params.service_type || "General").slice(0, 100),
+      service_type: sanitizeText(params.service_type || "General", 100) || "General",
       status: "draft",
       total,
-      line_items: Array.isArray(params.line_items)
-        ? params.line_items.slice(0, 50)
-        : [{ description: params.title || "Service", qty: 1, unit_price: total, total }],
-      notes: String(params.notes || "Drafted by Titan AI").slice(0, 2000),
+      line_items: sanitizeLineItems(params.line_items, total, params.title || "Service"),
+      notes: sanitizeText(params.notes || "Drafted by 2nd Me", 2000),
       created_by_id: user.id,
       user_id: user.id,
     };
@@ -138,14 +188,15 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       err.status = 400;
       throw err;
     }
+    const defaultDueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
     const row = {
-      customer_name: String(params.customer_name || "").slice(0, 200),
+      customer_name: sanitizeText(params.customer_name, 200),
       customer_id: ownership.customerId,
       status: intent === "send_invoice" ? "sent" : "draft",
       total,
       balance_due: total,
-      due_date: params.due_date || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-      notes: String(params.notes || "Created by Titan AI").slice(0, 2000),
+      due_date: sanitizeIsoDate(params.due_date, defaultDueDate),
+      notes: sanitizeText(params.notes || "Created by 2nd Me", 2000),
       created_by_id: user.id,
       user_id: user.id,
     };
@@ -155,7 +206,7 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       type: "done",
       message:
         intent === "send_invoice"
-          ? `Marked invoice as **sent** for **${data.customer_name || "customer"}** · $${total.toLocaleString()}. Email/share is separate — open Invoices to send the link.`
+          ? `Prepared invoice as **sent** for **${data.customer_name || "customer"}** · $${total.toLocaleString()}. No email was sent — open Invoices to send or share the payment link.`
           : `Created invoice draft for **${data.customer_name || "customer"}** · $${total.toLocaleString()}.`,
       entity: "Invoice",
       id: data.id,
@@ -170,10 +221,17 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
     const customerName = sanitizeText(params.customer_name || params.customerName, 200);
     const fallbackParts = customerName.split(" ").filter(Boolean);
     const resolvedFirst = firstName || fallbackParts[0] || "Customer";
-    const resolvedLast =
-      lastName || (fallbackParts.length > 1 ? fallbackParts.slice(1).join(" ").slice(0, 100) : "");
-    const email = sanitizeText(params.email, 200).toLowerCase();
+    const resolvedLast = lastName || (fallbackParts.length > 1 ? fallbackParts.slice(1).join(" ").slice(0, 100) : "");
+    const email = sanitizeEmail(params.email);
 
+    if (params.email && !email) {
+      const err = new Error("Invalid customer email address.");
+      err.status = 400;
+      throw err;
+    }
+
+    const requestedStatus = sanitizeText(params.status || "lead", 20).toLowerCase();
+    const status = new Set(["lead", "active", "inactive", "prospect"]).has(requestedStatus) ? requestedStatus : "lead";
     const row = {
       first_name: resolvedFirst,
       last_name: resolvedLast,
@@ -183,9 +241,9 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       city: sanitizeText(params.city, 120) || null,
       state: sanitizeText(params.state, 40) || null,
       zip: sanitizeText(params.zip, 20) || null,
-      status: sanitizeText(params.status || "lead", 20) || "lead",
+      status,
       source: sanitizeText(params.source || "ai", 40) || "ai",
-      notes: sanitizeText(params.notes || "Created by Titan AI", 2000),
+      notes: sanitizeText(params.notes || "Created by 2nd Me", 2000),
       created_by_id: user.id,
       user_id: user.id,
     };
@@ -195,6 +253,7 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
         .from("customers")
         .select("id")
         .eq("created_by_id", user.id)
+        .eq("user_id", user.id)
         .eq("email", row.email)
         .limit(1);
       if (Array.isArray(existing) && existing.length > 0) {
@@ -224,18 +283,25 @@ export async function executeAiOfficeAction(admin, user, intent, params = {}) {
       throw err;
     }
     const date = sanitizeIsoDate(params.date, new Date().toISOString().slice(0, 10));
-    const businessUsePercent = Math.min(100, Math.max(0, Number(params.business_use_percent ?? 100) || 100));
+    const businessUseRaw = Number(params.business_use_percent ?? 100);
+    const businessUsePercent = Number.isFinite(businessUseRaw) ? Math.min(100, Math.max(0, businessUseRaw)) : 100;
+    const receiptUrl = sanitizeHttpUrl(params.receipt_url);
+    if (params.receipt_url && !receiptUrl) {
+      const err = new Error("Receipt URL must use http or https.");
+      err.status = 400;
+      throw err;
+    }
     const row = {
       description: sanitizeText(params.description || "Expense", 300) || "Expense",
       amount,
       category: sanitizeText(params.category || "other", 80) || "other",
       date,
       vendor: sanitizeText(params.vendor, 200) || null,
-      receipt_url: sanitizeText(params.receipt_url, 1000) || null,
+      receipt_url: receiptUrl,
       is_tax_deductible: params.is_tax_deductible !== false,
       tax_year: Number(date.slice(0, 4)),
       business_use_percent: Math.round(businessUsePercent * 100) / 100,
-      notes: sanitizeText(params.notes || "Recorded by Titan AI", 2000) || "Recorded by Titan AI",
+      notes: sanitizeText(params.notes || "Recorded by 2nd Me", 2000) || "Recorded by 2nd Me",
       created_by_id: user.id,
       user_id: user.id,
     };
@@ -260,7 +326,7 @@ export async function rollbackAiOfficeAction(admin, user, rollbackAction = {}) {
   const kind = String(rollbackAction.kind || "");
   const entity = String(rollbackAction.entity || "");
   const id = String(rollbackAction.id || "");
-  if (kind !== "delete" || !entity || !id) {
+  if (kind !== "delete" || !entity || !id || id.length > 120) {
     const err = new Error("Rollback payload is invalid.");
     err.status = 400;
     throw err;
@@ -274,9 +340,10 @@ export async function rollbackAiOfficeAction(admin, user, rollbackAction = {}) {
 
   const { data: found, error: readErr } = await admin
     .from(table)
-    .select("id,created_by_id")
+    .select("id,created_by_id,user_id")
     .eq("id", id)
     .eq("created_by_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (readErr) throw readErr;
   if (!found) {
@@ -285,7 +352,12 @@ export async function rollbackAiOfficeAction(admin, user, rollbackAction = {}) {
     throw err;
   }
 
-  const { error: delErr } = await admin.from(table).delete().eq("id", id).eq("created_by_id", user.id);
+  const { error: delErr } = await admin
+    .from(table)
+    .delete()
+    .eq("id", id)
+    .eq("created_by_id", user.id)
+    .eq("user_id", user.id);
   if (delErr) throw delErr;
 
   return {
@@ -297,7 +369,7 @@ export async function rollbackAiOfficeAction(admin, user, rollbackAction = {}) {
 }
 
 /**
- * Execute confirmed Titan AI office actions: schedule job, create estimate, create invoice.
+ * Execute confirmed 2nd Me office actions.
  */
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -319,6 +391,9 @@ export default async function handler(req, res) {
     if (!entitled) return;
 
     const { intent, params = {} } = readJson(req);
+    if (!params || typeof params !== "object" || Array.isArray(params)) {
+      return res.status(400).json({ error: "Action parameters are invalid" });
+    }
 
     const data = await executeAiOfficeAction(admin, user, intent, params);
     return res.status(200).json({ data });
@@ -330,7 +405,7 @@ export default async function handler(req, res) {
     captureApiException(error, { tags: { route: "aiExecuteAction" } });
     return res.status(500).json({
       error: "Could not complete action",
-      hint: "Try creating from the Jobs, Estimates, or Invoices screens.",
+      hint: "Try creating the record from its TitanOS screen.",
     });
   }
 }

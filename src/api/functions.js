@@ -1,8 +1,11 @@
 import { supabase } from "./supabaseClient";
 
-function apiError(message, status = 400) {
+const FUNCTION_TIMEOUT_MS = 15_000;
+
+function apiError(message, status = 400, code = "") {
   const error = new Error(message);
   error.status = status;
+  if (code) error.code = code;
   return error;
 }
 
@@ -34,22 +37,40 @@ function functionsBaseUrl() {
 }
 
 async function postJson(url, payload, token) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw apiError(body.error || body.message || "Function call failed", response.status);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FUNCTION_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw apiError(body.error || body.message || "Function call failed", response.status, "HTTP_ERROR");
+    }
+    return body;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw apiError("Titan service request timed out", 503, "TIMEOUT");
+    }
+    if (typeof error?.status === "number") throw error;
+    throw apiError(error?.message || "Titan service is unreachable", 503, "NETWORK_ERROR");
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return body;
 }
 
-/** Local fallbacks so the app still responds when serverless API is unavailable. */
+function unavailableWrite(message) {
+  throw apiError(message, 503, "OFFLINE_WRITE_BLOCKED");
+}
+
+/** Local fallbacks are read-only. Writes fail closed so Titan never reports fake success. */
 async function localFallback(functionName, payload) {
   if (functionName === "titanAI") {
     const { answerFromSummary } = await import("@/lib/ai-business-summary");
@@ -67,7 +88,7 @@ async function localFallback(functionName, payload) {
         generalKnowledge: false,
         message:
           local ||
-          "2nd Me can't reach Titan's live data service right now. Your session is still intact; retry in a moment or open Jobs / Invoices / Customers directly.",
+          "2nd Me can't reach Titan's live data service right now. Retry in a moment or open Jobs / Invoices / Customers directly.",
       },
     };
   }
@@ -77,21 +98,19 @@ async function localFallback(functionName, payload) {
   }
 
   if (functionName === "sendEmail") {
-    if (import.meta.env.DEV) console.info("[sendEmail local stub]", payload);
-    return { success: true, stub: true };
+    return unavailableWrite("Email was not sent because Titan's live messaging service is unavailable.");
   }
 
   if (functionName === "createPaymentLink") {
-    return {
-      payment: null,
-      setupRequired: true,
-      message: "Checkout isn't set up yet. Contact support if you need live payments.",
-      stub: true,
-    };
+    return unavailableWrite("Payment link was not created because Titan's live billing service is unavailable.");
   }
 
-  if (functionName === "createAutopilotOrder" || functionName === "runAutopilotOrder" || functionName === "runAutopilotMembership") {
-    throw apiError("Titan Autopilot requires a secure connection to the live billing service.", 503);
+  if (
+    functionName === "createAutopilotOrder" ||
+    functionName === "runAutopilotOrder" ||
+    functionName === "runAutopilotMembership"
+  ) {
+    return unavailableWrite("Titan Autopilot requires a secure connection to the live billing service.");
   }
 
   if (functionName === "calculateFee") {
@@ -122,15 +141,11 @@ async function localFallback(functionName, payload) {
   }
 
   if (functionName === "adminFees") {
-    throw apiError("Fee admin API requires a signed-in admin on the live host.", 503);
+    return unavailableWrite("Fee admin API requires a signed-in admin on the live host.");
   }
 
-  if (functionName === "attachReferral") {
-    return { ok: true, matched: false, stub: true };
-  }
-
-  if (functionName === "markReferralPaying") {
-    return { ok: false, stub: true, error: "Billing hook unavailable offline" };
+  if (functionName === "attachReferral" || functionName === "markReferralPaying") {
+    return unavailableWrite("Referral changes require Titan's live service and were not saved.");
   }
 
   if (
@@ -143,7 +158,8 @@ async function localFallback(functionName, payload) {
   ) {
     throw apiError(
       "Customer portal API is not available on this host yet. Core TitanOS app features still work.",
-      503
+      503,
+      "PORTAL_UNAVAILABLE"
     );
   }
 
@@ -156,20 +172,14 @@ async function localFallback(functionName, payload) {
   }
 
   if (functionName === "sendFollowUp") {
-    if (import.meta.env.DEV) console.info("[sendFollowUp local stub]", payload);
-    return { success: true, stub: true, emailed: false };
+    return unavailableWrite("Follow-up was not sent because Titan's live messaging service is unavailable.");
   }
 
   if (functionName === "aiExecuteAction") {
-    return {
-      data: {
-        type: "done",
-        message: "Action unavailable offline — open Jobs / Estimates / Invoices.",
-      },
-    };
+    return unavailableWrite("2nd Me could not complete the action because Titan's live action service is unavailable.");
   }
 
-  throw apiError(`Function "${functionName}" is unavailable offline`, 503);
+  throw apiError(`Function "${functionName}" is unavailable offline`, 503, "OFFLINE_UNAVAILABLE");
 }
 
 function candidateUrls(path) {
@@ -193,6 +203,11 @@ function candidateUrls(path) {
   }
 
   return [...new Set(urls)];
+}
+
+function isClientRejection(error) {
+  const status = Number(error?.status || 0);
+  return status >= 400 && status < 500;
 }
 
 export function createFunctionsModule() {
@@ -221,12 +236,14 @@ export function createFunctionsModule() {
               }
             }
           }
+
+          // Validation, authorization, entitlement, conflict, and rate-limit errors
+          // are real server decisions. Do not mask them as an offline condition.
+          if (isClientRejection(lastError)) break;
         }
       }
 
-      // A genuine authentication failure is not an offline condition. Surface it
-      // so the caller can request sign-in instead of showing a misleading data warning.
-      if (lastError?.status === 401) {
+      if (isClientRejection(lastError)) {
         throw lastError;
       }
 

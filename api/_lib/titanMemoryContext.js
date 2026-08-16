@@ -1,3 +1,5 @@
+import { containsSensitiveMemoryText } from "./memorySafety.js";
+
 const ALLOWED_TYPES = new Set([
   "preference",
   "instruction",
@@ -29,6 +31,7 @@ function safeData(value) {
     const name = String(key || "").slice(0, 60);
     if (!name || /password|secret|token|key|credential/i.test(name)) continue;
     if (["string", "number", "boolean"].includes(typeof raw)) {
+      if (typeof raw === "string" && containsSensitiveMemoryText(raw)) continue;
       output[name] = typeof raw === "string" ? raw.slice(0, 500) : raw;
     }
   }
@@ -66,6 +69,9 @@ export async function loadTitanMemoryContext(admin, userId, question = "") {
   const queryTerms = words(question);
   return data
     .filter((row) => ALLOWED_TYPES.has(String(row.type || "").toLowerCase()))
+    // Defense in depth for legacy/imported records: obvious secrets never enter
+    // model context even if they predate current write-time validation.
+    .filter((row) => !containsSensitiveMemoryText(row.label))
     .map((row) => ({
       id: String(row.id || ""),
       type: String(row.type || "fact").toLowerCase(),

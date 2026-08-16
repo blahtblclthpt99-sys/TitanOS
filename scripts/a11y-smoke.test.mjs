@@ -39,4 +39,13 @@ describe("accessibility regression smoke", () => {
     assert.match(src, /export function announce/);
     assert.match(src, /a11y-status/);
   });
+
+  it("Invisible Interface associates validation errors and preserves touch targets", () => {
+    const path = join(root, "src", "components", "ai", "InvisibleInterface.jsx");
+    const src = readFileSync(path, "utf8");
+    assert.match(src, /aria-invalid/);
+    assert.match(src, /aria-describedby/);
+    assert.match(src, /htmlFor=\{inputId\}/);
+    assert.match(src, /min-h-11/);
+  });
 });

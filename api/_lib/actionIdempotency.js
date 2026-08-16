@@ -24,7 +24,7 @@ export function actionPayloadHash(intent, params) {
 
 function replayResult(row) {
   return row?.result_json && typeof row.result_json === "object"
-    ? { ...row.result_json, idempotentReplay: true, actionId: row.action_id }
+    ? { ...row.result_json, idempotentReplay: true, actionId: row.action_id, correlationId: row.action_id }
     : null;
 }
 
@@ -32,6 +32,26 @@ function conflict(message) {
   const err = new Error(message);
   err.status = 409;
   return err;
+}
+
+export async function listActionHistory(admin, userId, limit = 8) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 8, 20));
+  const { data, error } = await admin
+    .from("titan_ai_action_ledger")
+    .select("action_id,intent,status,result_json,error_message,created_at,updated_at")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(safeLimit);
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    correlationId: row.action_id,
+    intent: row.intent,
+    status: row.status,
+    message: row.status === "completed"
+      ? String(row.result_json?.message || "Action completed.").slice(0, 180)
+      : String(row.error_message || "Action did not complete.").slice(0, 180),
+    at: row.updated_at || row.created_at,
+  }));
 }
 
 export async function executeIdempotentAction({ admin, userId, actionId: rawActionId, intent, params, execute }) {
@@ -71,9 +91,7 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
       err.status = 503;
       throw err;
     }
-    if (existing.data.payload_hash !== payloadHash) {
-      throw conflict("That action ID was already used for a different request.");
-    }
+    if (existing.data.payload_hash !== payloadHash) throw conflict("That action ID was already used for a different request.");
     if (existing.data.status === "completed") {
       const replay = replayResult(existing.data);
       if (replay) return replay;
@@ -88,9 +106,7 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
         .eq("status", "failed")
         .select("action_id")
         .maybeSingle();
-      if (reset.error || !reset.data) {
-        throw conflict("That action retry was already claimed by another request. Retry the same confirmation in a moment.");
-      }
+      if (reset.error || !reset.data) throw conflict("That action retry was already claimed by another request. Retry the same confirmation in a moment.");
     } else {
       throw conflict("That action is already being processed. Retry the same confirmation in a moment.");
     }
@@ -98,9 +114,10 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
 
   try {
     const result = await execute();
+    const correlatedResult = { ...result, actionId, correlationId: actionId };
     const saved = await admin
       .from("titan_ai_action_ledger")
-      .update({ status: "completed", result_json: result, error_message: null, updated_at: new Date().toISOString() })
+      .update({ status: "completed", result_json: correlatedResult, error_message: null, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("action_id", actionId)
       .eq("payload_hash", payloadHash)
@@ -113,7 +130,7 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
       err.actionCompleted = true;
       throw err;
     }
-    return { ...result, actionId };
+    return correlatedResult;
   } catch (error) {
     if (!error?.actionCompleted) {
       await admin
@@ -128,6 +145,7 @@ export async function executeIdempotentAction({ admin, userId, actionId: rawActi
         .eq("payload_hash", payloadHash)
         .eq("status", "processing");
     }
+    error.correlationId = actionId;
     throw error;
   }
 }

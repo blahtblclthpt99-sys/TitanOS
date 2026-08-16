@@ -46,6 +46,18 @@ export const ALLOWED_AI_INTENTS = Object.freeze({
     description: "Creates an expense record owned by the user",
     autopilotEligible: true,
   },
+  remember_memory: {
+    label: "Remember",
+    path: "/ai-assistant",
+    description: "Creates a user-owned 2nd Me memory node",
+    autopilotEligible: false,
+  },
+  create_memory_rule: {
+    label: "Create From now on rule",
+    path: "/ai-assistant",
+    description: "Creates a persistent user-owned 2nd Me workflow rule",
+    autopilotEligible: false,
+  },
 });
 
 export function isAllowedAiIntent(intent) {

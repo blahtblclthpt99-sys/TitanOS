@@ -27,14 +27,14 @@ import {
 } from "@/lib/titanAiOpsMemory";
 
 const SUGGESTIONS = [
+  { label: "What am I forgetting?", prompt: "What am I forgetting or leaving unresolved right now?" },
   { label: "Today's jobs", prompt: "What jobs do I have scheduled today?" },
   { label: "Who owes money?", prompt: "Which customers have outstanding invoices?" },
-  { label: "Revenue this month", prompt: "How much revenue have I collected this month?" },
+  { label: "What should I do next?", prompt: "Based on what you know, what deserves my attention next?" },
   { label: "Schedule a job", prompt: "I need to schedule a job" },
   { label: "Create an estimate", prompt: "Create an estimate for a customer" },
-  { label: "Top customers", prompt: "Who are my top 5 customers by revenue?" },
-  { label: "Overdue invoices", prompt: "Show me all overdue invoices" },
-  { label: "Profit margin", prompt: "What's my net profit margin?" },
+  { label: "Remember something", prompt: "I want you to remember something" },
+  { label: "From now on…", prompt: "I want to create a from-now-on rule" },
 ];
 
 const LAW_SUGGESTIONS = [
@@ -119,8 +119,8 @@ export default function AIAssistant() {
         status: enabled ? "warn" : "ok",
         title: enabled ? "Kill switch enabled" : "Kill switch disabled",
         detail: enabled
-          ? "All Titan AI write actions are blocked until disabled."
-          : "Titan AI write actions can run again.",
+          ? "All 2nd Me write actions are blocked until disabled."
+          : "2nd Me write actions can run again.",
       });
       refreshOpsState();
     },
@@ -153,16 +153,41 @@ export default function AIAssistant() {
   const loadBusinessData = useCallback(async () => {
     setDataLoading(true);
     setDataError(false);
+    const safeList = async (loader) => {
+      try {
+        const rows = await loader();
+        return { rows: Array.isArray(rows) ? rows : [], failed: false };
+      } catch {
+        return { rows: [], failed: true };
+      }
+    };
+
     try {
-      const [jobs, invoices, customers, expenses, employees] = await Promise.all([
-        api.entities.Job.list("-created_date", 40),
-        api.entities.Invoice.list("-created_date", 40),
-        api.entities.Customer.list("-created_date", 40),
-        api.entities.Expense.list("-date", 30),
-        api.entities.Employee.list("-created_date", 20),
+      const [jobsResult, invoicesResult, customersResult, expensesResult, employeesResult] = await Promise.all([
+        safeList(() => api.entities.Job.list("-created_date", 40)),
+        safeList(() => api.entities.Invoice.list("-created_date", 40)),
+        safeList(() => api.entities.Customer.list("-created_date", 40)),
+        safeList(() => api.entities.Expense.list("-date", 30)),
+        safeList(() => api.entities.Employee.list("-created_date", 20)),
       ]);
-      setBusinessSummary(buildBusinessSummary({ jobs, invoices, customers, expenses, employees }));
+      setBusinessSummary(
+        buildBusinessSummary({
+          jobs: jobsResult.rows,
+          invoices: invoicesResult.rows,
+          customers: customersResult.rows,
+          expenses: expensesResult.rows,
+          employees: employeesResult.rows,
+        })
+      );
+      setDataError([
+        jobsResult,
+        invoicesResult,
+        customersResult,
+        expensesResult,
+        employeesResult,
+      ].some((result) => result.failed));
     } catch {
+      setBusinessSummary(buildBusinessSummary({ jobs: [], invoices: [], customers: [], expenses: [], employees: [] }));
       setDataError(true);
     } finally {
       setDataLoading(false);
@@ -221,17 +246,16 @@ export default function AIAssistant() {
 
       const pageContext = buildAiPageContext({
         pathname: "/assistant",
-        workflow: lawMastermind ? "law_mastermind" : "office",
+        workflow: lawMastermind ? "law_mastermind" : "second_self",
       });
 
-      // Never send businessSummary as trusted facts — server loads owned snapshot.
-      // offlineSnapshot is only used if the API is unreachable (device cache, labeled).
       const result = await api.functions.invoke("titanAI", {
         messages: history,
         pageContext,
         offlineSnapshot: businessSummary || undefined,
         lawMastermind,
         ownerAutopilot: ownerMode && ownerAutopilot,
+        secondSelf: !lawMastermind,
         guardrails: {
           killSwitch: ownerMode && opsState.killSwitch,
         },
@@ -282,7 +306,7 @@ export default function AIAssistant() {
           appendTitanActionLog(user.id, {
             status: "ok",
             title: data.type === "workflow_done" ? "Workflow completed" : "Action completed",
-            detail: data.message || "Titan AI action completed.",
+            detail: data.message || "2nd Me action completed.",
             rollback: data.rollback || null,
           });
           refreshOpsState();
@@ -290,22 +314,23 @@ export default function AIAssistant() {
       } else {
         replaceLastMessage({
           role: "assistant",
-          content: data.message || "I'm not sure how to handle that.",
+          content: data.message || "I need a little more context to help with that.",
           type: "text",
           source: data.source,
+          interface: data.interface || null,
         });
       }
     } catch (e) {
       const msg =
         e?.status === 401
-          ? "Please sign in again to use Titan AI."
-          : e?.message || "Something went wrong. Please try again.";
+          ? "Please sign in again to use 2nd Me."
+          : "I couldn't reach one of Titan's data services, but you can keep talking to me. Try the request again while I use the context I still have.";
       replaceLastMessage({ role: "assistant", content: msg, type: "error" });
       if (user?.id && ownerMode) {
         appendTitanActionLog(user.id, {
           status: "error",
-          title: "Action failed",
-          detail: msg,
+          title: "2nd Me request failed",
+          detail: e?.message || msg,
         });
         refreshOpsState();
       }
@@ -314,7 +339,6 @@ export default function AIAssistant() {
     }
   };
 
-  // Deep-link: /assistant?q=…
   useEffect(() => {
     const q = params.get("q");
     if (!q || seededQ.current || dataLoading) return;
@@ -331,57 +355,36 @@ export default function AIAssistant() {
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
-        pageContext: buildAiPageContext({ pathname: "/assistant" }),
+        pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
         confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params },
         ownerAutopilot: ownerMode && ownerAutopilot,
-        guardrails: {
-          killSwitch: ownerMode && opsState.killSwitch,
-        },
+        secondSelf: true,
+        guardrails: { killSwitch: ownerMode && opsState.killSwitch },
       });
       const data = result.data;
       const isError = data.type === "error";
-      setMessages((prev) =>
-        prev.map((m, i) =>
-          i === msgIndex
-            ? {
-                role: "assistant",
-                content: data.message,
-                type: isError ? "error" : "done",
-                rollback: data.rollback || null,
-              }
-            : m
-        )
-      );
+      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+        role: "assistant",
+        content: data.message,
+        type: isError ? "error" : "done",
+        rollback: data.rollback || null,
+      } : m));
       if (user?.id && ownerMode) {
         appendTitanActionLog(user.id, {
           status: isError ? "error" : "ok",
           title: isError ? "Confirmed action failed" : "Confirmed action completed",
-          detail: data.message || "Titan AI completed a confirmed action.",
+          detail: data.message || "2nd Me completed a confirmed action.",
           rollback: data.rollback || null,
         });
         refreshOpsState();
       }
       if (!isError) loadBusinessData();
     } catch {
-      setMessages((prev) =>
-        prev.map((m, i) =>
-          i === msgIndex
-            ? {
-                role: "assistant",
-                content: "Action failed. Please try again or use the app directly.",
-                type: "error",
-              }
-            : m
-        )
-      );
-      if (user?.id && ownerMode) {
-        appendTitanActionLog(user.id, {
-          status: "error",
-          title: "Confirmed action failed",
-          detail: "Action failed. Please try again or use the app directly.",
-        });
-        refreshOpsState();
-      }
+      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+        role: "assistant",
+        content: "That action failed safely. Nothing was assumed or silently changed.",
+        type: "error",
+      } : m));
     } finally {
       setConfirming(false);
     }
@@ -395,25 +398,18 @@ export default function AIAssistant() {
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
-        pageContext: buildAiPageContext({ pathname: "/assistant" }),
+        pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
         rollbackAction: rollback,
         ownerAutopilot: ownerMode && ownerAutopilot,
-        guardrails: {
-          killSwitch: ownerMode && opsState.killSwitch,
-        },
+        secondSelf: true,
+        guardrails: { killSwitch: ownerMode && opsState.killSwitch },
       });
       const data = result.data || {};
-      setMessages((prev) =>
-        prev.map((m, i) =>
-          i === msgIndex
-            ? {
-                ...m,
-                content: `${m.content}\n\nRollback: ${data.message || "completed."}`,
-                rollback: null,
-              }
-            : m
-        )
-      );
+      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+        ...m,
+        content: `${m.content}\n\nRollback: ${data.message || "completed."}`,
+        rollback: null,
+      } : m));
       appendTitanActionLog(user.id, {
         status: data.type === "error" ? "error" : "ok",
         title: data.type === "error" ? "Rollback failed" : "Rollback completed",
@@ -421,26 +417,17 @@ export default function AIAssistant() {
       });
       refreshOpsState();
       loadBusinessData();
-    } catch (e) {
-      appendTitanActionLog(user.id, {
-        status: "error",
-        title: "Rollback failed",
-        detail: e?.message || "Rollback request failed.",
-      });
-      refreshOpsState();
     } finally {
       setRollbackingId(null);
     }
   };
 
   const handleCancel = (msgIndex) => {
-    setMessages((prev) =>
-      prev.map((m, i) =>
-        i === msgIndex
-          ? { role: "assistant", content: "Cancelled. What else can I help you with?", type: "text" }
-          : m
-      )
-    );
+    setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+      role: "assistant",
+      content: "Cancelled. I didn't change anything.",
+      type: "text",
+    } : m));
     setConfirming(false);
   };
 
@@ -453,317 +440,42 @@ export default function AIAssistant() {
 
   const renderMessage = (msg, i) => {
     if (msg.role === "user") {
-      return (
-        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-          <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] md:max-w-[65%]">
-            <p className="text-sm font-medium">{msg.content}</p>
-          </div>
-        </motion.div>
-      );
+      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end"><div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] md:max-w-[65%]"><p className="text-sm font-medium">{msg.content}</p></div></motion.div>;
     }
     if (msg.type === "loading") {
-      return (
-        <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-          <div className="titan-surface rounded-bl-md px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              {[0, 150, 300].map((delay) => (
-                <div
-                  key={delay}
-                  className="w-2 h-2 bg-titan-cyan rounded-full animate-bounce"
-                  style={{ animationDelay: `${delay}ms` }}
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      );
+      return <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3"><div className="flex items-center gap-1.5">{[0,150,300].map((delay) => <div key={delay} className="w-2 h-2 bg-titan-cyan rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />)}</div></div></motion.div>;
     }
     if (msg.type === "executing") {
-      return (
-        <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-          <div className="titan-surface rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3">
-            <div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0" />
-            <span className="text-xs text-muted-foreground">Executing…</span>
-          </div>
-        </motion.div>
-      );
+      return <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3"><div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0"/><span className="text-xs text-muted-foreground">Executing…</span></div></motion.div>;
     }
     if (msg.type === "confirm") {
-      return (
-        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <div className="space-y-2 w-full max-w-2xl">
-            <InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage} />
-            <ConfirmationCard
-              summary={msg.meta.summary}
-              details={msg.meta.details}
-              onConfirm={() => handleConfirm(i)}
-              onCancel={() => handleCancel(i)}
-              loading={confirming}
-            />
-          </div>
-        </motion.div>
-      );
+      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="space-y-2 w-full max-w-2xl"><InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/><ConfirmationCard summary={msg.meta.summary} details={msg.meta.details} onConfirm={() => handleConfirm(i)} onCancel={() => handleCancel(i)} loading={confirming}/></div></motion.div>;
     }
     if (msg.type === "done" || msg.type === "error") {
-      return (
-        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <ActionResult
-            message={msg.content}
-            isError={msg.type === "error"}
-            onRollback={msg.rollback ? () => handleRollback(i) : null}
-            rollbackLoading={rollbackingId === (msg?.rollback?.id || `msg-${i}`)}
-          />
-        </motion.div>
-      );
+      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><ActionResult message={msg.content} isError={msg.type === "error"} onRollback={msg.rollback ? () => handleRollback(i) : null} rollbackLoading={rollbackingId === (msg?.rollback?.id || `msg-${i}`)}/></motion.div>;
     }
-    return (
-      <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-        <div className="titan-surface rounded-bl-md px-4 py-3 max-w-[85%] md:max-w-[65%] space-y-2">
-          {(msg.source || msg.dataBasis) && (
-            <div className="flex flex-wrap gap-1.5">
-              {msg.dataBasis === "server_snapshot" || msg.source === "local" ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-primary/10 text-primary px-1.5 py-0.5">
-                  Your data
-                </span>
-              ) : null}
-              {msg.generalKnowledge || msg.source === "openai" ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-muted text-muted-foreground px-1.5 py-0.5">
-                  May include general knowledge
-                </span>
-              ) : null}
-              {msg.source === "offline" || msg.dataBasis === "device_cache" ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-warning/15 text-warning-foreground px-1.5 py-0.5">
-                  Offline cache
-                </span>
-              ) : null}
-            </div>
-          )}
-          <InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage} />
-          <ReactMarkdown
-            className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5"
-            components={safeMarkdownComponents}
-          >
-            {msg.content}
-          </ReactMarkdown>
-        </div>
-      </motion.div>
-    );
+    return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3 max-w-[92%] md:max-w-[72%] space-y-2">{(msg.source || msg.dataBasis) && <div className="flex flex-wrap gap-1.5">{msg.dataBasis === "server_snapshot" || msg.source === "local" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-primary/10 text-primary px-1.5 py-0.5">Your data</span> : null}{msg.generalKnowledge || msg.source === "openai" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-muted text-muted-foreground px-1.5 py-0.5">General knowledge</span> : null}{msg.source === "offline" || msg.dataBasis === "device_cache" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-warning/15 text-warning-foreground px-1.5 py-0.5">Device context</span> : null}</div>}<InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/><ReactMarkdown className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5" components={safeMarkdownComponents}>{msg.content}</ReactMarkdown></div></motion.div>;
   };
 
   return (
-    <div
-      className="flex flex-col"
-      style={{
-        // Stay inside the app chrome (header + bottom nav + safe areas)
-        height: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-        maxHeight: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-      }}
-    >
+    <div className="flex flex-col" style={{ height: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))", maxHeight: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))" }}>
       <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">
-            {lawMastermind ? <Scale className="w-5 h-5 text-foreground" /> : <Bot className="w-5 h-5 text-foreground" />}
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">{lawMastermind ? <Scale className="w-5 h-5 text-foreground"/> : <Bot className="w-5 h-5 text-foreground"/>}</div>
           <div>
-            <h1 className="text-base font-bold text-foreground leading-tight">
-              {lawMastermind ? "Law Mastermind AI" : "Titan AI"}
-            </h1>
-            <div className="flex items-center gap-1.5">
-              {dataLoading ? (
-                <span className="text-xs text-muted-foreground">Loading snapshot…</span>
-              ) : dataError ? (
-                <>
-                  <span className="text-xs text-red-400">Data unavailable</span>
-                  <button onClick={loadBusinessData} className="text-muted-foreground hover:text-foreground/60 transition-colors">
-                    <RefreshCw className="w-3 h-3" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs text-muted-foreground">
-                    Preview · {businessSummary?.counts?.customers || 0} customers ·{" "}
-                    {businessSummary?.counts?.jobs || 0} jobs · answers use server snapshot
-                  </span>
-                </>
-              )}
-            </div>
-            {ownerMode && !lawMastermind ? (
-              <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch
-                  checked={ownerAutopilot}
-                  onCheckedChange={setAutopilot}
-                  aria-label="Owner autopilot"
-                />
-                Owner autopilot
-              </label>
-            ) : null}
+            <h1 className="text-base font-bold text-foreground leading-tight">{lawMastermind ? "Law Mastermind AI" : "2nd Me"}</h1>
+            <div className="flex items-center gap-1.5">{dataLoading ? <span className="text-xs text-muted-foreground">Connecting context…</span> : dataError ? <><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/><span className="text-xs text-muted-foreground">Partial context available · conversation still works</span><button onClick={loadBusinessData} className="text-muted-foreground hover:text-foreground/60 transition-colors" aria-label="Retry context"><RefreshCw className="w-3 h-3"/></button></> : <><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs text-muted-foreground">Memory + context ready</span></>}</div>
+            {ownerMode && !lawMastermind ? <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={ownerAutopilot} onCheckedChange={setAutopilot} aria-label="Owner autopilot"/>Owner autopilot</label> : null}
           </div>
         </div>
-        {messages.length > 0 && (
-          <button
-            onClick={clearChat}
-            className="text-muted-foreground hover:text-foreground/60 transition-colors p-2 rounded-xl hover:bg-muted"
-            title="New conversation"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        )}
+        {messages.length > 0 && <button onClick={clearChat} className="text-muted-foreground hover:text-foreground/60 transition-colors p-2 rounded-xl hover:bg-muted" title="New conversation"><RotateCcw className="w-4 h-4"/></button>}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4">
-        {ownerMode && !lawMastermind ? (
-          <div className="mb-4 rounded-2xl border border-border bg-card/70 p-3.5 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Titan Command Guardrails
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Kill switch blocks all Titan AI write actions until disabled.
-                </p>
-              </div>
-              <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                <ShieldAlert className={`w-3.5 h-3.5 ${opsState.killSwitch ? "text-red-400" : "text-emerald-400"}`} />
-                Kill switch
-                <Switch checked={Boolean(opsState.killSwitch)} onCheckedChange={setKillSwitch} />
-              </label>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
-                onClick={() => runWorkflow("morning_ops")}
-                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "morning_ops")?.enabled}
-              >
-                Run Morning Ops
-              </button>
-              <button
-                type="button"
-                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
-                onClick={() => runWorkflow("cash_recovery")}
-                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "cash_recovery")?.enabled}
-              >
-                Run Cash Recovery
-              </button>
-              <button
-                type="button"
-                className="h-10 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground hover:bg-muted"
-                onClick={() => runWorkflow("closeout")}
-                disabled={loading || opsState.killSwitch || !opsState.routines.find((r) => r.id === "closeout")?.enabled}
-              >
-                Run Daily Closeout
-              </button>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {opsState.routines.map((routine) => (
-                <label key={routine.id} className="inline-flex items-center gap-2 text-xs text-foreground">
-                  <Checkbox
-                    checked={routine.enabled !== false}
-                    onCheckedChange={(checked) => setRoutineEnabled(routine.id, checked === true)}
-                  />
-                  {routine.label}
-                </label>
-              ))}
-            </div>
-
-            <div className="rounded-xl border border-border/80 bg-background/40 p-2.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Action log</p>
-                <button
-                  type="button"
-                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    if (!user?.id) return;
-                    clearTitanActionLogs(user.id);
-                    refreshOpsState();
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-              <ul className="space-y-1 max-h-32 overflow-y-auto">
-                {opsState.logs.slice(0, 6).map((log) => (
-                  <li key={log.id} className="text-[11px] text-muted-foreground">
-                    <span className="text-foreground font-semibold">{log.title}</span>
-                    {log.detail ? ` · ${log.detail}` : ""}
-                  </li>
-                ))}
-                {opsState.logs.length === 0 ? (
-                  <li className="text-[11px] text-muted-foreground">No actions yet.</li>
-                ) : null}
-              </ul>
-            </div>
-          </div>
-        ) : null}
-
-        {messages.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center min-h-full text-center py-8"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-titan-cyan/20 to-titan-indigo/20 flex items-center justify-center mb-5 ai-pulse">
-              <Sparkles className="w-8 h-8 text-titan-cyan" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground mb-2">
-              {lawMastermind ? "Legal strategy, plain language" : "What can I do for you?"}
-            </h2>
-            <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
-              {lawMastermind
-                ? "Educational legal coaching only — not a lawyer. Ask about contracts, disputes, and risk checklists."
-                : "Ask about jobs, invoices, customers, or tell me what you need done."}
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
-              {(lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS).map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => sendMessage(s.prompt)}
-                  disabled={loading}
-                  className="text-left px-4 py-3 rounded-lg titan-surface titan-surface-interactive text-sm text-muted-foreground hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
-                >
-                  <Zap className="w-3 h-3 inline mr-2 text-titan-cyan" />
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <div className="space-y-4 pb-2">
-            <AnimatePresence initial={false}>{messages.map((msg, i) => renderMessage(msg, i))}</AnimatePresence>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+        {messages.length === 0 ? <div className="max-w-2xl mx-auto py-8"><div className="text-center mb-6"><Sparkles className="w-8 h-8 text-titan-cyan mx-auto mb-3"/><h2 className="text-xl font-bold text-foreground">What are we doing?</h2><p className="text-sm text-muted-foreground mt-2">Tell me naturally. I’ll use what I know, figure out what’s missing, and bring up the right interface or action.</p></div><div className="grid gap-2 sm:grid-cols-2">{(lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS).map((s) => <button key={s.label} onClick={() => sendMessage(s.prompt)} className="rounded-xl border border-border bg-card/70 px-3 py-3 text-left text-sm hover:bg-muted transition-colors">{s.label}</button>)}</div></div> : <div className="space-y-4 max-w-4xl mx-auto">{messages.map(renderMessage)}<div ref={messagesEndRef}/></div>}
       </div>
 
-      <div className="px-4 md:px-8 pb-6 pt-3 border-t border-border flex-shrink-0">
-        {confirming && (
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-titan-amber mb-3">
-            Confirm or cancel the action above before sending a new message.
-          </motion.p>
-        )}
-        <div className="flex gap-2 max-w-3xl mx-auto">
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isInputDisabled && sendMessage()}
-            placeholder={confirming ? "Waiting for confirmation…" : "Ask Titan anything…"}
-            className="bg-card border-border text-foreground rounded-2xl h-12 pl-5 placeholder:text-muted-foreground/80 focus:ring-1 focus:ring-titan-cyan/30 disabled:opacity-50"
-            disabled={isInputDisabled}
-          />
-          <button
-            onClick={() => sendMessage()}
-            disabled={isInputDisabled || !input.trim()}
-            className="w-12 h-12 rounded-2xl bg-titan-cyan hover:bg-titan-cyan/90 text-black flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
-            aria-label="Send message"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      <div className="px-4 md:px-8 py-3 border-t border-border flex-shrink-0"><form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="max-w-4xl mx-auto flex gap-2"><Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder={lawMastermind ? "Ask Law Mastermind…" : "What are we doing?"} disabled={isInputDisabled} className="flex-1"/><button type="submit" disabled={isInputDisabled || !input.trim()} className="h-9 w-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40" aria-label="Send"><Send className="w-4 h-4"/></button></form></div>
     </div>
   );
 }

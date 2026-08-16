@@ -13,6 +13,7 @@ import {
   executeSecondMeMemoryAction,
   rollbackSecondMeMemoryAction,
 } from "../_lib/secondMeMemoryActions.js";
+import { executeCompensatingWorkflow } from "../_lib/compensatingWorkflow.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -407,23 +408,23 @@ export function detectConfirmIntent(question) {
 
 async function executeWorkflow(admin, user, params = {}) {
   const steps = Array.isArray(params.steps) ? params.steps : [];
-  if (steps.length < 1 || steps.length > 10) {
-    const err = new Error("Workflow steps are invalid.");
-    err.status = 400;
-    throw err;
-  }
-  const { executeAiOfficeAction } = await import("./aiExecuteAction.js");
-  const results = [];
-  for (const step of steps) {
-    const intent = String(step?.intent || "");
-    if (!isAllowedAiIntent(intent) || intent === "remember_memory" || intent === "create_memory_rule") {
-      const err = new Error(`Workflow step intent is not allowed: ${intent || "unknown"}`);
-      err.status = 400;
-      throw err;
-    }
-    const result = await executeAiOfficeAction(admin, user, intent, step?.params || {});
-    results.push({ intent, ...result });
-  }
+  const { executeAiOfficeAction, rollbackAiOfficeAction } = await import("./aiExecuteAction.js");
+
+  const results = await executeCompensatingWorkflow({
+    steps,
+    executeStep: async (step) => {
+      const intent = String(step?.intent || "");
+      if (!isAllowedAiIntent(intent) || intent === "remember_memory" || intent === "create_memory_rule" || intent === "run_workflow") {
+        const err = new Error(`Workflow step intent is not allowed: ${intent || "unknown"}`);
+        err.status = 400;
+        throw err;
+      }
+      const result = await executeAiOfficeAction(admin, user, intent, step?.params || {});
+      return { intent, ...result };
+    },
+    rollbackStep: async (rollback) => rollbackAiOfficeAction(admin, user, rollback),
+  });
+
   return {
     type: "workflow_done",
     workflowId: String(params.workflowId || "custom"),

@@ -98,17 +98,63 @@ export async function executeSecondMeMemoryAction(admin, user, intent, params = 
     archived: false,
   };
 
-  const { data, error } = await admin.from("titan_memory_nodes").insert(row).select("id,type,label").maybeSingle();
+  const { data, error } = await admin
+    .from("titan_memory_nodes")
+    .insert(row)
+    .select("id,type,label")
+    .maybeSingle();
   if (error) throw error;
+  if (!data?.id) {
+    const err = new Error("Memory write did not return a saved record.");
+    err.status = 500;
+    throw err;
+  }
 
   return {
     type: "done",
-    message: intent === "create_memory_rule"
-      ? `Saved From now on rule: **${data.label}**.`
-      : `Saved to 2nd Me memory: **${data.label}**.`,
+    message:
+      intent === "create_memory_rule"
+        ? `Saved From now on rule: **${data.label}**.`
+        : `Saved to 2nd Me memory: **${data.label}**.`,
     entity: "Memory",
     id: data.id,
-    path: "/ai-assistant",
+    path: "/assistant",
     rollback: { kind: "delete", entity: "Memory", id: data.id },
+  };
+}
+
+export async function rollbackSecondMeMemoryAction(admin, user, rollbackAction = {}) {
+  const id = cleanText(rollbackAction.id, 80);
+  if (rollbackAction.kind !== "delete" || rollbackAction.entity !== "Memory" || !id) {
+    const err = new Error("Memory rollback payload is invalid.");
+    err.status = 400;
+    throw err;
+  }
+
+  const { data: found, error: readError } = await admin
+    .from("titan_memory_nodes")
+    .select("id,created_by_id")
+    .eq("id", id)
+    .eq("created_by_id", user.id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!found) {
+    const err = new Error("Memory not found or not owned by you.");
+    err.status = 403;
+    throw err;
+  }
+
+  const { error: deleteError } = await admin
+    .from("titan_memory_nodes")
+    .delete()
+    .eq("id", id)
+    .eq("created_by_id", user.id);
+  if (deleteError) throw deleteError;
+
+  return {
+    type: "done",
+    message: "Removed that item from 2nd Me memory.",
+    entity: "Memory",
+    id,
   };
 }

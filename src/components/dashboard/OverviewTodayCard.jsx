@@ -23,7 +23,7 @@ export default function OverviewTodayCard({
 
   return (
     <section
-      className="titan-surface mb-5 overflow-hidden p-4 sm:p-5"
+      className="titan-surface titan-depth-card mb-5 overflow-hidden p-4 sm:p-5 md:p-6"
       aria-label="Today's overview"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -39,8 +39,8 @@ export default function OverviewTodayCard({
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:items-center">
-        <div>
+      <div className="titan-overview-grid">
+        <div className="titan-overview-cell titan-overview-cell-primary">
           <p className="text-[11px] font-medium text-muted-foreground">Jobs Completed</p>
           <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-foreground">
             {jobsCompleted}
@@ -50,7 +50,7 @@ export default function OverviewTodayCard({
           </p>
         </div>
 
-        <div className="flex flex-col items-center justify-center">
+        <div className="titan-overview-cell flex flex-col items-center justify-center">
           <svg width="96" height="56" viewBox="0 0 96 56" aria-hidden="true" className="overflow-visible">
             <path
               d="M12 52 A36 36 0 0 1 84 52"
@@ -79,7 +79,7 @@ export default function OverviewTodayCard({
           <p className="text-[10px] text-muted-foreground">completion today</p>
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
+        <div className="titan-overview-cell">
           <p className="text-[11px] font-medium text-muted-foreground">On Time</p>
           <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-foreground">
             {onTimePct != null ? `${Math.round(onTimePct)}%` : "—"}

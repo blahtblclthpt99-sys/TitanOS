@@ -48,6 +48,7 @@ export function appendTitanActionLog(userId, row = {}) {
     status: row.status || "info",
     title: String(row.title || "Titan action").slice(0, 160),
     detail: String(row.detail || "").slice(0, 600),
+    correlationId: row.correlationId ? String(row.correlationId).slice(0, 128) : null,
     rollback: row.rollback || null,
   };
   const logs = [nextRow, ...(Array.isArray(state.logs) ? state.logs : [])].slice(0, MAX_LOGS);

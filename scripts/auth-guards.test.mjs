@@ -4,6 +4,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const PROFILE_ALLOWED = new Set([
   "full_name",
@@ -76,6 +77,34 @@ describe("updateMe privilege allowlist", () => {
     assert.equal(out.full_name, "Ada");
     for (const key of PROFILE_FORBIDDEN) {
       assert.equal(out[key], undefined);
+    }
+  });
+});
+
+describe("server admin authorization boundary", () => {
+  const authSource = readFileSync(new URL("../api/_lib/auth.js", import.meta.url), "utf8");
+  const migrationSource = readFileSync(
+    new URL("../supabase/migrations/20260816_lock_profile_privileged_columns.sql", import.meta.url),
+    "utf8"
+  );
+
+  it("trusts immutable auth app_metadata and never profiles.role", () => {
+    assert.match(authSource, /app_metadata\?\.role\s*===\s*["']admin["']/);
+    assert.doesNotMatch(authSource, /from\(["']profiles["']\)[\s\S]*select\(["']role["']\)/);
+  });
+
+  it("revokes table-wide profile UPDATE and grants only bounded columns", () => {
+    assert.match(migrationSource, /revoke\s+update\s+on\s+table\s+public\.profiles\s+from\s+authenticated/i);
+    const grant = migrationSource.match(/grant\s+update\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.profiles\s+to\s+authenticated/i)?.[1] || "";
+    assert.ok(grant, "bounded authenticated UPDATE grant must exist");
+    for (const forbidden of [
+      ...PROFILE_FORBIDDEN,
+      "founding_member",
+      "founding_tier",
+      "is_founding_titan",
+      "marketplace_pack_unlocked",
+    ]) {
+      assert.equal(new RegExp(`\\b${forbidden}\\b`, "i").test(grant), false, `${forbidden} must remain server-owned`);
     }
   });
 });

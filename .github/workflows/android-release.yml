@@ -7,7 +7,12 @@ on:
     paths:
       - .github/workflows/android-release.yml
       - android/**
+      - src/**
+      - public/**
+      - index.html
       - capacitor.config.*
+      - vite.config.*
+      - postcss.config.*
       - package.json
       - package-lock.json
   workflow_dispatch:

@@ -16,6 +16,15 @@ const ALLOWED_TYPES = new Set([
   "fact",
 ]);
 
+const OPEN_LOOP_TYPES = new Set([
+  "instruction",
+  "project",
+  "decision",
+  "recurring_task",
+  "important_date",
+  "workflow",
+]);
+
 function words(value) {
   return new Set(
     String(value || "")
@@ -38,13 +47,23 @@ function safeData(value) {
   return output;
 }
 
-function relevance(memory, queryTerms) {
+function isOpenLoopQuestion(question = "") {
+  return /forget|forgot|open\s+loop|unresolved|follow[ -]?up|pending|what.*next|need.*attention|due|deadline/i.test(
+    String(question || "")
+  );
+}
+
+function relevance(memory, queryTerms, { openLoopQuestion = false } = {}) {
   const haystack = words(`${memory.type} ${memory.label} ${JSON.stringify(memory.data || {})}`);
   let overlap = 0;
   for (const term of queryTerms) if (haystack.has(term)) overlap += 1;
   const confidence = Math.max(0, Math.min(1, Number(memory.confidence ?? 0.5)));
-  const freshness = memory.updated_at ? Math.max(0, 1 - (Date.now() - Date.parse(memory.updated_at)) / 31536000000) : 0;
-  return overlap * 10 + confidence * 2 + freshness;
+  const parsedUpdatedAt = memory.updated_at ? Date.parse(memory.updated_at) : NaN;
+  const freshness = Number.isFinite(parsedUpdatedAt)
+    ? Math.max(0, 1 - (Date.now() - parsedUpdatedAt) / 31536000000)
+    : 0;
+  const openLoopBoost = openLoopQuestion && OPEN_LOOP_TYPES.has(String(memory.type || "").toLowerCase()) ? 4 : 0;
+  return overlap * 10 + openLoopBoost + confidence * 2 + freshness;
 }
 
 /**
@@ -67,6 +86,7 @@ export async function loadTitanMemoryContext(admin, userId, question = "") {
   if (error || !Array.isArray(data)) return [];
 
   const queryTerms = words(question);
+  const openLoopQuestion = isOpenLoopQuestion(question);
   return data
     .filter((row) => ALLOWED_TYPES.has(String(row.type || "").toLowerCase()))
     // Defense in depth for legacy/imported records: obvious secrets never enter
@@ -81,9 +101,11 @@ export async function loadTitanMemoryContext(admin, userId, question = "") {
       confidence: Math.max(0, Math.min(1, Number(row.confidence ?? 0.5))),
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null,
-      classification: "KNOWN",
+      // Durable memory is user-authorized remembered context, not automatically
+      // equivalent to a current authoritative business record.
+      classification: "REMEMBERED",
     }))
-    .map((row) => ({ ...row, _score: relevance(row, queryTerms) }))
+    .map((row) => ({ ...row, _score: relevance(row, queryTerms, { openLoopQuestion }) }))
     .sort((a, b) => b._score - a._score)
     .slice(0, 8)
     .map(({ _score, ...row }) => row);
@@ -94,7 +116,7 @@ export function formatTitanMemoryForPrompt(memories = []) {
   return memories
     .map((memory, index) => {
       const detail = Object.keys(memory.data || {}).length ? ` data=${JSON.stringify(memory.data)}` : "";
-      return `${index + 1}. [${memory.classification}] ${memory.type}: ${memory.label}${detail} | source=${memory.source} | confidence=${memory.confidence} | updated=${memory.updatedAt || "unknown"}`;
+      return `${index + 1}. [${memory.classification || "REMEMBERED"}] ${memory.type}: ${memory.label}${detail} | source=${memory.source} | confidence=${memory.confidence} | updated=${memory.updatedAt || "unknown"}`;
     })
     .join("\n");
 }

@@ -28,19 +28,17 @@ export async function requireUser(req, res) {
 }
 
 /**
- * Require authenticated admin (JWT app_metadata.role or profiles.role).
+ * Require authenticated admin.
+ *
+ * Admin authority must come from Supabase Auth app_metadata, which normal
+ * clients cannot mutate. Do not fall back to public.profiles.role: profile rows
+ * are user-visible application data and must never become an authorization
+ * source for privileged server APIs.
  */
 export async function requireAdmin(req, res) {
   const auth = await requireUser(req, res);
   if (!auth) return null;
-  const { user, admin } = auth;
-  if (user.app_metadata?.role === "admin") return auth;
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profile?.role === "admin") return auth;
+  if (auth.user.app_metadata?.role === "admin") return auth;
   res.status(403).json({ error: "Admin access required" });
   return null;
 }

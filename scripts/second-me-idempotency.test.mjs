@@ -20,4 +20,10 @@ describe("2nd Me action idempotency", () => {
     const id = ensureSecondMeActionId({ actionId: "ai:stable-retry-123" });
     assert.equal(id, "ai:stable-retry-123");
   });
+
+  it("uses the exact protected action id as the correlation identity", () => {
+    const actionId = ensureSecondMeActionId({ actionId: "ai:correlation-987654" });
+    const correlationId = normalizeActionId(actionId);
+    assert.equal(correlationId, actionId);
+  });
 });

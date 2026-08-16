@@ -14,7 +14,7 @@ import {
   rollbackSecondMeMemoryAction,
 } from "../_lib/secondMeMemoryActions.js";
 import { executeCompensatingWorkflow } from "../_lib/compensatingWorkflow.js";
-import { executeIdempotentAction } from "../_lib/actionIdempotency.js";
+import { executeIdempotentAction, listActionHistory } from "../_lib/actionIdempotency.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -483,16 +483,30 @@ export default async function handler(req, res) {
     if (!entitled) return;
 
     const body = readJson(req);
-    const { messages = [], confirmedAction = null, rollbackAction = null, lawMastermind = false, guardrails = {} } = body;
+    const { messages = [], confirmedAction = null, rollbackAction = null, historyRequest = false, lawMastermind = false, guardrails = {} } = body;
     const pageContext = sanitizePageContext(body.pageContext);
     const killSwitchOn = Boolean(guardrails?.killSwitch);
+
+    if (historyRequest) {
+      try {
+        const items = await listActionHistory(admin, userData.user.id, body.historyLimit || 8);
+        return res.status(200).json({ data: { type: "action_history", items } });
+      } catch (historyErr) {
+        logError("titanAI:action_history", historyErr);
+        captureApiException(historyErr, { tags: { route: "titanAI", phase: "action_history" } });
+        return res.status(200).json({ data: { type: "action_history", items: [] } });
+      }
+    }
 
     if (rollbackAction) {
       if (killSwitchOn) return res.status(200).json({ data: { type: "error", message: "Titan guardrail kill switch is ON. Disable it to run rollback actions." } });
       try {
-        return res.status(200).json({ data: await executeRollback(admin, userData.user, rollbackAction) });
+        const data = await executeRollback(admin, userData.user, rollbackAction);
+        const correlationId = String(rollbackAction?.correlationId || "").slice(0, 128) || null;
+        return res.status(200).json({ data: correlationId ? { ...data, correlationId } : data });
       } catch (execErr) {
         logError("titanAI:rollback", execErr);
+        captureApiException(execErr, { tags: { route: "titanAI", phase: "rollback", correlation_id: String(rollbackAction?.correlationId || "unknown") } });
         const status = execErr?.status === 400 || execErr?.status === 403 ? execErr.status : 200;
         if (status !== 200) return res.status(status).json({ error: execErr.message || "Rollback rejected" });
         return res.status(200).json({ data: { type: "error", message: "Rollback failed." } });
@@ -517,6 +531,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ data });
       } catch (execErr) {
         logError("titanAI:action_execute", execErr);
+        captureApiException(execErr, { tags: { route: "titanAI", phase: "confirmed_action", intent: String(confirmedAction.intent || "unknown"), correlation_id: String(execErr?.correlationId || confirmedAction?.actionId || "unknown") } });
         const allowedStatus = [400, 403, 409, 503].includes(execErr?.status) ? execErr.status : 200;
         if (allowedStatus !== 200) return res.status(allowedStatus).json({ error: execErr.message || "Action rejected" });
         return res.status(200).json({ data: { type: "error", message: execErr?.actionCompleted ? execErr.message : "I couldn't save that action. Nothing was silently changed." } });

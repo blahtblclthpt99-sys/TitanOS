@@ -70,6 +70,7 @@ export default function AIAssistant() {
   const [ownerAutopilot, setOwnerAutopilot] = useState(false);
   const [opsState, setOpsState] = useState({ killSwitch: false, routines: [], logs: [] });
   const [rollbackingId, setRollbackingId] = useState(null);
+  const [actionHistory, setActionHistory] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const seededQ = useRef(false);
@@ -108,6 +109,18 @@ export default function AIAssistant() {
     }
     setOpsState(getTitanOpsState(user.id));
   }, [ownerMode, user?.id]);
+
+  const loadActionHistory = useCallback(async () => {
+    if (!user?.id || lawMastermind) { setActionHistory([]); return; }
+    try {
+      const result = await api.functions.invoke("titanAI", { messages: [], historyRequest: true, historyLimit: 6, secondSelf: true });
+      setActionHistory(Array.isArray(result?.data?.items) ? result.data.items : []);
+    } catch {
+      setActionHistory([]);
+    }
+  }, [lawMastermind, user?.id]);
+
+  useEffect(() => { void loadActionHistory(); }, [loadActionHistory]);
 
   const refreshOpsState = useCallback(() => {
     if (!user?.id || !ownerMode) return;
@@ -304,7 +317,7 @@ export default function AIAssistant() {
           role: "assistant",
           content: `${data.message || "Action completed."}${workflowDetails}`,
           type: "done",
-          rollback: data.rollback || null,
+          rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || null } : null,
         });
         if (user?.id && ownerMode) {
           appendTitanActionLog(user.id, {
@@ -373,7 +386,8 @@ export default function AIAssistant() {
         role: "assistant",
         content: data.message,
         type: isError ? "error" : "done",
-        rollback: data.rollback || null,
+        rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || actionId } : null,
+        correlationId: data.correlationId || data.actionId || actionId,
       } : m));
       if (user?.id && ownerMode) {
         appendTitanActionLog(user.id, {
@@ -381,10 +395,11 @@ export default function AIAssistant() {
           title: isError ? "Confirmed action failed" : "Confirmed action completed",
           detail: data.message || "2nd Me completed a confirmed action.",
           rollback: data.rollback || null,
+          correlationId: data.correlationId || data.actionId || confirmMsg.meta.actionId,
         });
         refreshOpsState();
       }
-      if (!isError) loadBusinessData();
+      if (!isError) { loadBusinessData(); void loadActionHistory(); }
     } catch (error) {
       const message = confirmedActionErrorMessage(error);
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
@@ -400,6 +415,7 @@ export default function AIAssistant() {
           status: "error",
           title: "Confirmed action failed",
           detail: error?.message || message,
+          correlationId: actionId,
         });
         refreshOpsState();
       }
@@ -419,7 +435,7 @@ export default function AIAssistant() {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
-        rollbackAction: rollback,
+        rollbackAction: { ...rollback, correlationId: rollback.correlationId || row?.correlationId || null },
         ownerAutopilot: ownerMode && ownerAutopilot,
         secondSelf: true,
         guardrails: { killSwitch: ownerMode && opsState.killSwitch },
@@ -435,9 +451,10 @@ export default function AIAssistant() {
         status: data.type === "error" ? "error" : "ok",
         title: data.type === "error" ? "Rollback failed" : "Rollback completed",
         detail: data.message || "Rollback result.",
+        correlationId: data.correlationId || rollback.correlationId || null,
       });
       refreshOpsState();
-      if (!shouldRetainRollback(data)) loadBusinessData();
+      if (!shouldRetainRollback(data)) { loadBusinessData(); void loadActionHistory(); }
     } catch (error) {
       const data = { type: "error", message: error?.message || "Rollback could not be completed." };
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
@@ -505,6 +522,8 @@ export default function AIAssistant() {
         </div>
         {messages.length > 0 && <button onClick={clearChat} className="text-muted-foreground hover:text-foreground/60 transition-colors p-2 rounded-xl hover:bg-muted" title="New conversation"><RotateCcw className="w-4 h-4"/></button>}
       </div>
+
+      {!lawMastermind && actionHistory.length > 0 ? <div className="px-4 md:px-8 pt-3 flex-shrink-0"><div className="titan-surface titan-bento-card max-w-4xl mx-auto px-3 py-2"><div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Recent 2nd Me actions</div><div className="titan-action-rail pb-1">{actionHistory.map((item) => <div key={item.correlationId} className="titan-action-chip"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold truncate">{String(item.intent || "action").replaceAll("_", " ")}</span><span className={`text-[10px] ${item.status === "completed" ? "text-emerald-500" : item.status === "failed" ? "text-destructive" : "text-amber-500"}`}>{item.status}</span></div><div className="text-[10px] text-muted-foreground mt-1 truncate">{item.message}</div><div className="text-[9px] text-muted-foreground/70 mt-1 font-mono" title={item.correlationId}>ID {String(item.correlationId).slice(-10)}</div></div>)}</div></div></div> : null}
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4">
         {messages.length === 0 ? <div className="max-w-2xl mx-auto py-8"><div className="text-center mb-6"><Sparkles className="w-8 h-8 text-titan-cyan mx-auto mb-3"/><h2 className="text-xl font-bold text-foreground">What are we doing?</h2><p className="text-sm text-muted-foreground mt-2">Tell me naturally. I’ll use what I know, figure out what’s missing, and bring up the right interface or action.</p></div><div className="grid gap-2 sm:grid-cols-2">{(lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS).map((s) => <button key={s.label} onClick={() => sendMessage(s.prompt)} className="rounded-xl border border-border bg-card/70 px-3 py-3 text-left text-sm hover:bg-muted transition-colors">{s.label}</button>)}</div></div> : <div className="space-y-4 max-w-4xl mx-auto">{messages.map(renderMessage)}<div ref={messagesEndRef}/></div>}

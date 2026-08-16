@@ -125,7 +125,7 @@ function WidgetShell({
         onDrop?.(e, id);
       }}
       className={`overflow-hidden transition-[box-shadow,opacity,transform] duration-base ${
-        bare ? "" : "titan-surface"
+        bare ? "" : "titan-surface titan-bento-card titan-rolling-surface"
       } ${
         customize
           ? dragging === id
@@ -1113,7 +1113,7 @@ export default function Dashboard({ isActive = true }) {
         </div>
       ) : null}
 
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <header className="titan-editorial-header mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="mb-1 text-caption font-bold uppercase tracking-widest text-primary">
             Command Center · {todayLabel}
@@ -1233,11 +1233,11 @@ export default function Dashboard({ isActive = true }) {
 
       <HomeAdClips isActive={isActive} />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="titan-bento-grid mt-4">
         {visibleWidgets.map((id) => (
           <div
             key={id}
-            className={`${WIDE_WIDGETS.has(id) ? "lg:col-span-2" : ""} ${
+            className={`titan-bento-item ${WIDE_WIDGETS.has(id) ? "titan-bento-item-wide" : ""} ${
               customize && hiddenWidgets.includes(id) ? "opacity-45" : ""
             }`}
             style={{ overflowAnchor: "none" }}

@@ -127,6 +127,18 @@ describe("observability surfaces on disk", () => {
     assert.match(src, /observability/);
   });
 
+  it("health validates the configured Stripe subscription catalog without exposing price ids", () => {
+    const src = read("api/functions/health.js");
+    assert.match(src, /stripeSubscriptionPricesConfigured/);
+    assert.match(src, /stripeSubscriptionCatalog/);
+    assert.match(src, /EXPECTED_SUBSCRIPTION_PRICES/);
+    assert.match(src, /unitAmount:\s*499/);
+    assert.match(src, /unitAmount:\s*999/);
+    assert.match(src, /unitAmount:\s*1999/);
+    assert.match(src, /productPlan === plan/);
+    assert.doesNotMatch(src, /price_1U4/);
+  });
+
   it("featureFlags + analyticsIngest API routes exist", () => {
     assert.ok(existsSync(join(root, "api/functions/featureFlags.js")));
     assert.ok(existsSync(join(root, "api/functions/analyticsIngest.js")));

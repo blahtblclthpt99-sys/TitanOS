@@ -1,9 +1,10 @@
 import { getSupabaseAdmin } from "./supabase.js";
 
 /**
- * Rate limit with durable cross-instance enforcement.
- * Upstash is used when configured; Titan's service-role-only Supabase RPC is the
- * built-in durable fallback. Local/test environments may use process memory.
+ * Rate limit with optional durable cross-instance enforcement.
+ * Existing async routes keep Upstash -> memory behavior. Routes that explicitly
+ * set requireDurable may additionally use Titan's service-role-only Supabase RPC
+ * and fail closed in production if no durable backend is reachable.
  */
 const buckets = new Map();
 const MAX_KEYS = 20_000;
@@ -91,8 +92,7 @@ export function assertRateLimit(req, res, opts = {}) {
   const windowMs = Number(opts.windowMs) > 0 ? Number(opts.windowMs) : 60_000;
   const routeKey = opts.key || req.url?.split("?")[0] || "unknown";
   const mem = memoryAllow(`${clientIp(req)}::${routeKey}`, limit, windowMs);
-  if (!mem.ok) return deny(res, mem.retryAfterSec);
-  return true;
+  return mem.ok ? true : deny(res, mem.retryAfterSec);
 }
 
 export async function assertRateLimitAsync(req, res, opts = {}) {
@@ -100,9 +100,12 @@ export async function assertRateLimitAsync(req, res, opts = {}) {
   const windowMs = Number(opts.windowMs) > 0 ? Number(opts.windowMs) : 60_000;
   const routeKey = opts.key || req.url?.split("?")[0] || "unknown";
   const bucketKey = `${clientIp(req)}::${routeKey}`;
-  const remote = (await upstashAllow(bucketKey, limit, windowMs)) || (await supabaseAllow(bucketKey, limit, windowMs));
+
+  let remote = await upstashAllow(bucketKey, limit, windowMs);
+  if (!remote && opts.requireDurable) remote = await supabaseAllow(bucketKey, limit, windowMs);
   if (remote) return remote.ok ? true : deny(res, remote.retryAfterSec);
   if (opts.requireDurable && productionRuntime()) return durableUnavailable(res);
+
   const mem = memoryAllow(bucketKey, limit, windowMs);
   return mem.ok ? true : deny(res, mem.retryAfterSec);
 }

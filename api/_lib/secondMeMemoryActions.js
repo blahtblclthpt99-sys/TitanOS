@@ -1,3 +1,5 @@
+import { assertMemoryIsSafe, containsSensitiveMemoryText } from "./memorySafety.js";
+
 const MEMORY_TYPES = new Set([
   "fact",
   "preference",
@@ -23,6 +25,14 @@ function normalizeMemoryType(value) {
   return MEMORY_TYPES.has(type) ? type : "fact";
 }
 
+function blockedMemoryResponse() {
+  return {
+    type: "clarify",
+    message:
+      "I can remember preferences, decisions, projects, people, instructions, and routines, but I won't store passwords, authentication tokens, private keys, Social Security numbers, or payment-card numbers in durable memory.",
+  };
+}
+
 export function detectSecondMeMemoryIntent(question) {
   const raw = cleanText(question, 4000);
   const q = raw.toLowerCase();
@@ -32,6 +42,7 @@ export function detectSecondMeMemoryIntent(question) {
     const type = normalizeMemoryType(remember[1]);
     const label = cleanText(remember[2], 500);
     if (!label) return null;
+    if (containsSensitiveMemoryText(label)) return blockedMemoryResponse();
     return {
       type: "confirm",
       intent: "remember_memory",
@@ -45,6 +56,7 @@ export function detectSecondMeMemoryIntent(question) {
   if (directRemember && !/remember something/i.test(q)) {
     const label = cleanText(directRemember[1], 500);
     if (!label) return null;
+    if (containsSensitiveMemoryText(label)) return blockedMemoryResponse();
     return {
       type: "confirm",
       intent: "remember_memory",
@@ -58,6 +70,7 @@ export function detectSecondMeMemoryIntent(question) {
   if (rule) {
     const label = cleanText(rule[1], 800);
     if (!label) return null;
+    if (containsSensitiveMemoryText(label)) return blockedMemoryResponse();
     return {
       type: "confirm",
       intent: "create_memory_rule",
@@ -79,9 +92,38 @@ export async function executeSecondMeMemoryAction(admin, user, intent, params = 
     err.status = 400;
     throw err;
   }
+  assertMemoryIsSafe(label);
 
   const type = intent === "create_memory_rule" ? "workflow" : normalizeMemoryType(params.type);
   const source = intent === "create_memory_rule" ? "second_me_rule" : "second_me_user";
+
+  // Keep memory idempotent for repeated confirmations/retries. Service-role access is
+  // explicitly scoped to both ownership fields before deciding an item already exists.
+  const { data: existing, error: existingError } = await admin
+    .from("titan_memory_nodes")
+    .select("id,type,label")
+    .eq("user_id", user.id)
+    .eq("created_by_id", user.id)
+    .eq("type", type)
+    .eq("label", label)
+    .eq("archived", false)
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing?.id) {
+    return {
+      type: "done",
+      message:
+        intent === "create_memory_rule"
+          ? `That From now on rule is already saved: **${existing.label}**.`
+          : `I already remember: **${existing.label}**.`,
+      entity: "Memory",
+      id: existing.id,
+      path: "/assistant",
+      duplicate: true,
+    };
+  }
+
   const row = {
     user_id: user.id,
     created_by_id: user.id,
@@ -133,9 +175,10 @@ export async function rollbackSecondMeMemoryAction(admin, user, rollbackAction =
 
   const { data: found, error: readError } = await admin
     .from("titan_memory_nodes")
-    .select("id,created_by_id")
+    .select("id,created_by_id,user_id")
     .eq("id", id)
     .eq("created_by_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (readError) throw readError;
   if (!found) {
@@ -148,7 +191,8 @@ export async function rollbackSecondMeMemoryAction(admin, user, rollbackAction =
     .from("titan_memory_nodes")
     .delete()
     .eq("id", id)
-    .eq("created_by_id", user.id);
+    .eq("created_by_id", user.id)
+    .eq("user_id", user.id);
   if (deleteError) throw deleteError;
 
   return {

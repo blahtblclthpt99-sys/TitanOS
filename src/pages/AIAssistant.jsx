@@ -18,6 +18,7 @@ import { isOwnerAccount } from "@/lib/ownerAccount";
 import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
 import { appendAiConversationTurn, listAiConversationDocs } from "@/lib/aiConversationStore";
 import { upsertSearchDocs } from "@/lib/searchIndex";
+import { confirmedActionErrorMessage, rollbackMessage, shouldRetainRollback } from "@/lib/secondMeActionUi";
 import {
   appendTitanActionLog,
   clearTitanActionLogs,
@@ -71,6 +72,7 @@ export default function AIAssistant() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const seededQ = useRef(false);
+  const actionInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!ownerMode) {
@@ -348,7 +350,8 @@ export default function AIAssistant() {
 
   const handleConfirm = async (msgIndex) => {
     const confirmMsg = messages[msgIndex];
-    if (!confirmMsg?.meta) return;
+    if (!confirmMsg?.meta || actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
     setConfirming(true);
     setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, type: "executing" } : m)));
 
@@ -379,13 +382,23 @@ export default function AIAssistant() {
         refreshOpsState();
       }
       if (!isError) loadBusinessData();
-    } catch {
+    } catch (error) {
+      const message = confirmedActionErrorMessage(error);
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
         role: "assistant",
-        content: "That action failed safely. Nothing was assumed or silently changed.",
+        content: message,
         type: "error",
       } : m));
+      if (user?.id && ownerMode) {
+        appendTitanActionLog(user.id, {
+          status: "error",
+          title: "Confirmed action failed",
+          detail: error?.message || message,
+        });
+        refreshOpsState();
+      }
     } finally {
+      actionInFlightRef.current = false;
       setConfirming(false);
     }
   };
@@ -393,7 +406,8 @@ export default function AIAssistant() {
   const handleRollback = async (msgIndex) => {
     const row = messages[msgIndex];
     const rollback = row?.rollback;
-    if (!rollback || !user?.id || !ownerMode || rollbackingId) return;
+    if (!rollback || !user?.id || !ownerMode || rollbackingId || actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
     setRollbackingId(row?.rollback?.id || `msg-${msgIndex}`);
     try {
       const result = await api.functions.invoke("titanAI", {
@@ -405,10 +419,11 @@ export default function AIAssistant() {
         guardrails: { killSwitch: ownerMode && opsState.killSwitch },
       });
       const data = result.data || {};
+      const retainRollback = shouldRetainRollback(data);
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
         ...m,
-        content: `${m.content}\n\nRollback: ${data.message || "completed."}`,
-        rollback: null,
+        content: rollbackMessage(m.content, data),
+        rollback: retainRollback ? m.rollback : null,
       } : m));
       appendTitanActionLog(user.id, {
         status: data.type === "error" ? "error" : "ok",
@@ -416,8 +431,22 @@ export default function AIAssistant() {
         detail: data.message || "Rollback result.",
       });
       refreshOpsState();
-      loadBusinessData();
+      if (!shouldRetainRollback(data)) loadBusinessData();
+    } catch (error) {
+      const data = { type: "error", message: error?.message || "Rollback could not be completed." };
+      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
+        ...m,
+        content: rollbackMessage(m.content, data),
+        rollback: m.rollback,
+      } : m));
+      appendTitanActionLog(user.id, {
+        status: "error",
+        title: "Rollback failed",
+        detail: data.message,
+      });
+      refreshOpsState();
     } finally {
+      actionInFlightRef.current = false;
       setRollbackingId(null);
     }
   };

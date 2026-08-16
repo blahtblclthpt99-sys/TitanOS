@@ -1,6 +1,6 @@
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions } from "../_lib/cors.js";
-import { assertRateLimit } from "../_lib/rateLimit.js";
+import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { hashPortalOtp } from "../_lib/portalOtp.js";
 import { logError } from "../_lib/safeLog.js";
@@ -41,7 +41,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!assertRateLimit(req, res, { limit: 8, windowMs: 60_000, key: "portalRequestOtp" })) return;
+  if (!(await assertRateLimitAsync(req, res, {
+    limit: 8,
+    windowMs: 60_000,
+    key: "portalRequestOtp",
+    requireDurable: true,
+  }))) return;
 
   try {
     const admin = getSupabaseAdmin();
@@ -53,11 +58,12 @@ export default async function handler(req, res) {
 
     const normalizedEmail = email.trim().toLowerCase();
     if (
-      !assertRateLimit(req, res, {
+      !(await assertRateLimitAsync(req, res, {
         limit: 3,
         windowMs: 10 * 60_000,
         key: `portalOtp:${normalizedEmail}`,
-      })
+        requireDurable: true,
+      }))
     ) {
       return;
     }

@@ -27,6 +27,7 @@ export function buildPersonalizedInsights(data = {}, user = {}) {
   const monthRevenue = data.monthRevenue || 0;
   const prevMonthRevenue = data.prevMonthRevenue || 0;
   const overdueTotal = data.overdueTotal || 0;
+  const opportunityGuidance = user?.privacy_prefs?.opportunity_guidance === true;
 
   const recommendations = [];
   const suggestedActions = [];
@@ -85,27 +86,31 @@ export function buildPersonalizedInsights(data = {}, user = {}) {
       reason: "Jobs scheduled today",
     });
   } else {
-    recommendations.push({
-      id: "rec-opportunities",
-      priority: 60,
-      title: "Find work that fits you",
-      body: "No jobs today — check profile-based opportunities before broad outreach.",
-      path: "/hire/matches",
-      cta: "Check job matches",
-    });
+    if (opportunityGuidance) {
+      recommendations.push({
+        id: "rec-opportunities",
+        priority: 60,
+        title: "Find work that fits you",
+        body: "No jobs today — check profile-based opportunities before broad outreach.",
+        path: "/hire/matches",
+        cta: "Check job matches",
+      });
+      suggestedActions.push({
+        id: "act-job-matches",
+        label: "Check job matches",
+        path: "/hire/matches",
+        reason: "Empty schedule · opportunity guidance enabled",
+      });
+    }
     recommendations.push({
       id: "rec-quiet",
-      priority: 35,
-      title: "Work the pipeline",
-      body: "A quiet schedule is also a good time for follow-ups, marketing, or booking-page polish.",
+      priority: opportunityGuidance ? 35 : 40,
+      title: opportunityGuidance ? "Work the pipeline" : "Fill a quiet day",
+      body: opportunityGuidance
+        ? "A quiet schedule is also a good time for follow-ups, marketing, or booking-page polish."
+        : "No jobs today — use the time for follow-ups, marketing, or booking-page polish.",
       path: "/leads",
       cta: "Check leads",
-    });
-    suggestedActions.push({
-      id: "act-job-matches",
-      label: "Check job matches",
-      path: "/hire/matches",
-      reason: "Empty schedule",
     });
   }
 

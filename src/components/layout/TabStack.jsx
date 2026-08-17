@@ -56,6 +56,7 @@ const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
+const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -106,6 +107,7 @@ const NON_TAB_ROUTES = {
   "/hire": Hire,
   "/hire/matches": JobMatches,
   "/hire/post-match-ready": MatchReadyJobPost,
+  "/hire/candidates": WorkerMatches,
   "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
@@ -249,7 +251,6 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            {/* key={pathname} remounts the boundary so a crash on Reports can't trap Jobs/Home */}
             <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Command Center.">
               <NonTabPage />
             </ErrorBoundary>

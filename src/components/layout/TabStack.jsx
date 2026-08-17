@@ -57,6 +57,7 @@ const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
+const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -108,6 +109,7 @@ const NON_TAB_ROUTES = {
   "/hire/matches": JobMatches,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
+  "/hire/find-workers": ExistingPostWorkerMatches,
   "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,

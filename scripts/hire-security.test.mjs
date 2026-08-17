@@ -165,6 +165,7 @@ describe("job match server trust boundaries", () => {
   const endpointV2 = fs.readFileSync(new URL("../api/functions/jobMatchesV2.js", import.meta.url), "utf8");
   const privacyMigration = fs.readFileSync(new URL("../supabase/migrations/20260817004000_private_job_match_preferences.sql", import.meta.url), "utf8");
   const phase2Migration = fs.readFileSync(new URL("../supabase/migrations/20260817083000_job_match_radius_and_interactions.sql", import.meta.url), "utf8");
+  const originMigration = fs.readFileSync(new URL("../supabase/migrations/20260817084000_private_job_match_origin.sql", import.meta.url), "utf8");
 
   it("derives worker identity from the verified auth user and scopes both profile sources to it", () => {
     assert.match(endpoint, /const userId = userData\.user\.id/);
@@ -187,6 +188,15 @@ describe("job match server trust boundaries", () => {
     assert.match(privacyMigration, /enable row level security/i);
     assert.match(privacyMigration, /revoke all on public\.job_match_preferences from anon/i);
     assert.match(privacyMigration, /using \(user_id = auth\.uid\(\) and created_by_id = auth\.uid\(\)\)/i);
+  });
+  it("keeps precise search origin in owner-only preferences, not the public driver profile", () => {
+    assert.match(originMigration, /alter table public\.job_match_preferences/i);
+    assert.match(originMigration, /search_lat double precision/i);
+    assert.match(originMigration, /search_lng double precision/i);
+    assert.match(endpointV2, /job_match_preferences[\s\S]*search_lat,search_lng/);
+    assert.match(endpointV2, /worker\.lat = privatePrefs\.search_lat/);
+    assert.match(endpointV2, /worker\.lng = privatePrefs\.search_lng/);
+    assert.doesNotMatch(endpointV2, /driver_profiles[^\n]*search_lat/);
   });
   it("keeps match interactions owner-only and does not persist external listing bodies", () => {
     assert.match(phase2Migration, /alter table public\.job_match_interactions enable row level security/i);

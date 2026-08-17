@@ -1,12 +1,13 @@
 import { api } from "@/api/apiClient";
 
 export async function getJobMatches({ includeExternal = true } = {}) {
-  const response = await api.functions.invoke("jobMatches", { includeExternal });
+  const response = await api.functions.invoke("jobMatchesV2", { includeExternal });
   return response?.data || {
     matches: [],
     needsProfile: false,
     needsSkills: false,
     internalCount: 0,
+    radiusMode: "city_state_fallback",
     external: { requested: false, enabled: false, reason: "unavailable" },
   };
 }

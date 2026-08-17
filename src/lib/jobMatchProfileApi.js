@@ -6,6 +6,11 @@ function list(values, max = 30) {
   return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))].slice(0, max);
 }
 
+function coordinate(value, min, max, fallback = null) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
+}
+
 async function getDriverQualifications(userId) {
   const { data, error } = await supabase
     .from("driver_profiles")
@@ -19,7 +24,7 @@ async function getDriverQualifications(userId) {
 async function getPrivatePreferences(userId) {
   const { data, error } = await supabase
     .from("job_match_preferences")
-    .select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,external_job_search_consent_at")
+    .select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,external_job_search_consent_at,search_lat,search_lng")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
@@ -42,6 +47,8 @@ export async function getMyJobMatchPreferences(userId) {
     preferred_schedule: privatePrefs?.preferred_schedule || [],
     external_job_search_consent: Boolean(privatePrefs?.external_job_search_consent),
     external_job_search_consent_at: privatePrefs?.external_job_search_consent_at || null,
+    search_lat: coordinate(privatePrefs?.search_lat, -90, 90),
+    search_lng: coordinate(privatePrefs?.search_lng, -180, 180),
   };
 }
 
@@ -66,13 +73,15 @@ export async function saveMyJobMatchPreferences(userId, patch = {}) {
     preferred_schedule: list(patch.preferred_schedule ?? current.preferred_schedule, 14),
     external_job_search_consent: consent,
     external_job_search_consent_at: consent && !previousConsent ? new Date().toISOString() : consent ? current.external_job_search_consent_at : null,
+    search_lat: patch.search_lat === null ? null : coordinate(patch.search_lat ?? current.search_lat, -90, 90),
+    search_lng: patch.search_lng === null ? null : coordinate(patch.search_lng ?? current.search_lng, -180, 180),
     updated_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase
     .from("job_match_preferences")
     .upsert(row, { onConflict: "user_id" })
-    .select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,external_job_search_consent_at")
+    .select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,external_job_search_consent_at,search_lat,search_lng")
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Job matching preferences were not saved.");

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ArrowUpRight, BriefcaseBusiness, CheckCircle2, Loader2, MapPin, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bookmark, BriefcaseBusiness, CheckCircle2, EyeOff, Loader2, MapPin, Navigation, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
 import EmptyState from "@/components/shared/EmptyState";
@@ -10,7 +10,9 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
 import { getJobMatches, isExternalJobMatch, jobMatchSourceLabel } from "@/lib/jobMatchApi";
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
+import { clearMyJobMatchInteraction, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
 import { getMyDriverProfile, saveMyDriverProfile } from "@/lib/driverProfilesApi";
+import { toggleSaveJob } from "@/lib/hireApi";
 
 function csv(value) {
   return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
@@ -20,12 +22,13 @@ function csvText(values) {
   return Array.isArray(values) ? values.join(", ") : "";
 }
 
-function MatchCard({ job }) {
+function MatchCard({ job, onAction, busy }) {
   const external = isExternalJobMatch(job);
   const score = Number(job.match?.score || 0);
   const reasons = Array.isArray(job.match?.reasons) ? job.match.reasons : [];
   const blockers = Array.isArray(job.match?.blockers) ? job.match.blockers : [];
   const source = jobMatchSourceLabel(job);
+  const state = job.interaction_state || null;
   const destination = external ? job.source_url || job.match?.source_url : `/hire?tab=browse&job=${encodeURIComponent(job.id)}`;
 
   return (
@@ -34,9 +37,8 @@ function MatchCard({ job }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-foreground">{job.title || "Job"}</h2>
-            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">
-              {score}% match
-            </span>
+            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{score}% match</span>
+            {state && <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{state}</span>}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Source: {source}</p>
         </div>
@@ -47,6 +49,7 @@ function MatchCard({ job }) {
 
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
         {(job.city || job.state) && <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{[job.city, job.state].filter(Boolean).join(", ")}</span>}
+        {job.distance_mi != null && <span>{Number(job.distance_mi).toFixed(1)} mi away</span>}
         {(job.budget_min || job.budget_max) && <span>{job.budget_min ? `From $${Number(job.budget_min).toLocaleString()}` : ""}{job.budget_min && job.budget_max ? " · " : ""}{job.budget_max ? `Up to $${Number(job.budget_max).toLocaleString()}` : ""}</span>}
       </div>
 
@@ -66,12 +69,20 @@ function MatchCard({ job }) {
         </div>
       ) : null}
 
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" disabled={busy} onClick={() => onAction(job, "save")} className="gap-2">
+          <Bookmark className={`h-4 w-4 ${state === "saved" ? "fill-current" : ""}`} aria-hidden="true" />{state === "saved" ? "Saved" : "Save"}
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => onAction(job, "ignore")} className="gap-2"><EyeOff className="h-4 w-4" aria-hidden="true" />Ignore</Button>
+      </div>
+
       {external ? (
-        <a href={destination} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-ring">
-          View on {source}<ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-        </a>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <a href={destination} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-ring">View on {source}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a>
+          <Button type="button" variant="outline" disabled={busy || state === "applied"} onClick={() => onAction(job, "applied")}>{state === "applied" ? "Applied" : "Mark applied"}</Button>
+        </div>
       ) : (
-        <Button asChild className="min-h-[44px] w-full"><Link to={destination}>Open in Titan Hire</Link></Button>
+        <Button asChild className="min-h-[44px] w-full"><Link to={destination}>{state === "applied" ? "View application in Titan Hire" : "Open in Titan Hire"}</Link></Button>
       )}
     </article>
   );
@@ -81,6 +92,7 @@ export default function JobMatches() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionBusy, setActionBusy] = useState(null);
   const [matches, setMatches] = useState([]);
   const [status, setStatus] = useState({ needsProfile: false, needsSkills: false, external: {} });
   const [form, setForm] = useState({
@@ -92,6 +104,8 @@ export default function JobMatches() {
     payType: "hourly",
     schedule: "",
     externalConsent: false,
+    searchLat: null,
+    searchLng: null,
   });
 
   const load = useCallback(async () => {
@@ -112,6 +126,8 @@ export default function JobMatches() {
         payType: prefs?.desired_pay_type || "hourly",
         schedule: csvText(prefs?.preferred_schedule),
         externalConsent: Boolean(prefs?.external_job_search_consent),
+        searchLat: prefs?.search_lat ?? null,
+        searchLng: prefs?.search_lng ?? null,
       });
       setMatches(result.matches || []);
       setStatus(result);
@@ -125,16 +141,14 @@ export default function JobMatches() {
   useEffect(() => { load(); }, [load]);
 
   const hasQualifications = useMemo(() => Boolean(csv(form.skills).length || csv(form.interests).length), [form.skills, form.interests]);
+  const hasPreciseOrigin = form.searchLat != null && form.searchLng != null;
 
   const save = async (event) => {
     event.preventDefault();
     if (!user?.id || saving) return;
     setSaving(true);
     try {
-      await saveMyDriverProfile(user.id, {
-        skills: csv(form.skills),
-        certifications: csv(form.certifications),
-      });
+      await saveMyDriverProfile(user.id, { skills: csv(form.skills), certifications: csv(form.certifications) });
       await saveMyJobMatchPreferences(user.id, {
         job_interests: csv(form.interests),
         work_radius_miles: Number(form.radius),
@@ -142,13 +156,62 @@ export default function JobMatches() {
         desired_pay_type: form.payType,
         preferred_schedule: csv(form.schedule),
         external_job_search_consent: Boolean(form.externalConsent),
+        search_lat: form.searchLat,
+        search_lng: form.searchLng,
       });
-      toast({ title: "Job matching updated", description: "Titan will use these qualifications and preferences for your matches." });
+      toast({ title: "Job matching updated", description: "Titan will use these qualifications and private preferences for your matches." });
       await load();
     } catch (error) {
       toast({ variant: "destructive", title: "Couldn't save matching profile", description: error.message || "Please try again." });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ variant: "destructive", title: "Location is not available on this device" });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((old) => ({ ...old, searchLat: position.coords.latitude, searchLng: position.coords.longitude }));
+        toast({ title: "Precise search origin ready", description: "Save your matching profile to use radius matching. This location stays private to your account." });
+      },
+      () => toast({ variant: "destructive", title: "Location permission was not granted", description: "Titan will keep using city/state matching." }),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  const actOnMatch = async (job, action) => {
+    if (!user?.id || actionBusy) return;
+    setActionBusy(job.id);
+    try {
+      const external = isExternalJobMatch(job);
+      if (action === "ignore") {
+        await setMyJobMatchInteraction(user.id, job, "ignored");
+        setMatches((rows) => rows.filter((row) => row.id !== job.id));
+      } else if (action === "save") {
+        if (external) {
+          if (job.interaction_state === "saved") {
+            await clearMyJobMatchInteraction(user.id, job);
+            setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: null } : row));
+          } else {
+            await setMyJobMatchInteraction(user.id, job, "saved");
+            setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: "saved" } : row));
+          }
+        } else {
+          const saved = await toggleSaveJob(user.id, job.id);
+          setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: saved ? "saved" : null } : row));
+        }
+      } else if (action === "applied" && external) {
+        await setMyJobMatchInteraction(user.id, job, "applied");
+        setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: "applied" } : row));
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't update this match", description: error.message || "Please try again." });
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -160,7 +223,7 @@ export default function JobMatches() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 id="match-profile-heading" className="font-semibold text-foreground">Your matching profile</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Skills and certifications are part of your professional profile. Pay, radius, schedule and external-search consent stay private to your account.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Skills and certifications are part of your professional profile. Pay, radius, schedule, precise search origin and external-search consent stay private to your account.</p>
           </div>
           <Button type="button" variant="outline" onClick={load} disabled={loading} className="min-h-[44px] gap-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />Refresh</Button>
         </div>
@@ -174,6 +237,12 @@ export default function JobMatches() {
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <label className="space-y-1.5"><span className="text-xs font-semibold text-foreground">Minimum desired pay</span><Input type="number" min="0" step="0.01" value={form.desiredPay} onChange={(e) => setForm((old) => ({ ...old, desiredPay: e.target.value }))} /></label>
             <label className="space-y-1.5"><span className="text-xs font-semibold text-foreground">Pay type</span><select value={form.payType} onChange={(e) => setForm((old) => ({ ...old, payType: e.target.value }))} className="min-h-[40px] rounded-md border border-border bg-background px-3 text-sm text-foreground"><option value="hourly">Hourly</option><option value="salary">Salary</option><option value="flat">Flat</option><option value="any">Any</option></select></label>
+          </div>
+
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-3">
+            <Button type="button" variant="outline" onClick={useCurrentLocation} className="gap-2"><Navigation className="h-4 w-4" aria-hidden="true" />Use current location</Button>
+            {hasPreciseOrigin && <Button type="button" variant="ghost" onClick={() => setForm((old) => ({ ...old, searchLat: null, searchLng: null }))}>Clear precise location</Button>}
+            <span className="text-xs text-muted-foreground">{hasPreciseOrigin ? "Precise radius matching ready. Save to apply it." : "City/state fallback is active until you choose a private search origin."}</span>
           </div>
 
           <label className="sm:col-span-2 flex min-h-[56px] cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
@@ -196,8 +265,8 @@ export default function JobMatches() {
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (
         <section aria-labelledby="matches-heading">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Best matches</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. External listings always show their provider.</p></div><span className="text-xs text-muted-foreground">{matches.length} result{matches.length === 1 ? "" : "s"}</span></div>
-          <div className="grid gap-4 md:grid-cols-2">{matches.map((job) => <MatchCard key={job.id} job={job} />)}</div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Best matches</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : "Location currently uses city/state fallback."} External listings always show their provider.</p></div><span className="text-xs text-muted-foreground">{matches.length} result{matches.length === 1 ? "" : "s"}</span></div>
+          <div className="grid gap-4 md:grid-cols-2">{matches.map((job) => <MatchCard key={job.id} job={job} onAction={actOnMatch} busy={actionBusy === job.id} />)}</div>
         </section>
       ) : (
         <EmptyState icon={BriefcaseBusiness} title="No strong matches yet" description={status.external?.reason === "provider_not_configured" && form.externalConsent ? "Titan searched its own board. External job search is not connected yet, so no outside listings were claimed." : "Titan did not find a strong current match. Keep your skills and availability up to date and check again."} />

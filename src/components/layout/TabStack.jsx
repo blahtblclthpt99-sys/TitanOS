@@ -55,6 +55,7 @@ const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -104,6 +105,7 @@ const NON_TAB_ROUTES = {
   "/referral": Referral,
   "/hire": Hire,
   "/hire/matches": JobMatches,
+  "/hire/post-match-ready": MatchReadyJobPost,
   "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,

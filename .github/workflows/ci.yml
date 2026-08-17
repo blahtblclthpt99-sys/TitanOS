@@ -43,6 +43,9 @@ jobs:
       - name: Free job access contract
         run: node --test scripts/free-job-access.test.mjs
 
+      - name: Google Play billing policy boundary
+        run: node --test scripts/play-billing-policy.test.mjs
+
       - name: Production build
         run: npm run build
         env:

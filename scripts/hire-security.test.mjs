@@ -4,6 +4,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   mergeRankedJobMatches,
   normalizeExternalJob,
@@ -119,5 +120,35 @@ describe("skills-driven job matching safety", () => {
       () => normalizeExternalJob({ id: "bad", title: "Bad", url: "http://example.test/job" }, { name: "Example" }),
       /HTTPS/
     );
+  });
+});
+
+describe("job match server trust boundaries", () => {
+  const endpoint = fs.readFileSync(new URL("../api/functions/jobMatches.js", import.meta.url), "utf8");
+  const privacyMigration = fs.readFileSync(new URL("../supabase/migrations/20260817004000_private_job_match_preferences.sql", import.meta.url), "utf8");
+
+  it("derives worker identity from the verified auth user and scopes both profile sources to it", () => {
+    assert.match(endpoint, /const userId = userData\.user\.id/);
+    assert.match(endpoint, /driver_profiles[\s\S]*?\.eq\("user_id", userId\)/);
+    assert.match(endpoint, /job_match_preferences[\s\S]*?\.eq\("user_id", userId\)/);
+  });
+
+  it("uses a fixed HTTPS external-provider host rather than a caller supplied URL", () => {
+    assert.match(endpoint, /https:\/\/api\.adzuna\.com\/v1\/api\/jobs\/us\/search\/1/);
+    assert.doesNotMatch(endpoint, /fetch\(body\.(url|endpoint|provider)/);
+  });
+
+  it("keeps provider credentials server-only", () => {
+    assert.match(endpoint, /process\.env\.ADZUNA_APP_ID/);
+    assert.match(endpoint, /process\.env\.ADZUNA_APP_KEY/);
+    assert.doesNotMatch(endpoint, /VITE_ADZUNA/);
+  });
+
+  it("keeps private matching preferences behind owner-only RLS and removes them from published profiles", () => {
+    assert.match(privacyMigration, /enable row level security/i);
+    assert.match(privacyMigration, /revoke all on public\.job_match_preferences from anon/i);
+    assert.match(privacyMigration, /using \(user_id = auth\.uid\(\) and created_by_id = auth\.uid\(\)\)/i);
+    assert.match(privacyMigration, /drop column if exists external_job_search_consent/i);
+    assert.match(privacyMigration, /drop column if exists desired_pay_min/i);
   });
 });

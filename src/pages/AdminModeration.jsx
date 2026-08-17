@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Archive, BadgeCheck, Check, Loader2, ShieldAlert, Trash2 } from "lucide-react";
+import { Archive, Check, Loader2, ShieldAlert, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
@@ -8,12 +8,7 @@ import PageLoader from "@/components/shared/PageLoader";
 import EmptyState from "@/components/shared/EmptyState";
 import { api } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  listTrustReports,
-  resolveTrustReport,
-  setVerificationStatus,
-} from "@/lib/trustSafetyApi";
-
+import { listTrustReports, resolveTrustReport } from "@/lib/ugcSafetyApi";
 import { isUserAdmin } from "@/lib/isAdmin";
 
 export default function AdminModeration() {
@@ -36,10 +31,11 @@ export default function AdminModeration() {
       setReports(openReports);
       setListings(activeListings);
       setTrustReports(trust);
-    } catch {
+    } catch (err) {
       setReports([]);
       setListings([]);
       setTrustReports([]);
+      toast({ variant: "destructive", title: err?.message || "Couldn't load moderation queue" });
     } finally {
       setLoading(false);
     }
@@ -49,7 +45,7 @@ export default function AdminModeration() {
     if (authChecked && isUserAdmin(user)) load();
   }, [authChecked, user]);
 
-  const dismiss = async (report) => {
+  const dismissMarketplace = async (report) => {
     if (actingId) return;
     setActingId(report.id);
     try {
@@ -85,18 +81,15 @@ export default function AdminModeration() {
     }
   };
 
-  const resolveTrust = async (report, status, verifyStatus) => {
+  const resolveTrust = async (report, status) => {
     if (actingId) return;
     setActingId(report.id);
     try {
-      if (report.kind === "verification" && verifyStatus) {
-        setVerificationStatus(report.target_id, report.type, verifyStatus, notes[report.id] || "");
-      }
       await resolveTrustReport(report.id, status);
-      setTrustReports((cur) => cur.filter((r) => r.id !== report.id));
-      toast({ title: status === "resolved" ? "Resolved" : "Dismissed" });
-    } catch {
-      toast({ variant: "destructive", title: "Couldn't update trust report" });
+      setTrustReports((current) => current.filter((item) => item.id !== report.id));
+      toast({ title: status === "resolved" ? "User report resolved" : "User report dismissed" });
+    } catch (err) {
+      toast({ variant: "destructive", title: err?.message || "Couldn't update user report" });
     } finally {
       setActingId(null);
     }
@@ -114,89 +107,48 @@ export default function AdminModeration() {
 
   return (
     <div className="relative p-4 md:p-8 max-w-5xl mx-auto pb-32">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-titan-cyan/8 blur-[100px]" />
-      </div>
       <div className="relative">
-        <PageHeader title="Moderation" subtitle="Marketplace, user reports, and verification queue" />
+        <PageHeader title="Moderation" subtitle="Server-backed user reports and marketplace review" />
         {loading ? (
           <PageLoader variant="list" label="Loading moderation queue" />
         ) : (
           <div className="space-y-8">
             <section>
               <div className="flex items-center gap-2 mb-3">
-                <BadgeCheck className="w-5 h-5 text-titan-cyan" />
-                <h2 className="font-semibold text-foreground">Trust &amp; Safety queue ({trustReports.length})</h2>
+                <UserRound className="w-5 h-5 text-titan-cyan" />
+                <h2 className="font-semibold text-foreground">User reports ({trustReports.length})</h2>
               </div>
               {trustReports.length ? (
                 <div className="space-y-3">
                   {trustReports.map((report) => (
                     <article key={report.id} className="titan-surface border border-border p-5">
-                      <p className="text-sm font-semibold text-foreground capitalize">
-                        {report.kind}
-                        {report.type ? ` · ${String(report.type).replace(/_/g, " ")}` : ""}
+                      <p className="text-sm font-semibold text-foreground">
+                        {report.target_name || "User"}
+                        <span className="ml-2 text-xs font-mono text-muted-foreground">{report.target_id}</span>
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Target: {report.target_name || report.target_id} · Reporter:{" "}
-                        {report.reporter_name || report.reporter_id}
+                        Reporter: {report.reporter_name || report.reporter_id}
                       </p>
-                      {report.reason && (
-                        <p className="text-sm mt-2">
-                          <span className="text-muted-foreground">Reason:</span> {report.reason}
-                        </p>
-                      )}
-                      {report.body && <p className="text-sm text-muted-foreground mt-1">{report.body}</p>}
-                      <Textarea
-                        value={notes[report.id] || ""}
-                        onChange={(e) => setNotes((c) => ({ ...c, [report.id]: e.target.value }))}
-                        placeholder="Review notes"
-                        className="mt-3 rounded-xl bg-muted min-h-[64px]"
-                      />
+                      <p className="text-sm mt-2"><span className="text-muted-foreground">Reason:</span> {report.reason}</p>
+                      {report.body && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{report.body}</p>}
+                      {report.link && <p className="text-xs font-mono text-muted-foreground mt-2 break-all">Context: {report.link}</p>}
+                      <p className="text-xs text-muted-foreground mt-2">{new Date(report.created_at).toLocaleString()}</p>
                       <div className="flex flex-wrap gap-2 mt-3">
-                        {report.kind === "verification" && (
-                          <>
-                            <Button
-                              disabled={!!actingId}
-                             
-                              onClick={() => resolveTrust(report, "resolved", "verified")}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              disabled={!!actingId}
-                              variant="outline"
-                              className="border-red-500/40 text-red-500"
-                              onClick={() => resolveTrust(report, "resolved", "rejected")}
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                        {report.kind === "user" && (
-                          <Button
-                            disabled={!!actingId}
-                           
-                            onClick={() => resolveTrust(report, "resolved")}
-                          >
-                            Mark resolved
-                          </Button>
-                        )}
-                        <Button disabled={!!actingId} variant="outline" onClick={() => resolveTrust(report, "dismissed")}>
-                          Dismiss
-                        </Button>
+                        <Button disabled={!!actingId} onClick={() => resolveTrust(report, "resolved")}>Resolve</Button>
+                        <Button disabled={!!actingId} variant="outline" onClick={() => resolveTrust(report, "dismissed")}>Dismiss</Button>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
-                <EmptyState title="No open trust reports" description="New trust & safety reports will show up here." className="py-10" />
+                <EmptyState title="No open user reports" description="New account and direct-message reports will appear here." className="py-10" />
               )}
             </section>
 
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <ShieldAlert className="w-5 h-5 text-titan-amber" />
-                <h2 className="font-semibold text-foreground">Open marketplace reports ({reports.length})</h2>
+                <h2 className="font-semibold text-foreground">Marketplace reports ({reports.length})</h2>
               </div>
               {reports.length ? (
                 <div className="space-y-3">
@@ -204,60 +156,34 @@ export default function AdminModeration() {
                     <article key={report.id} className="titan-surface border border-border p-5">
                       <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            Listing: <span className="font-mono text-titan-cyan">{report.listing_id}</span>
-                          </p>
-                          <p className="text-sm text-foreground/85 mt-2">
-                            <span className="text-muted-foreground">Reason:</span> {report.reason}
-                          </p>
+                          <p className="text-sm font-semibold text-foreground">Listing: <span className="font-mono text-titan-cyan">{report.listing_id}</span></p>
+                          <p className="text-sm text-foreground/85 mt-2"><span className="text-muted-foreground">Reason:</span> {report.reason}</p>
                           {report.details && <p className="text-sm text-muted-foreground mt-1">{report.details}</p>}
-                          <p className="text-xs text-muted-foreground mt-3">
-                            Reporter: {report.reporter_id} ·{" "}
-                            {new Date(report.created_date || report.created_at).toLocaleString()}
-                          </p>
                         </div>
-                        <Button
-                          onClick={() => dismiss(report)}
-                          disabled={!!actingId}
-                          variant="outline"
-                          className="border-border text-foreground hover:bg-muted h-9"
-                        >
+                        <Button onClick={() => dismissMarketplace(report)} disabled={!!actingId} variant="outline" className="h-9">
                           <Check className="w-4 h-4 mr-2" />
                           {actingId === report.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Dismiss"}
                         </Button>
                       </div>
                       <Textarea
                         value={notes[report.listing_id] || ""}
-                        onChange={(event) =>
-                          setNotes((current) => ({ ...current, [report.listing_id]: event.target.value }))
-                        }
+                        onChange={(event) => setNotes((current) => ({ ...current, [report.listing_id]: event.target.value }))}
                         placeholder="Moderation notes (optional)"
                         className="mt-4 bg-titan-surface2 border-border text-foreground rounded-xl min-h-[72px]"
                       />
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <Button
-                          onClick={() => moderate({ id: report.listing_id }, "removed", report)}
-                          disabled={!!actingId}
-                          className="bg-red-500/85 hover:bg-red-500 text-foreground"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remove listing
+                        <Button onClick={() => moderate({ id: report.listing_id }, "removed", report)} disabled={!!actingId} className="bg-red-500/85 hover:bg-red-500 text-foreground">
+                          <Trash2 className="w-4 h-4 mr-2" /> Remove listing
                         </Button>
-                        <Button
-                          onClick={() => moderate({ id: report.listing_id }, "archived", report)}
-                          disabled={!!actingId}
-                          variant="outline"
-                          className="border-border text-foreground"
-                        >
-                          <Archive className="w-4 h-4 mr-2" />
-                          Archive listing
+                        <Button onClick={() => moderate({ id: report.listing_id }, "archived", report)} disabled={!!actingId} variant="outline">
+                          <Archive className="w-4 h-4 mr-2" /> Archive listing
                         </Button>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
-                <EmptyState title="No open reports" description="Marketplace listing reports will appear here." className="py-10" />
+                <EmptyState title="No open marketplace reports" description="Marketplace listing reports will appear here." className="py-10" />
               )}
             </section>
 
@@ -275,29 +201,16 @@ export default function AdminModeration() {
                       <p className="text-sm text-foreground/45 mt-3 line-clamp-2">{listing.description}</p>
                       <Textarea
                         value={notes[listing.id] || ""}
-                        onChange={(event) =>
-                          setNotes((current) => ({ ...current, [listing.id]: event.target.value }))
-                        }
+                        onChange={(event) => setNotes((current) => ({ ...current, [listing.id]: event.target.value }))}
                         placeholder="Moderation notes (optional)"
                         className="mt-4 bg-titan-surface2 border-border text-foreground rounded-xl min-h-[72px]"
                       />
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <Button
-                          onClick={() => moderate(listing, "removed")}
-                          disabled={!!actingId}
-                          className="bg-red-500/85 hover:bg-red-500 text-foreground"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remove
+                        <Button onClick={() => moderate(listing, "removed")} disabled={!!actingId} className="bg-red-500/85 hover:bg-red-500 text-foreground">
+                          <Trash2 className="w-4 h-4 mr-2" /> Remove
                         </Button>
-                        <Button
-                          onClick={() => moderate(listing, "archived")}
-                          disabled={!!actingId}
-                          variant="outline"
-                          className="border-border text-foreground"
-                        >
-                          <Archive className="w-4 h-4 mr-2" />
-                          Archive
+                        <Button onClick={() => moderate(listing, "archived")} disabled={!!actingId} variant="outline">
+                          <Archive className="w-4 h-4 mr-2" /> Archive
                         </Button>
                       </div>
                     </article>

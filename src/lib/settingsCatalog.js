@@ -138,9 +138,9 @@ export const SETTINGS_PANELS = Object.freeze([
     category: "safety",
     icon: Lock,
     title: "Privacy",
-    description: "Community visibility and sharing",
-    keywords: ["community", "visibility", "share", "city", "discover"],
-    docs: "Controls what other professionals can see about you in Community.",
+    description: "Community visibility, AI guidance, and sharing",
+    keywords: ["community", "visibility", "share", "city", "discover", "opportunity", "guidance", "jobs", "ai"],
+    docs: "Controls community visibility and private account-level guidance preferences. Opportunity guidance never makes your job-search intent public.",
     resettable: true,
   },
   {
@@ -225,6 +225,13 @@ export const PRIVACY_OPTIONS = Object.freeze([
     description: "Allow completed work to appear in Community.",
     default: false,
     docs: "Off by default. Does not share customer private details.",
+  },
+  {
+    key: "opportunity_guidance",
+    label: "Opportunity guidance",
+    description: "Let Titan suggest matching work when your schedule is quiet.",
+    default: false,
+    docs: "Off by default. When enabled, 2nd Me may suggest opening Job Matches. This stays private, never applies to jobs, and does not authorize external-provider search.",
   },
   {
     key: "product_analytics",

@@ -57,9 +57,7 @@ function normalizeAdzunaResult(row = {}) {
 async function fetchAdzuna(profile) {
   const appId = String(process.env.ADZUNA_APP_ID || "").trim();
   const appKey = String(process.env.ADZUNA_APP_KEY || "").trim();
-  if (!appId || !appKey) {
-    return { enabled: false, reason: "provider_not_configured", jobs: [] };
-  }
+  if (!appId || !appKey) return { enabled: false, reason: "provider_not_configured", jobs: [] };
 
   const query = externalQuery(profile);
   if (!query) return { enabled: true, reason: "missing_worker_skills", jobs: [] };
@@ -81,9 +79,7 @@ async function fetchAdzuna(profile) {
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
-    if (!response.ok) {
-      return { enabled: true, reason: `provider_http_${response.status}`, jobs: [] };
-    }
+    if (!response.ok) return { enabled: true, reason: `provider_http_${response.status}`, jobs: [] };
     const body = await response.json().catch(() => ({}));
     const jobs = [];
     for (const row of Array.isArray(body.results) ? body.results : []) {
@@ -117,24 +113,27 @@ export default async function handler(req, res) {
 
     const body = readJson(req);
     const userId = userData.user.id;
-    const [{ data: profile, error: profileError }, { data: jobs, error: jobsError }] = await Promise.all([
-      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent").eq("user_id", userId).maybeSingle(),
+    const [profileResult, prefsResult, jobsResult] = await Promise.all([
+      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
+      admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent").eq("user_id", userId).maybeSingle(),
       admin.from("hire_jobs").select("id,created_at,title,description,category,city,state,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").order("created_at", { ascending: false }).limit(250),
     ]);
-    if (profileError) throw profileError;
-    if (jobsError) throw jobsError;
+    if (profileResult.error) throw profileResult.error;
+    if (prefsResult.error) throw prefsResult.error;
+    if (jobsResult.error) throw jobsResult.error;
 
+    const profile = profileResult.data;
+    const jobs = jobsResult.data || [];
     if (!profile) {
       return res.status(200).json({ data: { matches: [], needsProfile: true, needsSkills: true, external: { requested: false, enabled: false, reason: "profile_required" } } });
     }
 
-    const worker = buildWorkerMatchProfile(profile);
-    const ready = profileReady(worker);
-    if (!ready) {
+    const worker = buildWorkerMatchProfile({ ...profile, ...(prefsResult.data || {}) });
+    if (!profileReady(worker)) {
       return res.status(200).json({ data: { matches: [], needsProfile: false, needsSkills: true, external: { requested: false, enabled: false, reason: "skills_required" } } });
     }
 
-    const internal = rankInternalJobMatches(jobs || [], worker);
+    const internal = rankInternalJobMatches(jobs, worker);
     const wantsExternal = body.includeExternal !== false && worker.external_job_search_consent && internal.length < INTERNAL_TARGET;
     let externalState = {
       requested: wantsExternal,
@@ -149,7 +148,7 @@ export default async function handler(req, res) {
       externalState = { requested: true, enabled: provider.enabled, reason: provider.reason, provider: provider.enabled ? "Adzuna" : null };
     }
 
-    const matches = mergeRankedJobMatches({ internal: jobs || [], external: externalJobs, driverProfile: worker }).slice(0, 40);
+    const matches = mergeRankedJobMatches({ internal: jobs, external: externalJobs, driverProfile: worker }).slice(0, 40);
     return res.status(200).json({
       data: {
         matches,

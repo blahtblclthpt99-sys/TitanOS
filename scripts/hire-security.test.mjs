@@ -8,6 +8,7 @@ import fs from "node:fs";
 import {
   mergeRankedJobMatches,
   normalizeExternalJob,
+  rankInternalJobMatches,
   scoreJobMatch,
 } from "../src/lib/jobMatch.js";
 
@@ -72,7 +73,9 @@ describe("skills-driven job matching safety", () => {
     city: "Oklahoma City",
     state: "OK",
     desired_pay_min: 20,
+    desired_pay_type: "hourly",
     preferred_schedule: ["weekday", "day"],
+    job_interests: ["delivery"],
   };
   const native = {
     id: "native-1",
@@ -82,6 +85,7 @@ describe("skills-driven job matching safety", () => {
     state: "OK",
     budget_min: 22,
     budget_max: 26,
+    pay_type: "hourly",
     required_skills: ["delivery", "box truck"],
     required_certifications: ["dot medical card"],
     minimum_years_experience: 2,
@@ -93,6 +97,16 @@ describe("skills-driven job matching safety", () => {
     const match = scoreJobMatch(worker, native);
     assert.ok(match.score >= 90);
     assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
+  });
+
+  it("treats missing required credentials as a hard eligibility filter", () => {
+    const rows = rankInternalJobMatches([native], { ...worker, certifications: [] });
+    assert.equal(rows.length, 0);
+  });
+
+  it("does not compare incompatible pay periods as raw numbers", () => {
+    const match = scoreJobMatch(worker, { ...native, pay_type: "salary", budget_min: 40000, budget_max: 50000 });
+    assert.equal(match.reasons.includes("Meets pay preference"), false);
   });
 
   it("does not return external jobs without explicit consent", () => {
@@ -115,6 +129,24 @@ describe("skills-driven job matching safety", () => {
     assert.equal(rows[0].id, "native-1");
   });
 
+  it("deduplicates an outside copy of an existing native vacancy", () => {
+    const external = normalizeExternalJob({
+      id: "duplicate",
+      title: native.title,
+      city: native.city,
+      state: native.state,
+      url: "https://jobs.example.test/duplicate",
+      posted_at: "2026-08-16T12:00:00Z",
+    }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [native],
+      external: [external],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.filter((row) => row.title === native.title).length, 1);
+  });
+
   it("rejects insecure external source links", () => {
     assert.throws(
       () => normalizeExternalJob({ id: "bad", title: "Bad", url: "http://example.test/job" }, { name: "Example" }),
@@ -131,6 +163,10 @@ describe("job match server trust boundaries", () => {
     assert.match(endpoint, /const userId = userData\.user\.id/);
     assert.match(endpoint, /driver_profiles[\s\S]*?\.eq\("user_id", userId\)/);
     assert.match(endpoint, /job_match_preferences[\s\S]*?\.eq\("user_id", userId\)/);
+  });
+
+  it("filters jobs posted by the same authenticated account", () => {
+    assert.match(endpoint, /job\.created_by_id !== userId && job\.customer_id !== userId/);
   });
 
   it("uses a fixed HTTPS external-provider host rather than a caller supplied URL", () => {

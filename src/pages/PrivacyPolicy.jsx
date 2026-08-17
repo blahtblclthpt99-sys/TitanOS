@@ -6,6 +6,7 @@ import SiteFooter from "@/components/marketing/SiteFooter";
 
 const EFFECTIVE_DATE = "August 17, 2026";
 const VERSION = "1.2";
+const SUPPORT_EMAIL = "titanosmail@protonmail.com";
 
 const SECTIONS = [
   {
@@ -34,7 +35,7 @@ const SECTIONS = [
   },
   {
     title: "Your Rights",
-    body: `You may request access to, correction of, or deletion of your personal data, subject to applicable law and legitimate retention requirements. Privacy rights may vary by jurisdiction. To exercise a privacy right, use TitanOS account settings, visit the account-deletion page, or contact privacy@titanos.app.`,
+    body: `You may request access to, correction of, or deletion of your personal data, subject to applicable law and legitimate retention requirements. Privacy rights may vary by jurisdiction. To exercise a privacy right, use TitanOS account settings, visit the account-deletion page, or contact ${SUPPORT_EMAIL}.`,
   },
   {
     title: "Account Deletion & Data Retention",
@@ -50,7 +51,7 @@ const SECTIONS = [
   },
   {
     title: "Contact Us",
-    body: `Questions about this Privacy Policy or a privacy request? Contact privacy@titanos.app.`,
+    body: `Questions about this Privacy Policy or a privacy request? Contact ${SUPPORT_EMAIL}.`,
   },
 ];
 

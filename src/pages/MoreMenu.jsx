@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router";
-import { ChevronRight } from "lucide-react";
+import { BriefcaseBusiness, ChevronRight, Sparkles } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import ThemeToggle from "@/components/brand/ThemeToggle";
@@ -26,6 +26,24 @@ export default function MoreMenu() {
         <TitanBrandLogo layout="svg" markClassName="h-9 w-9" showTagline />
         <ThemeToggle variant="segmented" className="w-full sm:w-auto sm:min-w-[240px]" />
       </div>
+
+      <Link
+        to="/hire/matches"
+        className="titan-surface titan-surface-interactive mb-6 flex min-h-[88px] items-center gap-4 border-primary/20 p-4 focus-ring"
+      >
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <BriefcaseBusiness className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+            Matches for you <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Use your skills, certifications, location and preferences to find Titan jobs and approved outside opportunities.
+          </p>
+        </div>
+        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
 
       {betaBadgeLabel(user) && (
         <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-medium text-primary">

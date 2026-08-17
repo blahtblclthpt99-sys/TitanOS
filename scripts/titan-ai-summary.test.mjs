@@ -45,8 +45,18 @@ describe("Titan AI summary signals", () => {
 });
 
 describe("Titan opportunity pulse", () => {
-  it("surfaces Job Matches on an empty workday without fabricating a match count", () => {
+  it("keeps proactive Job Matches off until the user explicitly opts in", () => {
     const insights = buildPersonalizedInsights({ todayJobs: [] }, { full_name: "Ada Lovelace" });
+    assert.equal(insights.recommendations.some((item) => item.path === "/hire/matches"), false);
+    assert.equal(insights.suggestedActions.some((item) => item.path === "/hire/matches"), false);
+    assert.ok(insights.recommendations.some((item) => item.path === "/leads"));
+  });
+
+  it("surfaces Job Matches after opportunity guidance opt-in without fabricating a match count", () => {
+    const insights = buildPersonalizedInsights(
+      { todayJobs: [] },
+      { full_name: "Ada Lovelace", privacy_prefs: { opportunity_guidance: true } }
+    );
     const opportunity = insights.recommendations.find((item) => item.path === "/hire/matches");
     assert.ok(opportunity);
     assert.match(opportunity.title, /Find work that fits you/i);
@@ -55,7 +65,15 @@ describe("Titan opportunity pulse", () => {
     assert.ok(insights.suggestedActions.some((item) => item.path === "/hire/matches"));
   });
 
-  it("includes Job Matches in job-related search guidance", () => {
+  it("does not treat unrelated privacy preferences as opportunity consent", () => {
+    const insights = buildPersonalizedInsights(
+      { todayJobs: [] },
+      { full_name: "Ada Lovelace", privacy_prefs: { product_analytics: true, show_in_community: true } }
+    );
+    assert.equal(insights.recommendations.some((item) => item.path === "/hire/matches"), false);
+  });
+
+  it("includes Job Matches in explicit job-related search guidance", () => {
     const assistance = getSearchAssistance("jobs");
     assert.match(assistance.tip, /Job Matches/);
   });

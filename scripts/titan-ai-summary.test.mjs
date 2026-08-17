@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerFromSummary, buildBusinessSummary } from "../src/lib/ai-business-summary.js";
+import { buildPersonalizedInsights, getSearchAssistance } from "../src/lib/aiInsights.js";
 
 describe("Titan AI summary signals", () => {
   const summary = buildBusinessSummary({
@@ -40,5 +41,22 @@ describe("Titan AI summary signals", () => {
     assert.match(answer, /What's next/i);
     assert.match(answer, /Focus/i);
     assert.match(answer, /Collections|Dispatch|Margin/i);
+  });
+});
+
+describe("Titan opportunity pulse", () => {
+  it("surfaces Job Matches on an empty workday without fabricating a match count", () => {
+    const insights = buildPersonalizedInsights({ todayJobs: [] }, { full_name: "Ada Lovelace" });
+    const opportunity = insights.recommendations.find((item) => item.path === "/hire/matches");
+    assert.ok(opportunity);
+    assert.match(opportunity.title, /Find work that fits you/i);
+    assert.match(opportunity.body, /profile-based opportunities/i);
+    assert.doesNotMatch(opportunity.body, /\b\d+\s+matches?\b/i);
+    assert.ok(insights.suggestedActions.some((item) => item.path === "/hire/matches"));
+  });
+
+  it("includes Job Matches in job-related search guidance", () => {
+    const assistance = getSearchAssistance("jobs");
+    assert.match(assistance.tip, /Job Matches/);
   });
 });

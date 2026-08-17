@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Ban, Flag, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,13 +13,11 @@ import { useAuth } from "@/lib/AuthContext";
 import {
   REPORT_REASONS,
   blockUser,
-  isBlocked,
+  hasBlockedUser,
   submitUserReport,
-} from "@/lib/trustSafetyApi";
+} from "@/lib/ugcSafetyApi";
 
-/**
- * Compact report / block actions for cards and chat headers.
- */
+/** Compact server-backed report / block actions for UGC and direct messaging. */
 export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -27,15 +25,30 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
   const [reason, setReason] = useState(REPORT_REASONS[0]);
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
+  const [alreadyBlocked, setAlreadyBlocked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id || !targetId || targetId === user.id) return undefined;
+    hasBlockedUser(user.id, targetId)
+      .then((blocked) => {
+        if (!cancelled) setAlreadyBlocked(blocked);
+      })
+      .catch(() => {
+        if (!cancelled) setAlreadyBlocked(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, targetId]);
 
   if (!user?.id || !targetId || targetId === user.id) return null;
-
-  const alreadyBlocked = isBlocked(user.id, targetId);
 
   const onBlock = async () => {
     setBusy(true);
     try {
       await blockUser(user.id, targetId, targetName);
+      setAlreadyBlocked(true);
       toast({ title: alreadyBlocked ? "Already blocked" : "User blocked" });
       setOpen(false);
     } catch (err) {
@@ -49,7 +62,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
     setBusy(true);
     try {
       await submitUserReport(user, { targetId, targetName, reason, details, link });
-      toast({ title: "Report submitted" });
+      toast({ title: "Report submitted for moderation" });
       setReportOpen(false);
       setOpen(false);
       setDetails("");
@@ -85,7 +98,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
             type="button"
             className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left"
             onClick={onBlock}
-            disabled={busy}
+            disabled={busy || alreadyBlocked}
           >
             <Ban className="w-3.5 h-3.5" /> {alreadyBlocked ? "Blocked" : "Block"}
           </button>
@@ -93,7 +106,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
       )}
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-        <DialogContent className=" max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Report {targetName || "user"}</DialogTitle>
           </DialogHeader>
@@ -113,11 +126,7 @@ export default function ReportBlockMenu({ targetId, targetName, link = "" }) {
             placeholder="What happened?"
             className="rounded-xl bg-muted"
           />
-          <Button
-            className="rounded-xl"
-            disabled={busy}
-            onClick={onReport}
-          >
+          <Button className="rounded-xl" disabled={busy} onClick={onReport}>
             Submit report
           </Button>
         </DialogContent>

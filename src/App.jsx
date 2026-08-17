@@ -29,6 +29,7 @@ const FeatureDetail = lazy(() => import("@/pages/FeatureDetail"));
 const ThankYou = lazy(() => import("@/pages/ThankYou"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
+const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
 const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
@@ -45,6 +46,7 @@ const PUBLIC_EXACT = new Set([
   "/privacy",
   "/terms",
   "/terms-of-service",
+  "/delete-account",
   "/portal",
   "/login",
   "/register",
@@ -79,6 +81,7 @@ function PublicRoutes() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/delete-account" element={<DeleteAccount />} />
           <Route path="/portal" element={<CustomerPortal />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

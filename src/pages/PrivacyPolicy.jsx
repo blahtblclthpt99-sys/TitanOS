@@ -4,49 +4,54 @@ import { ArrowLeft, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
-const EFFECTIVE_DATE = "July 13, 2026";
-const VERSION = "1.1";
+const EFFECTIVE_DATE = "August 17, 2026";
+const VERSION = "1.2";
+const SUPPORT_EMAIL = "titanosmail@protonmail.com";
 
 const SECTIONS = [
   {
     title: "Information We Collect",
-    body: `We collect information you provide directly to us, such as your name, email address, phone number, and business details when you create an account or use our services. We also collect information about your use of TitanOS, including shifts, miles, expenses, and other driver records you create within the platform.`,
+    body: `We collect information you provide directly to us, such as your name, email address, phone number, business details, work profile, skills, certifications, jobs, customers, invoices, expenses, messages, and other records you create in TitanOS. When you use location-based features, TitanOS may access precise or approximate device location to support job locations, mileage, routing, geofence proof, driver features, and work matching.`,
   },
   {
     title: "How We Use Your Information",
-    body: `We use the information we collect to provide, maintain, and improve TitanOS; to process transactions and send related information; to send technical notices and support messages; to respond to your comments and questions; and to monitor and analyze trends and usage within the platform.`,
+    body: `We use the information we collect to provide, maintain, secure, and improve TitanOS; operate job matching and field-service workflows; process transactions and subscriptions; provide AI-assisted features using account-scoped context; send technical notices and support messages; respond to questions; prevent fraud and abuse; and analyze product reliability and usage in accordance with your privacy settings.`,
+  },
+  {
+    title: "Location Data",
+    body: `TitanOS requests coarse and fine location only when location-enabled features need it. Location may be used for job locations, mileage and trip features, routing, geofence evidence, nearby work matching, and related field-service functions. TitanOS does not request Android background-location permission in the current release. You can control location permission in your device settings.`,
   },
   {
     title: "Data Storage & Security",
-    body: `Your data is stored securely using industry-standard providers. We implement encryption in transit and at rest, access controls, and operational safeguards. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.`,
+    body: `Your data is stored using industry-standard service providers. We use encryption in transit and at rest where supported, authentication and authorization controls, row-level data access policies, and operational safeguards. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.`,
   },
   {
     title: "Data Sharing",
-    body: `We do not sell, trade, or rent your personal information to third parties. We may share information with trusted service providers who assist us in operating the platform (for example hosting, email, payments, or analytics), provided they protect it appropriately. We may also disclose information when required by law.`,
+    body: `We do not sell or rent your personal information. We may share information with service providers that help us operate TitanOS, such as hosting, authentication, database, email, payments, analytics, AI, mapping, and job-search providers, only as needed to provide the applicable feature and subject to their own contractual and privacy obligations. We may also disclose information when required by law or to protect users and the service.`,
   },
   {
     title: "Cookies & Tracking",
-    body: `TitanOS uses cookies and similar technologies to keep you signed in, remember preferences (such as theme), and understand how the product is used. You can control cookies through your browser; disabling them may affect some features.`,
+    body: `TitanOS uses cookies and similar technologies to keep you signed in, remember preferences, protect sessions, and understand product usage. Privacy controls allow you to manage optional product analytics and masked session replay where available. Disabling browser storage or cookies may affect some features.`,
   },
   {
     title: "Your Rights",
-    body: `You may request access, correction, or deletion of your personal data. Contact us and we will respond within 30 days, subject to legal retention requirements. [Legal review: add region-specific rights such as GDPR/CCPA where applicable.]`,
+    body: `You may request access to, correction of, or deletion of your personal data, subject to applicable law and legitimate retention requirements. Privacy rights may vary by jurisdiction. To exercise a privacy right, use TitanOS account settings, visit the account-deletion page, or contact ${SUPPORT_EMAIL}.`,
   },
   {
-    title: "Data Retention",
-    body: `We retain your information for as long as your account is active or as needed to provide the Service. If you close your account, we will delete or anonymize personal information within 90 days unless we must retain it for legal or compliance purposes.`,
+    title: "Account Deletion & Data Retention",
+    body: `You can submit an account-deletion request from within TitanOS or from our public account-deletion web page. We process verified deletion requests and delete or anonymize associated personal data within 30 days, except information we must retain for legitimate legal, tax, payment, security, fraud-prevention, dispute-resolution, or regulatory reasons. Retained records are limited to the applicable purpose and retention period.`,
   },
   {
     title: "Children's Privacy",
-    body: `TitanOS is not directed to individuals under 18. We do not knowingly collect personal information from children. If you believe a child has provided personal information, contact us and we will delete it promptly.`,
+    body: `TitanOS is not directed to individuals under 18. We do not knowingly collect personal information from children. If you believe a child has provided personal information, contact us and we will take appropriate steps to delete it.`,
   },
   {
     title: "Changes to This Policy",
-    body: `We may update this Privacy Policy from time to time. We will post the new policy on this page and update the effective date and version. Continued use after changes become effective constitutes acceptance of the revised policy.`,
+    body: `We may update this Privacy Policy from time to time. We will post the revised policy on this page and update the effective date and version. Material changes may also be communicated through TitanOS or another appropriate channel.`,
   },
   {
     title: "Contact Us",
-    body: `Questions about this Privacy Policy? Contact privacy@titanos.app. We take privacy seriously and will address concerns promptly.`,
+    body: `Questions about this Privacy Policy or a privacy request? Contact ${SUPPORT_EMAIL}.`,
   },
 ];
 
@@ -78,7 +83,7 @@ export default function PrivacyPolicy() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-primary" />
+                <Shield className="w-5 h-5 text-primary" aria-hidden="true" />
               </div>
               <span className="text-xs text-muted-foreground uppercase tracking-widest">Legal</span>
             </div>
@@ -87,12 +92,20 @@ export default function PrivacyPolicy() {
               Version {VERSION} · Effective date: {EFFECTIVE_DATE}
             </p>
 
-            <p className="text-muted-foreground text-sm leading-relaxed mb-10">
+            <p className="text-muted-foreground text-sm leading-relaxed mb-6">
               TitanOS (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is committed to protecting your privacy.
               This Privacy Policy explains how we collect, use, disclose, and safeguard your
-              information when you use our field service management platform. See also our{" "}
+              information when you use our field-service and driver operating system. See also our{" "}
               <Link to="/terms" className="text-primary underline underline-offset-2">
                 Terms of Service
+              </Link>
+              .
+            </p>
+
+            <p className="mb-10 text-sm text-muted-foreground">
+              Need to delete your account?{" "}
+              <Link to="/delete-account" className="text-primary underline underline-offset-2">
+                Open the TitanOS account-deletion page
               </Link>
               .
             </p>

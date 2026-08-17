@@ -45,8 +45,8 @@ jobs:
 
       - name: Verify release metadata
         run: |
-          grep -q 'versionCode 34' android/app/build.gradle
-          grep -q 'versionName "2.0.1"' android/app/build.gradle
+          grep -q 'versionCode 35' android/app/build.gradle
+          grep -q 'versionName "2.0.2"' android/app/build.gradle
           grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
 
       - name: Restore existing Play upload key when configured
@@ -88,14 +88,14 @@ jobs:
             echo "AAB_SIGNED=false" | tee -a aab-build-info.txt
           fi
           echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED" | tee -a aab-build-info.txt
-          echo "VERSION_NAME=2.0.1" | tee -a aab-build-info.txt
-          echo "VERSION_CODE=34" | tee -a aab-build-info.txt
+          echo "VERSION_NAME=2.0.2" | tee -a aab-build-info.txt
+          echo "VERSION_CODE=35" | tee -a aab-build-info.txt
           echo "APPLICATION_ID=com.titanos.myapp" | tee -a aab-build-info.txt
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TitanOS-2.0.1-code34-AAB
+          name: TitanOS-2.0.2-code35-AAB
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             aab-sha256.txt

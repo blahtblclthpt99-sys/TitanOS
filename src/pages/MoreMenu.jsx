@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router";
-import { BriefcaseBusiness, ChevronRight, Sparkles } from "lucide-react";
+import { BriefcaseBusiness, ChevronRight, Sparkles, Trash2 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import ThemeToggle from "@/components/brand/ThemeToggle";
@@ -40,6 +40,22 @@ export default function MoreMenu() {
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Use your skills, certifications, location and preferences to find Titan jobs and approved outside opportunities.
+          </p>
+        </div>
+        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
+
+      <Link
+        to="/delete-account"
+        className="titan-surface titan-surface-interactive mb-6 flex min-h-[72px] items-center gap-4 border-red-500/15 p-4 focus-ring"
+      >
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
+          <Trash2 className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">Delete account & data</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Submit a verified TitanOS account-deletion request and review data-retention details.
           </p>
         </div>
         <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />

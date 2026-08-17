@@ -72,7 +72,7 @@ alter table public.user_blocks enable row level security;
 
 revoke all on public.user_blocks from anon;
 revoke all on public.user_blocks from authenticated;
-grant select, insert, delete on public.user_blocks to authenticated;
+grant select, insert, update, delete on public.user_blocks to authenticated;
 grant all on public.user_blocks to service_role;
 
 drop policy if exists user_blocks_select_own on public.user_blocks;
@@ -83,6 +83,12 @@ create policy user_blocks_select_own on public.user_blocks
 drop policy if exists user_blocks_insert_own on public.user_blocks;
 create policy user_blocks_insert_own on public.user_blocks
   for insert to authenticated
+  with check (blocker_id = auth.uid() and blocker_id <> blocked_id);
+
+drop policy if exists user_blocks_update_own on public.user_blocks;
+create policy user_blocks_update_own on public.user_blocks
+  for update to authenticated
+  using (blocker_id = auth.uid())
   with check (blocker_id = auth.uid() and blocker_id <> blocked_id);
 
 drop policy if exists user_blocks_delete_own on public.user_blocks;

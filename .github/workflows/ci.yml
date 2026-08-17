@@ -49,10 +49,12 @@ jobs:
       - name: Google Play account deletion policy boundary
         run: node --test scripts/account-deletion-policy.test.mjs
 
+      - name: Google Play UGC safety policy boundary
+        run: node --test scripts/play-ugc-safety-policy.test.mjs
+
       - name: Production build
         run: npm run build
         env:
-          # Public placeholders so Vite can compile without real secrets
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
           VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app

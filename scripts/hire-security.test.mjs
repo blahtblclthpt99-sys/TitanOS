@@ -12,6 +12,7 @@ import {
   scoreJobMatch,
 } from "../src/lib/jobMatch.js";
 import { filterByRadius, haversineMiles } from "../src/lib/jobMatchRadius.js";
+import { rankPublishedWorkerMatches, scoreWorkerMatch } from "../src/lib/workerMatch.js";
 
 function visibleHireMessages(rows, userId, hireJobId) {
   return (rows || []).filter(
@@ -137,6 +138,64 @@ describe("skills-driven job matching safety", () => {
   });
 });
 
+describe("employer-side published worker matching", () => {
+  const job = {
+    title: "Box truck delivery driver",
+    category: "Delivery",
+    city: "Oklahoma City",
+    state: "OK",
+    required_skills: ["delivery", "box truck"],
+    required_certifications: ["dot medical card"],
+    minimum_years_experience: 3,
+  };
+  const strong = {
+    id: "strong",
+    userId: "worker-strong",
+    published: true,
+    name: "Strong Worker",
+    city: "Oklahoma City, OK",
+    skills: ["delivery", "box truck", "forklift"],
+    certifications: ["dot medical card"],
+    yearsExperience: 5,
+    availability: "available",
+    rating: 4.9,
+  };
+
+  it("ranks a strong published candidate with explainable reasons", () => {
+    const match = scoreWorkerMatch(job, strong);
+    assert.ok(match.score >= 85);
+    assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
+    assert.ok(match.reasons.includes("Meets experience requirement"));
+  });
+
+  it("hard-filters candidates missing a required credential", () => {
+    const rows = rankPublishedWorkerMatches(job, [{ ...strong, id: "missing", certifications: [] }]);
+    assert.equal(rows.length, 0);
+  });
+
+  it("never includes unpublished profiles or the job owner's own profile", () => {
+    const rows = rankPublishedWorkerMatches(
+      job,
+      [strong, { ...strong, id: "hidden", userId: "hidden-user", published: false }, { ...strong, id: "owner", userId: "owner" }],
+      { ownerUserId: "owner" }
+    );
+    assert.deepEqual(rows.map((row) => row.id), ["strong"]);
+  });
+
+  it("keeps lower experience visible as an explainable ranking factor instead of a hidden hard filter", () => {
+    const rows = rankPublishedWorkerMatches(job, [{ ...strong, id: "junior", yearsExperience: 1 }]);
+    assert.equal(rows.length, 1);
+    assert.ok(rows[0].match.blockers.some((reason) => /3\+ years/.test(reason)));
+  });
+
+  it("employer API reads published profiles and does not query private worker preferences", () => {
+    const source = fs.readFileSync(new URL("../src/lib/employerWorkerMatchApi.js", import.meta.url), "utf8");
+    assert.match(source, /listPublishedDrivers/);
+    assert.match(source, /Only the job owner can view ranked worker matches/);
+    assert.doesNotMatch(source, /job_match_preferences|privacy_prefs|search_lat|search_lng/);
+  });
+});
+
 describe("job match radius enforcement", () => {
   const okc = { lat: 35.4676, lng: -97.5164, work_radius_miles: 50 };
   it("computes plausible Haversine distance", () => {
@@ -216,6 +275,8 @@ describe("job match server trust boundaries", () => {
 describe("job match discovery wiring", () => {
   const nav = fs.readFileSync(new URL("../src/lib/nav-items.js", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../src/pages/JobMatches.jsx", import.meta.url), "utf8");
+  const stack = fs.readFileSync(new URL("../src/components/layout/TabStack.jsx", import.meta.url), "utf8");
+  const post = fs.readFileSync(new URL("../src/pages/MatchReadyJobPost.jsx", import.meta.url), "utf8");
 
   it("surfaces Job Matches as a live destination and match-ready posting as quick create", () => {
     assert.match(nav, /label: "Job Matches", path: "\/hire\/matches", group: "live"/);
@@ -233,5 +294,10 @@ describe("job match discovery wiring", () => {
     assert.match(page, /applied: matches\.filter\(\(job\) => job\.interaction_state === "applied"\)/);
     assert.match(page, /Opportunity inbox/);
     assert.match(page, /Ignored matches stay hidden/);
+  });
+
+  it("routes match-ready employers directly into owner-scoped candidate ranking", () => {
+    assert.match(stack, /"\/hire\/candidates": WorkerMatches/);
+    assert.match(post, /navigate\(`\/hire\/candidates\?job=\$\{encodeURIComponent\(job\.id\)\}`\)/);
   });
 });

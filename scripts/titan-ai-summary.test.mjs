@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerFromSummary, buildBusinessSummary } from "../src/lib/ai-business-summary.js";
 import { buildPersonalizedInsights, getSearchAssistance } from "../src/lib/aiInsights.js";
+import { defaultPrivacyPrefs, PRIVACY_OPTIONS, searchSettings } from "../src/lib/settingsCatalog.js";
 
 describe("Titan AI summary signals", () => {
   const summary = buildBusinessSummary({
@@ -45,8 +46,18 @@ describe("Titan AI summary signals", () => {
 });
 
 describe("Titan opportunity pulse", () => {
-  it("surfaces Job Matches on an empty workday without fabricating a match count", () => {
+  it("keeps proactive Job Matches off until the user explicitly opts in", () => {
     const insights = buildPersonalizedInsights({ todayJobs: [] }, { full_name: "Ada Lovelace" });
+    assert.equal(insights.recommendations.some((item) => item.path === "/hire/matches"), false);
+    assert.equal(insights.suggestedActions.some((item) => item.path === "/hire/matches"), false);
+    assert.ok(insights.recommendations.some((item) => item.path === "/leads"));
+  });
+
+  it("surfaces Job Matches after opportunity guidance opt-in without fabricating a match count", () => {
+    const insights = buildPersonalizedInsights(
+      { todayJobs: [] },
+      { full_name: "Ada Lovelace", privacy_prefs: { opportunity_guidance: true } }
+    );
     const opportunity = insights.recommendations.find((item) => item.path === "/hire/matches");
     assert.ok(opportunity);
     assert.match(opportunity.title, /Find work that fits you/i);
@@ -55,7 +66,23 @@ describe("Titan opportunity pulse", () => {
     assert.ok(insights.suggestedActions.some((item) => item.path === "/hire/matches"));
   });
 
-  it("includes Job Matches in job-related search guidance", () => {
+  it("does not treat unrelated privacy preferences as opportunity consent", () => {
+    const insights = buildPersonalizedInsights(
+      { todayJobs: [] },
+      { full_name: "Ada Lovelace", privacy_prefs: { product_analytics: true, show_in_community: true } }
+    );
+    assert.equal(insights.recommendations.some((item) => item.path === "/hire/matches"), false);
+  });
+
+  it("defines opportunity guidance as an explicit privacy opt-in that defaults off", () => {
+    const option = PRIVACY_OPTIONS.find((item) => item.key === "opportunity_guidance");
+    assert.ok(option);
+    assert.equal(option.default, false);
+    assert.equal(defaultPrivacyPrefs().privacy_prefs.opportunity_guidance, false);
+    assert.ok(searchSettings("opportunity guidance").options.some((item) => item.id === "settings-privacy-opportunity_guidance"));
+  });
+
+  it("includes Job Matches in explicit job-related search guidance", () => {
     const assistance = getSearchAssistance("jobs");
     assert.match(assistance.tip, /Job Matches/);
   });

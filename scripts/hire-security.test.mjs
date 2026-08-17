@@ -212,3 +212,26 @@ describe("job match server trust boundaries", () => {
     assert.match(endpointV2, /nativeSavedIds/);
   });
 });
+
+describe("job match discovery wiring", () => {
+  const nav = fs.readFileSync(new URL("../src/lib/nav-items.js", import.meta.url), "utf8");
+  const page = fs.readFileSync(new URL("../src/pages/JobMatches.jsx", import.meta.url), "utf8");
+
+  it("surfaces Job Matches as a live destination and match-ready posting as quick create", () => {
+    assert.match(nav, /label: "Job Matches", path: "\/hire\/matches", group: "live"/);
+    assert.match(nav, /label: "Match-ready job", path: "\/hire\/post-match-ready"/);
+    assert.match(nav, /paths: \[[^\]]*"\/hire\/matches"[^\]]*\]/);
+  });
+
+  it("keeps nested Hire pages grouped under Hire Workers", () => {
+    assert.match(nav, /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Hire Workers", path: "\/hire" \}/);
+  });
+
+  it("provides all, saved, and applied opportunity inbox views", () => {
+    assert.match(page, /const \[view, setView\] = useState\("all"\)/);
+    assert.match(page, /saved: matches\.filter\(\(job\) => job\.interaction_state === "saved"\)/);
+    assert.match(page, /applied: matches\.filter\(\(job\) => job\.interaction_state === "applied"\)/);
+    assert.match(page, /Opportunity inbox/);
+    assert.match(page, /Ignored matches stay hidden/);
+  });
+});

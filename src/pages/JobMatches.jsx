@@ -94,6 +94,7 @@ export default function JobMatches() {
   const [saving, setSaving] = useState(false);
   const [actionBusy, setActionBusy] = useState(null);
   const [matches, setMatches] = useState([]);
+  const [view, setView] = useState("all");
   const [status, setStatus] = useState({ needsProfile: false, needsSkills: false, external: {} });
   const [form, setForm] = useState({
     skills: "",
@@ -142,6 +143,12 @@ export default function JobMatches() {
 
   const hasQualifications = useMemo(() => Boolean(csv(form.skills).length || csv(form.interests).length), [form.skills, form.interests]);
   const hasPreciseOrigin = form.searchLat != null && form.searchLng != null;
+  const matchCounts = useMemo(() => ({
+    all: matches.length,
+    saved: matches.filter((job) => job.interaction_state === "saved").length,
+    applied: matches.filter((job) => job.interaction_state === "applied").length,
+  }), [matches]);
+  const visibleMatches = useMemo(() => view === "all" ? matches : matches.filter((job) => job.interaction_state === view), [matches, view]);
 
   const save = async (event) => {
     event.preventDefault();
@@ -191,6 +198,7 @@ export default function JobMatches() {
       if (action === "ignore") {
         await setMyJobMatchInteraction(user.id, job, "ignored");
         setMatches((rows) => rows.filter((row) => row.id !== job.id));
+        toast({ title: "Match hidden", description: "Titan will keep this listing out of your current match feed." });
       } else if (action === "save") {
         if (external) {
           if (job.interaction_state === "saved") {
@@ -218,6 +226,11 @@ export default function JobMatches() {
   return (
     <PageShell maxWidth="lg" className="space-y-6">
       <PageHeader eyebrow="Work" title="Matches for you" subtitle="Titan ranks work from your skills first, then can search approved external providers when you allow it." />
+
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline"><Link to="/hire">Hire home</Link></Button>
+        <Button asChild variant="outline"><Link to="/hire/post-match-ready">Post a match-ready job</Link></Button>
+      </div>
 
       <section className="titan-surface p-5" aria-labelledby="match-profile-heading">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -265,8 +278,17 @@ export default function JobMatches() {
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (
         <section aria-labelledby="matches-heading">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Best matches</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : "Location currently uses city/state fallback."} External listings always show their provider.</p></div><span className="text-xs text-muted-foreground">{matches.length} result{matches.length === 1 ? "" : "s"}</span></div>
-          <div className="grid gap-4 md:grid-cols-2">{matches.map((job) => <MatchCard key={job.id} job={job} onAction={actOnMatch} busy={actionBusy === job.id} />)}</div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Opportunity inbox</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : "Location currently uses city/state fallback."} Ignored matches stay hidden.</p></div><span className="text-xs text-muted-foreground">{visibleMatches.length} shown</span></div>
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter job matches">
+            {[['all', 'All'], ['saved', 'Saved'], ['applied', 'Applied']].map(([id, label]) => (
+              <Button key={id} type="button" size="sm" variant={view === id ? "default" : "outline"} onClick={() => setView(id)}>{label} ({matchCounts[id]})</Button>
+            ))}
+          </div>
+          {visibleMatches.length ? (
+            <div className="grid gap-4 md:grid-cols-2">{visibleMatches.map((job) => <MatchCard key={job.id} job={job} onAction={actOnMatch} busy={actionBusy === job.id} />)}</div>
+          ) : (
+            <EmptyState icon={BriefcaseBusiness} title={`No ${view} matches in this feed`} description={view === "saved" ? "Save a current match and it will appear here." : "Applied matches from Titan and supported external listings will appear here while they remain in your active match feed."} />
+          )}
         </section>
       ) : (
         <EmptyState icon={BriefcaseBusiness} title="No strong matches yet" description={status.external?.reason === "provider_not_configured" && form.externalConsent ? "Titan searched its own board. External job search is not connected yet, so no outside listings were claimed." : "Titan did not find a strong current match. Keep your skills and availability up to date and check again."} />

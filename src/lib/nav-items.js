@@ -60,6 +60,7 @@ export const APP_NAV_ITEMS = [
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "live" },
   { icon: Store, label: "Marketplace", path: "/marketplace", group: "live" },
   { icon: UserPlus, label: "Hire Workers", path: "/hire", group: "live" },
+  { icon: Sparkles, label: "Job Matches", path: "/hire/matches", group: "live" },
   { icon: CalendarCheck, label: "Booking", path: "/booking", group: "live" },
 
   // —— History — records
@@ -164,7 +165,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Live",
     description: "What is happening now",
-    paths: ["/driver", "/", "/jobs", "/schedule", "/marketplace", "/hire", "/booking"],
+    paths: ["/driver", "/", "/jobs", "/schedule", "/marketplace", "/hire", "/hire/matches", "/booking"],
   },
   {
     title: "History",
@@ -225,6 +226,7 @@ export const QUICK_CREATE_ACTIONS = [
   { label: "Invoice", path: "/invoices?new=1", icon: Receipt },
   { label: "Customer", path: "/customers?new=1", icon: Users },
   { label: "Post a haul", path: "/hire?new=1", icon: UserPlus },
+  { label: "Match-ready job", path: "/hire/post-match-ready", icon: Sparkles },
 ];
 
 /** Map path → OS domain id for chrome / breadcrumbs. */
@@ -287,6 +289,7 @@ export function resolvePageTitle(pathname = "/") {
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
   if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
+  if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
   if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerFromSummary, buildBusinessSummary } from "../src/lib/ai-business-summary.js";
 import { buildPersonalizedInsights, getSearchAssistance } from "../src/lib/aiInsights.js";
+import { defaultPrivacyPrefs, PRIVACY_OPTIONS, searchSettings } from "../src/lib/settingsCatalog.js";
 
 describe("Titan AI summary signals", () => {
   const summary = buildBusinessSummary({
@@ -71,6 +72,14 @@ describe("Titan opportunity pulse", () => {
       { full_name: "Ada Lovelace", privacy_prefs: { product_analytics: true, show_in_community: true } }
     );
     assert.equal(insights.recommendations.some((item) => item.path === "/hire/matches"), false);
+  });
+
+  it("defines opportunity guidance as an explicit privacy opt-in that defaults off", () => {
+    const option = PRIVACY_OPTIONS.find((item) => item.key === "opportunity_guidance");
+    assert.ok(option);
+    assert.equal(option.default, false);
+    assert.equal(defaultPrivacyPrefs().privacy_prefs.opportunity_guidance, false);
+    assert.ok(searchSettings("opportunity guidance").options.some((item) => item.id === "settings-privacy-opportunity_guidance"));
   });
 
   it("includes Job Matches in explicit job-related search guidance", () => {

@@ -15,7 +15,6 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
 const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
-/** Home always warm + last N tab visits (including active). */
 const TAB_LRU_SIZE = 3;
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -57,6 +56,7 @@ const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
+const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -108,6 +108,7 @@ const NON_TAB_ROUTES = {
   "/hire/matches": JobMatches,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
+  "/hire/find-workers": ExistingPostWorkerMatches,
   "/community": Community,
   "/notifications": Notifications,
   "/job-estimator": JobEstimator,
@@ -146,56 +147,28 @@ function NonTabPage() {
   const pathname = normalizeAppPath(rawPath);
 
   if (pathname.startsWith("/share/report/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <ShareReport />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><ShareReport /></Suspense>;
   }
   if (pathname.startsWith("/customers/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <CustomerDetail />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><CustomerDetail /></Suspense>;
   }
   if (pathname.startsWith("/invoices/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <InvoiceDetail />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><InvoiceDetail /></Suspense>;
   }
   if (pathname.startsWith("/driver/trip/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverTripDetail />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><DriverTripDetail /></Suspense>;
   }
   if (pathname.startsWith("/driver/") && pathname !== "/driver/") {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverProfile />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><DriverProfile /></Suspense>;
   }
 
   const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
   const Page = NON_TAB_ROUTES[routeKey];
   if (!Page) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <PageNotFound />
-      </Suspense>
-    );
+    return <Suspense fallback={<Spinner />}><PageNotFound /></Suspense>;
   }
 
-  return (
-    <Suspense fallback={<Spinner />}>
-      <Page />
-    </Suspense>
-  );
+  return <Suspense fallback={<Spinner />}><Page /></Suspense>;
 }
 
 export default function TabStack() {
@@ -208,10 +181,7 @@ export default function TabStack() {
   const activeTab = isTab ? pathname : null;
 
   if (activeTab) {
-    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(
-      0,
-      TAB_LRU_SIZE
-    );
+    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
@@ -222,20 +192,11 @@ export default function TabStack() {
         const Page = TAB_COMPONENTS[path];
         const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
-
         if (!isMounted) return null;
-
         return (
-          <div
-            key={path}
-            style={{ display: isActive ? "block" : "none" }}
-            aria-hidden={!isActive}
-            className={isActive && !reduceMotion ? "page-enter" : undefined}
-          >
+          <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive} className={isActive && !reduceMotion ? "page-enter" : undefined}>
             <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
-              <Suspense fallback={<Spinner label="Loading" />}>
-                <Page isActive={isActive} />
-              </Suspense>
+              <Suspense fallback={<Spinner label="Loading" />}><Page isActive={isActive} /></Suspense>
             </ErrorBoundary>
           </div>
         );

@@ -11,14 +11,14 @@ import FeatureHonestyBanner from "@/components/shared/FeatureHonestyBanner";
 import ComingSoonState from "@/components/shared/ComingSoonState";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
+import { getTrustState } from "@/lib/trustSafetyApi";
 import {
   REPORT_REASONS,
   blockUser,
-  getTrustState,
   listBlockedUsers,
   submitUserReport,
   unblockUser,
-} from "@/lib/trustSafetyApi";
+} from "@/lib/ugcSafetyApi";
 
 function Card({ title, icon: Icon, children }) {
   return (
@@ -40,6 +40,8 @@ export default function TrustSafety() {
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState("");
   const [blocks, setBlocks] = useState([]);
+  const [blockId, setBlockId] = useState("");
+  const [blockName, setBlockName] = useState("");
   const [reportForm, setReportForm] = useState({
     targetId: "",
     targetName: "",
@@ -53,7 +55,7 @@ export default function TrustSafety() {
     setLoadError(false);
     try {
       await getTrustState(user);
-      setBlocks(listBlockedUsers(user.id));
+      setBlocks(await listBlockedUsers(user.id));
     } catch {
       setLoadError(true);
       toast({ variant: "destructive", title: "Couldn't load Trust & Safety" });
@@ -77,9 +79,7 @@ export default function TrustSafety() {
     }
   };
 
-  if (!authChecked || isLoadingAuth) {
-    return <PageLoader variant="list" label="Loading Trust & Safety" />;
-  }
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading Trust & Safety" />;
 
   if (!user?.id) {
     return (
@@ -89,174 +89,150 @@ export default function TrustSafety() {
           title="Sign in for Trust & Safety"
           description="Report and block tools require an account."
           actionLabel="Sign in"
-          onAction={() => {
-            window.location.href = "/login";
-          }}
+          onAction={() => { window.location.href = "/login"; }}
         />
       </div>
     );
   }
 
-  if (loading) {
-    return <PageLoader variant="list" label="Loading Trust & Safety" />;
-  }
-
-  if (loadError) {
-    return <ErrorState title="Couldn't load Trust & Safety" onRetry={load} />;
-  }
+  if (loading) return <PageLoader variant="list" label="Loading Trust & Safety" />;
+  if (loadError) return <ErrorState title="Couldn't load Trust & Safety" onRetry={load} />;
 
   return (
     <div className="relative page-pad max-w-3xl mx-auto pb-32 space-y-4">
-      <div className="relative space-y-4">
-        <PageHeader
-          eyebrow="Account"
-          title="Trust & Safety"
-          subtitle="Identity verification and 2FA providers are not live yet. Reporting and blocking work on this account."
-        />
+      <PageHeader
+        eyebrow="Account"
+        title="Trust & Safety"
+        subtitle="Report harmful behavior and control who can interact with you."
+      />
 
-        <FeatureHonestyBanner>
-          Phone SMS, authenticator 2FA, document review, and fraud scoring are not production-ready. Those
-          controls were removed so nothing looks verified when it isn&apos;t. Report and block lists save for
-          your account now.
-        </FeatureHonestyBanner>
+      <FeatureHonestyBanner>
+        Reporting and blocking are live and sync with your TitanOS account. Identity verification, SMS phone
+        checks, authenticator 2FA, and document review still require production providers before they can be
+        offered as verified controls.
+      </FeatureHonestyBanner>
 
-        <ComingSoonState
-          title="Identity verification coming soon"
-          description="Email confirmation, SMS phone checks, ID/insurance review, and login 2FA need real providers before they can be offered as live controls."
-          primaryTo="/settings"
-          primaryLabel="Open Settings"
-        />
+      <ComingSoonState
+        title="Identity verification coming soon"
+        description="Email confirmation, SMS phone checks, ID/insurance review, and login 2FA need real providers before they can be offered as live controls."
+        primaryTo="/settings"
+        primaryLabel="Open Settings"
+      />
 
-        <Card title="Report a user" icon={Flag}>
-          <p className="text-xs text-muted-foreground">
-            Submit a report for Moderation review. Include the user ID when you have it.
-          </p>
-          <div className="grid sm:grid-cols-2 gap-2">
-            <Input
-              value={reportForm.targetName}
-              onChange={(e) => setReportForm((f) => ({ ...f, targetName: e.target.value }))}
-              placeholder="User display name"
-              className="rounded-xl bg-muted"
-              aria-label="User display name"
-            />
-            <Input
-              value={reportForm.targetId}
-              onChange={(e) => setReportForm((f) => ({ ...f, targetId: e.target.value }))}
-              placeholder="User ID"
-              className="rounded-xl bg-muted"
-              aria-label="User ID"
-            />
-          </div>
-          <select
-            value={reportForm.reason}
-            onChange={(e) => setReportForm((f) => ({ ...f, reason: e.target.value }))}
-            className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm"
-            aria-label="Report reason"
-          >
-            {REPORT_REASONS.map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
-          <Textarea
-            rows={3}
-            value={reportForm.details}
-            onChange={(e) => setReportForm((f) => ({ ...f, details: e.target.value }))}
-            placeholder="Details"
+      <Card title="Report a user" icon={Flag}>
+        <p className="text-xs text-muted-foreground">
+          Reports are sent to TitanOS moderation. Include the user ID and enough detail to review the issue.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <Input
+            value={reportForm.targetName}
+            onChange={(e) => setReportForm((f) => ({ ...f, targetName: e.target.value }))}
+            placeholder="User display name"
             className="rounded-xl bg-muted"
-            aria-label="Report details"
+            aria-label="User display name"
+          />
+          <Input
+            value={reportForm.targetId}
+            onChange={(e) => setReportForm((f) => ({ ...f, targetId: e.target.value }))}
+            placeholder="User ID"
+            className="rounded-xl bg-muted"
+            aria-label="User ID"
+          />
+        </div>
+        <select
+          value={reportForm.reason}
+          onChange={(e) => setReportForm((f) => ({ ...f, reason: e.target.value }))}
+          className="w-full h-10 px-3 rounded-xl bg-muted border border-border text-sm"
+          aria-label="Report reason"
+        >
+          {REPORT_REASONS.map((reason) => <option key={reason}>{reason}</option>)}
+        </select>
+        <Textarea
+          rows={3}
+          value={reportForm.details}
+          onChange={(e) => setReportForm((f) => ({ ...f, details: e.target.value }))}
+          placeholder="Details"
+          className="rounded-xl bg-muted"
+          aria-label="Report details"
+        />
+        <Button
+          className="rounded-xl min-h-[44px]"
+          disabled={busy === "report" || !reportForm.targetId.trim()}
+          onClick={() => withBusy("report", async () => {
+            await submitUserReport(user, reportForm);
+            setReportForm({ targetId: "", targetName: "", reason: REPORT_REASONS[0], details: "" });
+            toast({ title: "Report submitted for moderation" });
+          })}
+        >
+          Submit report
+        </Button>
+      </Card>
+
+      <Card title="Blocked users" icon={Ban}>
+        <p className="text-xs text-muted-foreground mb-2">
+          Blocking is account-wide. New direct messages are rejected in either direction until you unblock the user.
+        </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <Input
+            value={blockId}
+            onChange={(e) => setBlockId(e.target.value)}
+            placeholder="User ID to block"
+            className="rounded-xl bg-muted max-w-xs"
+            aria-label="User ID to block"
+          />
+          <Input
+            value={blockName}
+            onChange={(e) => setBlockName(e.target.value)}
+            placeholder="Name (optional)"
+            className="rounded-xl bg-muted max-w-[160px]"
+            aria-label="Display name"
           />
           <Button
+            variant="outline"
             className="rounded-xl min-h-[44px]"
-            disabled={busy === "report" || !reportForm.targetId.trim()}
-            onClick={() =>
-              withBusy("report", async () => {
-                await submitUserReport(user, reportForm);
-                setReportForm({
-                  targetId: "",
-                  targetName: "",
-                  reason: REPORT_REASONS[0],
-                  details: "",
-                });
-                toast({ title: "Report submitted" });
-              })
-            }
+            disabled={busy === "block" || !blockId.trim()}
+            onClick={() => withBusy("block", async () => {
+              await blockUser(user.id, blockId.trim(), blockName.trim());
+              setBlockId("");
+              setBlockName("");
+              setBlocks(await listBlockedUsers(user.id));
+              toast({ title: "User blocked" });
+            })}
           >
-            Submit report
+            Block user
           </Button>
-        </Card>
-
-        <Card title="Blocked users" icon={Ban}>
-          <p className="text-xs text-muted-foreground mb-2">
-            Blocked users won&apos;t appear in your messaging recommendations on this device.
-          </p>
-          <div className="flex flex-wrap gap-2 mb-3">
-            <Input
-              id="block-id"
-              placeholder="User ID to block"
-              className="rounded-xl bg-muted max-w-xs"
-              aria-label="User ID to block"
-            />
-            <Input
-              id="block-name"
-              placeholder="Name (optional)"
-              className="rounded-xl bg-muted max-w-[160px]"
-              aria-label="Display name"
-            />
-            <Button
-              variant="outline"
-              className="rounded-xl min-h-[44px]"
-              onClick={async () => {
-                const idEl = document.getElementById("block-id");
-                const nameEl = document.getElementById("block-name");
-                const tid = idEl?.value?.trim();
-                if (!tid) return toast({ variant: "destructive", title: "Enter a user ID" });
-                await blockUser(user.id, tid, nameEl?.value || "");
-                if (idEl) idEl.value = "";
-                if (nameEl) nameEl.value = "";
-                setBlocks(listBlockedUsers(user.id));
-                toast({ title: "User blocked" });
-              }}
-            >
-              Block user
-            </Button>
-          </div>
-          {blocks.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No blocked users.</p>
-          ) : (
-            <ul className="space-y-2">
-              {blocks.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm"
-                >
-                  <span>
-                    {b.target_name || "User"}{" "}
-                    <span className="text-xs text-muted-foreground font-mono">{b.target_id}</span>
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-xl min-h-[40px]"
-                    onClick={async () => {
-                      await unblockUser(user.id, b.target_id);
-                      setBlocks(listBlockedUsers(user.id));
-                    }}
-                  >
-                    Unblock
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <div className="rounded-2xl border border-border bg-muted/30 p-4 flex gap-3 text-sm text-muted-foreground">
-          <Shield className="w-5 h-5 text-titan-cyan shrink-0" aria-hidden="true" />
-          <p>
-            When verification providers go live, this page will show real status and enforce 2FA at sign-in.
-            Until then, only report and block tools are interactive.
-          </p>
         </div>
+        {blocks.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No blocked users.</p>
+        ) : (
+          <ul className="space-y-2">
+            {blocks.map((block) => (
+              <li key={block.id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm">
+                <span>
+                  {block.target_name || "User"}{" "}
+                  <span className="text-xs text-muted-foreground font-mono">{block.target_id}</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-xl min-h-[40px]"
+                  disabled={busy === `unblock:${block.target_id}`}
+                  onClick={() => withBusy(`unblock:${block.target_id}`, async () => {
+                    await unblockUser(user.id, block.target_id);
+                    setBlocks(await listBlockedUsers(user.id));
+                  })}
+                >
+                  Unblock
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <div className="rounded-2xl border border-border bg-muted/30 p-4 flex gap-3 text-sm text-muted-foreground">
+        <Shield className="w-5 h-5 text-titan-cyan shrink-0" aria-hidden="true" />
+        <p>Reports are retained for moderation and blocks are enforced server-side for direct-message creation.</p>
       </div>
     </div>
   );

@@ -40,6 +40,9 @@ jobs:
       - name: Existing-post worker matching regression
         run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/hire-existing-post-matches.test.mjs
 
+      - name: Free job access contract
+        run: node --test scripts/free-job-access.test.mjs
+
       - name: Production build
         run: npm run build
         env:

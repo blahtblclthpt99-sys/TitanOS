@@ -127,8 +127,8 @@ export default async function handler(req, res) {
     const userId = userData.user.id;
     const body = readJson(req);
     const [profileResult, prefsResult, jobsResult, interactionsResult, savesResult, appsResult] = await Promise.all([
-      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,lat,lng,availability").eq("user_id", userId).maybeSingle(),
-      admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent").eq("user_id", userId).maybeSingle(),
+      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
+      admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,search_lat,search_lng").eq("user_id", userId).maybeSingle(),
       admin.from("hire_jobs").select("id,created_at,created_by_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
       admin.from("job_match_interactions").select("source,source_name,source_job_id,state").eq("user_id", userId),
       admin.from("hire_saves").select("hire_job_id").eq("user_id", userId),
@@ -140,9 +140,10 @@ export default async function handler(req, res) {
 
     const profile = profileResult.data;
     if (!profile) return res.status(200).json({ data: { matches: [], needsProfile: true, needsSkills: true, external: { requested: false, enabled: false, reason: "profile_required" } } });
-    const worker = buildWorkerMatchProfile({ ...profile, ...(prefsResult.data || {}) });
-    worker.lat = profile.lat == null ? null : Number(profile.lat);
-    worker.lng = profile.lng == null ? null : Number(profile.lng);
+    const privatePrefs = prefsResult.data || {};
+    const worker = buildWorkerMatchProfile({ ...profile, ...privatePrefs });
+    worker.lat = privatePrefs.search_lat == null ? null : Number(privatePrefs.search_lat);
+    worker.lng = privatePrefs.search_lng == null ? null : Number(privatePrefs.search_lng);
     if (!profileReady(worker)) return res.status(200).json({ data: { matches: [], needsProfile: false, needsSkills: true, external: { requested: false, enabled: false, reason: "skills_required" } } });
 
     const nativeJobs = jobsResult.data || [];

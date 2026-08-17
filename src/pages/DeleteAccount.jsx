@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
+const SUPPORT_EMAIL = "titanosmail@protonmail.com";
+
 export default function DeleteAccount() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +77,7 @@ export default function DeleteAccount() {
                 <div className="flex flex-wrap gap-3">
                   <Button asChild><Link to="/login">Sign in to request deletion</Link></Button>
                   <Button asChild variant="outline">
-                    <a href="mailto:privacy@titanos.app?subject=TitanOS%20Account%20Deletion%20Request">Email privacy support</a>
+                    <a href={`mailto:${SUPPORT_EMAIL}?subject=TitanOS%20Account%20Deletion%20Request`}>Email privacy support</a>
                   </Button>
                 </div>
               </div>
@@ -84,7 +86,7 @@ export default function DeleteAccount() {
 
           <div className="mt-8 space-y-3 text-sm text-muted-foreground">
             <p><strong className="text-foreground">What deletion covers:</strong> account profile and personal data associated with your TitanOS account, subject to legitimate retention requirements.</p>
-            <p><strong className="text-foreground">Need help?</strong> Email privacy@titanos.app and include the email address associated with your TitanOS account.</p>
+            <p><strong className="text-foreground">Need help?</strong> Email {SUPPORT_EMAIL} and include the email address associated with your TitanOS account.</p>
             <p><Link to="/privacy-policy" className="text-primary underline underline-offset-2">Read the TitanOS Privacy Policy</Link></p>
           </div>
         </div>

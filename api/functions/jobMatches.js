@@ -116,14 +116,16 @@ export default async function handler(req, res) {
     const [profileResult, prefsResult, jobsResult] = await Promise.all([
       admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
       admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent").eq("user_id", userId).maybeSingle(),
-      admin.from("hire_jobs").select("id,created_at,title,description,category,city,state,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").order("created_at", { ascending: false }).limit(250),
+      admin.from("hire_jobs").select("id,created_at,created_by_id,customer_id,title,description,category,city,state,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").order("created_at", { ascending: false }).limit(250),
     ]);
     if (profileResult.error) throw profileResult.error;
     if (prefsResult.error) throw prefsResult.error;
     if (jobsResult.error) throw jobsResult.error;
 
     const profile = profileResult.data;
-    const jobs = jobsResult.data || [];
+    const jobs = (jobsResult.data || []).filter(
+      (job) => job.created_by_id !== userId && job.customer_id !== userId
+    );
     if (!profile) {
       return res.status(200).json({ data: { matches: [], needsProfile: true, needsSkills: true, external: { requested: false, enabled: false, reason: "profile_required" } } });
     }

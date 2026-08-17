@@ -4,6 +4,13 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import {
+  mergeRankedJobMatches,
+  normalizeExternalJob,
+  rankInternalJobMatches,
+  scoreJobMatch,
+} from "../src/lib/jobMatch.js";
 
 function visibleHireMessages(rows, userId, hireJobId) {
   return (rows || []).filter(
@@ -54,5 +61,130 @@ describe("hire application ACL (mirrors migration 016 intent)", () => {
   });
   it("stranger cannot read", () => {
     assert.equal(canReadApplication(app, { id: "stranger" }, job), false);
+  });
+});
+
+describe("skills-driven job matching safety", () => {
+  const worker = {
+    user_id: "worker-1",
+    skills: ["delivery", "box truck", "forklift"],
+    certifications: ["dot medical card"],
+    years_experience: 4,
+    city: "Oklahoma City",
+    state: "OK",
+    desired_pay_min: 20,
+    desired_pay_type: "hourly",
+    preferred_schedule: ["weekday", "day"],
+    job_interests: ["delivery"],
+  };
+  const native = {
+    id: "native-1",
+    title: "Box truck delivery driver",
+    category: "Delivery",
+    city: "Oklahoma City",
+    state: "OK",
+    budget_min: 22,
+    budget_max: 26,
+    pay_type: "hourly",
+    required_skills: ["delivery", "box truck"],
+    required_certifications: ["dot medical card"],
+    minimum_years_experience: 2,
+    schedule_tags: ["weekday", "day"],
+    status: "open",
+  };
+
+  it("produces an explainable high score for a strong native match", () => {
+    const match = scoreJobMatch(worker, native);
+    assert.ok(match.score >= 90);
+    assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
+  });
+
+  it("treats missing required credentials as a hard eligibility filter", () => {
+    const rows = rankInternalJobMatches([native], { ...worker, certifications: [] });
+    assert.equal(rows.length, 0);
+  });
+
+  it("does not compare incompatible pay periods as raw numbers", () => {
+    const match = scoreJobMatch(worker, { ...native, pay_type: "salary", budget_min: 40000, budget_max: 50000 });
+    assert.equal(match.reasons.includes("Meets pay preference"), false);
+  });
+
+  it("does not return external jobs without explicit consent", () => {
+    const external = normalizeExternalJob({
+      id: "ext-1",
+      title: "Route driver",
+      city: "Oklahoma City",
+      state: "OK",
+      url: "https://jobs.example.test/route-driver",
+      required_skills: ["delivery"],
+      posted_at: "2026-08-16T12:00:00Z",
+    }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [native],
+      external: [external],
+      driverProfile: { ...worker, external_job_search_consent: false },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, "native-1");
+  });
+
+  it("deduplicates an outside copy of an existing native vacancy", () => {
+    const external = normalizeExternalJob({
+      id: "duplicate",
+      title: native.title,
+      city: native.city,
+      state: native.state,
+      url: "https://jobs.example.test/duplicate",
+      posted_at: "2026-08-16T12:00:00Z",
+    }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [native],
+      external: [external],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.filter((row) => row.title === native.title).length, 1);
+  });
+
+  it("rejects insecure external source links", () => {
+    assert.throws(
+      () => normalizeExternalJob({ id: "bad", title: "Bad", url: "http://example.test/job" }, { name: "Example" }),
+      /HTTPS/
+    );
+  });
+});
+
+describe("job match server trust boundaries", () => {
+  const endpoint = fs.readFileSync(new URL("../api/functions/jobMatches.js", import.meta.url), "utf8");
+  const privacyMigration = fs.readFileSync(new URL("../supabase/migrations/20260817004000_private_job_match_preferences.sql", import.meta.url), "utf8");
+
+  it("derives worker identity from the verified auth user and scopes both profile sources to it", () => {
+    assert.match(endpoint, /const userId = userData\.user\.id/);
+    assert.match(endpoint, /driver_profiles[\s\S]*?\.eq\("user_id", userId\)/);
+    assert.match(endpoint, /job_match_preferences[\s\S]*?\.eq\("user_id", userId\)/);
+  });
+
+  it("filters jobs posted by the same authenticated account", () => {
+    assert.match(endpoint, /job\.created_by_id !== userId && job\.customer_id !== userId/);
+  });
+
+  it("uses a fixed HTTPS external-provider host rather than a caller supplied URL", () => {
+    assert.match(endpoint, /https:\/\/api\.adzuna\.com\/v1\/api\/jobs\/us\/search\/1/);
+    assert.doesNotMatch(endpoint, /fetch\(body\.(url|endpoint|provider)/);
+  });
+
+  it("keeps provider credentials server-only", () => {
+    assert.match(endpoint, /process\.env\.ADZUNA_APP_ID/);
+    assert.match(endpoint, /process\.env\.ADZUNA_APP_KEY/);
+    assert.doesNotMatch(endpoint, /VITE_ADZUNA/);
+  });
+
+  it("keeps private matching preferences behind owner-only RLS and removes them from published profiles", () => {
+    assert.match(privacyMigration, /enable row level security/i);
+    assert.match(privacyMigration, /revoke all on public\.job_match_preferences from anon/i);
+    assert.match(privacyMigration, /using \(user_id = auth\.uid\(\) and created_by_id = auth\.uid\(\)\)/i);
+    assert.match(privacyMigration, /drop column if exists external_job_search_consent/i);
+    assert.match(privacyMigration, /drop column if exists desired_pay_min/i);
   });
 });

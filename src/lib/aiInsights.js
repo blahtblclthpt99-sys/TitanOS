@@ -86,17 +86,25 @@ export function buildPersonalizedInsights(data = {}, user = {}) {
     });
   } else {
     recommendations.push({
+      id: "rec-opportunities",
+      priority: 60,
+      title: "Find work that fits you",
+      body: "No jobs today — check profile-based opportunities before broad outreach.",
+      path: "/hire/matches",
+      cta: "Check job matches",
+    });
+    recommendations.push({
       id: "rec-quiet",
-      priority: 40,
-      title: "Fill a quiet day",
-      body: "No jobs today — good time for follow-ups, marketing, or booking page polish.",
+      priority: 35,
+      title: "Work the pipeline",
+      body: "A quiet schedule is also a good time for follow-ups, marketing, or booking-page polish.",
       path: "/leads",
       cta: "Check leads",
     });
     suggestedActions.push({
-      id: "act-create-job",
-      label: "Create a job",
-      path: "/jobs?new=1",
+      id: "act-job-matches",
+      label: "Check job matches",
+      path: "/hire/matches",
       reason: "Empty schedule",
     });
   }
@@ -215,7 +223,7 @@ export function getSearchAssistance(query = "") {
   const autocomplete = getSearchAutocomplete(q);
   let tip = "Try a page name, customer action, or “overdue invoices”.";
   if (/invoice|bill|cash|overdue|pay/.test(q)) tip = "Jump to Invoices or Payments to collect cash faster.";
-  else if (/job|schedule|route|today/.test(q)) tip = "Open Jobs, Schedule, or Route Planner for today's field work.";
+  else if (/job|schedule|route|today/.test(q)) tip = "Open Jobs, Job Matches, Schedule, or Route Planner for field work and new opportunities.";
   else if (/message|chat|inbox/.test(q)) tip = "Messages includes search, receipts, and media sharing.";
   else if (/ai|help|recommend|insight/.test(q)) tip = "Titan AI can summarize your business and suggest next steps.";
   else if (/driver|cdl|truck/.test(q)) tip = "Driver Hub finds CDL, van, and OTR drivers near you.";

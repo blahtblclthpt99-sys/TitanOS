@@ -83,10 +83,11 @@ export default function MatchReadyJobPost() {
       });
       if (getSource(job) === DATA_SOURCE.local) {
         toast({ title: "Job saved on this device", description: "The live Hire board was unavailable, so other users will not see this post yet." });
+        navigate("/hire?tab=posts");
       } else {
-        toast({ title: "Match-ready job posted", description: "Titan can now rank qualified workers against these requirements." });
+        toast({ title: "Match-ready job posted", description: "Titan is ranking qualified published workers now." });
+        navigate(`/hire/candidates?job=${encodeURIComponent(job.id)}`);
       }
-      navigate("/hire?tab=posts");
     } catch (error) {
       toast({ variant: "destructive", title: "Couldn't post job", description: error.message || "Please try again." });
     } finally {

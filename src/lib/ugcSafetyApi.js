@@ -1,4 +1,7 @@
 import { supabase } from "@/api/supabaseClient";
+import { readLocal, writeLocal } from "@/lib/localStore";
+
+const TRUST_PREFIX = "titanos_trust";
 
 function throwIfError(error, fallback) {
   if (!error) return;
@@ -7,6 +10,22 @@ function throwIfError(error, fallback) {
     throw new Error("Messaging is unavailable between these accounts.");
   }
   throw new Error(message);
+}
+
+function cacheBlocks(userId, rows) {
+  if (!userId) return [];
+  const normalized = (rows || []).map((row) => ({
+    id: row.id,
+    target_id: row.blocked_id || row.target_id,
+    target_name: row.blocked_name || row.target_name || "",
+    created_at: row.created_at || new Date().toISOString(),
+  }));
+  writeLocal(TRUST_PREFIX, userId, "blocks", normalized);
+  return normalized;
+}
+
+function cachedBlocks(userId) {
+  return readLocal(TRUST_PREFIX, userId, "blocks", []);
 }
 
 export const REPORT_REASONS = [
@@ -83,11 +102,16 @@ export async function listBlockedUsers(userId) {
     .eq("blocker_id", userId)
     .order("created_at", { ascending: false });
   throwIfError(error, "Couldn't load blocked users");
-  return (data || []).map((row) => ({
-    ...row,
-    target_id: row.blocked_id,
-    target_name: row.blocked_name,
-  }));
+  return cacheBlocks(userId, data || []);
+}
+
+export function listCachedBlockedUsers(userId) {
+  return userId ? cachedBlocks(userId) : [];
+}
+
+export function isBlockedCached(userId, targetId) {
+  if (!userId || !targetId) return false;
+  return cachedBlocks(userId).some((row) => String(row.target_id) === String(targetId));
 }
 
 export async function blockUser(userId, targetId, targetName = "") {
@@ -107,6 +131,9 @@ export async function blockUser(userId, targetId, targetName = "") {
     .select("id,blocker_id,blocked_id,blocked_name,created_at")
     .single();
   throwIfError(error, "Couldn't block user");
+
+  const current = cachedBlocks(userId).filter((row) => String(row.target_id) !== String(targetId));
+  cacheBlocks(userId, [data, ...current]);
   return data;
 }
 
@@ -118,6 +145,12 @@ export async function unblockUser(userId, targetId) {
     .eq("blocker_id", userId)
     .eq("blocked_id", targetId);
   throwIfError(error, "Couldn't unblock user");
+  writeLocal(
+    TRUST_PREFIX,
+    userId,
+    "blocks",
+    cachedBlocks(userId).filter((row) => String(row.target_id) !== String(targetId))
+  );
 }
 
 export async function hasBlockedUser(userId, targetId) {

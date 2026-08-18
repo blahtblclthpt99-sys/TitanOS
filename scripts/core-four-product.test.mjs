@@ -9,6 +9,7 @@ const dashboard = readFileSync(new URL("../src/pages/Dashboard.jsx", import.meta
 const secondMe = readFileSync(new URL("../src/pages/SecondMe.jsx", import.meta.url), "utf8");
 const auto = readFileSync(new URL("../src/pages/Autopilot.jsx", import.meta.url), "utf8");
 const discovery = readFileSync(new URL("../api/functions/leadDiscovery.js", import.meta.url), "utf8");
+const leadsApi = readFileSync(new URL("../src/lib/leadsApi.js", import.meta.url), "utf8");
 
 test("mobile product navigation exposes exactly the four Titan pillars", () => {
   const mobileBlock = nav.match(/export const MOBILE_TAB_ITEMS = \[([\s\S]*?)\];/);
@@ -80,4 +81,10 @@ test("lead discovery is authenticated, bounded, privacy-reduced, and attribution
   assert.match(discovery, /safeHttpUrl/);
   assert.match(discovery, /OpenStreetMap contributors/);
   assert.doesNotMatch(discovery, /sendEmail|sendFollowUp|fetch\([^)]*website/);
+});
+
+test("lead client filtering uses the same ownership column as RLS", () => {
+  assert.match(leadsApi, /Lead\.filter\(\{ created_by_id: id \}/);
+  assert.doesNotMatch(leadsApi, /Lead\.filter\(\{ user_id: id \}/);
+  assert.match(leadsApi, /created_by_id: userId/);
 });

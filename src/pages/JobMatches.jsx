@@ -13,6 +13,8 @@ import { getJobMatches, isExternalJobMatch, jobMatchSourceLabel } from "@/lib/jo
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
 import { clearMyJobMatchInteraction, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
 import { getMyEmploymentProfile, saveMyEmploymentProfile } from "@/lib/employmentProfilesApi";
+import { recordOpportunityResponse } from "@/lib/engagementApi";
+import { DATA_SOURCE, getSource } from "@/lib/dataSource";
 import { applyToHireJob, toggleSaveJob } from "@/lib/hireApi";
 
 function csv(value) {
@@ -236,7 +238,15 @@ export default function JobMatches() {
           setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: saved ? "saved" : null } : row));
         }
       } else if (action === "interest" && !external) {
-        await applyToHireJob(user, job.id, { message: "I'm interested in this employment opportunity.", bid_amount: "" });
+        const application = await applyToHireJob(user, job.id, { message: "I'm interested in this employment opportunity.", bid_amount: "" });
+        if (getSource(application) !== DATA_SOURCE.local && application?.id) {
+          try {
+            await recordOpportunityResponse(application.id, job.id);
+          } catch {
+            // The verified application remains authoritative. Engagement event
+            // recording failure must not undo or misrepresent the application.
+          }
+        }
         setMatches((rows) => rows.map((row) => row.id === job.id ? { ...row, interaction_state: "applied" } : row));
         toast({ title: "Interest sent", description: "The business can now review your Job Profile and respond through Titan." });
       } else if (action === "applied" && external) {

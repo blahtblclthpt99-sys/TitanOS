@@ -32,12 +32,7 @@ export default async function handler(req, res) {
       if (!token) return res.status(401).json({ error: "Unauthorized" });
       const { data: userData, error: userErr } = await admin.auth.getUser(token);
       if (userErr || !userData?.user) return res.status(401).json({ error: "Unauthorized" });
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("role")
-        .eq("id", userData.user.id)
-        .maybeSingle();
-      if (profile?.role !== "admin") {
+      if (userData.user.app_metadata?.role !== "admin") {
         return res.status(403).json({ error: "Admin or billing hook required" });
       }
     }

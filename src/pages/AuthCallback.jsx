@@ -5,6 +5,8 @@ import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
 import { supabase } from "@/api/supabaseClient";
+import { api } from "@/api/apiClient";
+import { accountHomePath } from "@/lib/accountExperience";
 import { consumeReturnTo } from "@/lib/returnTo";
 
 const OAUTH_EXCHANGE_TIMEOUT_MS = 15000;
@@ -31,6 +33,23 @@ function friendlyAuthError(message) {
     return "Google sign-in could not finish (login session expired). Close extra tabs, then tap Continue with Google again from this same browser.";
   }
   return message || "Sign-in failed";
+}
+
+function readPendingAccountType() {
+  try {
+    const value = sessionStorage.getItem("titanos_pending_account_type") || "";
+    return value === "business" || value === "job_seeker" ? value : "";
+  } catch {
+    return "";
+  }
+}
+
+function clearPendingAccountType() {
+  try {
+    sessionStorage.removeItem("titanos_pending_account_type");
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function AuthCallback() {
@@ -61,9 +80,16 @@ export default function AuthCallback() {
           }
         }
 
-        // Drop oauth query params from the address bar after a successful exchange
         if (typeof window !== "undefined" && window.history?.replaceState) {
           window.history.replaceState({}, document.title, "/auth/callback");
+        }
+
+        // Preserve the Job Seeker / Business choice made before OAuth. This
+        // server endpoint cannot change subscription entitlements.
+        const pendingAccountType = readPendingAccountType();
+        if (pendingAccountType) {
+          await api.functions.invoke("setAccountType", { account_type: pendingAccountType });
+          clearPendingAccountType();
         }
 
         // Log new OAuth signups (created in the last 10 minutes)
@@ -80,7 +106,7 @@ export default function AuthCallback() {
                 body: JSON.stringify({
                   email: u.email,
                   fullName: u.user_metadata?.full_name || u.user_metadata?.name || "",
-                  source: "oauth",
+                  source: pendingAccountType ? `oauth:${pendingAccountType}` : "oauth",
                 }),
               });
             }
@@ -94,7 +120,8 @@ export default function AuthCallback() {
           PROFILE_BOOT_TIMEOUT_MS,
           "Your account signed in, but profile setup took too long. Tap retry to continue."
         );
-        const dest = consumeReturnTo("/driver");
+        const me = await api.auth.me().catch(() => null);
+        const dest = consumeReturnTo(accountHomePath(me));
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

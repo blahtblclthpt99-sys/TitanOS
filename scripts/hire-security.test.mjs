@@ -1,5 +1,5 @@
 /**
- * Find Work security + product wiring regression tests.
+ * Hardened work ecosystem security + product wiring regression tests.
  * Run: node --test scripts/hire-security.test.mjs
  */
 import { describe, it } from "node:test";
@@ -180,7 +180,6 @@ describe("employer-side published worker matching", () => {
     certifications: ["dot medical card"],
     yearsExperience: 5,
     availability: "available",
-    rating: 4.9,
   };
 
   it("ranks a strong published candidate with explainable reasons", () => {
@@ -213,10 +212,12 @@ describe("employer-side published worker matching", () => {
     assert.ok(rows[0].match.blockers.some((reason) => /3\+ years/.test(reason)));
   });
 
-  it("employer API reads published profiles and does not query private worker preferences", () => {
+  it("uses neutral published profiles and keeps private preferences and Driver data out of recruiting", () => {
     const source = fs.readFileSync(new URL("../src/lib/employerWorkerMatchApi.js", import.meta.url), "utf8");
-    assert.match(source, /listPublishedDrivers/);
-    assert.match(source, /Only the job owner can view ranked worker matches/);
+    assert.match(source, /listPublishedEmploymentProfiles/);
+    assert.match(source, /listPublishedServiceProfiles/);
+    assert.match(source, /Only the opportunity owner can view ranked matches/);
+    assert.doesNotMatch(source, /listPublishedDrivers/);
     assert.doesNotMatch(source, /job_match_preferences|privacy_prefs|search_lat|search_lng/);
   });
 });
@@ -319,31 +320,42 @@ describe("job match server trust boundaries", () => {
   });
 });
 
-describe("Find Work product wiring", () => {
+describe("three-workspace work ecosystem wiring", () => {
   const nav = fs.readFileSync(new URL("../src/lib/nav-items.js", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../src/pages/JobMatches.jsx", import.meta.url), "utf8");
   const stack = fs.readFileSync(new URL("../src/components/layout/TabStack.jsx", import.meta.url), "utf8");
   const post = fs.readFileSync(new URL("../src/pages/MatchReadyJobPost.jsx", import.meta.url), "utf8");
 
-  it("surfaces Find Work as a core pillar while keeping employer posting internal", () => {
-    assert.match(nav, /label: "Find Work", path: "\/hire\/matches", group: "find_work"/);
-    assert.match(nav, /label: "Match-ready job", path: "\/hire\/post-match-ready", group: "business", hidden: true/);
-    assert.match(nav, /NAV_GROUP_ORDER = \["business", "find_work", "second_me", "growth"\]/);
+  it("keeps Job Seeker, Independent Work, and Business recruiting as separate workspace surfaces", () => {
+    assert.match(nav, /label: "Available Jobs", path: "\/hire\/matches", group: "seeker", audience: "job_seeker"/);
+    assert.match(nav, /label: "Opportunities", path: "\/work-opportunities", group: "independent", audience: "self_employed"/);
+    assert.match(nav, /label: "Talent", path: "\/talent", group: "management", audience: "business"/);
+    assert.match(nav, /label: "Match-ready opportunity", path: "\/hire\/post-match-ready", group: "management", hidden: true/);
+    assert.match(nav, /NAV_GROUP_ORDER = \["operations", "money", "management", "independent", "independent_money", "seeker", "shared"\]/);
   });
 
-  it("keeps nested hire routes under the Find Work parent", () => {
+  it("routes employment, independent work, and recruiting to different parents", () => {
     assert.match(
       nav,
-      /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Find Work", path: "\/hire\/matches" \}/
+      /if \(path\.startsWith\("\/hire\/matches"\) \|\| path\.startsWith\("\/job-profile"\)\) return \{ label: "Available Jobs", path: "\/hire\/matches" \}/
+    );
+    assert.match(
+      nav,
+      /if \(path\.startsWith\("\/talent"\) \|\| path\.startsWith\("\/hire\/candidates"\)[\s\S]*?return \{ label: "Talent", path: "\/talent" \}/
+    );
+    assert.match(
+      nav,
+      /if \(path\.startsWith\("\/work-opportunities"\) \|\| path\.startsWith\("\/service-profile"\)\) return \{ label: "Independent Work", path: "\/independent" \}/
     );
   });
 
-  it("provides all, saved, and applied opportunity inbox views", () => {
+  it("provides all, saved, and interested employment views while removing ignored jobs", () => {
     assert.match(page, /const \[view, setView\] = useState\("all"\)/);
     assert.match(page, /saved: matches\.filter\(\(job\) => job\.interaction_state === "saved"\)/);
     assert.match(page, /applied: matches\.filter\(\(job\) => job\.interaction_state === "applied"\)/);
-    assert.match(page, /Opportunity inbox/);
-    assert.match(page, /Ignored matches stay hidden/);
+    assert.match(page, /\[\["all", "All"\], \["saved", "Saved"\], \["applied", "Interested"\]\]/);
+    assert.match(page, /Employment opportunities/);
+    assert.match(page, /setMatches\(\(rows\) => rows\.filter\(\(row\) => row\.id !== job\.id\)\)/);
   });
 
   it("retains owner-scoped employer candidate ranking as a compatibility workflow", () => {

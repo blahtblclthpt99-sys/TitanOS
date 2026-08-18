@@ -37,6 +37,9 @@ jobs:
       - name: Unit / integration / regression pack
         run: npm test
 
+      - name: Core Four product boundary
+        run: node --test scripts/core-four-product.test.mjs
+
       - name: Private Storage URL safety
         run: node --test scripts/storage-url-security.test.mjs
 

@@ -16,6 +16,14 @@ export async function getEngagementBatch({ subjectUserIds = [], opportunityId } 
   return response?.data?.snapshots || {};
 }
 
+export async function recordOpportunityResponse(applicationId, opportunityId) {
+  const response = await api.functions.invoke("recordOpportunityResponse", {
+    application_id: applicationId,
+    opportunity_id: opportunityId,
+  });
+  return response?.data || null;
+}
+
 export async function disputeEngagementEvent(eventId, reason) {
   const response = await api.functions.invoke("disputeEngagementEvent", {
     event_id: eventId,

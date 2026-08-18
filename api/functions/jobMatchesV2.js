@@ -48,6 +48,7 @@ function normalizeAdzunaResult(row = {}) {
     posted_at: row.created,
     employment_type: row.contract_time === "full_time" ? "full_time" : row.contract_time === "part_time" ? "part_time" : "",
     pay_type: row.salary_min || row.salary_max ? "salary" : "",
+    relationship_type: "employment",
   }, { name: "Adzuna" });
 }
 
@@ -111,15 +112,14 @@ function annotateAndFilter(jobs, interactionMap, nativeSavedIds, nativeAppliedId
         ? "saved"
         : interaction?.state || null;
     if (state === "ignored") return [];
-    return [{ ...job, interaction_state: state }];
+    return [{ ...job, relationship_type: "employment", relationship_label: "Employee Opportunity", interaction_state: state }];
   });
 }
 
 /**
- * A new seeker should see work before filling out a profile. This is deliberately
- * a broad discovery feed, not a claim that Titan has verified fit. As profile
- * data arrives, the normal matching engine takes over and hard requirements are
- * enforced.
+ * New Job Seekers see open employment before profile completion. This is broad
+ * discovery, not verified fit. Contract/customer requests are excluded here and
+ * live only in Independent Work.
  */
 function broadInternalMatches(jobs = [], location = {}) {
   const seekerCity = clean(location.city);
@@ -136,7 +136,7 @@ function broadInternalMatches(jobs = [], location = {}) {
   };
 
   return (jobs || [])
-    .filter((job) => job && (job.status || "open") === "open")
+    .filter((job) => job && (job.status || "open") === "open" && clean(job.relationship_type || "employment") === "employment")
     .map((job) => {
       const tier = locationTier(job);
       const reasons = [];
@@ -153,6 +153,8 @@ function broadInternalMatches(jobs = [], location = {}) {
       const score = tier === 5 ? 70 : tier === 4 ? 65 : tier === 3 ? 58 : tier === 2 ? 50 : 40;
       return {
         ...job,
+        relationship_type: "employment",
+        relationship_label: "Employee Opportunity",
         match: {
           score,
           reasons,
@@ -191,10 +193,10 @@ export default async function handler(req, res) {
     const userId = userData.user.id;
     const body = readJson(req);
     const [accountResult, profileResult, prefsResult, jobsResult, interactionsResult, savesResult, appsResult] = await Promise.all([
-      admin.from("profiles").select("id,account_type,city,state").eq("id", userId).maybeSingle(),
+      admin.from("profiles").select("id,active_workspace,city,state").eq("id", userId).maybeSingle(),
       admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
       admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,search_lat,search_lng").eq("user_id", userId).maybeSingle(),
-      admin.from("hire_jobs").select("id,created_at,created_by_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
+      admin.from("hire_jobs").select("id,created_at,created_by_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode,relationship_type").eq("status", "open").eq("relationship_type", "employment").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
       admin.from("job_match_interactions").select("source,source_name,source_job_id,state").eq("user_id", userId),
       admin.from("hire_saves").select("hire_job_id").eq("user_id", userId),
       admin.from("hire_applications").select("hire_job_id,status").eq("worker_id", userId),
@@ -204,8 +206,8 @@ export default async function handler(req, res) {
     }
 
     const account = accountResult.data || {};
-    if (clean(account.account_type) === "business") {
-      return res.status(403).json({ error: "Available Jobs is for Job Seeker accounts. Business accounts use Talent to recruit." });
+    if (clean(account.active_workspace) !== "job_seeker") {
+      return res.status(403).json({ error: "Employee opportunities are available in the Job Seeker workspace." });
     }
 
     const profile = profileResult.data;
@@ -251,7 +253,8 @@ export default async function handler(req, res) {
       externalState = { requested: true, enabled: provider.enabled, reason: provider.reason, provider: provider.enabled ? "Adzuna" : null };
     }
 
-    const merged = filterByRadius(mergeRankedJobMatches({ internal: nativeJobs, external: externalJobs, driverProfile: worker }), worker);
+    const merged = filterByRadius(mergeRankedJobMatches({ internal: nativeJobs, external: externalJobs, driverProfile: worker }), worker)
+      .map((job) => ({ ...job, relationship_type: "employment", relationship_label: "Employee Opportunity" }));
     const matches = annotateAndFilter(merged, interactionMap, nativeSavedIds, nativeAppliedIds).slice(0, 40);
 
     return res.status(200).json({ data: {

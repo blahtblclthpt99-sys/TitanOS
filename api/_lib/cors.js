@@ -1,14 +1,13 @@
 /**
- * Shared CORS helpers for Vercel serverless functions (web + Capacitor).
+ * Shared CORS helpers for Titan server functions (web + Capacitor).
  * Origins are allowlisted — do not reflect arbitrary Origin with credentials.
  */
 
 const DEFAULT_ALLOWED = [
-  "https://titanos-web.vercel.app",
-  "https://titanos.app",
-  "https://www.titanos.app",
   "https://titanfieldos.com",
   "https://www.titanfieldos.com",
+  "https://titanos.app",
+  "https://www.titanos.app",
   "http://localhost:5173",
   "http://localhost:4173",
   "http://127.0.0.1:5173",
@@ -53,7 +52,7 @@ export function resolveAppOrigin(req) {
     return configured.replace(/\/$/, "");
   }
   // Do not accept arbitrary configured HTTPS URLs outside the allowlist.
-  return "https://titanos-web.vercel.app";
+  return "https://titanfieldos.com";
 }
 
 export function applyCors(res, req) {
@@ -76,9 +75,7 @@ export function applyCors(res, req) {
   res.setHeader("Vary", "Origin");
 }
 
-/**
- * Handle CORS preflight only. Returns true when the request was fully handled.
- */
+/** Handle CORS preflight only. Returns true when the request was fully handled. */
 export function handleOptions(req, res) {
   if (req.method !== "OPTIONS") return false;
   applyCors(res, req);

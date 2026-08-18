@@ -57,8 +57,8 @@ export async function saveMyEmploymentProfile(userId, patch = {}) {
   };
 
   if (!row.display_name) throw new Error("Add your name.");
-  if (!row.skills.length && !row.qualifications.length) {
-    throw new Error("Add at least one skill or qualification.");
+  if (row.discoverable && !row.skills.length && !row.qualifications.length) {
+    throw new Error("Add at least one skill or qualification before letting businesses discover you.");
   }
 
   const { data, error } = await supabase

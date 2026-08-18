@@ -27,7 +27,6 @@ const handlers = Object.freeze({
   jobMatchesV2: () => import("../../../api/functions/jobMatchesV2.js"),
   leadDiscovery: () => import("../../../api/functions/leadDiscovery.js"),
   markReferralPaying: () => import("../../../api/functions/markReferralPaying.js"),
-  mppPaid: () => import("../../../api/functions/mppPaid.js"),
   paypalWebhook: () => import("../../../api/functions/paypalWebhook.js"),
   portalAcceptEstimate: () => import("../../../api/functions/portalAcceptEstimate.js"),
   portalGetData: () => import("../../../api/functions/portalGetData.js"),

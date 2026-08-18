@@ -1,13 +1,13 @@
 /**
  * Host-neutral server error reporting.
  *
- * The original implementation imported @sentry/node from the shared API path.
+ * The original implementation imported the Node-specific Sentry SDK from the shared API path.
  * That works in Node serverless runtimes but forces Cloudflare Workers to bundle
  * Node-only networking internals. This helper keeps the same call-site contract
  * while sending a minimal Sentry envelope with standards-based fetch.
  *
- * api/instrument.mjs remains the optional Node-only tracing/profiling bootstrap
- * for Node deployments; it is intentionally not imported from this shared path.
+ * The legacy Node tracing/profiling bootstrap remains available for Node deployments,
+ * but it is intentionally not imported from this shared path.
  */
 
 let pendingSentry = new Set();

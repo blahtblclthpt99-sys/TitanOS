@@ -169,7 +169,7 @@ describe("Critical workflow surfaces (structural)", () => {
     assert.match(read("api/register.js"), /assertRateLimit|captureApiException/);
   });
 
-  it("Core Four product surfaces and essential business workflows exist", () => {
+  it("three-sided work OS surfaces and essential business workflows exist", () => {
     for (const f of [
       "src/pages/Dashboard.jsx",
       "src/pages/Jobs.jsx",
@@ -178,6 +178,12 @@ describe("Critical workflow surfaces (structural)", () => {
       "src/pages/Estimates.jsx",
       "src/pages/Invoices.jsx",
       "src/pages/Payments.jsx",
+      "src/pages/JobMatches.jsx",
+      "src/pages/JobSeekerProfile.jsx",
+      "src/pages/IndependentHome.jsx",
+      "src/pages/WorkOpportunities.jsx",
+      "src/pages/ServiceProfile.jsx",
+      "src/pages/WorkerMatches.jsx",
       "src/pages/SecondMe.jsx",
       "src/pages/Autopilot.jsx",
     ]) {
@@ -185,12 +191,16 @@ describe("Critical workflow surfaces (structural)", () => {
     }
 
     const nav = read("src/lib/nav-items.js");
-    assert.match(nav, /label:\s*"Find Work"/);
+    assert.match(nav, /label:\s*"Available Jobs"/);
     assert.match(nav, /path:\s*"\/hire\/matches"/);
+    assert.match(nav, /label:\s*"Opportunities"/);
+    assert.match(nav, /path:\s*"\/work-opportunities"/);
+    assert.match(nav, /label:\s*"Talent"/);
+    assert.match(nav, /path:\s*"\/talent"/);
+    assert.match(nav, /label:\s*"TitanAUTO"/);
+    assert.match(nav, /path:\s*"\/autopilot"/);
     assert.match(nav, /label:\s*"2nd Self"/);
     assert.match(nav, /path:\s*"\/second-me"/);
-    assert.match(nav, /label:\s*"Titan Auto \+ Leads"/);
-    assert.match(nav, /path:\s*"\/autopilot"/);
     assert.doesNotMatch(nav, /label:\s*"TitanCom"/);
   });
 

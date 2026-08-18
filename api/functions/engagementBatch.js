@@ -16,6 +16,8 @@ function compact(snapshot) {
     sampleSize: snapshot.sampleSize,
     stats: snapshot.stats,
     policy: snapshot.policy,
+    events: [],
+    own: false,
     informational_only: true,
     eligibility_input: false,
     ranking_input: false,
@@ -36,6 +38,18 @@ export default async function handler(req, res) {
   const requestedIds = uniqueIds(body.subject_user_ids || body.subjectUserIds);
   if (!opportunityId || !requestedIds.length) return res.status(400).json({ error: "Opportunity and subjects are required." });
 
+  const forbiddenFilterKeys = [
+    "engagement_min",
+    "engagement_max",
+    "responsiveness_min",
+    "attendance_min",
+    "minimum_engagement",
+    "sort_by_engagement",
+  ];
+  if (forbiddenFilterKeys.some((key) => body[key] !== undefined)) {
+    return res.status(400).json({ error: "Engagement is informational and cannot filter, rank, or exclude candidates." });
+  }
+
   const { data: opportunity, error: opportunityError } = await auth.admin
     .from("hire_jobs")
     .select("id,customer_id,created_by_id,relationship_type")
@@ -51,11 +65,11 @@ export default async function handler(req, res) {
   let allowedRows = [];
   if (relationship === "employment") {
     const result = await auth.admin
-      .from("driver_profiles")
+      .from("employment_profiles")
       .select("user_id")
       .in("user_id", requestedIds)
-      .eq("published", true);
-    if (result.error) return res.status(400).json({ error: "Could not validate published candidate profiles." });
+      .eq("discoverable", true);
+    if (result.error) return res.status(400).json({ error: "Could not validate discoverable Job Seeker profiles." });
     allowedRows = result.data || [];
   } else if (relationship === "contract" || relationship === "customer_request") {
     const result = await auth.admin

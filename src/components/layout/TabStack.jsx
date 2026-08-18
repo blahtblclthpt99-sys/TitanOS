@@ -1,10 +1,9 @@
 /**
  * TitanOS authenticated route stack.
  *
- * Product surface is intentionally limited to four pillars:
- * Business, Find Work, 2nd Self, and Titan Auto + Leads.
- * Essential account/support/admin utilities remain reachable, while retired product
- * routes redirect into the nearest core pillar instead of staying as parallel products.
+ * TitanOS is a Business Operating System first. Daily operating routes remain
+ * direct product destinations. Growth, matching, and intelligence extend the
+ * business OS without displacing jobs, customers, money, people, or fleet.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -16,22 +15,15 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
-// Four product roots kept warm between switches.
+// Business Home remains warm because it is the operating dashboard.
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const JobMatches = lazy(() => import("@/pages/JobMatches"));
-const SecondMe = lazy(() => import("@/pages/SecondMe"));
-const Autopilot = lazy(() => import("@/pages/Autopilot"));
-
-const TAB_PATHS = ["/", "/hire/matches", "/second-me", "/autopilot"];
-const TAB_LRU_SIZE = 4;
+const TAB_PATHS = ["/"];
+const TAB_LRU_SIZE = 1;
 const TAB_COMPONENTS = {
   "/": Dashboard,
-  "/hire/matches": JobMatches,
-  "/second-me": SecondMe,
-  "/autopilot": Autopilot,
 };
 
-// Titan Business workflows.
+// Core business operations.
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
 const Customers = lazy(() => import("@/pages/Customers"));
@@ -41,18 +33,32 @@ const Invoices = lazy(() => import("@/pages/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Payments = lazy(() => import("@/pages/Payments"));
 
-// Internal workflows behind 2nd Self / Titan Auto.
+// Business management.
+const Employees = lazy(() => import("@/pages/Employees"));
+const Fleet = lazy(() => import("@/pages/Fleet"));
+const DriverHub = lazy(() => import("@/pages/DriverHub"));
+const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
+const Credentials = lazy(() => import("@/pages/Credentials"));
+const Contracts = lazy(() => import("@/pages/Contracts"));
+const Insurance = lazy(() => import("@/pages/Insurance"));
+const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
+
+// Business extensions.
+const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const SecondMe = lazy(() => import("@/pages/SecondMe"));
+const Autopilot = lazy(() => import("@/pages/Autopilot"));
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Leads = lazy(() => import("@/pages/Leads"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
 
-// Find Work compatibility workflows used by employer-side matching. They are not
-// separate product destinations and remain hidden from primary navigation.
+// Employer-side matching workflows.
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 
-// Essential utilities, not product pillars.
+// Essential utilities.
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -64,23 +70,13 @@ const AdminFees = lazy(() => import("@/pages/AdminFees"));
 const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 
 const LEGACY_REDIRECTS = {
-  // Retired shell/product destinations -> Titan Business.
-  "/more": "/",
-  "/driver": "/",
-  "/routes": "/",
-  "/booking": "/",
-  "/employees": "/",
-  "/fleet": "/",
-  "/inventory": "/",
-  "/business-documents": "/",
-  "/contracts": "/",
-  "/insurance": "/",
-  "/credentials": "/",
-  "/finances": "/",
+  // Consolidated or retired business destinations.
+  "/booking": "/schedule",
+  "/finances": "/invoices",
   "/reports": "/",
-  "/tax-center": "/",
+  "/tax-center": "/invoices",
   "/analytics": "/",
-  "/companies": "/",
+  "/companies": "/settings",
   "/job-estimator": "/estimates",
   "/receipts": "/invoices",
   "/marketplace": "/",
@@ -94,18 +90,18 @@ const LEGACY_REDIRECTS = {
   "/deals": "/",
   "/escrow": "/",
 
-  // Retired AI aliases -> 2nd Self.
+  // Old AI aliases -> 2nd Self.
   "/ai-assistant": "/assistant",
   "/growth-coach": "/second-me",
   "/marketing": "/second-me",
   "/phone": "/second-me",
 
-  // Old Hire landing -> current job-seeking pillar.
+  // Old Hire landing -> current matching workspace.
   "/hire": "/hire/matches",
 };
 
 const NON_TAB_ROUTES = {
-  // Titan Business
+  // Business operations
   "/jobs": Jobs,
   "/schedule": Schedule,
   "/customers": Customers,
@@ -113,12 +109,27 @@ const NON_TAB_ROUTES = {
   "/invoices": Invoices,
   "/payments": Payments,
 
-  // 2nd Self + Titan Auto internals
+  // Business management
+  "/employees": Employees,
+  "/fleet": Fleet,
+  "/driver": DriverHub,
+  "/routes": RoutePlanner,
+  "/inventory": Inventory,
+  "/business-documents": BusinessDocuments,
+  "/credentials": Credentials,
+  "/contracts": Contracts,
+  "/insurance": Insurance,
+  "/more": MoreMenu,
+
+  // Growth & intelligence extensions
+  "/hire/matches": JobMatches,
+  "/second-me": SecondMe,
+  "/autopilot": Autopilot,
   "/assistant": AIAssistant,
   "/leads": Leads,
   "/follow-ups": FollowUps,
 
-  // Find Work internal employer workflows
+  // Employer-side matching internals
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
@@ -158,8 +169,11 @@ function NonTabPage() {
     );
   }
 
-  // Old nested Driver routes are intentionally retired with Driver Hub.
-  if (pathname.startsWith("/driver/")) return <Navigate to="/" replace />;
+  // Driver detail/history routes are no longer a separate consumer operating
+  // system. Keep the business-facing fleet workspace as the only Driver entry.
+  if (pathname.startsWith("/driver/") && pathname !== "/driver") {
+    return <Navigate to="/driver" replace />;
+  }
 
   const Page = NON_TAB_ROUTES[pathname];
   if (!Page) {
@@ -207,7 +221,7 @@ export default function TabStack() {
             aria-hidden={!isActive}
             className={isActive && !reduceMotion ? "page-enter" : undefined}
           >
-            <ErrorBoundary message="This Titan pillar failed to load. Try switching away and back, or refresh.">
+            <ErrorBoundary message="Titan Business Home failed to load. Try switching away and back, or refresh.">
               <Suspense fallback={<Spinner label="Loading" />}>
                 <Page isActive={isActive} />
               </Suspense>
@@ -226,7 +240,7 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or return to Business Home.">
+            <ErrorBoundary key={pathname} message="This business workspace failed to load. Try again or return to Business Home.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>

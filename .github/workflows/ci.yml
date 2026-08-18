@@ -1,4 +1,4 @@
-# TitanOS CI — build gate for GitHub → Vercel continuous deployment
+# TitanOS CI — build gate for TitanfieldOS production
 name: CI
 
 on:
@@ -46,6 +46,9 @@ jobs:
       - name: Ad monetization safety
         run: node --test scripts/ad-monetization.test.mjs
 
+      - name: Cloudflare hosting safety
+        run: node --test scripts/cloudflare-hosting.test.mjs
+
       - name: Private Storage URL safety
         run: node --test scripts/storage-url-security.test.mjs
 
@@ -75,8 +78,16 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
-          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
-          VITE_API_BASE_URL: https://titanos-web.vercel.app
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanfieldos.com
+          VITE_API_BASE_URL: https://titanfieldos.com
+
+      - name: Build Cloudflare Pages Functions
+        run: |
+          mkdir -p .cloudflare
+          npx --yes wrangler@4 pages functions build functions --outfile=.cloudflare/pages-worker.js --minify
+          BYTES=$(gzip -c .cloudflare/pages-worker.js | wc -c)
+          echo "Compressed Pages Worker: ${BYTES} bytes"
+          test "$BYTES" -le 3145728
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -86,5 +97,5 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
-          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
-          VITE_API_BASE_URL: https://titanos-web.vercel.app
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanfieldos.com
+          VITE_API_BASE_URL: https://titanfieldos.com

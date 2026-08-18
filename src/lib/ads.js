@@ -5,7 +5,10 @@ import { resolvePlan } from "@/lib/plan";
  * Workspace identity never changes ad entitlement; billing does.
  */
 export const ADSENSE_ENABLED = String(import.meta.env.VITE_ADSENSE_ENABLED || "").toLowerCase() === "true";
-export const ADSENSE_CLIENT = String(import.meta.env.VITE_ADSENSE_CLIENT || "").trim();
+export const ADSENSE_PUBLISHER_ID = "pub-7224659901194043";
+export const ADSENSE_CLIENT = String(
+  import.meta.env.VITE_ADSENSE_CLIENT || `ca-${ADSENSE_PUBLISHER_ID}`
+).trim();
 
 export const ADSENSE_SLOTS = Object.freeze({
   business_home: String(import.meta.env.VITE_ADSENSE_SLOT_BUSINESS_HOME || "").trim(),

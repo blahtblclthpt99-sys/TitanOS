@@ -17,6 +17,7 @@ import SupportCenter from "@/pages/SupportCenter";
 import SupportCommandCenter from "@/pages/SupportCommandCenter";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { normalizeAppPath } from "@/lib/routing";
+import "@/styles/titan-reference.css";
 
 export default function AppLayout() {
   const feedbackRef = useRef(null);
@@ -37,7 +38,7 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="titan-app-shell min-h-screen bg-background text-foreground">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -58,7 +59,7 @@ export default function AppLayout() {
         id="main-content"
         tabIndex={-1}
         aria-label="Main content"
-        className="md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
+        className="titan-main-stage md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
         style={{
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",

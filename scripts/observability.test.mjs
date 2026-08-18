@@ -129,10 +129,13 @@ describe("observability surfaces on disk", () => {
     assert.match(src, /sentryConfigurationError = dsn && !sentryEnabled \? "invalid_dsn" : ""/);
   });
 
-  it("health exposes observability readiness", () => {
+  it("health exposes truthful observability readiness", () => {
     const src = read("api/functions/health.js");
     assert.match(src, /opsAlertConfigured/);
     assert.match(src, /observability/);
+    assert.match(src, /sentryDsnPresent/);
+    assert.match(src, /sentryConfigured:\s*isValidSentryDsn\(sentryDsn\)/);
+    assert.match(src, /"invalid_dsn"/);
   });
 
   it("health validates the configured Stripe subscription catalog without exposing price ids", () => {

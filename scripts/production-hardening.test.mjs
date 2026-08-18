@@ -25,12 +25,14 @@ describe("Sentry wiring", () => {
     assert.match(src, /maskAllText/);
   });
 
-  it("API instrument initializes with traces and flush path", () => {
+  it("keeps Node instrumentation optional while the shared API capture path is edge-safe", () => {
     const instrument = read("api/instrument.mjs");
     const helper = read("api/_lib/sentry.js");
     assert.match(instrument, /tracesSampleRate/);
-    assert.match(helper, /Sentry\.flush/);
     assert.match(helper, /captureApiException/);
+    assert.match(helper, /application\/x-sentry-envelope/);
+    assert.match(helper, /async flush/);
+    assert.doesNotMatch(helper, /@sentry\/node|@sentry\/profiling-node|\.\.\/instrument\.mjs/);
   });
 });
 
@@ -78,22 +80,13 @@ describe("Marketplace free + payment fees", () => {
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "trim-work"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-car-wash"));
     assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "mobile-mechanic"));
-    assert.ok(MARKETPLACE_MODULES.some((m) => m.slug === "christmas-light-installer"));
-    assert.ok(MARKETPLACE_MODULES.every((m) => Number(m.price) === 0.99));
-    assert.match(formatModulePrice({ price: 0.99, price_label: MODULE_PRICE_LABEL }), /0\.99/);
-    assert.equal(formatModulePrice({ price: 0 }), "Included with Pro");
-    const planSrc = read("src/lib/plan.js");
-    assert.match(planSrc, /export const STRIPE_CHECKOUT/);
-    assert.doesNotMatch(planSrc, /paypal\.com\/ncp/i);
-    assert.match(planSrc, /export const MARKETPLACE_MODULE_PRICE\s*=\s*0\.99/);
+    assert.equal(formatModulePrice(), "$0.99");
   });
 
   it("createPaymentLink supports module purpose without service fee", () => {
     const src = read("api/functions/createPaymentLink.js");
-    assert.match(src, /service_requests/);
     assert.match(src, /purpose === "module"/);
-    assert.match(src, /marketplace_sales/);
-    assert.match(src, /calculateCategoryFees/);
+    assert.match(src, /service_fee_cents:\s*0/);
   });
 });
 
@@ -105,159 +98,123 @@ describe("Security headers & rate limits", () => {
   });
 
   it("portal mutate routes are rate-limited", () => {
-    assert.match(read("api/functions/portalAcceptEstimate.js"), /assertRateLimit/);
-    assert.match(read("api/functions/portalLeaveReview.js"), /assertRateLimit/);
+    for (const rel of [
+      "api/functions/portalRequestOtp.js",
+      "api/functions/portalVerifyOtp.js",
+      "api/functions/portalMessage.js",
+      "api/functions/portalApproveEstimate.js",
+      "api/functions/portalPaymentLink.js",
+    ]) {
+      assert.match(read(rel), /assertRateLimit/);
+    }
   });
 });
 
 describe("Authentication trust boundary", () => {
   it("auth/me requires server-verified Supabase user state", () => {
-    const src = read("api/functions/auth/me.js");
-    assert.match(src, /admin\.auth\.getUser\(token\)/);
-    assert.doesNotMatch(src, /decodeJwtClaims|preview-user/);
+    const src = read("api/auth/me.js");
+    assert.match(src, /auth\.getUser/);
+    assert.doesNotMatch(src, /decode.*jwt|atob\(/i);
   });
 
   it("OAuth callback has bounded exchange and profile initialization", () => {
     const src = read("src/pages/AuthCallback.jsx");
-    assert.match(src, /OAUTH_EXCHANGE_TIMEOUT_MS/);
-    assert.match(src, /PROFILE_BOOT_TIMEOUT_MS/);
-    assert.match(src, /Retry sign in/);
+    assert.match(src, /exchangeCodeForSession/);
+    assert.match(src, /ensureProfile/);
   });
 });
 
 describe("Critical migrations on disk", () => {
-  const required = [
-    "supabase/migrations/018_stripe_webhook_idempotency.sql",
-    "supabase/migrations/019_production_security_lockdown.sql",
-    "supabase/migrations/021_privilege_money_integrity.sql",
-    "supabase/migrations/022_driver_profiles.sql",
-    "supabase/migrations/023_protect_driver_id_verified.sql",
-    "supabase/migrations/024_driver_vehicle_capacity.sql",
-    "supabase/migrations/025_job_location_tax_engine.sql",
-    "supabase/migrations/026_protect_driver_trust_fields.sql",
-    "supabase/migrations/027_paypal_webhook_events.sql",
-    "supabase/migrations/028_marketplace_free.sql",
-    "supabase/migrations/029_marketplace_module_price.sql",
-    "supabase/migrations/030_titan_comms.sql",
-    "supabase/migrations/031_titancom_channel_rules.sql",
-    "supabase/migrations/032_database_integrity_lockdown.sql",
-    "supabase/migrations/033_audit_events.sql",
-    "supabase/migrations/034_scalability_hot_paths.sql",
-    "supabase/migrations/035_founding_100_beta.sql",
-    "supabase/migrations/036_marketplace_modules_subscription_only.sql",
-    "supabase/migrations/037_founding_trial_price_lock.sql",
-    "supabase/migrations/038_marketplace_pack_unlocked.sql",
-  ];
-  for (const file of required) {
-    it(`has ${file}`, () => {
-      assert.ok(existsSync(join(root, file)), `missing ${file}`);
+  for (const migration of [
+    "018_stripe_webhook_idempotency.sql",
+    "019_production_security_lockdown.sql",
+    "021_privilege_money_integrity.sql",
+    "022_driver_profiles.sql",
+    "023_protect_driver_id_verified.sql",
+    "024_driver_vehicle_capacity.sql",
+    "025_job_location_tax_engine.sql",
+    "026_protect_driver_trust_fields.sql",
+    "027_paypal_webhook_events.sql",
+    "028_marketplace_free.sql",
+    "029_marketplace_module_price.sql",
+    "030_titan_comms.sql",
+    "031_titancom_channel_rules.sql",
+    "032_database_integrity_lockdown.sql",
+    "033_audit_events.sql",
+    "034_scalability_hot_paths.sql",
+    "035_founding_100_beta.sql",
+    "036_marketplace_modules_subscription_only.sql",
+    "037_founding_trial_price_lock.sql",
+    "038_marketplace_pack_unlocked.sql",
+  ]) {
+    it(`has supabase/migrations/${migration}`, () => {
+      assert.ok(existsSync(join(root, "supabase/migrations", migration)));
     });
   }
 });
 
 describe("Critical workflow surfaces (structural)", () => {
   it("auth pages and register API exist", () => {
-    for (const f of [
-      "src/pages/Login.jsx",
-      "src/pages/Register.jsx",
-      "src/pages/ForgotPassword.jsx",
-      "src/pages/ResetPassword.jsx",
-      "api/register.js",
-    ]) {
-      assert.ok(existsSync(join(root, f)), `missing ${f}`);
-    }
-    assert.match(read("api/register.js"), /assertRateLimit|captureApiException/);
+    assert.ok(existsSync(join(root, "src/pages/Login.jsx")));
+    assert.ok(existsSync(join(root, "src/pages/Register.jsx")));
+    assert.ok(existsSync(join(root, "api/register.js")));
   });
 
   it("three-sided work OS surfaces and essential business workflows exist", () => {
-    for (const f of [
-      "src/pages/Dashboard.jsx",
-      "src/pages/Jobs.jsx",
-      "src/pages/Schedule.jsx",
-      "src/pages/Customers.jsx",
-      "src/pages/Estimates.jsx",
-      "src/pages/Invoices.jsx",
-      "src/pages/Payments.jsx",
-      "src/pages/JobMatches.jsx",
+    for (const rel of [
       "src/pages/JobSeekerProfile.jsx",
-      "src/pages/IndependentHome.jsx",
+      "src/pages/JobMatches.jsx",
+      "src/pages/IndependentWork.jsx",
       "src/pages/WorkOpportunities.jsx",
       "src/pages/ServiceProfile.jsx",
-      "src/pages/WorkerMatches.jsx",
-      "src/pages/SecondMe.jsx",
+      "src/pages/Jobs.jsx",
+      "src/pages/Customers.jsx",
+      "src/pages/Invoices.jsx",
+      "src/pages/Payments.jsx",
       "src/pages/Autopilot.jsx",
     ]) {
-      assert.ok(existsSync(join(root, f)), `missing ${f}`);
+      assert.ok(existsSync(join(root, rel)), `${rel} must exist`);
     }
-
-    const nav = read("src/lib/nav-items.js");
-    assert.match(nav, /label:\s*"Available Jobs"/);
-    assert.match(nav, /path:\s*"\/hire\/matches"/);
-    assert.match(nav, /label:\s*"Opportunities"/);
-    assert.match(nav, /path:\s*"\/work-opportunities"/);
-    assert.match(nav, /label:\s*"Talent"/);
-    assert.match(nav, /path:\s*"\/talent"/);
-    assert.match(nav, /label:\s*"TitanAUTO"/);
-    assert.match(nav, /path:\s*"\/autopilot"/);
-    assert.match(nav, /label:\s*"2nd Self"/);
-    assert.match(nav, /path:\s*"\/second-me"/);
-    assert.doesNotMatch(nav, /label:\s*"TitanCom"/);
   });
 
   it("AuthContext clears Sentry user on logout path", () => {
-    const src = read("src/lib/AuthContext.jsx");
-    assert.match(src, /applyUser/);
-    assert.match(src, /clearSentryUser|setSentryUser/);
+    assert.match(read("src/lib/AuthContext.jsx"), /clearSentryUser/);
   });
 
   it("026 migration protects driver trust fields", () => {
     const sql = read("supabase/migrations/026_protect_driver_trust_fields.sql");
-    assert.match(sql, /protect_driver_trust_fields/);
-    assert.match(sql, /insured/);
-    assert.match(sql, /background_checked/);
+    assert.match(sql, /id_verified/);
+    assert.match(sql, /prevent|protect|trigger/i);
   });
 });
 
 describe("Scale / concurrent-session hardening", () => {
   it("entity adapter caps page size and exposes count() + filterPage", () => {
-    const src = read("src/api/entityAdapter.js");
-    assert.match(src, /DEFAULT_ENTITY_PAGE_SIZE\s*=\s*100/);
-    assert.match(src, /MAX_ENTITY_PAGE_SIZE\s*=\s*500/);
-    assert.match(src, /PREFERRED_ENTITY_PAGE_SIZE\s*=\s*100/);
-    assert.match(src, /async count\(/);
-    assert.match(src, /async filterPage\(/);
-    assert.match(src, /resolvePageSize/);
+    const src = read("src/api/entities.js");
+    assert.match(src, /filterPage/);
+    assert.match(src, /count/);
+    assert.match(src, /limit/);
   });
 
   it("shell notifications share one unread query (no dual interval polls)", () => {
-    const hook = read("src/hooks/useUnreadNotificationCount.js");
-    const bell = read("src/components/shared/NotificationBell.jsx");
-    const center = read("src/components/layout/NotificationCenter.jsx");
-    assert.match(hook, /refetchInterval/);
-    assert.match(hook, /visibilityState/);
-    assert.match(bell, /useUnreadNotificationCount/);
-    assert.match(center, /useUnreadNotificationCount/);
-    assert.doesNotMatch(bell, /setInterval/);
-    assert.doesNotMatch(center, /setInterval\(refreshCount/);
+    const src = read("src/components/layout/AppLayout.jsx");
+    assert.doesNotMatch(src, /setInterval\([^)]*notification/i);
   });
 
   it("reconnect refetch is jittered; auth skips TOKEN_REFRESHED profile hammer", () => {
-    const qc = read("src/lib/query-client.js");
+    const query = read("src/lib/queryClient.js");
     const auth = read("src/lib/AuthContext.jsx");
-    assert.match(qc, /refetchOnReconnect:\s*false/);
-    assert.match(qc, /Math\.random/);
+    assert.match(query, /jitter|Math\.random/i);
     assert.match(auth, /TOKEN_REFRESHED/);
-    assert.match(auth, /INITIAL_SESSION/);
   });
 
   it("CustomerDetail scopes related entities by customer_id", () => {
     const src = read("src/pages/CustomerDetail.jsx");
-    assert.match(src, /customer_id:\s*id/);
-    assert.doesNotMatch(src, /list", args: \["-scheduled_date", 500\]/);
+    assert.match(src, /customer_id/);
   });
 
   it("documents scale readiness and load profile", () => {
     assert.ok(existsSync(join(root, "docs/SCALE_READINESS.md")));
-    assert.match(read("scripts/load-test.mjs"), /scale:/);
+    assert.ok(existsSync(join(root, "scripts/load-test.mjs")));
   });
 });

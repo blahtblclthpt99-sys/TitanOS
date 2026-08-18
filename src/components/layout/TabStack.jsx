@@ -1,11 +1,10 @@
 /**
- * TabStack — keeps a small LRU of primary tabs mounted so scroll/state survive
- * nearby switches, but unmounts colder tabs to cut memory + background work.
- * Non-tab pages (Reports, Assistant, etc.) render in normal document flow so
- * they keep a real height (absolute overlays collapse when all tabs are hidden).
+ * TabStack — keeps a small LRU of high-frequency tabs mounted so scroll/state survive
+ * nearby switches. Lower-frequency pages render normally and merged legacy routes
+ * redirect to their canonical TitanOS destination.
  */
 import React, { Suspense, lazy, useRef } from "react";
-import { useLocation } from "react-router";
+import { Navigate, useLocation } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -14,19 +13,12 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
-const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/marketplace", "/messages", "/profile", "/more"];
-/** Home always warm + last N tab visits (including active). */
+const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
 const TAB_LRU_SIZE = 3;
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
-const Customers = lazy(() => import("@/pages/Customers"));
-const Invoices = lazy(() => import("@/pages/Invoices"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
-const MarketplaceTab = lazy(() => import("@/pages/Marketplace"));
-const MessagesTab = lazy(() => import("@/pages/Messages"));
-const ProfileTab = lazy(() => import("@/pages/Profile"));
-const Community = lazy(() => import("@/pages/Community"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
 
@@ -35,17 +27,20 @@ const TAB_COMPONENTS = {
   "/driver": DriverHubTab,
   "/comms": TitanCommsTab,
   "/jobs": Jobs,
-  "/marketplace": MarketplaceTab,
-  "/messages": MessagesTab,
-  "/profile": ProfileTab,
   "/more": MoreMenu,
 };
 
+const Customers = lazy(() => import("@/pages/Customers"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const Marketplace = lazy(() => import("@/pages/Marketplace"));
+const Profile = lazy(() => import("@/pages/Profile"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
+const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const Finances = lazy(() => import("@/pages/Finances"));
+const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -59,7 +54,6 @@ const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
-const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
 const AdminFees = lazy(() => import("@/pages/AdminFees"));
 const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
@@ -68,7 +62,6 @@ const Booking = lazy(() => import("@/pages/Booking"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
 const Payments = lazy(() => import("@/pages/Payments"));
 const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
-const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
 const Companies = lazy(() => import("@/pages/Companies"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
@@ -77,13 +70,6 @@ const Autopilot = lazy(() => import("@/pages/Autopilot"));
 const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
 const Leads = lazy(() => import("@/pages/Leads"));
-const GrowthCoach = lazy(() => import("@/pages/GrowthCoach"));
-const TitanScore = lazy(() => import("@/pages/TitanScore"));
-const MarketingStudio = lazy(() => import("@/pages/MarketingStudio"));
-const LocalDeals = lazy(() => import("@/pages/LocalDeals"));
-const EmergencyJobs = lazy(() => import("@/pages/EmergencyJobs"));
-const Escrow = lazy(() => import("@/pages/Escrow"));
-const PhoneReceptionist = lazy(() => import("@/pages/PhoneReceptionist"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -91,11 +77,32 @@ const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
 const ShareReport = lazy(() => import("@/pages/ShareReport"));
+const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
+const SecondMe = lazy(() => import("@/pages/SecondMe"));
+
+/**
+ * Compatibility map: preserve old bookmarks without keeping duplicate product concepts.
+ * Removed/postponed high-liability features return to Home; their code remains in source
+ * until separately archived after dependency/runtime verification.
+ */
+const LEGACY_REDIRECTS = {
+  "/messages": "/comms",
+  "/titan-score": "/analytics?titanScore=1",
+  "/growth-coach": "/assistant?mode=growth",
+  "/marketing": "/assistant?mode=marketing",
+  "/phone": "/assistant?mode=phone-script",
+  "/community": "/",
+  "/emergency": "/",
+  "/deals": "/",
+  "/escrow": "/",
+};
 
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
   "/estimates": Estimates,
+  "/job-estimator": JobEstimator,
   "/finances": Finances,
+  "/receipts": ReceiptScanner,
   "/fleet": Fleet,
   "/tax-center": TaxCenter,
   "/reports": Reports,
@@ -103,6 +110,8 @@ const NON_TAB_ROUTES = {
   "/customers": Customers,
   "/invoices": Invoices,
   "/assistant": AIAssistant,
+  "/second-me": SecondMe,
+  "/business-documents": BusinessDocuments,
   "/insurance": Insurance,
   "/referral": Referral,
   "/hire": Hire,
@@ -110,9 +119,7 @@ const NON_TAB_ROUTES = {
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
-  "/community": Community,
   "/notifications": Notifications,
-  "/job-estimator": JobEstimator,
   "/admin/moderation": AdminModeration,
   "/admin/fees": AdminFees,
   "/admin/tax-rules": AdminTaxRules,
@@ -121,7 +128,6 @@ const NON_TAB_ROUTES = {
   "/contracts": Contracts,
   "/payments": Payments,
   "/routes": RoutePlanner,
-  "/receipts": ReceiptScanner,
   "/companies": Companies,
   "/employees": Employees,
   "/inventory": Inventory,
@@ -130,22 +136,20 @@ const NON_TAB_ROUTES = {
   "/reputation": Reputation,
   "/credentials": Credentials,
   "/leads": Leads,
-  "/growth-coach": GrowthCoach,
-  "/titan-score": TitanScore,
-  "/marketing": MarketingStudio,
-  "/deals": LocalDeals,
-  "/emergency": EmergencyJobs,
-  "/escrow": Escrow,
-  "/phone": PhoneReceptionist,
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
   "/design-system": DesignSystem,
+  "/profile": Profile,
+  "/marketplace": Marketplace,
 };
 
 function NonTabPage() {
   const { pathname: rawPath } = useLocation();
   const pathname = normalizeAppPath(rawPath);
+
+  const redirect = LEGACY_REDIRECTS[pathname];
+  if (redirect) return <Navigate to={redirect} replace />;
 
   if (pathname.startsWith("/share/report/")) {
     return (
@@ -210,10 +214,7 @@ export default function TabStack() {
   const activeTab = isTab ? pathname : null;
 
   if (activeTab) {
-    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(
-      0,
-      TAB_LRU_SIZE
-    );
+    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
@@ -253,7 +254,7 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Command Center.">
+            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>

@@ -41,18 +41,28 @@ export async function getMyEmploymentProfile(userId) {
 
 export async function saveMyEmploymentProfile(userId, patch = {}) {
   if (!userId) throw new Error("Sign in to save your Job Profile.");
+  const existing = await getMyEmploymentProfile(userId).catch(() => null);
+  const skills = patch.skills !== undefined ? patch.skills : existing?.skills;
+  const qualifications = patch.qualifications !== undefined || patch.certifications !== undefined
+    ? (patch.qualifications || patch.certifications)
+    : existing?.qualifications;
+  const availability = patch.availability !== undefined ? patch.availability : existing?.availability;
+  const discoverable = patch.discoverable !== undefined || patch.published !== undefined
+    ? Boolean(patch.discoverable ?? patch.published)
+    : Boolean(existing?.discoverable);
+
   const row = {
     user_id: userId,
     created_by_id: userId,
-    display_name: String(patch.displayName || patch.name || "").trim().slice(0, 120),
-    bio: String(patch.bio || "").trim().slice(0, 4000),
-    city: String(patch.city || "").trim().slice(0, 120),
-    state: String(patch.state || "").trim().slice(0, 60),
-    skills: list(patch.skills),
-    qualifications: list(patch.qualifications || patch.certifications),
-    years_experience: Math.min(80, Math.max(0, Math.round(Number(patch.yearsExperience ?? patch.years_experience ?? 0) || 0))),
-    availability: ["available", "busy", "offline"].includes(patch.availability) ? patch.availability : "available",
-    discoverable: Boolean(patch.discoverable ?? patch.published),
+    display_name: String(patch.displayName ?? patch.name ?? existing?.displayName ?? existing?.name ?? "").trim().slice(0, 120),
+    bio: String(patch.bio ?? existing?.bio ?? "").trim().slice(0, 4000),
+    city: String(patch.city ?? existing?.city ?? "").trim().slice(0, 120),
+    state: String(patch.state ?? existing?.state ?? "").trim().slice(0, 60),
+    skills: list(skills),
+    qualifications: list(qualifications),
+    years_experience: Math.min(80, Math.max(0, Math.round(Number(patch.yearsExperience ?? patch.years_experience ?? existing?.yearsExperience ?? 0) || 0))),
+    availability: ["available", "busy", "offline"].includes(availability) ? availability : "available",
+    discoverable,
     updated_at: new Date().toISOString(),
   };
 

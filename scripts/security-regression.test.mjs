@@ -104,6 +104,21 @@ describe("security regression", () => {
     assert.match(migration, /from authenticated/i);
   });
 
+  it("sensitive server privilege bypasses use Auth app_metadata only", () => {
+    const files = [
+      "api/functions/markReferralPaying.js",
+      "api/functions/sendEmail.js",
+      "api/functions/runAutopilotMembership.js",
+      "api/functions/calculateFee.js",
+      "api/functions/createNotification.js",
+    ];
+    for (const file of files) {
+      const src = read(file);
+      assert.match(src, /app_metadata\?\.role === "admin"/, `${file} must use Auth metadata for admin authority`);
+      assert.doesNotMatch(src, /profile\?\.role\s*===\s*"admin"/, `${file} must not grant admin via profile role`);
+    }
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

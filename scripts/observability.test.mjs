@@ -119,6 +119,14 @@ describe("observability surfaces on disk", () => {
     assert.match(src, /replayIntegration/);
     assert.match(src, /maskAllText:\s*true/);
     assert.match(src, /sendDefaultPii:\s*false/);
+    assert.match(src, /isValidSentryDsn/);
+  });
+
+  it("server sentry rejects malformed configured DSNs before SDK init", () => {
+    const src = read("api/instrument.mjs");
+    assert.match(src, /isValidSentryDsn/);
+    assert.match(src, /sentryEnabled = Boolean\(dsn && isValidSentryDsn\(dsn\)\)/);
+    assert.match(src, /sentryConfigurationError = dsn && !sentryEnabled \? "invalid_dsn" : ""/);
   });
 
   it("health exposes observability readiness", () => {

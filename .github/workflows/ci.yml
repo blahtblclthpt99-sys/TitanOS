@@ -37,6 +37,9 @@ jobs:
       - name: Unit / integration / regression pack
         run: npm test
 
+      - name: TitanAI knowledge and Responses API regression
+        run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/titan-ai-knowledge.test.mjs
+
       - name: Existing-post worker matching regression
         run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/hire-existing-post-matches.test.mjs
 

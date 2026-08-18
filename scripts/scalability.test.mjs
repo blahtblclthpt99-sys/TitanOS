@@ -18,6 +18,35 @@ describe("scalability surfaces", () => {
     assert.match(sql, /driver_trips/);
   });
 
+  it("core RLS migration caches request-constant auth predicates and covers payment FK lookup", () => {
+    const sql = read("supabase/migrations/20260818083000_optimize_core_rls_initplans.sql");
+    assert.match(sql, /idx_payments_created_by_id/);
+    assert.match(sql, /idx_company_members_company_user_active/);
+    assert.match(sql, /id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /created_by_id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /\(select public\.is_admin\(\)\)/);
+    assert.match(sql, /assigned_to = \(select auth\.uid\(\)\)::text/);
+    assert.match(sql, /coalesce\(status, 'pending'\) <> all/);
+    assert.match(sql, /public\.is_company_member\(company_id\)/);
+  });
+
+  it("hot secondary RLS migration preserves ownership rules with init plans", () => {
+    const sql = read("supabase/migrations/20260818085000_optimize_hot_secondary_rls.sql");
+    assert.match(sql, /idx_notifications_created_by_id/);
+    assert.match(sql, /idx_marketplace_messages_created_by_id/);
+    assert.match(sql, /idx_driver_profiles_created_by_id/);
+    assert.match(sql, /driver_trips_own_select/);
+    assert.match(sql, /user_id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /sender_id = \(select auth\.uid\(\)\)::text/);
+    assert.match(sql, /recipient_id = \(select auth\.uid\(\)\)::text/);
+    assert.match(sql, /created_by_id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /\(select public\.is_admin\(\)\)/);
+    assert.match(sql, /status = 'active'/);
+    assert.match(sql, /published = true/);
+    assert.match(sql, /seller_id = \(select auth\.uid\(\)\)::text/);
+    assert.doesNotMatch(sql, /module_installs_all/);
+  });
+
   it("entity adapter exposes preferred page size and filterPage", () => {
     const src = read("src/api/entityAdapter.js");
     assert.match(src, /PREFERRED_ENTITY_PAGE_SIZE\s*=\s*100/);

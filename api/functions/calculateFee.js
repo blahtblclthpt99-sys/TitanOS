@@ -26,12 +26,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Valid grossAmount required" });
     }
 
-    const { data: profile } = await auth.admin
-      .from("profiles")
-      .select("role")
-      .eq("id", auth.user.id)
-      .maybeSingle();
-    const isAdmin = profile?.role === "admin" || auth.user.app_metadata?.role === "admin";
+    const isAdmin = auth.user.app_metadata?.role === "admin";
 
     const result = await calculateCategoryFees(auth.admin, {
       categoryId,

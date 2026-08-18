@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   if (!auth) return;
 
   try {
-    const { to, subject, body, from_name: fromName } = readJson(req);
+    const { to, subject, body } = readJson(req);
     if (!to || !subject || !body) {
       return res.status(400).json({ error: "to, subject, and body are required" });
     }
@@ -39,14 +39,15 @@ export default async function handler(req, res) {
     }
 
     // Restrict destinations to the caller's own email or customers they own.
+    // Privileged server authority comes only from Supabase Auth app_metadata.
     const { admin, user } = auth;
     const { data: profile } = await admin
       .from("profiles")
-      .select("email, role")
+      .select("email")
       .eq("id", user.id)
       .maybeSingle();
     const ownEmail = String(profile?.email || user.email || "").toLowerCase();
-    const isAdmin = profile?.role === "admin" || user.app_metadata?.role === "admin";
+    const isAdmin = user.app_metadata?.role === "admin";
 
     if (!isAdmin) {
       const { data: customers } = await admin

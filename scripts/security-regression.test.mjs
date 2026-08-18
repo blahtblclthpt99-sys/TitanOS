@@ -84,6 +84,76 @@ describe("security regression", () => {
     assert.match(tenant, /NEW\.company_id := OLD\.company_id/);
   });
 
+  it("payment-link privileged authority comes only from auth app_metadata", () => {
+    const src = read("api/functions/createPaymentLink.js");
+    assert.match(src, /app_metadata\?\.role === "admin"/);
+    assert.match(src, /invoice\.created_by_id !== user\.id && !serverAdmin/);
+    assert.doesNotMatch(src, /profile\?\.role\s*!==\s*"admin"/);
+    assert.doesNotMatch(src, /profile\?\.role\s*===\s*"admin"/);
+    assert.doesNotMatch(src, /select\("role,/);
+  });
+
+  it("database admin authority uses JWT app_metadata without unnecessary definer privilege", () => {
+    const authorityMigration = read("supabase/migrations/20260818073500_align_admin_authority_and_revoke_trigger_rpc.sql");
+    const invokerMigration = read("supabase/migrations/20260818081000_harden_is_admin_security_invoker.sql");
+    assert.match(authorityMigration, /auth\.jwt\(\)/);
+    assert.match(authorityMigration, /'app_metadata'/);
+    assert.match(authorityMigration, /->> 'role'\) = 'admin'/);
+    assert.doesNotMatch(authorityMigration, /from public\.profiles/i);
+    assert.match(authorityMigration, /revoke execute on function public\.enforce_marketplace_message_block\(\) from public/i);
+    assert.match(authorityMigration, /from anon/i);
+    assert.match(authorityMigration, /from authenticated/i);
+
+    assert.match(invokerMigration, /security invoker/i);
+    assert.match(invokerMigration, /auth\.jwt\(\)/);
+    assert.doesNotMatch(invokerMigration, /from public\.profiles/i);
+    assert.match(invokerMigration, /revoke execute on function public\.is_admin\(\) from public/i);
+    assert.match(invokerMigration, /revoke execute on function public\.is_admin\(\) from anon/i);
+    assert.match(invokerMigration, /grant execute on function public\.is_admin\(\) to authenticated/i);
+  });
+
+  it("sensitive server privilege bypasses use Auth app_metadata only", () => {
+    const files = [
+      "api/functions/markReferralPaying.js",
+      "api/functions/sendEmail.js",
+      "api/functions/runAutopilotMembership.js",
+      "api/functions/calculateFee.js",
+      "api/functions/createNotification.js",
+    ];
+    for (const file of files) {
+      const src = read(file);
+      assert.match(
+        src,
+        /app_metadata\?\.role\s*(?:===|!==)\s*"admin"/,
+        `${file} must use Auth metadata for admin authority`
+      );
+      assert.doesNotMatch(src, /profile\?\.role\s*(?:===|!==)\s*"admin"/, `${file} must not grant admin via profile role`);
+    }
+  });
+
+  it("marketplace tables use least privilege and authenticated user ownership", () => {
+    const sql = read("supabase/migrations/20260818091000_harden_marketplace_table_privileges.sql");
+    assert.match(sql, /marketplace_modules_read[\s\S]*to anon, authenticated[\s\S]*using \(true\)/i);
+    assert.match(sql, /marketplace_modules_admin[\s\S]*to authenticated[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /module_installs_all[\s\S]*to authenticated[\s\S]*user_id = \(select auth\.uid\(\)\)::text/i);
+    assert.match(sql, /module_waitlists_all[\s\S]*to authenticated[\s\S]*user_id = \(select auth\.uid\(\)\)::text/i);
+    assert.match(sql, /developer_applications_select[\s\S]*to authenticated/i);
+    assert.match(sql, /revoke all privileges on table public\.module_installs from anon/i);
+    assert.match(sql, /revoke all privileges on table public\.module_waitlists from anon/i);
+    assert.match(sql, /revoke all privileges on table public\.developer_applications from anon/i);
+    assert.match(sql, /grant select on table public\.marketplace_modules to anon/i);
+    assert.doesNotMatch(sql, /grant (?:insert|update|delete|truncate)[^;]*marketplace_modules to anon/i);
+  });
+
+  it("marketplace catalog admin policy does not overlap public SELECT", () => {
+    const sql = read("supabase/migrations/20260818092000_split_marketplace_catalog_admin_policies.sql");
+    assert.match(sql, /marketplace_modules_admin_insert[\s\S]*for insert[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /marketplace_modules_admin_update[\s\S]*for update[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /marketplace_modules_admin_delete[\s\S]*for delete[\s\S]*select public\.is_admin\(\)/i);
+    assert.doesNotMatch(sql, /for all/i);
+    assert.doesNotMatch(sql, /for select/i);
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

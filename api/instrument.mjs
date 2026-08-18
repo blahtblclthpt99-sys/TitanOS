@@ -15,6 +15,20 @@ function resolveDsn() {
   return typeof dsn === "string" ? dsn.trim() : "";
 }
 
+export function isValidSentryDsn(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      Boolean(parsed.hostname) &&
+      Boolean(parsed.username) &&
+      parsed.pathname.split("/").filter(Boolean).length > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
 function resolveEnvironment() {
   return (
     process.env.SENTRY_ENVIRONMENT ||
@@ -39,7 +53,8 @@ function isDevLike() {
 }
 
 const dsn = resolveDsn();
-export const sentryEnabled = Boolean(dsn);
+export const sentryEnabled = Boolean(dsn && isValidSentryDsn(dsn));
+export const sentryConfigurationError = dsn && !sentryEnabled ? "invalid_dsn" : "";
 
 let profilingLoaded = false;
 const integrations = [];

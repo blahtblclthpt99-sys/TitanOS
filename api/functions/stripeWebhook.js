@@ -4,6 +4,7 @@ import { assertRateLimit } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { syncStripeSubscription } from "../_lib/stripeSubscriptions.js";
+import { checkoutSettlementAction } from "../_lib/stripeSettlement.js";
 
 /**
  * Stripe webhook — only trusted path to mark payments/invoices paid.
@@ -86,8 +87,6 @@ async function markInvoicePaid(
     return;
   }
   const due = Number(inv.balance_due ?? inv.total ?? 0);
-  // Compare service base (excluding platform fee) against invoice due.
-  // amountTotal from Stripe includes fees; using it alone could mark underpaid invoices paid.
   const basePaid =
     expectedBaseAmount != null && Number.isFinite(Number(expectedBaseAmount))
       ? Number(expectedBaseAmount)
@@ -126,7 +125,6 @@ export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  // High ceiling so Stripe retries are not blocked; still guards extreme abuse.
   if (!assertRateLimit(req, res, { limit: 600, windowMs: 60_000, key: "stripeWebhook" })) return;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -155,14 +153,12 @@ export default async function handler(req, res) {
     } catch (sigErr) {
       logError("stripeWebhook:signature", sigErr);
       captureApiException(sigErr, { tags: { route: "stripeWebhook", stage: "signature" } });
-      // Never process unverified events — including when STRIPE_WEBHOOK_RELAXED is set.
       return res.status(400).json({ error: "Invalid signature" });
     }
 
     const admin = getSupabaseAdmin();
     let idempotencyClaimed = false;
 
-    // Idempotency — claim event id; on failure after claim, release so Stripe can retry
     if (event.id) {
       try {
         const { error: idemErr } = await admin.from("stripe_webhook_events").insert({
@@ -207,8 +203,9 @@ export default async function handler(req, res) {
         session.metadata?.base_amount != null ? Number(session.metadata.base_amount) : null;
       const expectedPlatformFee =
         session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
+      const settlementAction = checkoutSettlementAction(event.type, session);
 
-      if (event.type === "checkout.session.completed" && session.mode === "subscription") {
+      if (settlementAction === "sync_subscription") {
         const stripe = new (await import("stripe")).default(stripeKey);
         const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
         if (subscriptionId) {
@@ -223,18 +220,25 @@ export default async function handler(req, res) {
         event.type === "customer.subscription.deleted"
       ) {
         await syncStripeSubscription(admin, session);
-      } else if (event.type === "checkout.session.completed") {
-        if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
-          return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
-        }
-        // Prefer payment row linkage; verify ownership before marking invoice.
+      } else if (settlementAction === "await_payment") {
+        return res.status(200).json({
+          received: true,
+          type: event.type,
+          ignored: "payment_not_settled",
+        });
+      } else if (settlementAction === "settle_payment") {
         if (paymentId) {
           const { data: payRow } = await admin
             .from("payments")
             .select("id, user_id, created_by_id, invoice_id, amount, amount_total, status")
             .eq("id", paymentId)
             .maybeSingle();
-          if (payRow && expectedUserId && String(payRow.user_id) !== String(expectedUserId) && String(payRow.created_by_id) !== String(expectedUserId)) {
+          if (
+            payRow &&
+            expectedUserId &&
+            String(payRow.user_id) !== String(expectedUserId) &&
+            String(payRow.created_by_id) !== String(expectedUserId)
+          ) {
             logError("stripeWebhook:payment_user_mismatch", { paymentId, expectedUserId });
             return res.status(200).json({ received: true, type: event.type, ignored: "ownership" });
           }
@@ -252,20 +256,14 @@ export default async function handler(req, res) {
           sessionId,
           status: "succeeded",
         });
-      } else if (
-        event.type === "checkout.session.expired" ||
-        event.type === "checkout.session.async_payment_failed"
-      ) {
+      } else if (settlementAction === "cancel_payment") {
         await markPaymentStatus(admin, {
           paymentId,
           sessionId,
           status: "canceled",
           extraNote: `Stripe ${event.type}`,
         });
-      } else if (
-        event.type === "payment_intent.payment_failed" ||
-        event.type === "charge.failed"
-      ) {
+      } else if (settlementAction === "fail_payment") {
         const piMeta = session.metadata || {};
         await markPaymentStatus(admin, {
           paymentId: piMeta.payment_id || paymentId,
@@ -273,7 +271,7 @@ export default async function handler(req, res) {
           status: "failed",
           extraNote: `Stripe ${event.type}: ${session.last_payment_error?.message || "failed"}`,
         });
-      } else if (event.type === "charge.refunded") {
+      } else if (settlementAction === "refund_payment") {
         const piMeta = session.metadata || {};
         await markPaymentStatus(admin, {
           paymentId: piMeta.payment_id || paymentId,

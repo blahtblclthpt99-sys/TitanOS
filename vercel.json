@@ -11,12 +11,17 @@
     "api/functions/stripeCustomerPortal.js": { "maxDuration": 30 },
     "api/functions/stripeWebhook.js": { "maxDuration": 30 },
     "api/functions/titanAI.js": { "maxDuration": 60 },
+    "api/functions/titanAILive.js": { "maxDuration": 60 },
     "api/functions/aiExecuteAction.js": { "maxDuration": 30 },
     "api/functions/receiptVisionOcr.js": { "maxDuration": 60 },
     "api/functions/portalRequestOtp.js": { "maxDuration": 20 },
     "api/functions/analyticsIngest.js": { "maxDuration": 15 }
   },
   "rewrites": [
+    {
+      "source": "/api/functions/titanAI",
+      "destination": "/api/functions/titanAILive"
+    },
     {
       "source": "/((?!api/|assets/|fonts/|robots\\.txt|sitemap\\.xml|sw\\.js|manifest\\.webmanifest|favicon\\.svg|pwa-.*\\.png|downloads/).*)",
       "destination": "/index.html"

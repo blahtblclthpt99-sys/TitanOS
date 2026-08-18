@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 import { loadEmployerWorkerMatches } from "@/lib/employerWorkerMatchApi";
 
-function CandidateCard({ driver }) {
+function CandidateCard({ worker }) {
   return (
-    <article className="titan-surface p-4 md:p-5 space-y-3">
+    <article className="titan-surface space-y-3 p-4 md:p-5">
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
           <UserSearch className="h-5 w-5" aria-hidden="true" />
@@ -18,40 +18,39 @@ function CandidateCard({ driver }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="font-semibold text-foreground">{driver.name}</h2>
+              <h2 className="font-semibold text-foreground">{worker.name}</h2>
               <p className="text-xs text-muted-foreground">
-                {driver.city || "Location not listed"}
-                {driver.yearsExperience ? ` · ${driver.yearsExperience} yrs experience` : ""}
+                {worker.city || "Location not listed"}
+                {worker.yearsExperience ? ` · ${worker.yearsExperience} yrs experience` : ""}
+                {worker.distanceMi ? ` · ${Number(worker.distanceMi).toFixed(1)} mi away` : ""}
               </p>
             </div>
             <div className="rounded-lg bg-primary/10 px-3 py-1.5 text-right">
-              <p className="text-lg font-bold tabular-nums text-primary">{driver.match.score}%</p>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">match</p>
+              <p className="text-lg font-bold tabular-nums text-primary">{worker.match.score}%</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">fit</p>
             </div>
           </div>
         </div>
       </div>
 
-      {driver.match.reasons.length > 0 ? (
+      {worker.match.reasons.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {driver.match.reasons.map((reason) => (
-            <span key={reason} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">
-              {reason}
-            </span>
+          {worker.match.reasons.map((reason) => (
+            <span key={reason} className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">{reason}</span>
           ))}
         </div>
       ) : null}
 
-      {driver.match.blockers.length > 0 ? (
-        <p className="text-xs text-muted-foreground">{driver.match.blockers.join(" · ")}</p>
+      {worker.match.blockers.length > 0 ? (
+        <p className="text-xs text-muted-foreground">{worker.match.blockers.join(" · ")}</p>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <p className="text-xs text-muted-foreground">
-          {driver.skills?.length ? driver.skills.slice(0, 4).join(" · ") : "Published driver profile"}
+          {worker.skills?.length ? worker.skills.slice(0, 5).join(" · ") : "Published professional profile"}
         </p>
         <Button asChild size="sm">
-          <Link to={`/driver/${driver.id}`}>View profile</Link>
+          <Link to={`/talent/worker/${encodeURIComponent(worker.id)}`}>View talent profile</Link>
         </Button>
       </div>
     </article>
@@ -67,7 +66,7 @@ export default function WorkerMatches() {
   useEffect(() => {
     let alive = true;
     if (!user?.id || !jobId) {
-      setState({ loading: false, job: null, matches: [], error: jobId ? "Sign in to view candidates." : "Choose a job from Hire first." });
+      setState({ loading: false, job: null, matches: [], error: jobId ? "Sign in to view candidates." : "Choose a recruiting job first." });
       return () => { alive = false; };
     }
 
@@ -86,26 +85,22 @@ export default function WorkerMatches() {
   return (
     <PageShell maxWidth="lg" className="space-y-5">
       <PageHeader
-        eyebrow="Hire"
-        title="Matching workers"
-        subtitle="Ranked from published worker profiles using the job's skills, credentials, experience, location and current availability."
+        eyebrow="Business · Talent"
+        title="Matching candidates"
+        subtitle="Titan ranks opt-in job seekers by required qualifications, skills, experience, location, and current availability for this job."
       />
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/hire?tab=posts"><ArrowLeft className="h-4 w-4" aria-hidden="true" />My posts</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/driver?folder=directory"><UserSearch className="h-4 w-4" aria-hidden="true" />Browse all published drivers</Link>
-        </Button>
+        <Button asChild variant="outline" size="sm"><Link to="/talent"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Talent</Link></Button>
+        <Button asChild variant="outline" size="sm"><Link to="/hire/post-match-ready">Create recruiting job</Link></Button>
       </div>
 
       {state.loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Ranking published workers…
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Ranking nearby qualified candidates…
         </div>
       ) : state.error ? (
-        <EmptyState icon={Briefcase} title="Worker matches unavailable" description={state.error} />
+        <EmptyState icon={Briefcase} title="Candidate matches unavailable" description={state.error} />
       ) : (
         <>
           <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -114,7 +109,7 @@ export default function WorkerMatches() {
               <div>
                 <h2 className="font-semibold text-foreground">{state.job?.title || "Selected job"}</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {state.matches.length} eligible published worker{state.matches.length === 1 ? "" : "s"} ranked. Required credentials are enforced as hard filters; lower experience remains visible as an explainable ranking factor.
+                  {state.matches.length} eligible published job seeker{state.matches.length === 1 ? "" : "s"} ranked. Required credentials are hard filters; experience and distance remain explainable ranking factors.
                 </p>
               </div>
             </div>
@@ -122,13 +117,13 @@ export default function WorkerMatches() {
 
           {state.matches.length ? (
             <div className="space-y-3">
-              {state.matches.map((driver) => <CandidateCard key={driver.id} driver={driver} />)}
+              {state.matches.map((worker) => <CandidateCard key={worker.id} worker={worker} />)}
             </div>
           ) : (
             <EmptyState
               icon={UserSearch}
-              title="No eligible published workers yet"
-              description="No published profiles currently meet this job's required credentials and minimum match threshold. You can still browse the full Driver directory or wait for more workers to publish profiles."
+              title="No matching job seekers yet"
+              description="No opt-in profiles currently meet this job's required qualifications and minimum fit threshold. Keep the recruiting job open; new matching seekers can become visible as they complete their profiles."
             />
           )}
         </>

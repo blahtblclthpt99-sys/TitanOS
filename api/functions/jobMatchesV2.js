@@ -21,6 +21,14 @@ function profileReady(profile) {
   return Boolean(profile && (profile.skills?.length || profile.job_interests?.length));
 }
 
+function employmentProfileForMatch(profile) {
+  if (!profile) return null;
+  return {
+    ...profile,
+    certifications: profile.qualifications || [],
+  };
+}
+
 function externalQuery(profile) {
   return [...new Set([...(profile.job_interests || []).slice(0, 3), ...(profile.skills || []).slice(0, 5)])].join(" ").slice(0, 180);
 }
@@ -194,9 +202,9 @@ export default async function handler(req, res) {
     const body = readJson(req);
     const [accountResult, profileResult, prefsResult, jobsResult, interactionsResult, savesResult, appsResult] = await Promise.all([
       admin.from("profiles").select("id,active_workspace,city,state").eq("id", userId).maybeSingle(),
-      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
+      admin.from("employment_profiles").select("user_id,skills,qualifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
       admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,search_lat,search_lng").eq("user_id", userId).maybeSingle(),
-      admin.from("hire_jobs").select("id,created_at,created_by_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode,relationship_type").eq("status", "open").eq("relationship_type", "employment").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
+      admin.from("hire_jobs").select("id,created_at,created_by_id,customer_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode,relationship_type").eq("status", "open").eq("relationship_type", "employment").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
       admin.from("job_match_interactions").select("source,source_name,source_job_id,state").eq("user_id", userId),
       admin.from("hire_saves").select("hire_job_id").eq("user_id", userId),
       admin.from("hire_applications").select("hire_job_id,status").eq("worker_id", userId),
@@ -210,7 +218,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "Employee opportunities are available in the Job Seeker workspace." });
     }
 
-    const profile = profileResult.data;
+    const profile = employmentProfileForMatch(profileResult.data);
     const privatePrefs = prefsResult.data || {};
     const baseLocation = {
       city: profile?.city || account.city || "",

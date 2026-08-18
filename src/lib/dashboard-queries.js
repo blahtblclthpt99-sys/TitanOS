@@ -1,6 +1,6 @@
-/** Shared TanStack Query descriptors for dashboard data + prefetch.
- * Column lists match Command Center widgets — avoids hauling photos/checklists/line_items.
- * Limits are intentionally lower than full list pages (those use their own queries).
+/** Shared TanStack Query descriptors for the focused Titan Business home.
+ * Column lists avoid hauling large payload fields and only include data used by
+ * the operational snapshot.
  */
 
 export const DASHBOARD_JOB_COLUMNS =
@@ -15,12 +15,9 @@ export const DASHBOARD_ESTIMATE_COLUMNS =
 export const DASHBOARD_CUSTOMER_COLUMNS =
   "id,first_name,last_name,email,phone,status,created_at";
 
-export const DASHBOARD_EMPLOYEE_COLUMNS = "id,name,status,created_at";
-
 export const DASHBOARD_QUERIES = [
   { entity: "Job", method: "list", args: ["-scheduled_date", 80, undefined, DASHBOARD_JOB_COLUMNS] },
   { entity: "Invoice", method: "list", args: ["-created_date", 80, undefined, DASHBOARD_INVOICE_COLUMNS] },
   { entity: "Estimate", method: "list", args: ["-created_date", 50, undefined, DASHBOARD_ESTIMATE_COLUMNS] },
   { entity: "Customer", method: "list", args: ["-created_date", 50, undefined, DASHBOARD_CUSTOMER_COLUMNS] },
-  { entity: "Employee", method: "list", args: ["-created_date", 50, undefined, DASHBOARD_EMPLOYEE_COLUMNS] },
 ];

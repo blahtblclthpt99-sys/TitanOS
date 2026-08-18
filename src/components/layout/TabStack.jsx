@@ -1,9 +1,10 @@
 /**
  * TitanOS authenticated route stack.
  *
- * Two account experiences share auth, safety, TitanAUTO and support:
- * - Business accounts get the Business Operating System and recruiting.
- * - Job seekers get nearby job matching and a professional matching profile.
+ * Isolated workspaces share auth, safety, TitanAUTO and support:
+ * - Business: full Business Operating System + recruiting/teams/fleet.
+ * - Independent Work: opportunities + lightweight customers/work/quotes/money.
+ * - Job Seeker: employment discovery + professional matching profile.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -13,14 +14,13 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAuth } from "@/lib/AuthContext";
-import { accountHomePath, isBusinessAccount } from "@/lib/accountExperience";
+import { accountHomePath, activeWorkspace, WORKSPACES } from "@/lib/accountExperience";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
-// Business operations.
+// Shared operating primitives used by Business and Independent Work.
 const Jobs = lazy(() => import("@/pages/Jobs"));
-const Schedule = lazy(() => import("@/pages/Schedule"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
@@ -28,7 +28,8 @@ const Invoices = lazy(() => import("@/pages/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Payments = lazy(() => import("@/pages/Payments"));
 
-// Business management + recruiting.
+// Business-only operations and management.
+const Schedule = lazy(() => import("@/pages/Schedule"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const DriverHub = lazy(() => import("@/pages/DriverHub"));
@@ -43,6 +44,11 @@ const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 const TalentProfile = lazy(() => import("@/pages/TalentProfile"));
+
+// Independent Work.
+const IndependentHome = lazy(() => import("@/pages/IndependentHome"));
+const WorkOpportunities = lazy(() => import("@/pages/WorkOpportunities"));
+const ServiceProfile = lazy(() => import("@/pages/ServiceProfile"));
 
 // Job seeker.
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
@@ -71,13 +77,16 @@ const TAB_PATHS = ["/"];
 const TAB_LRU_SIZE = 1;
 const TAB_COMPONENTS = { "/": Dashboard };
 
-const BUSINESS_ONLY_PREFIXES = [
+const LIGHTWEIGHT_OS_PREFIXES = [
   "/jobs",
-  "/schedule",
   "/customers",
   "/estimates",
   "/invoices",
   "/payments",
+];
+
+const BUSINESS_ONLY_PREFIXES = [
+  "/schedule",
   "/employees",
   "/talent",
   "/fleet",
@@ -94,6 +103,7 @@ const BUSINESS_ONLY_PREFIXES = [
   "/hire/post-match-ready",
 ];
 
+const INDEPENDENT_ONLY_PREFIXES = ["/independent", "/work-opportunities", "/service-profile"];
 const SEEKER_ONLY_PREFIXES = ["/hire/matches", "/job-profile"];
 
 const LEGACY_REDIRECTS = {
@@ -119,19 +129,18 @@ const LEGACY_REDIRECTS = {
   "/growth-coach": "/second-me",
   "/marketing": "/second-me",
   "/phone": "/second-me",
-  "/hire": "/hire/matches",
 };
 
 const NON_TAB_ROUTES = {
-  // Business operations
+  // Shared operating primitives for Business + Independent Work.
   "/jobs": Jobs,
-  "/schedule": Schedule,
   "/customers": Customers,
   "/estimates": Estimates,
   "/invoices": Invoices,
   "/payments": Payments,
 
-  // Business management and recruiting
+  // Business only.
+  "/schedule": Schedule,
   "/employees": Employees,
   "/talent": ExistingPostWorkerMatches,
   "/fleet": Fleet,
@@ -147,18 +156,23 @@ const NON_TAB_ROUTES = {
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
 
-  // Job seeker
+  // Independent Work.
+  "/independent": IndependentHome,
+  "/work-opportunities": WorkOpportunities,
+  "/service-profile": ServiceProfile,
+
+  // Job seeker.
   "/hire/matches": JobMatches,
   "/job-profile": JobSeekerProfile,
 
-  // Shared Titan layer
+  // Shared Titan layer.
   "/autopilot": Autopilot,
   "/second-me": SecondMe,
   "/assistant": AIAssistant,
   "/leads": Leads,
   "/follow-ups": FollowUps,
 
-  // Utilities
+  // Utilities.
   "/notifications": Notifications,
   "/profile": Profile,
   "/settings": Settings,
@@ -179,19 +193,33 @@ function NonTabPage() {
   const { pathname: rawPath } = useLocation();
   const { user } = useAuth();
   const pathname = normalizeAppPath(rawPath);
-  const business = isBusinessAccount(user);
+  const workspace = activeWorkspace(user);
+  const business = workspace === WORKSPACES.BUSINESS;
+  const independent = workspace === WORKSPACES.SELF_EMPLOYED;
+  const seeker = workspace === WORKSPACES.JOB_SEEKER;
+
+  if (pathname === "/hire") {
+    return <Navigate to={business ? "/talent" : independent ? "/work-opportunities" : "/hire/matches"} replace />;
+  }
 
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
 
-  if (business && startsWithAny(pathname, SEEKER_ONLY_PREFIXES)) {
-    return <Navigate to="/talent" replace />;
+  if (business && (startsWithAny(pathname, SEEKER_ONLY_PREFIXES) || startsWithAny(pathname, INDEPENDENT_ONLY_PREFIXES))) {
+    return <Navigate to="/" replace />;
   }
-  if (!business && startsWithAny(pathname, BUSINESS_ONLY_PREFIXES)) {
+  if (independent && (startsWithAny(pathname, SEEKER_ONLY_PREFIXES) || startsWithAny(pathname, BUSINESS_ONLY_PREFIXES))) {
+    return <Navigate to="/independent" replace />;
+  }
+  if (seeker && (
+    startsWithAny(pathname, BUSINESS_ONLY_PREFIXES) ||
+    startsWithAny(pathname, INDEPENDENT_ONLY_PREFIXES) ||
+    startsWithAny(pathname, LIGHTWEIGHT_OS_PREFIXES)
+  )) {
     return <Navigate to="/hire/matches" replace />;
   }
 
-  if (pathname.startsWith("/customers/") && pathname !== "/customers") {
+  if ((business || independent) && pathname.startsWith("/customers/") && pathname !== "/customers") {
     return (
       <Suspense fallback={<Spinner />}>
         <CustomerDetail />
@@ -199,7 +227,7 @@ function NonTabPage() {
     );
   }
 
-  if (pathname.startsWith("/invoices/") && pathname !== "/invoices") {
+  if ((business || independent) && pathname.startsWith("/invoices/") && pathname !== "/invoices") {
     return (
       <Suspense fallback={<Spinner />}>
         <InvoiceDetail />
@@ -215,7 +243,7 @@ function NonTabPage() {
     );
   }
 
-  // Old driver detail URLs now resolve through the business Talent workspace.
+  // Old driver detail URLs resolve through Business Talent only.
   if (pathname.startsWith("/driver/") && pathname !== "/driver") {
     const workerId = pathname.split("/").filter(Boolean)[1];
     return business && workerId
@@ -245,10 +273,11 @@ export default function TabStack() {
   const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
-  const business = isBusinessAccount(user);
+  const workspace = activeWorkspace(user);
+  const business = workspace === WORKSPACES.BUSINESS;
 
   if (!business && pathname === "/") {
-    return <Navigate to="/hire/matches" replace />;
+    return <Navigate to={accountHomePath(user)} replace />;
   }
 
   const isTab = business && TAB_PATHS.includes(pathname);

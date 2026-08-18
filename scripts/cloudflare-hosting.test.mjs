@@ -14,6 +14,7 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
   const adapter = read("functions/_lib/vercelAdapter.js");
   const router = read("functions/api/functions/[name].js");
   const register = read("functions/api/register.js");
+  const serverTelemetry = read("api/_lib/sentry.js");
 
   it("builds Vite output as a node-compatible Cloudflare Pages project", () => {
     assert.match(wrangler, /"pages_build_output_dir"\s*:\s*"\.\/dist"/);
@@ -38,6 +39,12 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     assert.match(adapter, /process\.env\.NODE_ENV = "production"/);
     assert.match(adapter, /process\.env\.VERCEL_ENV = "production"/);
     assert.match(adapter, /https:\/\/titanfieldos\.com/);
+  });
+
+  it("keeps shared server telemetry Worker-safe instead of bundling the Node Sentry SDK", () => {
+    assert.match(serverTelemetry, /application\/x-sentry-envelope/);
+    assert.match(serverTelemetry, /captureApiException/);
+    assert.doesNotMatch(serverTelemetry, /@sentry\/node|@sentry\/profiling-node|\.\.\/instrument\.mjs/);
   });
 
   it("ports registration and all current core work-system APIs to same-origin Pages Functions", () => {

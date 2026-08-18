@@ -25,6 +25,19 @@ function withTimeout(promise, ms, message) {
   ]);
 }
 
+function normalizeWorkspaceInput(enabledWorkspaces, activeWorkspace, accountType) {
+  const allowed = new Set(["job_seeker", "self_employed", "business"]);
+  const requested = Array.isArray(enabledWorkspaces)
+    ? enabledWorkspaces.map((value) => String(value || "").trim().toLowerCase()).filter((value) => allowed.has(value))
+    : [];
+  const enabled = [...new Set(requested.length ? requested : [String(accountType || activeWorkspace || "job_seeker").trim().toLowerCase()])]
+    .filter((value) => allowed.has(value));
+  if (!enabled.length) enabled.push("job_seeker");
+  const activeCandidate = String(activeWorkspace || accountType || enabled[0]).trim().toLowerCase();
+  const active = enabled.includes(activeCandidate) ? activeCandidate : enabled[0];
+  return { enabled, active };
+}
+
 async function fetchProfile(userId) {
   const { data, error } = await supabase
     .from("profiles")
@@ -38,6 +51,8 @@ async function fetchProfile(userId) {
         "paying_subscriber",
         "plan_tier",
         "account_type",
+        "enabled_workspaces",
+        "active_workspace",
         "founding_user",
         "founding_number",
         "founding_trial_ends_at",
@@ -97,6 +112,8 @@ async function buildUser(authUser, profile) {
     paying_subscriber: profile?.paying_subscriber ?? false,
     plan_tier: profile?.plan_tier || "",
     account_type: profile?.account_type || "",
+    enabled_workspaces: profile?.enabled_workspaces || profile?.professional_profile?.enabled_workspaces || [],
+    active_workspace: profile?.active_workspace || profile?.professional_profile?.active_workspace || "",
     founding_user: profile?.founding_user ?? false,
     founding_number: profile?.founding_number ?? null,
     founding_trial_ends_at: profile?.founding_trial_ends_at ?? null,
@@ -155,7 +172,8 @@ async function assertOAuthProviderEnabled(provider) {
   }
 }
 
-async function registerViaServer({ email, password, fullName, accountType }) {
+async function registerViaServer({ email, password, fullName, enabledWorkspaces, activeWorkspace, accountType }) {
+  const workspaces = normalizeWorkspaceInput(enabledWorkspaces, activeWorkspace, accountType);
   const bases = [];
   const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
   if (configured) bases.push(configured);
@@ -174,7 +192,13 @@ async function registerViaServer({ email, password, fullName, accountType }) {
       const response = await fetch(`${base}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, fullName, accountType }),
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          enabledWorkspaces: workspaces.enabled,
+          activeWorkspace: workspaces.active,
+        }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -190,6 +214,8 @@ async function registerViaServer({ email, password, fullName, accountType }) {
       return {
         session: body.session || null,
         user: body.user || null,
+        enabledWorkspaces: body.enabledWorkspaces || workspaces.enabled,
+        activeWorkspace: body.activeWorkspace || workspaces.active,
         needsEmailVerification: Boolean(body.needsEmailVerification),
         verificationMode: body.verificationMode || null,
       };
@@ -235,15 +261,23 @@ export function createAuthModule() {
       throwIfError(error, 401);
     },
 
-    async register({ email, password, fullName, accountType = "job_seeker" }) {
-      // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and safely stores account experience without changing paid entitlements.
+    async register({ email, password, fullName, enabledWorkspaces, activeWorkspace, accountType = "job_seeker" }) {
+      const workspaces = normalizeWorkspaceInput(enabledWorkspaces, activeWorkspace, accountType);
+      // Prefer server register — avoids Supabase built-in mailer rate limits and
+      // persists workspace identity independently from paid entitlements.
       try {
-        return await registerViaServer({ email, password, fullName, accountType });
+        return await registerViaServer({
+          email,
+          password,
+          fullName,
+          enabledWorkspaces: workspaces.enabled,
+          activeWorkspace: workspaces.active,
+          accountType,
+        });
       } catch (serverError) {
-        // Fall back to direct Supabase signup when API is unavailable. The
-        // account_type metadata is only an onboarding hint; billing still comes
-        // exclusively from the profile/subscription record.
+        // Fall back to direct Supabase signup when API is unavailable. Metadata is
+        // an onboarding hint only; billing still comes exclusively from server
+        // subscription/profile fields.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -251,7 +285,9 @@ export function createAuthModule() {
             emailRedirectTo: getAuthRedirectTo("/auth/callback"),
             data: {
               ...(fullName ? { full_name: fullName } : {}),
-              account_type: accountType,
+              account_type: workspaces.active === "business" ? "business" : "worker",
+              enabled_workspaces: workspaces.enabled,
+              active_workspace: workspaces.active,
             },
           },
         });
@@ -276,7 +312,7 @@ export function createAuthModule() {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, fullName, source: "supabase_fallback" }),
+              body: JSON.stringify({ email, fullName, source: `supabase_fallback:${workspaces.active}` }),
             });
             if (res.ok) break;
           }
@@ -286,6 +322,8 @@ export function createAuthModule() {
         return {
           session: data.session,
           user: data.user,
+          enabledWorkspaces: workspaces.enabled,
+          activeWorkspace: workspaces.active,
           needsEmailVerification: !data.session,
         };
       }
@@ -407,7 +445,8 @@ export function createAuthModule() {
         "referred_by_code",
         "active_company_id",
         // Intentionally excluded (server/admin only): role, is_pro, lifetime_premium,
-        // paying_subscriber, plan_tier, account_type, verified_worker, verification_notes
+        // paying_subscriber, plan_tier, account_type, workspace fields,
+        // verified_worker, verification_notes
       ];
 
       const payload = {};

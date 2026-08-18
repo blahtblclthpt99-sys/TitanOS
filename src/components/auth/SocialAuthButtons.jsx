@@ -17,13 +17,20 @@ function GoogleIcon({ className }) {
 
 const PROVIDERS = [{ id: "google", label: "Continue with Google", Icon: GoogleIcon }];
 
-export default function SocialAuthButtons({ onError, returnTo }) {
+export default function SocialAuthButtons({ onError, returnTo, accountType = "" }) {
   const [loadingProvider, setLoadingProvider] = useState("");
 
   const start = async (provider) => {
     setLoadingProvider(provider);
     try {
       if (returnTo) rememberReturnTo(returnTo);
+      if (accountType === "business" || accountType === "job_seeker") {
+        try {
+          sessionStorage.setItem("titanos_pending_account_type", accountType);
+        } catch {
+          /* ignore storage restrictions */
+        }
+      }
       await api.auth.loginWithProvider(provider);
     } catch (err) {
       setLoadingProvider("");

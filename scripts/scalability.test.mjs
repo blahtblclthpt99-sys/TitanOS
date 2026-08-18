@@ -18,6 +18,18 @@ describe("scalability surfaces", () => {
     assert.match(sql, /driver_trips/);
   });
 
+  it("core RLS migration caches request-constant auth predicates and covers payment FK lookup", () => {
+    const sql = read("supabase/migrations/20260818083000_optimize_core_rls_initplans.sql");
+    assert.match(sql, /idx_payments_created_by_id/);
+    assert.match(sql, /idx_company_members_company_user_active/);
+    assert.match(sql, /id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /created_by_id = \(select auth\.uid\(\)\)/);
+    assert.match(sql, /\(select public\.is_admin\(\)\)/);
+    assert.match(sql, /assigned_to = \(select auth\.uid\(\)\)::text/);
+    assert.match(sql, /coalesce\(status, 'pending'\) <> all/);
+    assert.match(sql, /public\.is_company_member\(company_id\)/);
+  });
+
   it("entity adapter exposes preferred page size and filterPage", () => {
     const src = read("src/api/entityAdapter.js");
     assert.match(src, /PREFERRED_ENTITY_PAGE_SIZE\s*=\s*100/);

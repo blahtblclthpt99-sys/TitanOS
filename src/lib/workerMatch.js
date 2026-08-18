@@ -131,7 +131,6 @@ export function rankPublishedWorkerMatches(job = {}, drivers = [], { minimumScor
     .filter((driver) => driver.match.score >= minimumScore)
     .sort((a, b) =>
       b.match.score - a.match.score ||
-      Number(b.availability === "available") - Number(a.availability === "available") ||
-      Number(b.rating || 0) - Number(a.rating || 0)
+      String(a.userId || a.id || "").localeCompare(String(b.userId || b.id || ""))
     );
 }

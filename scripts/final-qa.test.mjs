@@ -15,7 +15,7 @@ function extractQuotedPaths(src, marker) {
   if (idx < 0) return [];
   const slice = src.slice(idx, idx + 8000);
   const paths = [];
-  const re = /["'](\/[^"']+)["']/g;
+  const re = /["'](\/[^"']*)["']/g;
   let m;
   while ((m = re.exec(slice))) paths.push(m[1]);
   return [...new Set(paths)];
@@ -31,12 +31,8 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       navSrc.indexOf("export const APP_NAV_ITEMS"),
       navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
     );
-    const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]+)["']/g)].map((m) => m[1]);
-
-    // Core Four deliberately exposes a compact product surface: seven business
-    // operations plus one root each for Find Work, 2nd Self, and Titan Auto.
-    assert.equal(navPaths.length, 10, "Core Four primary navigation should stay intentionally small");
-    for (const required of [
+    const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]*)["']/g)].map((m) => m[1]);
+    const expectedCorePaths = [
       "/",
       "/jobs",
       "/schedule",
@@ -47,9 +43,16 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       "/hire/matches",
       "/second-me",
       "/autopilot",
-    ]) {
-      assert.ok(navPaths.includes(required), `missing Core Four nav path: ${required}`);
-    }
+    ];
+
+    // Business Home + six business workflows + one root each for Find Work,
+    // 2nd Self, and Titan Auto. Compare the exact set so feature creep or
+    // accidental removal fails this release gate.
+    assert.deepEqual(
+      [...navPaths].sort(),
+      [...expectedCorePaths].sort(),
+      "Core Four primary navigation must match the approved product surface exactly"
+    );
 
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
     const nonTabPaths = extractQuotedPaths(tabSrc, "NON_TAB_ROUTES");

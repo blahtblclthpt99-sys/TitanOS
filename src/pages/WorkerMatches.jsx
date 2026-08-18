@@ -5,10 +5,12 @@ import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
 import EmptyState from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
+import EngagementSignal from "@/components/trust/EngagementSignal";
 import { useAuth } from "@/lib/AuthContext";
 import { loadEmployerWorkerMatches } from "@/lib/employerWorkerMatchApi";
+import { getEngagementBatch } from "@/lib/engagementApi";
 
-function CandidateCard({ worker }) {
+function CandidateCard({ worker, opportunityId, engagement }) {
   const service = worker.profileKind === "service";
   const profilePath = service
     ? `/talent/service/${encodeURIComponent(worker.id)}`
@@ -51,6 +53,15 @@ function CandidateCard({ worker }) {
 
       {worker.match.blockers.length > 0 ? <p className="text-xs text-muted-foreground">{worker.match.blockers.join(" · ")}</p> : null}
 
+      {engagement ? (
+        <EngagementSignal
+          subjectUserId={worker.id}
+          opportunityId={opportunityId}
+          snapshot={engagement}
+          compact
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <p className="text-xs text-muted-foreground">
           {worker.skills?.length ? worker.skills.slice(0, 5).join(" · ") : service ? "Published service information" : "Published professional profile"}
@@ -65,22 +76,33 @@ export default function WorkerMatches() {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const jobId = params.get("job") || "";
-  const [state, setState] = useState({ loading: true, job: null, matches: [], profileKind: "employment", error: "" });
+  const [state, setState] = useState({ loading: true, job: null, matches: [], profileKind: "employment", engagement: {}, error: "" });
 
   useEffect(() => {
     let alive = true;
     if (!user?.id || !jobId) {
-      setState({ loading: false, job: null, matches: [], profileKind: "employment", error: jobId ? "Sign in to view matches." : "Choose an opportunity first." });
+      setState({ loading: false, job: null, matches: [], profileKind: "employment", engagement: {}, error: jobId ? "Sign in to view matches." : "Choose an opportunity first." });
       return () => { alive = false; };
     }
 
     setState((old) => ({ ...old, loading: true, error: "" }));
     loadEmployerWorkerMatches(user, jobId)
-      .then(({ job, matches, profileKind }) => {
-        if (alive) setState({ loading: false, job, matches, profileKind: profileKind || "employment", error: "" });
+      .then(async ({ job, matches, profileKind }) => {
+        // Qualification ordering is complete before Engagement is requested.
+        // Engagement snapshots are attached by id only and never re-sort/filter.
+        let engagement = {};
+        try {
+          engagement = await getEngagementBatch({
+            subjectUserIds: matches.map((row) => row.id),
+            opportunityId: jobId,
+          });
+        } catch {
+          engagement = {};
+        }
+        if (alive) setState({ loading: false, job, matches, profileKind: profileKind || "employment", engagement, error: "" });
       })
       .catch((error) => {
-        if (alive) setState({ loading: false, job: null, matches: [], profileKind: "employment", error: error?.message || "Could not load matches." });
+        if (alive) setState({ loading: false, job: null, matches: [], profileKind: "employment", engagement: {}, error: error?.message || "Could not load matches." });
       });
 
     return () => { alive = false; };
@@ -118,14 +140,21 @@ export default function WorkerMatches() {
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{state.job?.relationship_type === "employment" ? "Employee Opportunity" : "Contract Opportunity"}</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {state.matches.length} eligible published {service ? "Service Profile" : "Job Seeker profile"}{state.matches.length === 1 ? "" : "s"} ranked. Engagement is not part of qualification, eligibility, or ordering.
+                  {state.matches.length} eligible published {service ? "Service Profile" : "Job Seeker profile"}{state.matches.length === 1 ? "" : "s"} ranked. Engagement is loaded only after this order is final and cannot remove, filter, or reorder a qualified profile.
                 </p>
               </div>
             </div>
           </section>
 
           {state.matches.length ? (
-            <div className="space-y-3">{state.matches.map((worker) => <CandidateCard key={`${worker.profileKind || state.profileKind}:${worker.id}`} worker={worker} />)}</div>
+            <div className="space-y-3">{state.matches.map((worker) => (
+              <CandidateCard
+                key={`${worker.profileKind || state.profileKind}:${worker.id}`}
+                worker={worker}
+                opportunityId={jobId}
+                engagement={state.engagement?.[worker.id]}
+              />
+            ))}</div>
           ) : (
             <EmptyState
               icon={UserSearch}

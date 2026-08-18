@@ -47,7 +47,6 @@ export default function Fleet() {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "make") next.model = "";
-      // Auto nickname from make/model when user hasn't typed a custom name.
       if (["make", "model"].includes(key)) {
         const auto = [next.make, next.model].filter(Boolean).join(" ");
         if (!prev.name || prev.name === [prev.make, prev.model].filter(Boolean).join(" ")) {
@@ -66,13 +65,11 @@ export default function Fleet() {
       name: form.name || [form.make, form.model].filter(Boolean).join(" "),
       category: form.category,
       status: form.status,
-      // DB uses brand for make
       brand: form.make || "",
       model: form.model || "",
       purchase_date: form.purchase_date || null,
       next_service_date: form.next_service_date || null,
       warranty_expires: form.warranty_expires || null,
-      // local mirror for Driver Hub labels
       make: form.make || "",
     };
     try {
@@ -89,10 +86,10 @@ export default function Fleet() {
   if (!user?.id) {
     return (
       <div className="page-pad max-w-6xl mx-auto pb-24">
-        <PageHeader title="Fleet & equipment" subtitle="Track vehicles and tools" />
+        <PageHeader title="Fleet & equipment" subtitle="Track business vehicles, tools, and service needs" />
         <EmptyState
           title="Sign in to manage fleet"
-          description="Equipment tracking requires an account."
+          description="Fleet tracking requires an account."
           actionLabel="Sign in"
           onAction={() => { window.location.href = "/login"; }}
         />
@@ -104,13 +101,14 @@ export default function Fleet() {
 
   return (
     <div className="page-pad max-w-6xl mx-auto">
-      <PageHeader title="Fleet & equipment" subtitle={`${rows.length} assets tracked`} />
-      <p className="text-sm text-muted-foreground -mt-3 mb-4">
-        Add make & model for vehicles — Driver Hub uses them for fuel estimates and tax mileage.{" "}
-        <Link to="/driver" className="text-titan-cyan hover:underline">
-          Open Driver Hub →
-        </Link>
-      </p>
+      <PageHeader title="Fleet & equipment" subtitle={`${rows.length} business asset${rows.length === 1 ? "" : "s"} tracked`} />
+
+      <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+        <span className="mr-auto">Keep vehicles, equipment, service dates, and field operations connected to real business work.</span>
+        <Button asChild size="sm" variant="outline"><Link to="/driver">Fleet operations</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link to="/employees">Employees</Link></Button>
+      </div>
+
       <div className="grid lg:grid-cols-[.85fr_1.15fr] gap-5">
         <form className="titan-surface p-5 space-y-3" onSubmit={add}>
           <h2 className="font-semibold text-foreground flex gap-2">
@@ -147,9 +145,7 @@ export default function Fleet() {
                   >
                     <option value="">Select make…</option>
                     {VEHICLE_MAKES.map((make) => (
-                      <option key={make} value={make}>
-                        {make}
-                      </option>
+                      <option key={make} value={make}>{make}</option>
                     ))}
                   </select>
                 </div>
@@ -164,9 +160,7 @@ export default function Fleet() {
                   >
                     <option value="">{form.make ? "Select model…" : "Pick make first"}</option>
                     {modelOptions.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
+                      <option key={model} value={model}>{model}</option>
                     ))}
                   </select>
                 </div>
@@ -224,9 +218,7 @@ export default function Fleet() {
             className="bg-muted border-border text-foreground"
             aria-label="Warranty expires"
           />
-          <Button className="w-full">
-            {isVehicle ? "Save vehicle" : "Save equipment"}
-          </Button>
+          <Button className="w-full">{isVehicle ? "Save vehicle" : "Save equipment"}</Button>
         </form>
 
         <section className="space-y-3">
@@ -234,7 +226,7 @@ export default function Fleet() {
             <EmptyState
               icon={Truck}
               title="No fleet yet"
-              description="Add a vehicle with make & model to use it in Driver Hub."
+              description="Add the vehicles and equipment your business uses to complete jobs."
             />
           )}
           {rows.map((row) => (
@@ -244,12 +236,8 @@ export default function Fleet() {
                 <p className="font-semibold text-foreground">{vehicleLabel(row)}</p>
                 <p className="text-sm text-foreground/45 capitalize">
                   {row.category?.replace("_", " ")} · {row.status}
-                  {(row.make || row.brand) && row.model
-                    ? ` · ${row.make || row.brand} ${row.model}`
-                    : ""}
-                  {row.purchase_date
-                    ? ` · Purchased ${new Date(`${row.purchase_date}T00:00:00`).toLocaleDateString()}`
-                    : ""}
+                  {(row.make || row.brand) && row.model ? ` · ${row.make || row.brand} ${row.model}` : ""}
+                  {row.purchase_date ? ` · Purchased ${new Date(`${row.purchase_date}T00:00:00`).toLocaleDateString()}` : ""}
                 </p>
                 {(due(row.next_service_date) || due(row.warranty_expires)) && (
                   <p className="text-xs text-titan-amber flex gap-1 mt-1">

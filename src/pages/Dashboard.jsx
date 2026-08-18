@@ -2,7 +2,6 @@ import React from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  Brain,
   Briefcase,
   Building2,
   Calendar,
@@ -14,6 +13,7 @@ import {
   RefreshCw,
   Truck,
   UserRoundCog,
+  UserSearch,
   Users,
   Workflow,
 } from "lucide-react";
@@ -38,30 +38,10 @@ const DAILY_OPERATIONS = [
 
 const BUSINESS_MANAGEMENT = [
   { label: "Employees", description: "Team roster, roles, and field staff", path: "/employees", icon: UserRoundCog },
+  { label: "Talent", description: "Post roles and review qualified nearby candidates", path: "/talent", icon: UserSearch },
   { label: "Fleet", description: "Vehicles, equipment, service, and fleet operations", path: "/fleet", icon: Truck },
   { label: "Inventory", description: "Supplies, parts, costs, and low-stock alerts", path: "/inventory", icon: Package },
   { label: "Business Documents", description: "Credentials, contracts, and insurance", path: "/business-documents", icon: FolderKanban },
-];
-
-const EXTENSIONS = [
-  {
-    label: "Find Work",
-    description: "Find additional work when the business needs more jobs.",
-    path: "/hire/matches",
-    icon: Briefcase,
-  },
-  {
-    label: "Titan Auto + Leads",
-    description: "Build the lead pipeline and automate approved repetitive work.",
-    path: "/autopilot",
-    icon: Workflow,
-  },
-  {
-    label: "2nd Self",
-    description: "Use Titan intelligence, memory, and approved actions across the business.",
-    path: "/second-me",
-    icon: Brain,
-  },
 ];
 
 function Metric({ label, value, hint }) {
@@ -235,33 +215,29 @@ export default function Dashboard({ isActive = true }) {
       <section className="titan-surface p-5" aria-label="Business management">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Manage the company</p>
-          <h2 className="mt-1 text-lg font-semibold text-foreground">People, fleet, inventory, and records</h2>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">People, talent, fleet, inventory, and records</h2>
           <p className="mt-1 text-sm text-muted-foreground">The operating infrastructure behind the jobs.</p>
         </div>
-        <WorkspaceGrid items={BUSINESS_MANAGEMENT} columns="lg:grid-cols-4" />
+        <WorkspaceGrid items={BUSINESS_MANAGEMENT} columns="xl:grid-cols-5" />
       </section>
 
-      <section aria-label="Business extensions">
-        <div className="mb-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Business extensions</p>
-          <h2 className="mt-1 text-lg font-semibold text-foreground">Add intelligence and growth when you need it</h2>
-        </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {EXTENSIONS.map((item) => (
-            <button
-              key={item.path}
-              type="button"
-              onClick={() => navigate(item.path)}
-              className="titan-surface group p-5 text-left transition-colors hover:border-primary/40 focus-ring"
-            >
-              <item.icon className="h-6 w-6 text-primary" aria-hidden="true" />
-              <h3 className="mt-4 font-semibold text-foreground">{item.label}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-              <p className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                Open <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      <section className="titan-surface overflow-hidden p-5" aria-label="TitanAUTO">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Workflow className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">TitanAUTO</p>
+              <h2 className="mt-1 text-lg font-semibold text-foreground">Automate repetitive business work after approval</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                Find leads, prioritize recruiting and follow-up work, and run bounded automations without turning TitanOS into a separate AI product.
               </p>
-            </button>
-          ))}
+            </div>
+          </div>
+          <Button type="button" onClick={() => navigate("/autopilot")} className="shrink-0 gap-1">
+            Open TitanAUTO <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
       </section>
     </PageShell>

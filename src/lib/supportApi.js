@@ -79,6 +79,14 @@ export async function escalateSupportCase(caseId) {
   return api.functions.invoke("supportEscalate", { case_id: caseId });
 }
 
+export async function reopenSupportCase(caseId) {
+  return api.functions.invoke("supportReopenCase", { case_id: caseId });
+}
+
+export async function refreshSupportSubscription(caseId) {
+  return api.functions.invoke("supportRefreshSubscription", { case_id: caseId });
+}
+
 export async function submitSupportCsat(caseId, { solved, rating, comment } = {}) {
   return api.functions.invoke("supportSubmitCsat", {
     case_id: caseId,

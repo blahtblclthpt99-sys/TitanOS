@@ -88,6 +88,17 @@ export async function submitSupportCsat(caseId, { solved, rating, comment } = {}
   });
 }
 
+export function subscribeToSupportCase(caseId, onChange) {
+  if (!caseId || typeof onChange !== "function") return () => {};
+  const channel = supabase
+    .channel(`support-case-${caseId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "support_messages", filter: `case_id=eq.${caseId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "support_case_events", filter: `case_id=eq.${caseId}` }, onChange)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "support_cases", filter: `id=eq.${caseId}` }, onChange)
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}
+
 export async function uploadSupportAttachment({ caseId, userId, file }) {
   if (!caseId || !userId || !file) throw new Error("Case, user, and file are required.");
   if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) throw new Error("This attachment type is not supported.");

@@ -96,5 +96,5 @@ export function rankPublishedServiceMatches(job = {}, profiles = [], { minimumSc
     }))
     .filter((profile) => !profile.match.missing_certifications.length)
     .filter((profile) => profile.match.score >= minimumScore)
-    .sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name));
+    .sort((a, b) => b.match.score - a.match.score || String(a.id || "").localeCompare(String(b.id || "")));
 }

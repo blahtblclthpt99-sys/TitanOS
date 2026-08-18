@@ -46,6 +46,9 @@ jobs:
       - name: Free job access contract
         run: node --test scripts/free-job-access.test.mjs
 
+      - name: Find Jobs session recovery
+        run: node --test scripts/job-match-session-recovery.test.mjs
+
       - name: Google Play billing policy boundary
         run: node --test scripts/play-billing-policy.test.mjs
 

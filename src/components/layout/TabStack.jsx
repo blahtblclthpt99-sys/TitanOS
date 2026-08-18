@@ -44,6 +44,7 @@ const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
 const TalentProfile = lazy(() => import("@/pages/TalentProfile"));
+const ServiceTalentProfile = lazy(() => import("@/pages/ServiceTalentProfile"));
 
 // Independent Work.
 const IndependentHome = lazy(() => import("@/pages/IndependentHome"));
@@ -239,6 +240,14 @@ function NonTabPage() {
     return (
       <Suspense fallback={<Spinner />}>
         <TalentProfile />
+      </Suspense>
+    );
+  }
+
+  if (business && pathname.startsWith("/talent/service/")) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <ServiceTalentProfile />
       </Suspense>
     );
   }

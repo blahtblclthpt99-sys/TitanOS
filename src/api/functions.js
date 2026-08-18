@@ -76,7 +76,7 @@ async function localFallback(functionName, payload) {
     const { answerFromSummary } = await import("@/lib/ai-business-summary");
     const last =
       (payload.messages || []).filter((m) => m.role === "user").slice(-1)[0]?.content || "";
-    // Offline: only answer from a client display snapshot with clear provenance —
+    // Offline/reconnecting: only answer from a client display snapshot with clear provenance —
     // never claim server truth. Prefer empty/unavailable over invented facts.
     const summary = payload.offlineSnapshot || null;
     const local = summary ? answerFromSummary(last, summary) : null;
@@ -88,7 +88,7 @@ async function localFallback(functionName, payload) {
         generalKnowledge: false,
         message:
           local ||
-          "2nd Me can't reach Titan's live data service right now. Retry in a moment or open Jobs / Invoices / Customers directly.",
+          "I can keep working with the context already on this device, but I can't verify live account data until your Titan session reconnects.",
       },
     };
   }
@@ -235,6 +235,13 @@ export function createFunctionsModule() {
                 lastError = retryError;
               }
             }
+          }
+
+          // A stale/expired session must never turn read-only 2nd Me into a dead end.
+          // After one refresh attempt, fall back to the already-loaded device snapshot.
+          // Writes and every other 4xx remain fail-closed.
+          if (functionName === "titanAI" && lastError?.status === 401) {
+            return localFallback(functionName, payload);
           }
 
           // Validation, authorization, entitlement, conflict, and rate-limit errors

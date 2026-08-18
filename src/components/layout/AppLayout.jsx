@@ -9,6 +9,7 @@ import FloatingAIButton from "@/components/shared/FloatingAIButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
 import AppUpdateGate from "@/components/shared/AppUpdateGate";
+import AdPlacement from "@/components/monetization/AdPlacement";
 import SupportCenter from "@/pages/SupportCenter";
 import SupportCommandCenter from "@/pages/SupportCommandCenter";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
@@ -63,6 +64,7 @@ export default function AppLayout() {
         <div className="page-enter">
           {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
         </div>
+        {!isSupportCenter && !isSupportCommandCenter ? <AdPlacement key={pathname} /> : null}
       </main>
 
       <FloatingAIButton />

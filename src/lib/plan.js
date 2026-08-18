@@ -221,12 +221,16 @@ const PLAN_ALIASES = Object.freeze({
   worker_premium: "worker_premium",
 });
 
+/**
+ * Billing entitlement is intentionally independent from Titan workspace identity.
+ * Never fall back to account_type / active_workspace / enabled_workspaces here.
+ */
 export function resolvePlan(user) {
   if (!user) return "anonymous";
   if (user.role === "admin") return "business";
 
-  const raw = String(user.plan_tier || user.account_type || "").toLowerCase();
-  if (raw === "customer" || user.account_type === "customer") return "customer";
+  const raw = String(user.plan_tier || "").trim().toLowerCase();
+  if (raw === "customer") return "customer";
   if (raw === "business") return "business";
   if (raw === "starter") return "starter";
   if (

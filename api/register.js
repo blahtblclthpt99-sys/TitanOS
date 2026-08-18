@@ -6,6 +6,21 @@ import { assertRateLimit } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
+const WORKSPACES = new Set(["job_seeker", "self_employed", "business"]);
+
+function normalizeWorkspaces(body = {}) {
+  const requested = Array.isArray(body.enabledWorkspaces || body.enabled_workspaces)
+    ? body.enabledWorkspaces || body.enabled_workspaces
+    : [];
+  const enabled = [...new Set(requested.map((value) => String(value || "").trim().toLowerCase()).filter((value) => WORKSPACES.has(value)))];
+  const legacy = String(body.accountType || body.account_type || "").trim().toLowerCase();
+  if (!enabled.length && WORKSPACES.has(legacy)) enabled.push(legacy);
+  if (!enabled.length) enabled.push("job_seeker");
+  const requestedActive = String(body.activeWorkspace || body.active_workspace || legacy || enabled[0]).trim().toLowerCase();
+  const active = enabled.includes(requestedActive) ? requestedActive : enabled[0];
+  return { enabled, active };
+}
+
 /**
  * Server-side registration.
  * Production (VERCEL_ENV=production) requires email confirm unless
@@ -24,11 +39,11 @@ export default async function handler(req, res) {
 
   try {
     const body = readJson(req);
-    const email = String(body.email || "")
-      .trim()
-      .toLowerCase();
+    const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
+    const workspaces = normalizeWorkspaces(body);
+    const legacyAccountType = workspaces.active === "business" ? "business" : "worker";
     const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
     const requireConfirm =
       flag != null && String(flag).trim() !== ""
@@ -50,7 +65,12 @@ export default async function handler(req, res) {
       email,
       password,
       email_confirm: !requireConfirm,
-      user_metadata: fullName ? { full_name: fullName } : undefined,
+      user_metadata: {
+        ...(fullName ? { full_name: fullName } : {}),
+        account_type: legacyAccountType,
+        enabled_workspaces: workspaces.enabled,
+        active_workspace: workspaces.active,
+      },
     });
 
     if (createError) {
@@ -74,14 +94,46 @@ export default async function handler(req, res) {
       });
     }
 
-    await recordSignupEmail(admin, { email, fullName, source: "register" });
+    await recordSignupEmail(admin, { email, fullName, source: `register:${workspaces.active}` });
 
-    // Founding 100 claim (also runs from profiles AFTER INSERT trigger — best-effort here)
     if (created.user?.id) {
+      // Founding claim first. Workspace identity is UX only and never determines
+      // subscription entitlement.
       try {
         await admin.rpc("claim_founding_slot", { p_user_id: created.user.id });
       } catch {
         /* trigger may already have claimed; ignore */
+      }
+
+      try {
+        const { data: profile } = await admin
+          .from("profiles")
+          .select("plan_tier,professional_profile")
+          .eq("id", created.user.id)
+          .maybeSingle();
+        const professionalProfile = profile?.professional_profile && typeof profile.professional_profile === "object"
+          ? profile.professional_profile
+          : {};
+        const row = {
+          id: created.user.id,
+          ...(fullName ? { full_name: fullName } : {}),
+          account_type: legacyAccountType,
+          enabled_workspaces: workspaces.enabled,
+          active_workspace: workspaces.active,
+          professional_profile: {
+            ...professionalProfile,
+            enabled_workspaces: workspaces.enabled,
+            active_workspace: workspaces.active,
+          },
+        };
+        if (!String(profile?.plan_tier || "").trim()) row.plan_tier = "worker_free";
+        const { error: profileError } = await admin
+          .from("profiles")
+          .upsert(row, { onConflict: "id" });
+        if (profileError) throw profileError;
+      } catch (profileError) {
+        // Do not orphan an Auth account because profile enrichment failed.
+        logError("api/register:workspaces", profileError);
       }
     }
 
@@ -91,6 +143,8 @@ export default async function handler(req, res) {
           id: created.user?.id,
           email: created.user?.email || email,
         },
+        enabledWorkspaces: workspaces.enabled,
+        activeWorkspace: workspaces.active,
         session: null,
         needsEmailVerification: true,
         verificationMode: "email_link",
@@ -117,6 +171,8 @@ export default async function handler(req, res) {
           id: created.user?.id,
           email: created.user?.email || email,
         },
+        enabledWorkspaces: workspaces.enabled,
+        activeWorkspace: workspaces.active,
         session: null,
         needsEmailVerification: true,
         verificationMode: "email_link",
@@ -129,6 +185,8 @@ export default async function handler(req, res) {
         id: signedIn.user.id,
         email: signedIn.user.email,
       },
+      enabledWorkspaces: workspaces.enabled,
+      activeWorkspace: workspaces.active,
       session: {
         access_token: signedIn.session.access_token,
         refresh_token: signedIn.session.refresh_token,

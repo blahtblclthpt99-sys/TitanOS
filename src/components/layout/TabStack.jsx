@@ -1,194 +1,268 @@
 /**
- * TabStack — keeps a small LRU of high-frequency tabs mounted so scroll/state survive
- * nearby switches. Lower-frequency pages render normally and merged legacy routes
- * redirect to their canonical TitanOS destination.
+ * TitanOS authenticated route stack.
+ *
+ * Isolated workspaces share auth, safety, TitanAUTO and support:
+ * - Business: full Business Operating System + recruiting/teams/fleet.
+ * - Independent Work: opportunities + lightweight customers/work/quotes/money.
+ * - Job Seeker: employment discovery + professional matching profile.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useAuth } from "@/lib/AuthContext";
+import { accountHomePath, activeWorkspace, WORKSPACES } from "@/lib/accountExperience";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
-
-const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
-const TAB_LRU_SIZE = 3;
-
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+
+// Shared operating primitives used by Business and Independent Work.
 const Jobs = lazy(() => import("@/pages/Jobs"));
-const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
-const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
-const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
-
-const TAB_COMPONENTS = {
-  "/": Dashboard,
-  "/driver": DriverHubTab,
-  "/comms": TitanCommsTab,
-  "/jobs": Jobs,
-  "/more": MoreMenu,
-};
-
 const Customers = lazy(() => import("@/pages/Customers"));
-const Invoices = lazy(() => import("@/pages/Invoices"));
-const Marketplace = lazy(() => import("@/pages/Marketplace"));
-const Profile = lazy(() => import("@/pages/Profile"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
-const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
-const Schedule = lazy(() => import("@/pages/Schedule"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
-const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
-const Finances = lazy(() => import("@/pages/Finances"));
-const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
+const Payments = lazy(() => import("@/pages/Payments"));
+
+// Business-only operations and management.
+const Schedule = lazy(() => import("@/pages/Schedule"));
+const Employees = lazy(() => import("@/pages/Employees"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
-const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
-const Reports = lazy(() => import("@/pages/Reports"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const DriverHub = lazy(() => import("@/pages/DriverHub"));
+const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
+const Credentials = lazy(() => import("@/pages/Credentials"));
+const Contracts = lazy(() => import("@/pages/Contracts"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
-const Referral = lazy(() => import("@/pages/Referral"));
-const Hire = lazy(() => import("@/pages/Hire"));
-const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
-const Notifications = lazy(() => import("@/pages/Notifications"));
-const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
-const AdminFees = lazy(() => import("@/pages/AdminFees"));
-const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
-const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
-const Booking = lazy(() => import("@/pages/Booking"));
-const Contracts = lazy(() => import("@/pages/Contracts"));
-const Payments = lazy(() => import("@/pages/Payments"));
-const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
-const Companies = lazy(() => import("@/pages/Companies"));
-const Employees = lazy(() => import("@/pages/Employees"));
-const Inventory = lazy(() => import("@/pages/Inventory"));
-const FollowUps = lazy(() => import("@/pages/FollowUps"));
+const TalentProfile = lazy(() => import("@/pages/TalentProfile"));
+const ServiceTalentProfile = lazy(() => import("@/pages/ServiceTalentProfile"));
+
+// Independent Work.
+const IndependentHome = lazy(() => import("@/pages/IndependentHome"));
+const WorkOpportunities = lazy(() => import("@/pages/WorkOpportunities"));
+const ServiceProfile = lazy(() => import("@/pages/ServiceProfile"));
+
+// Job seeker.
+const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const JobSeekerProfile = lazy(() => import("@/pages/JobSeekerProfile"));
+
+// Shared Titan layer.
 const Autopilot = lazy(() => import("@/pages/Autopilot"));
-const Reputation = lazy(() => import("@/pages/Reputation"));
-const Credentials = lazy(() => import("@/pages/Credentials"));
+const SecondMe = lazy(() => import("@/pages/SecondMe"));
+const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Leads = lazy(() => import("@/pages/Leads"));
-const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
-const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
+const FollowUps = lazy(() => import("@/pages/FollowUps"));
+
+// Utilities / transparency.
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
-const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
-const ShareReport = lazy(() => import("@/pages/ShareReport"));
-const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
-const SecondMe = lazy(() => import("@/pages/SecondMe"));
+const Engagement = lazy(() => import("@/pages/Engagement"));
+const AccountType = lazy(() => import("@/pages/AccountType"));
+const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
+const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
+const AdminFees = lazy(() => import("@/pages/AdminFees"));
+const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 
-/**
- * Compatibility map: preserve old bookmarks without keeping duplicate product concepts.
- * Removed/postponed high-liability features return to Home; their code remains in source
- * until separately archived after dependency/runtime verification.
- */
+const TAB_PATHS = ["/"];
+const TAB_LRU_SIZE = 1;
+const TAB_COMPONENTS = { "/": Dashboard };
+
+const LIGHTWEIGHT_OS_PREFIXES = [
+  "/jobs",
+  "/customers",
+  "/estimates",
+  "/invoices",
+  "/payments",
+];
+
+const BUSINESS_ONLY_PREFIXES = [
+  "/schedule",
+  "/employees",
+  "/talent",
+  "/fleet",
+  "/driver",
+  "/routes",
+  "/inventory",
+  "/business-documents",
+  "/credentials",
+  "/contracts",
+  "/insurance",
+  "/more",
+  "/hire/candidates",
+  "/hire/find-workers",
+  "/hire/post-match-ready",
+];
+
+const INDEPENDENT_ONLY_PREFIXES = ["/independent", "/work-opportunities", "/service-profile"];
+const SEEKER_ONLY_PREFIXES = ["/hire/matches", "/job-profile"];
+
 const LEGACY_REDIRECTS = {
-  "/messages": "/comms",
-  "/titan-score": "/analytics?titanScore=1",
-  "/growth-coach": "/assistant?mode=growth",
-  "/marketing": "/assistant?mode=marketing",
-  "/phone": "/assistant?mode=phone-script",
+  "/booking": "/schedule",
+  "/finances": "/invoices",
+  "/reports": "/",
+  "/tax-center": "/invoices",
+  "/analytics": "/",
+  "/companies": "/settings",
+  "/job-estimator": "/estimates",
+  "/receipts": "/invoices",
+  "/marketplace": "/",
+  "/reputation": "/customers",
+  "/referral": "/customers",
+  "/comms": "/customers",
+  "/messages": "/customers",
+  "/titan-score": "/",
   "/community": "/",
   "/emergency": "/",
   "/deals": "/",
   "/escrow": "/",
+  "/ai-assistant": "/assistant",
+  "/growth-coach": "/second-me",
+  "/marketing": "/second-me",
+  "/phone": "/second-me",
 };
 
 const NON_TAB_ROUTES = {
-  "/schedule": Schedule,
-  "/estimates": Estimates,
-  "/job-estimator": JobEstimator,
-  "/finances": Finances,
-  "/receipts": ReceiptScanner,
-  "/fleet": Fleet,
-  "/tax-center": TaxCenter,
-  "/reports": Reports,
-  "/analytics": Analytics,
+  // Shared operating primitives for Business + Independent Work.
+  "/jobs": Jobs,
   "/customers": Customers,
+  "/estimates": Estimates,
   "/invoices": Invoices,
-  "/assistant": AIAssistant,
-  "/second-me": SecondMe,
+  "/payments": Payments,
+
+  // Business only.
+  "/schedule": Schedule,
+  "/employees": Employees,
+  "/talent": ExistingPostWorkerMatches,
+  "/fleet": Fleet,
+  "/driver": DriverHub,
+  "/routes": RoutePlanner,
+  "/inventory": Inventory,
   "/business-documents": BusinessDocuments,
+  "/credentials": Credentials,
+  "/contracts": Contracts,
   "/insurance": Insurance,
-  "/referral": Referral,
-  "/hire": Hire,
-  "/hire/matches": JobMatches,
+  "/more": MoreMenu,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
-  "/notifications": Notifications,
-  "/admin/moderation": AdminModeration,
-  "/admin/fees": AdminFees,
-  "/admin/tax-rules": AdminTaxRules,
-  "/admin": AdminControlCenter,
-  "/booking": Booking,
-  "/contracts": Contracts,
-  "/payments": Payments,
-  "/routes": RoutePlanner,
-  "/companies": Companies,
-  "/employees": Employees,
-  "/inventory": Inventory,
-  "/follow-ups": FollowUps,
+
+  // Independent Work.
+  "/independent": IndependentHome,
+  "/work-opportunities": WorkOpportunities,
+  "/service-profile": ServiceProfile,
+
+  // Job seeker.
+  "/hire/matches": JobMatches,
+  "/job-profile": JobSeekerProfile,
+
+  // Shared Titan layer.
   "/autopilot": Autopilot,
-  "/reputation": Reputation,
-  "/credentials": Credentials,
+  "/second-me": SecondMe,
+  "/assistant": AIAssistant,
   "/leads": Leads,
+  "/follow-ups": FollowUps,
+
+  // Utilities / transparency.
+  "/notifications": Notifications,
+  "/profile": Profile,
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
-  "/design-system": DesignSystem,
-  "/profile": Profile,
-  "/marketplace": Marketplace,
+  "/engagement": Engagement,
+  "/account-type": AccountType,
+  "/admin": AdminControlCenter,
+  "/admin/moderation": AdminModeration,
+  "/admin/fees": AdminFees,
+  "/admin/tax-rules": AdminTaxRules,
 };
+
+function startsWithAny(pathname, prefixes) {
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 function NonTabPage() {
   const { pathname: rawPath } = useLocation();
+  const { user } = useAuth();
   const pathname = normalizeAppPath(rawPath);
+  const workspace = activeWorkspace(user);
+  const business = workspace === WORKSPACES.BUSINESS;
+  const independent = workspace === WORKSPACES.SELF_EMPLOYED;
+  const seeker = workspace === WORKSPACES.JOB_SEEKER;
+
+  if (pathname === "/hire") {
+    return <Navigate to={business ? "/talent" : independent ? "/work-opportunities" : "/hire/matches"} replace />;
+  }
 
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
 
-  if (pathname.startsWith("/share/report/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <ShareReport />
-      </Suspense>
-    );
+  if (business && (startsWithAny(pathname, SEEKER_ONLY_PREFIXES) || startsWithAny(pathname, INDEPENDENT_ONLY_PREFIXES))) {
+    return <Navigate to="/" replace />;
   }
-  if (pathname.startsWith("/customers/")) {
+  if (independent && (startsWithAny(pathname, SEEKER_ONLY_PREFIXES) || startsWithAny(pathname, BUSINESS_ONLY_PREFIXES))) {
+    return <Navigate to="/independent" replace />;
+  }
+  if (seeker && (
+    startsWithAny(pathname, BUSINESS_ONLY_PREFIXES) ||
+    startsWithAny(pathname, INDEPENDENT_ONLY_PREFIXES) ||
+    startsWithAny(pathname, LIGHTWEIGHT_OS_PREFIXES)
+  )) {
+    return <Navigate to="/hire/matches" replace />;
+  }
+
+  if ((business || independent) && pathname.startsWith("/customers/") && pathname !== "/customers") {
     return (
       <Suspense fallback={<Spinner />}>
         <CustomerDetail />
       </Suspense>
     );
   }
-  if (pathname.startsWith("/invoices/")) {
+
+  if ((business || independent) && pathname.startsWith("/invoices/") && pathname !== "/invoices") {
     return (
       <Suspense fallback={<Spinner />}>
         <InvoiceDetail />
       </Suspense>
     );
   }
-  if (pathname.startsWith("/driver/trip/")) {
+
+  if (business && pathname.startsWith("/talent/worker/")) {
     return (
       <Suspense fallback={<Spinner />}>
-        <DriverTripDetail />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/driver/") && pathname !== "/driver/") {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverProfile />
+        <TalentProfile />
       </Suspense>
     );
   }
 
-  const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
-  const Page = NON_TAB_ROUTES[routeKey];
+  if (business && pathname.startsWith("/talent/service/")) {
+    return (
+      <Suspense fallback={<Spinner />}>
+        <ServiceTalentProfile />
+      </Suspense>
+    );
+  }
+
+  // Old driver detail URLs resolve through Business Talent only.
+  if (pathname.startsWith("/driver/") && pathname !== "/driver") {
+    const workerId = pathname.split("/").filter(Boolean)[1];
+    return business && workerId
+      ? <Navigate to={`/talent/worker/${encodeURIComponent(workerId)}`} replace />
+      : <Navigate to={accountHomePath(user)} replace />;
+  }
+
+  const Page = NON_TAB_ROUTES[pathname];
   if (!Page) {
     return (
       <Suspense fallback={<Spinner />}>
@@ -205,29 +279,35 @@ function NonTabPage() {
 }
 
 export default function TabStack() {
+  const { user } = useAuth();
   const location = useLocation();
   const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
+  const workspace = activeWorkspace(user);
+  const business = workspace === WORKSPACES.BUSINESS;
 
-  const isTab = TAB_PATHS.includes(pathname);
+  if (!business && pathname === "/") {
+    return <Navigate to={accountHomePath(user)} replace />;
+  }
+
+  const isTab = business && TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
 
   if (activeTab) {
-    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
+    recentTabs.current = [activeTab, ...recentTabs.current.filter((path) => path !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
+
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
 
   return (
     <div className="relative w-full min-h-[calc(100svh-8rem)]">
-      {TAB_PATHS.map((path) => {
+      {business ? TAB_PATHS.map((path) => {
         const Page = TAB_COMPONENTS[path];
         const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
-
         if (!isMounted) return null;
-
         return (
           <div
             key={path}
@@ -235,16 +315,16 @@ export default function TabStack() {
             aria-hidden={!isActive}
             className={isActive && !reduceMotion ? "page-enter" : undefined}
           >
-            <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
+            <ErrorBoundary message="Titan Business Home failed to load. Try switching away and back, or refresh.">
               <Suspense fallback={<Spinner label="Loading" />}>
                 <Page isActive={isActive} />
               </Suspense>
             </ErrorBoundary>
           </div>
         );
-      })}
+      }) : null}
 
-      {!isTab && (
+      {!isTab ? (
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}
@@ -254,12 +334,12 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home.">
+            <ErrorBoundary key={pathname} message="This Titan workspace failed to load. Try again or return to your account home.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
-      )}
+      ) : null}
     </div>
   );
 }

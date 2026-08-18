@@ -3,35 +3,33 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
-import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
-import DoorDashKeepAlive from "@/components/driver/activity/DoorDashKeepAlive";
 import { useAuth } from "@/lib/AuthContext";
-import { warmSearchIndex } from "@/lib/searchIndex";
 import { trackEvent } from "@/lib/productAnalytics";
 import { refreshFeatureFlagsFromServer } from "@/lib/featureFlags";
-import ScheduledExportRunner from "@/components/shared/ScheduledExportRunner";
 
-function PrefetchOnMount() {
+function CoreBoot() {
   usePrefetchDashboard(true);
   const { user } = useAuth();
+
   useEffect(() => {
-    if (user?.id) {
-      warmSearchIndex(user.id).catch(() => {});
-      trackEvent("session_start");
-      refreshFeatureFlagsFromServer().catch(() => {});
-    }
+    if (!user?.id) return;
+    trackEvent("session_start");
+    refreshFeatureFlagsFromServer().catch(() => {});
   }, [user?.id]);
+
   return null;
 }
 
-/** Authenticated app shell — keeps react-query out of the marketing bundle. */
+/**
+ * Authenticated TitanOS core shell.
+ * Non-core Driver/DoorDash keepalives, scheduled exports, and global-search warming
+ * no longer run for every signed-in session. Their legacy routes remain compatible,
+ * but they do not consume startup work unless they are explicitly reintroduced.
+ */
 export default function AuthenticatedShell() {
   return (
     <QueryClientProvider client={queryClientInstance}>
-      <PrefetchOnMount />
-      <ScheduledExportRunner />
-      <DriverSessionKeepAlive />
-      <DoorDashKeepAlive />
+      <CoreBoot />
       <AppLayout />
     </QueryClientProvider>
   );

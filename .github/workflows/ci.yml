@@ -37,6 +37,15 @@ jobs:
       - name: Unit / integration / regression pack
         run: npm test
 
+      - name: Business OS product boundary
+        run: node --test scripts/business-os-product.test.mjs
+
+      - name: Engagement and recruiting boundary
+        run: node --test scripts/engagement-boundary.test.mjs
+
+      - name: Ad monetization safety
+        run: node --test scripts/ad-monetization.test.mjs
+
       - name: Private Storage URL safety
         run: node --test scripts/storage-url-security.test.mjs
 
@@ -45,6 +54,9 @@ jobs:
 
       - name: Free job access contract
         run: node --test scripts/free-job-access.test.mjs
+
+      - name: Find Jobs session recovery
+        run: node --test scripts/job-match-session-recovery.test.mjs
 
       - name: Google Play billing policy boundary
         run: node --test scripts/play-billing-policy.test.mjs

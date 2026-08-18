@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { getFreshAccessToken } from "@/lib/sessionRecovery";
 
 const FUNCTION_TIMEOUT_MS = 15_000;
 
@@ -7,27 +7,6 @@ function apiError(message, status = 400, code = "") {
   error.status = status;
   if (code) error.code = code;
   return error;
-}
-
-async function getAccessToken({ forceRefresh = false } = {}) {
-  if (forceRefresh) {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error) return null;
-    return data.session?.access_token || null;
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) return null;
-
-  const expiresAtMs = Number(data.session.expires_at || 0) * 1000;
-  if (expiresAtMs && expiresAtMs - Date.now() < 60_000) {
-    const refreshed = await supabase.auth.refreshSession();
-    if (!refreshed.error && refreshed.data.session?.access_token) {
-      return refreshed.data.session.access_token;
-    }
-  }
-
-  return data.session.access_token || null;
 }
 
 function functionsBaseUrl() {
@@ -213,7 +192,7 @@ function isClientRejection(error) {
 export function createFunctionsModule() {
   return {
     async invoke(functionName, payload = {}) {
-      let token = await getAccessToken();
+      let token = await getFreshAccessToken();
       const path = `/api/functions/${functionName}`;
       const candidates = candidateUrls(path);
 
@@ -227,7 +206,7 @@ export function createFunctionsModule() {
 
           if (error?.status === 401 && !refreshedAfter401) {
             refreshedAfter401 = true;
-            token = await getAccessToken({ forceRefresh: true });
+            token = await getFreshAccessToken({ forceRefresh: true, minValidityMs: 0 });
             if (token) {
               try {
                 return await postJson(url, payload, token);

@@ -4,192 +4,165 @@ import {
   Calendar,
   FileText,
   Receipt,
-  Truck,
-  DollarSign,
-  Bot,
   Briefcase,
-  BarChart3,
-  LineChart,
-  Settings,
-  ClipboardList,
-  Shield,
-  Bell,
-  ShieldAlert,
-  CalendarCheck,
   CreditCard,
-  Route,
   Building2,
-  Package,
-  UserCog,
-  MessageSquare,
-  Star,
-  ContactRound,
-  User,
-  Percent,
-  Landmark,
-  Radio,
   Workflow,
-  Car,
-  LifeBuoy,
-  Brain,
-  FolderOpen,
+  ContactRound,
+  UserRoundCog,
+  Truck,
+  Package,
+  FolderKanban,
+  MoreHorizontal,
+  UserSearch,
+  UserCircle,
+  Hammer,
 } from "lucide-react";
+import { activeWorkspace, WORKSPACES } from "@/lib/accountExperience";
 
 /**
- * TitanOS practical navigation.
- * Keep core destinations visible; merged/postponed tools remain available through
- * their canonical parent feature or compatibility routes rather than cluttering chrome.
+ * TitanOS has isolated workspaces over one account:
+ * - Job Seeker: employment discovery + professional profile.
+ * - Independent Work: opportunities + lightweight customer/work/money OS.
+ * - Business: full company operating system + recruiting/teams/fleet.
+ *
+ * TitanAUTO is shared and adapts to the active workspace.
  */
 export const APP_NAV_ITEMS = [
-  // TODAY
-  { icon: LayoutDashboard, label: "Home", path: "/", group: "today" },
-  { icon: Bell, label: "Notifications", path: "/notifications", group: "today" },
+  // BUSINESS — daily operations
+  { icon: LayoutDashboard, label: "Business Home", path: "/", group: "operations", audience: "business" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "operations", audience: "business" },
+  { icon: Calendar, label: "Schedule", path: "/schedule", group: "operations", audience: "business" },
+  { icon: Users, label: "Customers", path: "/customers", group: "operations", audience: "business" },
 
-  // WORK
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "work" },
-  { icon: Calendar, label: "Schedule", path: "/schedule", group: "work" },
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "work" },
-  { icon: Route, label: "Route Planner", path: "/routes", group: "work" },
-  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "work" },
-  { icon: UserCog, label: "Employees", path: "/employees", group: "work" },
-  { icon: Truck, label: "Fleet", path: "/fleet", group: "work" },
-  { icon: Package, label: "Inventory", path: "/inventory", group: "work" },
-  { icon: FolderOpen, label: "Business Documents", path: "/business-documents", group: "work" },
+  // BUSINESS — sales & money
+  { icon: FileText, label: "Estimates", path: "/estimates", group: "money", audience: "business" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "money", audience: "business" },
+  { icon: CreditCard, label: "Payments", path: "/payments", group: "money", audience: "business" },
 
-  // CUSTOMERS
-  { icon: Users, label: "Customers", path: "/customers", group: "customers" },
-  { icon: ContactRound, label: "Leads", path: "/leads", group: "customers" },
-  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "customers" },
-  { icon: Radio, label: "Communications", legacyName: "TitanCom", path: "/comms", group: "customers" },
-  { icon: Star, label: "Reputation", path: "/reputation", group: "customers" },
+  // BUSINESS — management & hiring
+  { icon: UserRoundCog, label: "Employees", path: "/employees", group: "management", audience: "business" },
+  { icon: UserSearch, label: "Talent", path: "/talent", group: "management", audience: "business" },
+  { icon: Truck, label: "Fleet", path: "/fleet", group: "management", audience: "business" },
+  { icon: Package, label: "Inventory", path: "/inventory", group: "management", audience: "business" },
+  { icon: FolderKanban, label: "Business Documents", path: "/business-documents", group: "management", audience: "business" },
 
-  // MONEY
-  { icon: FileText, label: "Estimates", path: "/estimates", group: "money" },
-  { icon: Receipt, label: "Invoices", path: "/invoices", group: "money" },
-  { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
-  { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
-  { icon: BarChart3, label: "Reports", path: "/reports", group: "money" },
-  { icon: ClipboardList, label: "Tax Center", path: "/tax-center", group: "money" },
+  // SELF-EMPLOYED — lightweight Business OS
+  { icon: Hammer, label: "Home", path: "/independent", group: "independent", audience: "self_employed" },
+  { icon: UserSearch, label: "Opportunities", path: "/work-opportunities", group: "independent", audience: "self_employed" },
+  { icon: Users, label: "Customers", path: "/customers", group: "independent", audience: "self_employed" },
+  { icon: Briefcase, label: "Work", path: "/jobs", group: "independent", audience: "self_employed" },
+  { icon: FileText, label: "Quotes", path: "/estimates", group: "independent_money", audience: "self_employed" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "independent_money", audience: "self_employed" },
+  { icon: CreditCard, label: "Money", path: "/payments", group: "independent_money", audience: "self_employed" },
+  { icon: UserCircle, label: "Service Profile", path: "/service-profile", group: "independent", audience: "self_employed" },
 
-  // SECOND ME
-  { icon: Brain, label: "Second Me", path: "/second-me", group: "second_me" },
-  { icon: Bot, label: "TitanAI", path: "/assistant", group: "second_me" },
-  { icon: Workflow, label: "Autopilot", path: "/autopilot", group: "second_me" },
+  // JOB SEEKER
+  { icon: Briefcase, label: "Available Jobs", path: "/hire/matches", group: "seeker", audience: "job_seeker" },
+  { icon: UserCircle, label: "Job Profile", path: "/job-profile", group: "seeker", audience: "job_seeker" },
 
-  // BUSINESS
-  { icon: Building2, label: "My Business", path: "/companies", group: "business" },
-  { icon: User, label: "Profile", path: "/profile", group: "business" },
-  { icon: LineChart, label: "Analytics", path: "/analytics", group: "business" },
-  { icon: Settings, label: "Settings", path: "/settings", group: "business" },
-
-  // SUPPORT & SAFETY
-  { icon: LifeBuoy, label: "Titan Support", path: "/support", group: "support" },
-  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "support" },
-
-  // ADMIN — actual server/route authorization is still mandatory.
-  { icon: Shield, label: "Control Center", path: "/admin", group: "administration", adminOnly: true },
-  { icon: LifeBuoy, label: "Support Command Center", path: "/admin/support", group: "administration", adminOnly: true },
-  { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "administration", adminOnly: true },
-  { icon: Percent, label: "Fee Management", path: "/admin/fees", group: "administration", adminOnly: true },
-  { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
+  // SHARED
+  { icon: Workflow, label: "TitanAUTO", path: "/autopilot", group: "shared", audience: "shared" },
 ];
 
-/**
- * Preserved internal workflows. These routes remain available to existing flows and
- * bookmarks but are intentionally excluded from the primary navigation and More menu.
- */
 export const INTERNAL_WORKFLOW_ITEMS = [
-  { label: "Job Matches", path: "/hire/matches", group: "live", hidden: true },
-  { label: "Match-ready job", path: "/hire/post-match-ready", group: "live", hidden: true },
-];
-
-export const INTERNAL_WORKFLOW_GROUPS = [
-  {
-    title: "Hiring",
-    paths: ["/hire/matches", "/hire/post-match-ready", "/hire/candidates", "/hire/find-workers"],
-  },
+  { label: "Fleet Operations", path: "/driver", group: "management", hidden: true },
+  { label: "Route Planner", path: "/routes", group: "management", hidden: true },
+  { label: "Credentials", path: "/credentials", group: "management", hidden: true },
+  { label: "Contracts", path: "/contracts", group: "management", hidden: true },
+  { label: "Insurance", path: "/insurance", group: "management", hidden: true },
+  { label: "2nd Self", path: "/second-me", group: "shared", hidden: true },
+  { label: "Titan AI", path: "/assistant", group: "shared", hidden: true },
+  { label: "Leads", path: "/leads", group: "shared", hidden: true },
+  { label: "Follow-ups", path: "/follow-ups", group: "shared", hidden: true },
+  { label: "Candidate matches", path: "/hire/candidates", group: "management", hidden: true },
+  { label: "Recruiting posts", path: "/hire/find-workers", group: "management", hidden: true },
+  { label: "Match-ready opportunity", path: "/hire/post-match-ready", group: "management", hidden: true },
+  { label: "Workspaces", path: "/account-type", group: "utilities", hidden: true },
+  { label: "Profile", path: "/profile", group: "utilities", hidden: true },
+  { label: "Settings", path: "/settings", group: "utilities", hidden: true },
+  { label: "Subscription", path: "/subscription", group: "utilities", hidden: true },
+  { label: "Titan Support", path: "/support", group: "utilities", hidden: true },
+  { label: "Trust & Safety", path: "/trust-safety", group: "utilities", hidden: true },
 ];
 
 export const NAV_GROUP_META = {
-  today: { label: "Today", collapsible: false, defaultOpen: true },
-  work: { label: "Work", collapsible: true, defaultOpen: true },
-  customers: { label: "Customers", collapsible: true, defaultOpen: true },
-  money: { label: "Money", collapsible: true, defaultOpen: true },
-  second_me: { label: "Second Me", collapsible: true, defaultOpen: true },
-  business: { label: "Business", collapsible: true, defaultOpen: false },
-  support: { label: "Support & Safety", collapsible: true, defaultOpen: false },
-  administration: { label: "Admin", collapsible: true, defaultOpen: false },
+  operations: { label: "Operations", collapsible: false, defaultOpen: true },
+  money: { label: "Sales & Money", collapsible: false, defaultOpen: true },
+  management: { label: "Business Management", collapsible: false, defaultOpen: true },
+  independent: { label: "Independent Work", collapsible: false, defaultOpen: true },
+  independent_money: { label: "Quotes & Money", collapsible: false, defaultOpen: true },
+  seeker: { label: "Job Seeker", collapsible: false, defaultOpen: true },
+  shared: { label: "Titan", collapsible: false, defaultOpen: true },
 };
 
-export const NAV_GROUP_ORDER = [
-  "today",
-  "work",
-  "customers",
-  "money",
-  "second_me",
-  "business",
-  "support",
-  "administration",
-];
+export const NAV_GROUP_ORDER = ["operations", "money", "management", "independent", "independent_money", "seeker", "shared"];
 
-/** Keep mobile focused on the four highest-frequency roots; More exposes the rest. */
-export const MOBILE_TAB_ITEMS = [
-  { icon: LayoutDashboard, label: "Home", path: "/" },
+const BUSINESS_MOBILE = [
+  { icon: Building2, label: "Home", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Car, label: "Driver", path: "/driver" },
-  { icon: Radio, label: "Comms", path: "/comms" },
+  { icon: Users, label: "Customers", path: "/customers" },
+  { icon: Receipt, label: "Money", path: "/invoices" },
+  { icon: MoreHorizontal, label: "More", path: "/more" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/driver", "/comms", "/more"];
+const INDEPENDENT_MOBILE = [
+  { icon: Hammer, label: "Home", path: "/independent" },
+  { icon: UserSearch, label: "Opportunities", path: "/work-opportunities" },
+  { icon: Briefcase, label: "Work", path: "/jobs" },
+  { icon: Receipt, label: "Invoices", path: "/invoices" },
+  { icon: Workflow, label: "TitanAUTO", path: "/autopilot" },
+];
+
+const SEEKER_MOBILE = [
+  { icon: Briefcase, label: "Jobs", path: "/hire/matches" },
+  { icon: UserCircle, label: "Profile", path: "/job-profile" },
+  { icon: Workflow, label: "TitanAUTO", path: "/autopilot" },
+];
+
+export function navItemsForUser(user) {
+  const audience = activeWorkspace(user);
+  return APP_NAV_ITEMS.filter((item) => item.audience === audience || item.audience === "shared");
+}
+
+export function mobileTabItemsForUser(user) {
+  const workspace = activeWorkspace(user);
+  if (workspace === WORKSPACES.BUSINESS) return BUSINESS_MOBILE;
+  if (workspace === WORKSPACES.SELF_EMPLOYED) return INDEPENDENT_MOBILE;
+  return SEEKER_MOBILE;
+}
+
+/** Kept as a compatibility export for older imports; prefer mobileTabItemsForUser. */
+export const MOBILE_TAB_ITEMS = BUSINESS_MOBILE;
+export const MOBILE_ROOT_PATHS = BUSINESS_MOBILE.map((item) => item.path);
 
 export const MORE_MENU_GROUPS = [
   {
-    title: "Today",
-    description: "What is happening and what needs your attention",
-    paths: ["/", "/notifications"],
+    title: "Run the business",
+    description: "Daily operations, money, people, fleet, inventory, and records.",
+    paths: [
+      "/schedule",
+      "/estimates",
+      "/payments",
+      "/employees",
+      "/talent",
+      "/fleet",
+      "/inventory",
+      "/business-documents",
+    ],
   },
   {
-    title: "Work",
-    description: "Plan, dispatch, complete, and document work",
-    paths: ["/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
-  },
-  {
-    title: "Customers",
-    description: "Manage customers, leads, communication, and reputation",
-    paths: ["/customers", "/leads", "/follow-ups", "/comms", "/reputation"],
-  },
-  {
-    title: "Money",
-    description: "Estimate, invoice, collect, track, and report",
-    paths: ["/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"],
-  },
-  {
-    title: "Second Me",
-    description: "Memory, intelligence, and approved automation",
-    paths: ["/second-me", "/assistant", "/autopilot"],
-  },
-  {
-    title: "Business",
-    description: "Your business, profile, analytics, and settings",
-    paths: ["/companies", "/profile", "/analytics", "/settings"],
-  },
-  {
-    title: "Support & Safety",
-    description: "Get help and manage safety",
-    paths: ["/support", "/trust-safety"],
-  },
-  {
-    title: "Admin",
-    description: "Authorized staff controls",
-    paths: ["/admin", "/admin/support", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
+    title: "Titan",
+    description: "Shared automation and account utilities.",
+    paths: ["/autopilot"],
   },
 ];
 
 export const QUICK_CREATE_ACTIONS = [
   { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
   { label: "Create Estimate", path: "/estimates?new=1", icon: FileText },
-  { label: "Invoice", path: "/invoices?new=1", icon: Receipt },
-  { label: "Customer", path: "/customers?new=1", icon: Users },
+  { label: "Create Invoice", path: "/invoices?new=1", icon: Receipt },
+  { label: "Add Lead", path: "/leads?new=1", icon: ContactRound },
 ];
 
 export function resolveNavDomain(pathname = "/") {
@@ -197,65 +170,94 @@ export function resolveNavDomain(pathname = "/") {
   const item =
     APP_NAV_ITEMS.find((n) => n.path === path) ||
     APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
-  return item?.group || "today";
+  if (item?.group) return item.group;
+  if (path.startsWith("/driver") || path.startsWith("/routes")) return "management";
+  if (path.startsWith("/talent") || path.startsWith("/hire/candidates") || path.startsWith("/hire/find-workers") || path.startsWith("/hire/post-match-ready")) return "management";
+  if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) return "management";
+  if (path.startsWith("/hire/matches") || path.startsWith("/job-profile")) return "seeker";
+  if (path.startsWith("/independent") || path.startsWith("/work-opportunities") || path.startsWith("/service-profile")) return "independent";
+  if (path.startsWith("/autopilot") || path.startsWith("/second-me") || path.startsWith("/assistant") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return "shared";
+  if (path.startsWith("/invoices") || path.startsWith("/estimates") || path.startsWith("/payments")) return "money";
+  return "operations";
 }
 
 export function navItemsByPaths(paths) {
   return paths.map((path) => APP_NAV_ITEMS.find((item) => item.path === path)).filter(Boolean);
 }
 
-export function filterNavItems(items, { isAdmin = false } = {}) {
-  return items.filter((item) => !item.adminOnly || isAdmin);
+export function filterNavItems(items, { user } = {}) {
+  if (!user) return items;
+  const allowed = new Set(navItemsForUser(user).map((item) => item.path));
+  return items.filter((item) => allowed.has(item.path));
 }
+
+const LEGACY_TITLES = {
+  "/more": "Business Tools",
+  "/notifications": "Notifications",
+  "/driver": "Fleet Operations",
+  "/routes": "Route Planner",
+  "/employees": "Employees",
+  "/fleet": "Fleet",
+  "/talent": "Talent",
+  "/inventory": "Inventory",
+  "/business-documents": "Business Documents",
+  "/job-profile": "Job Profile",
+  "/service-profile": "Service Profile",
+  "/independent": "Independent Work",
+  "/work-opportunities": "Opportunities",
+  "/leads": "Leads",
+  "/follow-ups": "Follow-ups",
+  "/assistant": "2nd Self",
+  "/profile": "Profile",
+  "/settings": "Settings",
+  "/support": "Titan Support",
+  "/trust-safety": "Trust & Safety",
+  "/subscription": "Subscription",
+  "/account-type": "Workspaces",
+};
 
 export function resolvePageTitle(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
-
-  if (path === "/") return "Home";
-  if (path === "/more") return "More";
-  if (path.startsWith("/driver/trip")) return "Trip detail";
-  if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
   if (path.startsWith("/customers/") && path !== "/customers") return "Customer";
   if (path.startsWith("/invoices/") && path !== "/invoices") return "Invoice";
-  if (path.startsWith("/features/")) return "Feature";
+  if (path.startsWith("/hire/matches")) return "Available Jobs";
+  if (path.startsWith("/work-opportunities")) return "Work Opportunities";
+  if (path.startsWith("/service-profile")) return "Service Profile";
+  if (path.startsWith("/independent")) return "Independent Work";
+  if (path.startsWith("/talent")) return "Talent";
+  if (path.startsWith("/hire/candidates")) return "Candidate Matches";
+  if (path.startsWith("/second-me") || path.startsWith("/assistant")) return "2nd Self";
+  if (path.startsWith("/autopilot") || path.startsWith("/leads")) return "TitanAUTO";
+  if (path.startsWith("/driver")) return "Fleet Operations";
   if (path.startsWith("/admin/support")) return "Support Command Center";
   if (path.startsWith("/admin/moderation")) return "Moderation";
   if (path === "/admin") return "Control Center";
   if (path.startsWith("/admin/fees")) return "Fee Management";
   if (path.startsWith("/admin/tax-rules")) return "Tax Rules";
-  if (path.startsWith("/book/")) return "Booking";
-  if (path.startsWith("/u/")) return "Public profile";
-  if (path.startsWith("/sign/")) return "Sign document";
-
-  const internal = INTERNAL_WORKFLOW_ITEMS.find((item) => item.path === path);
-  if (internal) return internal.label;
 
   const exact = APP_NAV_ITEMS.find((item) => item.path === path);
   if (exact) return exact.label;
-
-  const tab = MOBILE_TAB_ITEMS.find((item) => item.path === path);
-  if (tab) return tab.label === "Driver" ? "Driver Hub" : tab.label;
-
-  const prefix = APP_NAV_ITEMS.find((item) => item.path !== "/" && path.startsWith(`${item.path}/`));
-  if (prefix) return prefix.label;
-
-  return "TitanOS";
+  const internal = INTERNAL_WORKFLOW_ITEMS.find((item) => item.path === path);
+  if (internal) return internal.label;
+  return LEGACY_TITLES[path] || "TitanOS";
 }
 
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
-  if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
+  if (path.startsWith("/driver") || path.startsWith("/routes")) return { label: "Fleet", path: "/fleet" };
+  if (path.startsWith("/talent") || path.startsWith("/hire/candidates") || path.startsWith("/hire/find-workers") || path.startsWith("/hire/post-match-ready")) return { label: "Talent", path: "/talent" };
+  if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) return { label: "Business Documents", path: "/business-documents" };
+  if (path.startsWith("/hire/matches") || path.startsWith("/job-profile")) return { label: "Available Jobs", path: "/hire/matches" };
+  if (path.startsWith("/work-opportunities") || path.startsWith("/service-profile")) return { label: "Independent Work", path: "/independent" };
+  if (path.startsWith("/assistant") || path.startsWith("/second-me")) return { label: "TitanAUTO", path: "/autopilot" };
+  if (path.startsWith("/autopilot") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return { label: "TitanAUTO", path: "/autopilot" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
-  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
-  if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
-  if (path.startsWith("/comms")) return { label: "Communications", path: "/comms" };
-  if (path.startsWith("/assistant")) return { label: "TitanAI", path: "/assistant" };
-  if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
-  if (path.startsWith("/business-documents") || path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
-    return { label: "Business Documents", path: "/business-documents" };
-  }
-  if (path.startsWith("/support")) return { label: "Titan Support", path: "/support" };
-  if (path.startsWith("/admin")) return { label: "More", path: "/more" };
-  return { label: "More", path: "/more" };
+  if (path.startsWith("/jobs")) return { label: "Work", path: "/jobs" };
+  if (path.startsWith("/estimates")) return { label: "Quotes", path: "/estimates" };
+  if (path.startsWith("/payments")) return { label: "Money", path: "/payments" };
+  if (path.startsWith("/employees")) return { label: "Employees", path: "/employees" };
+  if (path.startsWith("/fleet")) return { label: "Fleet", path: "/fleet" };
+  if (path.startsWith("/inventory")) return { label: "Inventory", path: "/inventory" };
+  return { label: "TitanOS", path: "/" };
 }

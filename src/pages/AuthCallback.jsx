@@ -5,10 +5,13 @@ import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
 import { supabase } from "@/api/supabaseClient";
+import { api } from "@/api/apiClient";
+import { accountHomePath } from "@/lib/accountExperience";
 import { consumeReturnTo } from "@/lib/returnTo";
 
 const OAUTH_EXCHANGE_TIMEOUT_MS = 15000;
 const PROFILE_BOOT_TIMEOUT_MS = 12000;
+const ALLOWED_WORKSPACES = new Set(["job_seeker", "self_employed", "business"]);
 
 function withTimeout(promise, ms, message) {
   return new Promise((resolve, reject) => {
@@ -31,6 +34,38 @@ function friendlyAuthError(message) {
     return "Google sign-in could not finish (login session expired). Close extra tabs, then tap Continue with Google again from this same browser.";
   }
   return message || "Sign-in failed";
+}
+
+function readPendingWorkspaces() {
+  try {
+    const raw = sessionStorage.getItem("titanos_pending_workspaces") || "";
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const enabled = [...new Set((Array.isArray(parsed?.enabled_workspaces) ? parsed.enabled_workspaces : [])
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter((value) => ALLOWED_WORKSPACES.has(value)))];
+      const active = String(parsed?.active_workspace || "").trim().toLowerCase();
+      if (enabled.length && enabled.includes(active)) return { enabled_workspaces: enabled, active_workspace: active };
+    }
+
+    // One-release compatibility with the old two-mode OAuth handoff.
+    const legacy = sessionStorage.getItem("titanos_pending_account_type") || "";
+    if (legacy === "business" || legacy === "job_seeker") {
+      return { enabled_workspaces: [legacy], active_workspace: legacy };
+    }
+  } catch {
+    /* ignore malformed or unavailable storage */
+  }
+  return null;
+}
+
+function clearPendingWorkspaces() {
+  try {
+    sessionStorage.removeItem("titanos_pending_workspaces");
+    sessionStorage.removeItem("titanos_pending_account_type");
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function AuthCallback() {
@@ -56,14 +91,17 @@ export default function AuthCallback() {
         } else {
           const { data, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) throw sessionError;
-          if (!data.session) {
-            throw new Error("No session returned. Try again or use email login.");
-          }
+          if (!data.session) throw new Error("No session returned. Try again or use email login.");
         }
 
-        // Drop oauth query params from the address bar after a successful exchange
         if (typeof window !== "undefined" && window.history?.replaceState) {
           window.history.replaceState({}, document.title, "/auth/callback");
+        }
+
+        const pendingWorkspaces = readPendingWorkspaces();
+        if (pendingWorkspaces) {
+          await api.functions.invoke("setWorkspaces", pendingWorkspaces);
+          clearPendingWorkspaces();
         }
 
         // Log new OAuth signups (created in the last 10 minutes)
@@ -80,7 +118,7 @@ export default function AuthCallback() {
                 body: JSON.stringify({
                   email: u.email,
                   fullName: u.user_metadata?.full_name || u.user_metadata?.name || "",
-                  source: "oauth",
+                  source: pendingWorkspaces ? `oauth:${pendingWorkspaces.active_workspace}` : "oauth",
                 }),
               });
             }
@@ -94,7 +132,8 @@ export default function AuthCallback() {
           PROFILE_BOOT_TIMEOUT_MS,
           "Your account signed in, but profile setup took too long. Tap retry to continue."
         );
-        const dest = consumeReturnTo("/driver");
+        const me = await api.auth.me().catch(() => null);
+        const dest = consumeReturnTo(accountHomePath(me));
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));
@@ -111,17 +150,11 @@ export default function AuthCallback() {
     <AuthLayout title="Signing you in" subtitle="Completing authentication">
       {error ? (
         <div className="space-y-4 text-center">
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
-          <Link to="/login" className="text-sm font-semibold text-slate-800 hover:underline">
-            Retry sign in
-          </Link>
+          <p className="text-sm text-red-600" role="alert">{error}</p>
+          <Link to="/login" className="text-sm font-semibold text-slate-800 hover:underline">Retry sign in</Link>
         </div>
       ) : (
-        <div className="flex justify-center py-6">
-          <Loader2 className="w-8 h-8 animate-spin text-slate-400" aria-hidden="true" />
-        </div>
+        <div className="flex justify-center py-6"><Loader2 className="w-8 h-8 animate-spin text-slate-400" aria-hidden="true" /></div>
       )}
     </AuthLayout>
   );

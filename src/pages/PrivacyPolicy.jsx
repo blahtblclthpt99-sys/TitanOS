@@ -4,8 +4,8 @@ import { ArrowLeft, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import SiteFooter from "@/components/marketing/SiteFooter";
 
-const EFFECTIVE_DATE = "August 17, 2026";
-const VERSION = "1.2";
+const EFFECTIVE_DATE = "August 18, 2026";
+const VERSION = "1.3";
 const SUPPORT_EMAIL = "titanosmail@protonmail.com";
 
 const SECTIONS = [
@@ -27,11 +27,15 @@ const SECTIONS = [
   },
   {
     title: "Data Sharing",
-    body: `We do not sell or rent your personal information. We may share information with service providers that help us operate TitanOS, such as hosting, authentication, database, email, payments, analytics, AI, mapping, and job-search providers, only as needed to provide the applicable feature and subject to their own contractual and privacy obligations. We may also disclose information when required by law or to protect users and the service.`,
+    body: `We do not sell or rent your personal information. We may share information with service providers that help us operate TitanOS, such as hosting, authentication, database, email, payments, analytics, AI, mapping, job-search, and advertising providers, only as needed to provide the applicable feature and subject to their own contractual and privacy obligations. We do not provide advertisers with private job applications, candidate-review decisions, invoices, payment records, private business records, or precise work-profile location data for ad targeting. We may also disclose information when required by law or to protect users and the service.`,
+  },
+  {
+    title: "Advertising",
+    body: `TitanOS may display clearly labeled sponsored advertising on selected free-tier web and PWA surfaces. Paid subscription tiers are intended to remain ad-free. Advertising is excluded from authentication, hiring and candidate-review decisions, profiles, estimates, invoices, payments, support and administration, TitanAUTO action execution, and fleet or driver safety workflows. When advertising is enabled, third-party advertising providers may receive limited browser, device, page-context, ad-impression, or ad-interaction information necessary to serve, measure, secure, and report ads. Where consent is legally required, ad serving is subject to the applicable consent and privacy choices.`,
   },
   {
     title: "Cookies & Tracking",
-    body: `TitanOS uses cookies and similar technologies to keep you signed in, remember preferences, protect sessions, and understand product usage. Privacy controls allow you to manage optional product analytics and masked session replay where available. Disabling browser storage or cookies may affect some features.`,
+    body: `TitanOS uses cookies and similar technologies to keep you signed in, remember preferences, protect sessions, and understand product usage. When free-tier advertising is enabled, advertising providers may also use cookies or similar technologies for ad delivery, frequency control, fraud prevention, measurement, and—only where permitted by your consent choices—personalization. Privacy controls allow you to manage optional product analytics and masked session replay where available. Disabling browser storage or cookies may affect some features.`,
   },
   {
     title: "Your Rights",
@@ -95,7 +99,7 @@ export default function PrivacyPolicy() {
             <p className="text-muted-foreground text-sm leading-relaxed mb-6">
               TitanOS (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is committed to protecting your privacy.
               This Privacy Policy explains how we collect, use, disclose, and safeguard your
-              information when you use our field-service and driver operating system. See also our{" "}
+              information when you use our work and business operating system. See also our{" "}
               <Link to="/terms" className="text-primary underline underline-offset-2">
                 Terms of Service
               </Link>

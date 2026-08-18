@@ -1,22 +1,40 @@
 import { api } from "@/api/apiClient";
-import { readLocal, uid, writeLocal } from "@/lib/localStore";
 
-const PREFIX = "titanos_leads";
-const local = (userId) => readLocal(PREFIX, userId, "all", []);
-const save = (userId, rows) => writeLocal(PREFIX, userId, "all", rows);
+function requireUserId(userId) {
+  const id = String(userId || "").trim();
+  if (!id) throw new Error("Sign in again to manage leads.");
+  return id;
+}
+
 export async function listLeads(userId) {
-  try { return await api.entities.Lead.filter({ user_id: userId }, "-created_date"); } catch { return local(userId); }
+  const id = requireUserId(userId);
+  // Match the database authorization source exactly: leads_own is bound to
+  // created_by_id = auth.uid(). `user_id` remains legacy display/data metadata.
+  return api.entities.Lead.filter({ created_by_id: id }, "-created_date");
 }
+
 export async function createLead(user, values) {
-  const row = { status: "new", source: "manual", ...values, user_id: user.id, created_by_id: user.id };
-  try { return await api.entities.Lead.create(row); }
-  catch { const item = { id: uid(), created_at: new Date().toISOString(), ...row }; save(user.id, [item, ...local(user.id)]); return item; }
+  const userId = requireUserId(user?.id);
+  const row = {
+    status: "new",
+    source: "manual",
+    ...values,
+    user_id: userId,
+    created_by_id: userId,
+  };
+  return api.entities.Lead.create(row);
 }
+
 export async function updateLead(userId, id, values) {
-  try { return await api.entities.Lead.update(id, values); }
-  catch { const item = { ...local(userId).find((row) => row.id === id), ...values }; save(userId, local(userId).map((row) => row.id === id ? item : row)); return item; }
+  requireUserId(userId);
+  if (!id) throw new Error("Lead id is required.");
+  return api.entities.Lead.update(id, values);
 }
+
 export const updateStatus = (userId, id, status) => updateLead(userId, id, { status });
+
 export async function deleteLead(userId, id) {
-  try { await api.entities.Lead.delete(id); } catch { save(userId, local(userId).filter((row) => row.id !== id)); }
+  requireUserId(userId);
+  if (!id) throw new Error("Lead id is required.");
+  return api.entities.Lead.delete(id);
 }

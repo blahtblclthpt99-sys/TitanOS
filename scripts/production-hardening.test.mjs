@@ -169,22 +169,39 @@ describe("Critical workflow surfaces (structural)", () => {
     assert.match(read("api/register.js"), /assertRateLimit|captureApiException/);
   });
 
-  it("Driver Hub, Dashboard, Estimates, Payments, Profile, TitanCom routes exist", () => {
+  it("three-sided work OS surfaces and essential business workflows exist", () => {
     for (const f of [
       "src/pages/Dashboard.jsx",
+      "src/pages/Jobs.jsx",
+      "src/pages/Schedule.jsx",
+      "src/pages/Customers.jsx",
       "src/pages/Estimates.jsx",
+      "src/pages/Invoices.jsx",
       "src/pages/Payments.jsx",
-      "src/pages/Profile.jsx",
-      "src/pages/DriverHub.jsx",
-      "src/pages/TitanComms.jsx",
-      "src/lib/titanCommsApi.js",
-      "src/lib/titanCommsPtt.js",
+      "src/pages/JobMatches.jsx",
+      "src/pages/JobSeekerProfile.jsx",
+      "src/pages/IndependentHome.jsx",
+      "src/pages/WorkOpportunities.jsx",
+      "src/pages/ServiceProfile.jsx",
+      "src/pages/WorkerMatches.jsx",
+      "src/pages/SecondMe.jsx",
+      "src/pages/Autopilot.jsx",
     ]) {
       assert.ok(existsSync(join(root, f)), `missing ${f}`);
     }
-    assert.match(read("src/components/layout/TabStack.jsx"), /\/comms/);
-    assert.match(read("src/lib/nav-items.js"), /TitanCom/);
-    assert.match(read("src/lib/nav-items.js"), /path:\s*"\/comms"/);
+
+    const nav = read("src/lib/nav-items.js");
+    assert.match(nav, /label:\s*"Available Jobs"/);
+    assert.match(nav, /path:\s*"\/hire\/matches"/);
+    assert.match(nav, /label:\s*"Opportunities"/);
+    assert.match(nav, /path:\s*"\/work-opportunities"/);
+    assert.match(nav, /label:\s*"Talent"/);
+    assert.match(nav, /path:\s*"\/talent"/);
+    assert.match(nav, /label:\s*"TitanAUTO"/);
+    assert.match(nav, /path:\s*"\/autopilot"/);
+    assert.match(nav, /label:\s*"2nd Self"/);
+    assert.match(nav, /path:\s*"\/second-me"/);
+    assert.doesNotMatch(nav, /label:\s*"TitanCom"/);
   });
 
   it("AuthContext clears Sentry user on logout path", () => {

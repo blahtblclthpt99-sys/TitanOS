@@ -1,5 +1,5 @@
 /**
- * FINAL QA structural gates — nav↔routes, exports, migrations, GPS, escrow honesty.
+ * FINAL QA structural gates — Core Four nav↔routes, exports, migrations, GPS, escrow honesty.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -15,33 +15,48 @@ function extractQuotedPaths(src, marker) {
   if (idx < 0) return [];
   const slice = src.slice(idx, idx + 8000);
   const paths = [];
-  const re = /["'](\/[^"']+)["']/g;
+  const re = /["'](\/[^"']*)["']/g;
   let m;
-  while ((m = re.exec(slice))) {
-    // stop at next top-level const after object if we wandered too far
-    paths.push(m[1]);
-  }
+  while ((m = re.exec(slice))) paths.push(m[1]);
   return [...new Set(paths)];
 }
 
-describe("final-qa: nav ↔ app routing closure", () => {
-  it("every APP_NAV_ITEMS path is owned by TabStack or the authenticated shell", () => {
+describe("final-qa: Core Four nav ↔ app routing closure", () => {
+  it("every user-facing APP_NAV_ITEMS path is owned by TabStack or the authenticated shell", () => {
     const navSrc = read("src/lib/nav-items.js");
     const tabSrc = read("src/components/layout/TabStack.jsx");
     const layoutSrc = read("src/components/layout/AppLayout.jsx");
 
-    // Only APP_NAV_ITEMS — ignore internal workflows and QUICK_CREATE_ACTIONS query paths.
     const navBlock = navSrc.slice(
       navSrc.indexOf("export const APP_NAV_ITEMS"),
       navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
     );
-    const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]+)["']/g)].map((m) => m[1]);
-    assert.ok(navPaths.length >= 30, "expected full nav catalog");
+    const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]*)["']/g)].map((m) => m[1]);
+    const expectedCorePaths = [
+      "/",
+      "/jobs",
+      "/schedule",
+      "/customers",
+      "/estimates",
+      "/invoices",
+      "/payments",
+      "/hire/matches",
+      "/second-me",
+      "/autopilot",
+    ];
+
+    // Business Home + six business workflows + one root each for Find Work,
+    // 2nd Self, and Titan Auto. Compare the exact set so feature creep or
+    // accidental removal fails this release gate.
+    assert.deepEqual(
+      [...navPaths].sort(),
+      [...expectedCorePaths].sort(),
+      "Core Four primary navigation must match the approved product surface exactly"
+    );
 
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
     const nonTabPaths = extractQuotedPaths(tabSrc, "NON_TAB_ROUTES");
 
-    // Support deliberately renders at the authenticated-shell layer instead of TabStack.
     const shellRoutes = [];
     if (
       /pathname\s*===\s*["']\/support["']/.test(layoutSrc) &&
@@ -57,9 +72,7 @@ describe("final-qa: nav ↔ app routing closure", () => {
     }
 
     const routed = new Set([...tabPaths, ...nonTabPaths, ...shellRoutes]);
-
-    // Detail hosts covered by startsWith checks in TabStack.
-    const detailHosts = ["/customers", "/invoices", "/driver"];
+    const detailHosts = ["/customers", "/invoices"];
 
     const missing = navPaths.filter((p) => {
       if (routed.has(p)) return false;
@@ -67,7 +80,7 @@ describe("final-qa: nav ↔ app routing closure", () => {
       return true;
     });
 
-    assert.deepEqual(missing, [], `unrouted nav paths: ${missing.join(", ")}`);
+    assert.deepEqual(missing, [], `unrouted Core Four nav paths: ${missing.join(", ")}`);
   });
 });
 

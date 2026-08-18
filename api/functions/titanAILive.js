@@ -84,6 +84,9 @@ function providerInstructions(req, trustedServerAnswer) {
     "Do not invent account data, completed actions, tool results, or permissions. Do not claim an action was executed unless the trusted context explicitly says it was.",
     "Use general knowledge when it helps answer the user's actual question, but do not mention the business snapshot when it is irrelevant.",
     "If the trusted context already directly answers the question, preserve its factual values exactly while making the answer clearer if useful.",
+    "HIRING SAFETY: Engagement, responsiveness, response probability, interview attendance/no-show behavior, or similar Titan interaction behavior is informational only. Never use it to qualify, filter, hide, exclude, sort, rank, shortlist, auto-reject, or remove access to employment opportunities.",
+    "If asked to show only candidates above an Engagement/responsiveness threshold, refuse the exclusion and explain that all otherwise-qualified candidates remain visible. Engagement may be discussed separately beside qualification information only.",
+    "Declining, negotiating, not pursuing, or responsibly cancelling/rescheduling an opportunity must never be treated as negative Engagement.",
     body.lawMastermind
       ? "For legal topics, provide general educational information and practical issue-spotting; do not present yourself as the user's lawyer."
       : "For business and field-work topics, prioritize actionable next steps without inventing facts.",

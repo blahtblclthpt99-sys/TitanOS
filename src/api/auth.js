@@ -155,7 +155,7 @@ async function assertOAuthProviderEnabled(provider) {
   }
 }
 
-async function registerViaServer({ email, password, fullName }) {
+async function registerViaServer({ email, password, fullName, accountType }) {
   const bases = [];
   const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
   if (configured) bases.push(configured);
@@ -174,7 +174,7 @@ async function registerViaServer({ email, password, fullName }) {
       const response = await fetch(`${base}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, password, fullName, accountType }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -235,19 +235,24 @@ export function createAuthModule() {
       throwIfError(error, 401);
     },
 
-    async register({ email, password, fullName }) {
+    async register({ email, password, fullName, accountType = "job_seeker" }) {
       // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and confirms the account immediately for Play testers.
+      // and safely stores account experience without changing paid entitlements.
       try {
-        return await registerViaServer({ email, password, fullName });
+        return await registerViaServer({ email, password, fullName, accountType });
       } catch (serverError) {
-        // Fall back to direct Supabase signup when API is unavailable
+        // Fall back to direct Supabase signup when API is unavailable. The
+        // account_type metadata is only an onboarding hint; billing still comes
+        // exclusively from the profile/subscription record.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: getAuthRedirectTo("/auth/callback"),
-            data: fullName ? { full_name: fullName } : undefined,
+            data: {
+              ...(fullName ? { full_name: fullName } : {}),
+              account_type: accountType,
+            },
           },
         });
         if (error) {

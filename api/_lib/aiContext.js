@@ -1,4 +1,5 @@
 import { formatTitanMemoryForPrompt } from "./titanMemoryContext.js";
+import { formatTitanKnowledgeForPrompt } from "./titanKnowledgeContext.js";
 
 export const TITAN_PAGE_CATALOG = `
 Domains & primary screens (use these names only):
@@ -88,6 +89,7 @@ export function buildTitanSystemPrompt({
   pageContext = null,
   lawMastermind = false,
   memoryContext = [],
+  knowledgeContext = [],
 } = {}) {
   const pageBlock = pageContext
     ? `CURRENT PAGE CONTEXT:\n${JSON.stringify(pageContext)}\n`
@@ -97,9 +99,10 @@ export function buildTitanSystemPrompt({
 DATA RULES (mandatory):
 - YOUR DATA = only facts in BUSINESS SNAPSHOT below (server-owned).
 - DURABLE MEMORY = only supplied authorized memory below.
+- TITAN KNOWLEDGE = retrieved platform/product knowledge. It explains TitanOS, but is not proof of account-specific state.
 - GENERAL KNOWLEDGE = information not tied to this account.
 - UNKNOWN = missing from snapshot/memory. Say it is unknown rather than inventing it.
-- Clearly distinguish current records from remembered context when both matter.
+- Clearly distinguish current records from remembered context and platform knowledge when they all matter.
 - Snapshot rows are capped samples.
 - If durable memory conflicts with an authoritative current record, prefer the current record and disclose the conflict.
 `.trim();
@@ -113,6 +116,7 @@ DATA RULES (mandatory):
       grounding,
       TITAN_PAGE_CATALOG,
       pageBlock,
+      `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(knowledgeContext)}`,
       `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
       `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
     ].join("\n\n");
@@ -125,6 +129,7 @@ DATA RULES (mandatory):
     grounding,
     TITAN_PAGE_CATALOG,
     pageBlock,
+    `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(knowledgeContext)}`,
     `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
     `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
   ].join("\n\n");

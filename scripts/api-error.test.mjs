@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { AppError, sendApiError, sendDbClientError } from "../api/_lib/apiError.js";
 
@@ -53,5 +54,12 @@ describe("apiError helpers", () => {
     assert.equal(res.statusCode, 409);
     assert.equal(res.body.code, "DUPLICATE");
     assert.doesNotMatch(res.body.error, /duplicate key/i);
+  });
+
+  it("packages Android with the live Titan API and allows Capacitor's secure localhost origin", () => {
+    const workflow = readFileSync(new URL("../.github/workflows/android-release.yml", import.meta.url), "utf8");
+    const cors = readFileSync(new URL("../api/_lib/cors.js", import.meta.url), "utf8");
+    assert.match(workflow, /VITE_API_BASE_URL:\s*https:\/\/titanos-web\.vercel\.app/);
+    assert.match(cors, /"https:\/\/localhost"/);
   });
 });

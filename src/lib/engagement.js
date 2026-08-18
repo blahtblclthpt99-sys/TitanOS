@@ -23,7 +23,6 @@ const POSITIVE_BUSINESS = new Set([
   "employer_cancelled",
   "employer_rescheduled",
   "mutually_rescheduled",
-  "hiring_status_update",
   "completed",
 ]);
 

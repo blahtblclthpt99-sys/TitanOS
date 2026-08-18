@@ -104,7 +104,6 @@ COMMENT ON TABLE public.service_profiles IS
 
 -- ---------------------------------------------------------------------------
 -- Explicit relationship type on opportunities
--- Existing rows are legacy and remain employment-compatible until explicitly edited.
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.hire_jobs
   ADD COLUMN IF NOT EXISTS relationship_type text NOT NULL DEFAULT 'employment';
@@ -113,6 +112,14 @@ ALTER TABLE public.hire_jobs DROP CONSTRAINT IF EXISTS hire_jobs_relationship_ty
 ALTER TABLE public.hire_jobs ADD CONSTRAINT hire_jobs_relationship_type_valid CHECK (
   relationship_type IN ('employment','contract','customer_request')
 );
+
+-- Legacy Titan Hire rows used employment_type=“gig”/“contract” before an explicit
+-- relationship column existed. Preserve their original independent-work meaning
+-- instead of silently relabeling them as employee opportunities.
+UPDATE public.hire_jobs
+SET relationship_type = 'contract'
+WHERE relationship_type = 'employment'
+  AND lower(coalesce(employment_type, '')) IN ('gig','contract');
 
 CREATE INDEX IF NOT EXISTS hire_jobs_relationship_status_idx
   ON public.hire_jobs (relationship_type, status, created_at DESC);

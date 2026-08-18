@@ -1,4 +1,5 @@
 import { api } from "@/api/apiClient";
+import { resolveStoredUploadUrl, resolveStoredUploadUrls } from "@/api/integrations";
 import { readLocal, writeLocal, uid, withEntityFallback } from "@/lib/localStore";
 import { locationLabel } from "@/lib/platformConstants";
 import { assertWithinFreeLimit, getPlanConfig } from "@/lib/plan";
@@ -18,6 +19,20 @@ function normalizeListing(row) {
   };
 }
 
+async function hydrateListingMedia(row) {
+  const normalized = normalizeListing(row);
+  if (!normalized) return normalized;
+  const [images, sellerAvatar] = await Promise.all([
+    resolveStoredUploadUrls(normalized.images),
+    resolveStoredUploadUrl(normalized.seller_avatar || ""),
+  ]);
+  return {
+    ...normalized,
+    images: images.filter(Boolean),
+    seller_avatar: sellerAvatar,
+  };
+}
+
 export async function listMarketplaceListings({
   search = "",
   category = "All",
@@ -30,15 +45,15 @@ export async function listMarketplaceListings({
 } = {}) {
   const remote = async () => {
     let rows = await api.entities.MarketplaceListing.list("-created_date", 200);
-    rows = rows.map(normalizeListing);
+    rows = await Promise.all(rows.map(hydrateListingMedia));
     return filterListings(rows, { search, category, state, city, status, sellerId }).slice(
       page * pageSize,
       page * pageSize + pageSize
     );
   };
 
-  const local = () => {
-    const rows = readLocal(PREFIX, "global", "all", []).map(normalizeListing);
+  const local = async () => {
+    const rows = await Promise.all(readLocal(PREFIX, "global", "all", []).map(hydrateListingMedia));
     return filterListings(rows, { search, category, state, city, status, sellerId }).slice(
       page * pageSize,
       page * pageSize + pageSize
@@ -68,9 +83,10 @@ function filterListings(rows, { search, category, state, city, status, sellerId 
 
 export async function getListing(id) {
   try {
-    return normalizeListing(await api.entities.MarketplaceListing.get(id));
+    return hydrateListingMedia(await api.entities.MarketplaceListing.get(id));
   } catch {
-    return readLocal(PREFIX, "global", "all", []).map(normalizeListing).find((r) => r.id === id) || null;
+    const row = readLocal(PREFIX, "global", "all", []).find((r) => r.id === id) || null;
+    return hydrateListingMedia(row);
   }
 }
 
@@ -108,26 +124,26 @@ export async function createListing(user, data) {
   };
 
   try {
-    return normalizeListing(await api.entities.MarketplaceListing.create(payload));
+    return hydrateListingMedia(await api.entities.MarketplaceListing.create(payload));
   } catch {
     const row = { id: uid(), created_at: new Date().toISOString(), ...payload, favorite_count: 0, view_count: 0, rating_avg: 0, rating_count: 0 };
     const all = readLocal(PREFIX, "global", "all", []);
     all.unshift(row);
     writeLocal(PREFIX, "global", "all", all);
-    return normalizeListing(row);
+    return hydrateListingMedia(row);
   }
 }
 
 export async function updateListing(id, data) {
   try {
-    return normalizeListing(await api.entities.MarketplaceListing.update(id, data));
+    return hydrateListingMedia(await api.entities.MarketplaceListing.update(id, data));
   } catch {
     const all = readLocal(PREFIX, "global", "all", []);
     const idx = all.findIndex((r) => r.id === id);
     if (idx < 0) throw new Error("Listing not found");
     all[idx] = { ...all[idx], ...data, updated_at: new Date().toISOString() };
     writeLocal(PREFIX, "global", "all", all);
-    return normalizeListing(all[idx]);
+    return hydrateListingMedia(all[idx]);
   }
 }
 

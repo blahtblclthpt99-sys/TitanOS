@@ -35,9 +35,10 @@ const BLANK_EXPENSE = {
 
 export default function Finances() {
   const navigate = useNavigate();
-  const { data: [invoices, expenses], loading, error, reload } = useEntityData([
+  const { data: [invoices, expenses, estimates], loading, error, reload } = useEntityData([
     { entity: "Invoice", method: "list", args: ["-created_date", 100] },
     { entity: "Expense", method: "list", args: ["-date", 100] },
+    { entity: "Estimate", method: "list", args: ["-created_date", 100] },
   ]);
 
   const [showForm, setShowForm] = useState(false);
@@ -94,6 +95,10 @@ export default function Finances() {
 
   const { totalRevenue, totalExpenses, profit, outstanding } = buildFinanceSummary(invoices, expenses);
   const categoryData = buildExpenseCategoryData(expenses);
+  const approvedEstimates = estimates.filter((estimate) => /approved|accepted/i.test(String(estimate.status || "")));
+  const approvedEstimateValue = approvedEstimates.reduce((sum, estimate) => sum + Number(estimate.total || 0), 0);
+  const readyInvoices = invoices.filter((invoice) => !/paid|void|cancel/i.test(String(invoice.status || "")));
+  const paidInvoices = invoices.filter((invoice) => /paid/i.test(String(invoice.status || "")));
 
   const summaryCards = [
     {
@@ -134,14 +139,40 @@ export default function Finances() {
   if (error) return <ErrorState title="Couldn't load finances" onRetry={reload} />;
 
   return (
-    <div className="page-pad max-w-7xl mx-auto">
+    <div className="titan-money-flow-page page-pad max-w-7xl mx-auto">
       <PageHeader
-        title="Finances"
-        subtitle="Profit & loss overview"
+        eyebrow="Money"
+        title="Money Flow"
+        subtitle="Estimate → invoice → payment → profit. See what is approved, what is ready to collect, and what has landed."
         onAdd={() => setShowForm(true)}
         addLabel="Add Expense"
         actions={<ExportMenu spec={financesExportSpec(invoices, expenses)} />}
       />
+
+      <section className="titan-money-flow-rail" aria-label="Money flow status">
+        <button type="button" className="titan-money-stage text-left" onClick={() => navigate("/estimates")}>
+          <p className="titan-money-kicker">Estimate approved</p>
+          <p className="titan-money-value">{formatCurrency(approvedEstimateValue)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {approvedEstimates.length} approved estimate{approvedEstimates.length === 1 ? "" : "s"}
+          </p>
+        </button>
+        <button type="button" className="titan-money-stage text-left" data-tone="purple" onClick={() => navigate("/invoices")}>
+          <p className="titan-money-kicker">Invoice ready</p>
+          <p className="titan-money-value">{formatCurrency(outstanding)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {readyInvoices.length} invoice{readyInvoices.length === 1 ? "" : "s"} open
+          </p>
+        </button>
+        <button type="button" className="titan-money-stage text-left" data-tone="success" onClick={() => navigate("/payments")}>
+          <p className="titan-money-kicker">Paid</p>
+          <p className="titan-money-value">{formatCurrency(totalRevenue)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {paidInvoices.length} paid invoice{paidInvoices.length === 1 ? "" : "s"}
+          </p>
+        </button>
+      </section>
+
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           type="button"
@@ -165,7 +196,7 @@ export default function Finances() {
             <Receipt className="w-5 h-5 text-titan-amber" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">1099 Tax Center</p>
+            <p className="text-sm font-semibold text-foreground">Tax Center</p>
             <p className="text-xs text-muted-foreground">Mileage, write-offs & quarterly estimates</p>
           </div>
         </button>

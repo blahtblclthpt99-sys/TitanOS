@@ -1,13 +1,10 @@
 import { Capacitor } from "@capacitor/core";
 import { shouldUseHashRouter } from "@/lib/routing";
 
-/**
- * Canonical public HTTPS origins that must be allow-listed in Supabase Auth.
- * Keep in sync with Vercel / custom domains.
- */
+/** Canonical public HTTPS origins that must be allow-listed in Supabase Auth. */
 export const AUTH_PUBLIC_ORIGINS = [
-  "https://titanos-web.vercel.app",
   "https://titanfieldos.com",
+  "https://www.titanfieldos.com",
   "http://localhost:5173",
 ];
 
@@ -25,7 +22,7 @@ function withPath(origin, path) {
 /**
  * OAuth / email redirect URL.
  * - Native app → custom scheme deep link (handled by capacitor-auth.js)
- * - Web → current browser origin (so Vercel / IONOS / custom domains all work)
+ * - Web → current browser origin
  * - Fallback → configured VITE_TITANOS_PUBLIC_ORIGIN
  */
 export function getAuthRedirectTo(path = "/auth/callback") {
@@ -35,7 +32,6 @@ export function getAuthRedirectTo(path = "/auth/callback") {
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin;
-    // Prefer the live host the user is actually on
     if (origin.startsWith("http://") || origin.startsWith("https://")) {
       return withPath(origin, path);
     }
@@ -51,8 +47,6 @@ export function getAuthRedirectTo(path = "/auth/callback") {
 
 /** Redirect URLs to paste into Supabase → Authentication → URL Configuration */
 export function getSupabaseRedirectAllowList() {
-  // Include site roots: some providers / Site URL configs return ?code= on `/`
-  // (PathNormalizer forwards those to /auth/callback).
   const paths = ["/", "/auth/callback", "/reset-password"];
   const https = AUTH_PUBLIC_ORIGINS.flatMap((origin) =>
     paths.map((p) => `${origin.replace(/\/$/, "")}${p === "/" ? "" : p}`)

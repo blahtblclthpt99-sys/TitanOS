@@ -1,9 +1,9 @@
 /**
  * TitanOS authenticated route stack.
  *
- * TitanOS is a Business Operating System first. Daily operating routes remain
- * direct product destinations. Growth, matching, and intelligence extend the
- * business OS without displacing jobs, customers, money, people, or fleet.
+ * Two account experiences share auth, safety, TitanAUTO and support:
+ * - Business accounts get the Business Operating System and recruiting.
+ * - Job seekers get nearby job matching and a professional matching profile.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -12,18 +12,13 @@ import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useAuth } from "@/lib/AuthContext";
+import { accountHomePath, isBusinessAccount } from "@/lib/accountExperience";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
-
-// Business Home remains warm because it is the operating dashboard.
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const TAB_PATHS = ["/"];
-const TAB_LRU_SIZE = 1;
-const TAB_COMPONENTS = {
-  "/": Dashboard,
-};
 
-// Core business operations.
+// Business operations.
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
 const Customers = lazy(() => import("@/pages/Customers"));
@@ -33,7 +28,7 @@ const Invoices = lazy(() => import("@/pages/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Payments = lazy(() => import("@/pages/Payments"));
 
-// Business management.
+// Business management + recruiting.
 const Employees = lazy(() => import("@/pages/Employees"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const DriverHub = lazy(() => import("@/pages/DriverHub"));
@@ -44,33 +39,64 @@ const Credentials = lazy(() => import("@/pages/Credentials"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
+const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
+const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
+const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
+const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 
-// Business extensions.
+// Job seeker.
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
-const SecondMe = lazy(() => import("@/pages/SecondMe"));
+const JobSeekerProfile = lazy(() => import("@/pages/JobSeekerProfile"));
+
+// Shared Titan layer.
 const Autopilot = lazy(() => import("@/pages/Autopilot"));
+const SecondMe = lazy(() => import("@/pages/SecondMe"));
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Leads = lazy(() => import("@/pages/Leads"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
 
-// Employer-side matching workflows.
-const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
-const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
-const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
-
-// Essential utilities.
+// Utilities.
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
+const AccountType = lazy(() => import("@/pages/AccountType"));
 const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
 const AdminFees = lazy(() => import("@/pages/AdminFees"));
 const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 
+const TAB_PATHS = ["/"];
+const TAB_LRU_SIZE = 1;
+const TAB_COMPONENTS = { "/": Dashboard };
+
+const BUSINESS_ONLY_PREFIXES = [
+  "/jobs",
+  "/schedule",
+  "/customers",
+  "/estimates",
+  "/invoices",
+  "/payments",
+  "/employees",
+  "/talent",
+  "/fleet",
+  "/driver",
+  "/routes",
+  "/inventory",
+  "/business-documents",
+  "/credentials",
+  "/contracts",
+  "/insurance",
+  "/more",
+  "/hire/candidates",
+  "/hire/find-workers",
+  "/hire/post-match-ready",
+];
+
+const SEEKER_ONLY_PREFIXES = ["/hire/matches", "/job-profile"];
+
 const LEGACY_REDIRECTS = {
-  // Consolidated or retired business destinations.
   "/booking": "/schedule",
   "/finances": "/invoices",
   "/reports": "/",
@@ -89,14 +115,10 @@ const LEGACY_REDIRECTS = {
   "/emergency": "/",
   "/deals": "/",
   "/escrow": "/",
-
-  // Old AI aliases -> 2nd Self.
   "/ai-assistant": "/assistant",
   "/growth-coach": "/second-me",
   "/marketing": "/second-me",
   "/phone": "/second-me",
-
-  // Old Hire landing -> current matching workspace.
   "/hire": "/hire/matches",
 };
 
@@ -109,8 +131,9 @@ const NON_TAB_ROUTES = {
   "/invoices": Invoices,
   "/payments": Payments,
 
-  // Business management
+  // Business management and recruiting
   "/employees": Employees,
+  "/talent": ExistingPostWorkerMatches,
   "/fleet": Fleet,
   "/driver": DriverHub,
   "/routes": RoutePlanner,
@@ -120,19 +143,20 @@ const NON_TAB_ROUTES = {
   "/contracts": Contracts,
   "/insurance": Insurance,
   "/more": MoreMenu,
-
-  // Growth & intelligence extensions
-  "/hire/matches": JobMatches,
-  "/second-me": SecondMe,
-  "/autopilot": Autopilot,
-  "/assistant": AIAssistant,
-  "/leads": Leads,
-  "/follow-ups": FollowUps,
-
-  // Employer-side matching internals
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
+
+  // Job seeker
+  "/hire/matches": JobMatches,
+  "/job-profile": JobSeekerProfile,
+
+  // Shared Titan layer
+  "/autopilot": Autopilot,
+  "/second-me": SecondMe,
+  "/assistant": AIAssistant,
+  "/leads": Leads,
+  "/follow-ups": FollowUps,
 
   // Utilities
   "/notifications": Notifications,
@@ -140,18 +164,32 @@ const NON_TAB_ROUTES = {
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
+  "/account-type": AccountType,
   "/admin": AdminControlCenter,
   "/admin/moderation": AdminModeration,
   "/admin/fees": AdminFees,
   "/admin/tax-rules": AdminTaxRules,
 };
 
+function startsWithAny(pathname, prefixes) {
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 function NonTabPage() {
   const { pathname: rawPath } = useLocation();
+  const { user } = useAuth();
   const pathname = normalizeAppPath(rawPath);
+  const business = isBusinessAccount(user);
 
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
+
+  if (business && startsWithAny(pathname, SEEKER_ONLY_PREFIXES)) {
+    return <Navigate to="/talent" replace />;
+  }
+  if (!business && startsWithAny(pathname, BUSINESS_ONLY_PREFIXES)) {
+    return <Navigate to="/hire/matches" replace />;
+  }
 
   if (pathname.startsWith("/customers/") && pathname !== "/customers") {
     return (
@@ -169,10 +207,21 @@ function NonTabPage() {
     );
   }
 
-  // Driver detail/history routes are no longer a separate consumer operating
-  // system. Keep the business-facing fleet workspace as the only Driver entry.
+  if (business && pathname.startsWith("/talent/worker/")) {
+    const workerId = pathname.slice("/talent/worker/".length);
+    return (
+      <Suspense fallback={<Spinner />}>
+        <DriverProfile forcedDriverId={workerId} />
+      </Suspense>
+    );
+  }
+
+  // Old driver detail URLs now resolve through the business Talent workspace.
   if (pathname.startsWith("/driver/") && pathname !== "/driver") {
-    return <Navigate to="/driver" replace />;
+    const workerId = pathname.split("/").filter(Boolean)[1];
+    return business && workerId
+      ? <Navigate to={`/talent/worker/${encodeURIComponent(workerId)}`} replace />
+      : <Navigate to={accountHomePath(user)} replace />;
   }
 
   const Page = NON_TAB_ROUTES[pathname];
@@ -192,11 +241,18 @@ function NonTabPage() {
 }
 
 export default function TabStack() {
+  const { user } = useAuth();
   const location = useLocation();
   const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
-  const isTab = TAB_PATHS.includes(pathname);
+  const business = isBusinessAccount(user);
+
+  if (!business && pathname === "/") {
+    return <Navigate to="/hire/matches" replace />;
+  }
+
+  const isTab = business && TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
 
   if (activeTab) {
@@ -208,12 +264,11 @@ export default function TabStack() {
 
   return (
     <div className="relative w-full min-h-[calc(100svh-8rem)]">
-      {TAB_PATHS.map((path) => {
+      {business ? TAB_PATHS.map((path) => {
         const Page = TAB_COMPONENTS[path];
         const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
         if (!isMounted) return null;
-
         return (
           <div
             key={path}
@@ -228,7 +283,7 @@ export default function TabStack() {
             </ErrorBoundary>
           </div>
         );
-      })}
+      }) : null}
 
       {!isTab ? (
         <AnimatePresence mode="wait">
@@ -240,7 +295,7 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            <ErrorBoundary key={pathname} message="This business workspace failed to load. Try again or return to Business Home.">
+            <ErrorBoundary key={pathname} message="This Titan workspace failed to load. Try again or return to your account home.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>

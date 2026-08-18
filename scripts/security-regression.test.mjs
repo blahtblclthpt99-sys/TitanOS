@@ -145,6 +145,15 @@ describe("security regression", () => {
     assert.doesNotMatch(sql, /grant (?:insert|update|delete|truncate)[^;]*marketplace_modules to anon/i);
   });
 
+  it("marketplace catalog admin policy does not overlap public SELECT", () => {
+    const sql = read("supabase/migrations/20260818092000_split_marketplace_catalog_admin_policies.sql");
+    assert.match(sql, /marketplace_modules_admin_insert[\s\S]*for insert[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /marketplace_modules_admin_update[\s\S]*for update[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /marketplace_modules_admin_delete[\s\S]*for delete[\s\S]*select public\.is_admin\(\)/i);
+    assert.doesNotMatch(sql, /for all/i);
+    assert.doesNotMatch(sql, /for select/i);
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

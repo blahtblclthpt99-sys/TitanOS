@@ -1,46 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Link, useLocation } from "react-router";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { useNavBadges } from "@/hooks/useNavBadges";
 import { isRouteActive } from "@/lib/nav-utils";
 import NavBadge from "@/components/shared/NavBadge";
-import {
-  APP_NAV_ITEMS,
-  NAV_GROUP_META,
-  NAV_GROUP_ORDER,
-  filterNavItems,
-} from "@/lib/nav-items";
+import { APP_NAV_ITEMS, NAV_GROUP_META, NAV_GROUP_ORDER } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
-import { readStorage, writeStorage } from "@/lib/storage";
-import { useAuth } from "@/lib/AuthContext";
-import { isUserAdmin } from "@/lib/isAdmin";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanWordmark from "@/components/brand/TitanWordmark";
-
-const OPEN_GROUPS_KEY = "titanos_sidebar_open_groups";
-
-function defaultOpenState(pathname) {
-  const state = {};
-  for (const id of NAV_GROUP_ORDER) {
-    const meta = NAV_GROUP_META[id];
-    state[id] = !meta.collapsible || meta.defaultOpen;
-  }
-  const activeItem = APP_NAV_ITEMS.find((item) => isRouteActive(pathname, item.path));
-  if (activeItem?.group) state[activeItem.group] = true;
-  return state;
-}
-
-function loadOpenState(pathname) {
-  try {
-    const raw = readStorage(OPEN_GROUPS_KEY);
-    if (!raw) return defaultOpenState(pathname);
-    return { ...defaultOpenState(pathname), ...JSON.parse(raw) };
-  } catch {
-    return defaultOpenState(pathname);
-  }
-}
 
 function NavLink({ item, expanded, active, badge }) {
   return (
@@ -55,14 +23,14 @@ function NavLink({ item, expanded, active, badge }) {
           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
       } ${expanded ? "" : "justify-center"}`}
     >
-      {active && (
+      {active ? (
         <span
           className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_12px_rgba(34,211,238,0.6)]"
           aria-hidden="true"
         />
-      )}
+      ) : null}
       <item.icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-      {expanded && <span className="flex-1 truncate text-sm">{item.label}</span>}
+      {expanded ? <span className="flex-1 truncate text-sm">{item.label}</span> : null}
       <NavBadge count={badge} className={expanded ? "" : "absolute -top-0.5 -right-0.5"} />
     </Link>
   );
@@ -72,80 +40,41 @@ export default function Sidebar() {
   const { expanded, toggle } = useSidebarState();
   const location = useLocation();
   const badges = useNavBadges();
-  const reduceMotion = useReducedMotion();
-  const { user } = useAuth();
-  const isAdmin = isUserAdmin(user);
   const pathname = normalizeAppPath(location.pathname);
-  const [openGroups, setOpenGroups] = useState(() => loadOpenState(pathname));
-
-  const navItems = useMemo(() => filterNavItems(APP_NAV_ITEMS, { isAdmin }), [isAdmin]);
 
   const grouped = useMemo(() => {
     const map = {};
-    for (const item of navItems) {
-      const g = item.group || "today";
-      if (!map[g]) map[g] = [];
-      map[g].push(item);
+    for (const item of APP_NAV_ITEMS) {
+      if (!map[item.group]) map[item.group] = [];
+      map[item.group].push(item);
     }
-    return NAV_GROUP_ORDER.filter((g) => map[g]?.length).map((g) => ({
-      id: g,
-      ...NAV_GROUP_META[g],
-      items: map[g],
-      badgeTotal: map[g].reduce((sum, item) => sum + (badges[item.path] || 0), 0),
-      hasActive: map[g].some((item) => isRouteActive(pathname, item.path)),
+    return NAV_GROUP_ORDER.filter((group) => map[group]?.length).map((group) => ({
+      id: group,
+      label: NAV_GROUP_META[group]?.label || group,
+      items: map[group],
     }));
-  }, [badges, pathname, navItems]);
-
-  useEffect(() => {
-    const activeItem = APP_NAV_ITEMS.find((item) => isRouteActive(pathname, item.path));
-    if (!activeItem?.group) return;
-    setOpenGroups((prev) => {
-      if (prev[activeItem.group]) return prev;
-      const next = { ...prev, [activeItem.group]: true };
-      writeStorage(OPEN_GROUPS_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [pathname]);
-
-  const toggleGroup = (id) => {
-    setOpenGroups((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      writeStorage(OPEN_GROUPS_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
+  }, []);
 
   return (
-    <motion.aside
-      initial={false}
-      animate={{ width: expanded ? 256 : 72 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="titan-sidebar hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40"
-      aria-label="Sidebar"
+    <aside
+      className={`titan-sidebar hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40 transition-[width] duration-200 ${expanded ? "w-64" : "w-[72px]"}`}
+      aria-label="Titan core navigation"
     >
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-2.5">
         <Link
           to="/"
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1.5 focus-ring"
-          aria-label="TitanOS home"
+          aria-label="TitanOS business home"
         >
           <TitanMark className="h-10 w-10 flex-shrink-0" />
-          <AnimatePresence initial={false}>
-            {expanded && (
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.15 }}
-                className="min-w-0 overflow-hidden"
-              >
-                <TitanWordmark size="sm" />
-                <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-primary/75">
-                  Operating System
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {expanded ? (
+            <div className="min-w-0 overflow-hidden">
+              <TitanWordmark size="sm" />
+              <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-primary/75">
+                Core
+              </p>
+            </div>
+          ) : null}
         </Link>
         <button
           type="button"
@@ -160,62 +89,28 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3" aria-label="Main navigation">
-        {grouped.map((group) => {
-          const isOpen = !group.collapsible || openGroups[group.id] || group.hasActive;
-          const showItems = expanded ? isOpen : group.id === "today" || group.hasActive;
-
-          return (
-            <div key={group.id} className="mb-1.5">
-              {expanded && group.collapsible && (
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.id)}
-                  aria-expanded={isOpen}
-                  className={`mb-0.5 flex w-full min-h-[32px] items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors duration-fast focus-ring ${
-                    group.hasActive ? "text-primary" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex-1 text-[9px] font-bold uppercase tracking-[0.17em]">{group.label}</span>
-                  {group.badgeTotal > 0 && (
-                    <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">{group.badgeTotal}</span>
-                  )}
-                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${isOpen ? "" : "-rotate-90"}`} aria-hidden="true" />
-                </button>
-              )}
-
-              {expanded && !group.collapsible && (
-                <p className="px-2.5 pb-1 pt-1 text-[9px] font-bold uppercase tracking-[0.17em] text-muted-foreground">{group.label}</p>
-              )}
-
-              <AnimatePresence initial={false}>
-                {showItems && (
-                  <motion.div
-                    initial={expanded && !reduceMotion ? { height: 0, opacity: 0 } : false}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="space-y-0.5 overflow-hidden"
-                  >
-                    {group.items.map((item) => (
-                      <NavLink key={item.path} item={item} expanded={expanded} active={isRouteActive(pathname, item.path)} badge={badges[item.path]} />
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+      <nav className="flex-1 space-y-3 overflow-y-auto px-2 py-3" aria-label="Main navigation">
+        {grouped.map((group) => (
+          <div key={group.id}>
+            {expanded ? (
+              <p className="px-2.5 pb-1 pt-1 text-[9px] font-bold uppercase tracking-[0.17em] text-muted-foreground">
+                {group.label}
+              </p>
+            ) : null}
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  item={item}
+                  expanded={expanded}
+                  active={isRouteActive(pathname, item.path)}
+                  badge={badges[item.path]}
+                />
+              ))}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </nav>
-
-      {expanded && (
-        <div className="border-t border-sidebar-border px-3 py-2.5">
-          <p className="text-[10px] text-muted-foreground">
-            <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">⌘B</kbd>{" "}
-            toggle sidebar
-          </p>
-        </div>
-      )}
-    </motion.aside>
+    </aside>
   );
 }

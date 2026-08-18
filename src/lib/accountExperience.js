@@ -17,11 +17,16 @@ export function normalizeWorkspace(value) {
   return ALLOWED.has(clean) ? clean : WORKSPACES.JOB_SEEKER;
 }
 
+function mirroredWorkspaces(user) {
+  const value = user?.professional_profile?.enabled_workspaces;
+  return Array.isArray(value) ? value : [];
+}
+
 export function enabledWorkspaces(user) {
   const explicit = Array.isArray(user?.enabled_workspaces)
-    ? user.enabled_workspaces.map(normalizeWorkspace)
-    : [];
-  const unique = [...new Set(explicit.filter((value) => ALLOWED.has(value)))];
+    ? user.enabled_workspaces
+    : mirroredWorkspaces(user);
+  const unique = [...new Set(explicit.map(normalizeWorkspace).filter((value) => ALLOWED.has(value)))];
   if (unique.length) return unique;
 
   // Compatibility for profiles created before the workspace migration.
@@ -33,7 +38,9 @@ export function enabledWorkspaces(user) {
 
 export function activeWorkspace(user) {
   const enabled = enabledWorkspaces(user);
-  const requested = normalizeWorkspace(user?.active_workspace || user?.account_type);
+  const requested = normalizeWorkspace(
+    user?.active_workspace || user?.professional_profile?.active_workspace || user?.account_type
+  );
   return enabled.includes(requested) ? requested : enabled[0];
 }
 

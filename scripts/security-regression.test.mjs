@@ -93,15 +93,23 @@ describe("security regression", () => {
     assert.doesNotMatch(src, /select\("role,/);
   });
 
-  it("database admin authority uses auth app_metadata and trigger helpers are not RPCs", () => {
-    const migration = read("supabase/migrations/20260818073500_align_admin_authority_and_revoke_trigger_rpc.sql");
-    assert.match(migration, /auth\.jwt\(\)/);
-    assert.match(migration, /'app_metadata'/);
-    assert.match(migration, /->> 'role'\) = 'admin'/);
-    assert.doesNotMatch(migration, /from public\.profiles/i);
-    assert.match(migration, /revoke execute on function public\.enforce_marketplace_message_block\(\) from public/i);
-    assert.match(migration, /from anon/i);
-    assert.match(migration, /from authenticated/i);
+  it("database admin authority uses JWT app_metadata without unnecessary definer privilege", () => {
+    const authorityMigration = read("supabase/migrations/20260818073500_align_admin_authority_and_revoke_trigger_rpc.sql");
+    const invokerMigration = read("supabase/migrations/20260818081000_harden_is_admin_security_invoker.sql");
+    assert.match(authorityMigration, /auth\.jwt\(\)/);
+    assert.match(authorityMigration, /'app_metadata'/);
+    assert.match(authorityMigration, /->> 'role'\) = 'admin'/);
+    assert.doesNotMatch(authorityMigration, /from public\.profiles/i);
+    assert.match(authorityMigration, /revoke execute on function public\.enforce_marketplace_message_block\(\) from public/i);
+    assert.match(authorityMigration, /from anon/i);
+    assert.match(authorityMigration, /from authenticated/i);
+
+    assert.match(invokerMigration, /security invoker/i);
+    assert.match(invokerMigration, /auth\.jwt\(\)/);
+    assert.doesNotMatch(invokerMigration, /from public\.profiles/i);
+    assert.match(invokerMigration, /revoke execute on function public\.is_admin\(\) from public/i);
+    assert.match(invokerMigration, /revoke execute on function public\.is_admin\(\) from anon/i);
+    assert.match(invokerMigration, /grant execute on function public\.is_admin\(\) to authenticated/i);
   });
 
   it("sensitive server privilege bypasses use Auth app_metadata only", () => {

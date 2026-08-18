@@ -97,3 +97,15 @@ export async function getPublishedServiceProfileByUserId(userId) {
   if (error) throw error;
   return normalize(data);
 }
+
+export async function listPublishedServiceProfiles() {
+  const { data, error } = await supabase
+    .from("service_profiles")
+    .select("*")
+    .eq("published", true)
+    .neq("availability", "offline")
+    .order("updated_at", { ascending: false })
+    .limit(250);
+  if (error) throw error;
+  return (data || []).map(normalize).filter(Boolean);
+}

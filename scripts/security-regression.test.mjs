@@ -131,6 +131,20 @@ describe("security regression", () => {
     }
   });
 
+  it("marketplace tables use least privilege and authenticated user ownership", () => {
+    const sql = read("supabase/migrations/20260818091000_harden_marketplace_table_privileges.sql");
+    assert.match(sql, /marketplace_modules_read[\s\S]*to anon, authenticated[\s\S]*using \(true\)/i);
+    assert.match(sql, /marketplace_modules_admin[\s\S]*to authenticated[\s\S]*select public\.is_admin\(\)/i);
+    assert.match(sql, /module_installs_all[\s\S]*to authenticated[\s\S]*user_id = \(select auth\.uid\(\)\)::text/i);
+    assert.match(sql, /module_waitlists_all[\s\S]*to authenticated[\s\S]*user_id = \(select auth\.uid\(\)\)::text/i);
+    assert.match(sql, /developer_applications_select[\s\S]*to authenticated/i);
+    assert.match(sql, /revoke all privileges on table public\.module_installs from anon/i);
+    assert.match(sql, /revoke all privileges on table public\.module_waitlists from anon/i);
+    assert.match(sql, /revoke all privileges on table public\.developer_applications from anon/i);
+    assert.match(sql, /grant select on table public\.marketplace_modules to anon/i);
+    assert.doesNotMatch(sql, /grant (?:insert|update|delete|truncate)[^;]*marketplace_modules to anon/i);
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

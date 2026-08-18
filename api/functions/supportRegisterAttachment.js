@@ -44,17 +44,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Attachment must be 10 MB or smaller." });
     }
 
-    const { data: objectRow, error: objectError } = await auth.admin
-      .schema("storage")
-      .from("objects")
-      .select("name,bucket_id,metadata")
-      .eq("bucket_id", "support-attachments")
-      .eq("name", storagePath)
-      .maybeSingle();
-    if (objectError) throw objectError;
+    const slash = storagePath.lastIndexOf("/");
+    const folder = slash >= 0 ? storagePath.slice(0, slash) : "";
+    const objectName = slash >= 0 ? storagePath.slice(slash + 1) : storagePath;
+    const { data: listed, error: listError } = await auth.admin.storage
+      .from("support-attachments")
+      .list(folder, { limit: 10, search: objectName });
+    if (listError) throw listError;
+    const objectRow = (listed || []).find((item) => item.name === objectName);
     if (!objectRow) return res.status(404).json({ error: "Uploaded attachment was not found." });
 
-    const actualSize = Number(objectRow.metadata?.size ?? objectRow.metadata?.contentLength ?? 0);
+    const actualSize = Number(objectRow.metadata?.size ?? 0);
     const actualMime = String(objectRow.metadata?.mimetype || objectRow.metadata?.contentType || "").toLowerCase();
     if (actualSize && actualSize !== sizeBytes) return res.status(409).json({ error: "Attachment size verification failed." });
     if (actualMime && actualMime !== mimeType) return res.status(409).json({ error: "Attachment type verification failed." });

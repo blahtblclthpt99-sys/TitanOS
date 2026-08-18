@@ -1,5 +1,5 @@
 /**
- * FINAL QA structural gates — Core Four nav↔routes, exports, migrations, GPS, escrow honesty.
+ * FINAL QA structural gates — workspace nav↔routes, exports, migrations, GPS, escrow honesty.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -21,7 +21,7 @@ function extractQuotedPaths(src, marker) {
   return [...new Set(paths)];
 }
 
-describe("final-qa: Core Four nav ↔ app routing closure", () => {
+describe("final-qa: three-workspace nav ↔ app routing closure", () => {
   it("every user-facing APP_NAV_ITEMS path is owned by TabStack or the authenticated shell", () => {
     const navSrc = read("src/lib/nav-items.js");
     const tabSrc = read("src/components/layout/TabStack.jsx");
@@ -32,7 +32,8 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
     );
     const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]*)["']/g)].map((m) => m[1]);
-    const expectedCorePaths = [
+    const uniqueNavPaths = [...new Set(navPaths)];
+    const expectedWorkspacePaths = [
       "/",
       "/jobs",
       "/schedule",
@@ -40,18 +41,26 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       "/estimates",
       "/invoices",
       "/payments",
+      "/employees",
+      "/talent",
+      "/fleet",
+      "/inventory",
+      "/business-documents",
+      "/independent",
+      "/work-opportunities",
+      "/service-profile",
       "/hire/matches",
-      "/second-me",
+      "/job-profile",
       "/autopilot",
     ];
 
-    // Business Home + six business workflows + one root each for Find Work,
-    // 2nd Self, and Titan Auto. Compare the exact set so feature creep or
-    // accidental removal fails this release gate.
+    // TitanOS intentionally reuses some business routes inside Independent Work.
+    // Compare the unique route set so workspace reuse is allowed while accidental
+    // product-surface additions/removals still fail the release gate.
     assert.deepEqual(
-      [...navPaths].sort(),
-      [...expectedCorePaths].sort(),
-      "Core Four primary navigation must match the approved product surface exactly"
+      [...uniqueNavPaths].sort(),
+      [...expectedWorkspacePaths].sort(),
+      "Three-workspace primary navigation must match the approved product surface exactly"
     );
 
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
@@ -74,13 +83,13 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
     const routed = new Set([...tabPaths, ...nonTabPaths, ...shellRoutes]);
     const detailHosts = ["/customers", "/invoices"];
 
-    const missing = navPaths.filter((p) => {
+    const missing = uniqueNavPaths.filter((p) => {
       if (routed.has(p)) return false;
       if (detailHosts.some((h) => p === h || p.startsWith(`${h}/`))) return false;
       return true;
     });
 
-    assert.deepEqual(missing, [], `unrouted Core Four nav paths: ${missing.join(", ")}`);
+    assert.deepEqual(missing, [], `unrouted workspace nav paths: ${missing.join(", ")}`);
   });
 });
 
@@ -184,6 +193,8 @@ describe("final-qa: docs + rule", () => {
     assert.match(obj, /No feature ships until/i);
     assert.match(read("docs/TITANIUM_MASTER_PROMPT.md"), /FINAL OBJECTIVE/);
     assert.match(read("AGENTS.md"), /FINAL OBJECTIVE/);
-    assert.match(read("src/pages/MoreMenu.jsx"), /not a feature list/i);
+    const moreMenu = read("src/pages/MoreMenu.jsx");
+    assert.match(moreMenu, /Business Tools/i);
+    assert.match(moreMenu, /running a real business/i);
   });
 });

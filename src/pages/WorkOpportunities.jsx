@@ -19,6 +19,8 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
 import { getWorkOpportunities } from "@/lib/workOpportunitiesApi";
 import { applyToHireJob, toggleSaveJob } from "@/lib/hireApi";
+import { recordOpportunityResponse } from "@/lib/engagementApi";
+import { DATA_SOURCE, getSource } from "@/lib/dataSource";
 
 function money(job) {
   const min = Number(job?.budget_min || 0);
@@ -125,10 +127,18 @@ export default function WorkOpportunities() {
     if (!user?.id || busy) return;
     setBusy(opportunity.id);
     try {
-      await applyToHireJob(user, opportunity.id, {
+      const application = await applyToHireJob(user, opportunity.id, {
         message: `Interested in this ${opportunity.relationship_type === "customer_request" ? "service request" : "contract opportunity"}.`,
         bid_amount: "",
       });
+      if (getSource(application) !== DATA_SOURCE.local && application?.id) {
+        try {
+          await recordOpportunityResponse(application.id, opportunity.id);
+        } catch {
+          // The application itself is the source of truth. If event recording is
+          // unavailable, do not roll back or fake the Engagement record.
+        }
+      }
       setState((current) => ({
         ...current,
         opportunities: current.opportunities.map((row) => row.id === opportunity.id ? { ...row, interaction_state: "interested" } : row),

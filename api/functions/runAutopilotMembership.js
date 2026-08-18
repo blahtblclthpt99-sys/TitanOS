@@ -17,9 +17,10 @@ export default async function handler(req, res) {
 
   try {
     const { data: profile } = await auth.admin.from("profiles")
-      .select("plan_tier,paying_subscriber,role").eq("id", auth.user.id).maybeSingle();
+      .select("plan_tier,paying_subscriber").eq("id", auth.user.id).maybeSingle();
     const plan = String(profile?.plan_tier || "").toLowerCase();
-    const entitled = profile?.role === "admin" || (profile?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(plan));
+    const isAdmin = auth.user.app_metadata?.role === "admin";
+    const entitled = isAdmin || (profile?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(plan));
     if (!entitled) return res.status(402).json({ error: "A paid Pro or Business membership is required." });
 
     const body = readJson(req);

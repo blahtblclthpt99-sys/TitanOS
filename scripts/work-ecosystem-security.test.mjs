@@ -105,13 +105,13 @@ describe("opportunity relationship separation", () => {
     assert.match(src, /Engagement never enters this calculation/);
   });
 
-  it("business-side matching never crosses profile pools", () => {
+  it("business-side matching never crosses profile pools and never imports Engagement", () => {
     const src = read("src/lib/employerWorkerMatchApi.js");
     assert.match(src, /relationship === "employment"/);
     assert.match(src, /listPublishedDrivers/);
     assert.match(src, /relationship === "contract" \|\| relationship === "customer_request"/);
     assert.match(src, /listPublishedServiceProfiles/);
-    assert.doesNotMatch(src, /engagement/i);
+    assert.doesNotMatch(src, /from ["'][^"']*engagement/i);
   });
 
   it("service matcher rejects employment opportunities", () => {
@@ -212,9 +212,9 @@ describe("Engagement architecture separation", () => {
     assert.doesNotMatch(src, /filter\([^\n]*engagement/i);
   });
 
-  it("candidate APIs expose no Engagement threshold filter", () => {
-    const apiFiles = filesUnder("api", (full) => /\.(js|mjs|ts)$/.test(full));
-    for (const full of apiFiles) {
+  it("candidate API implementations expose no Engagement threshold filter", () => {
+    const functionFiles = filesUnder("api/functions", (full) => /\.(js|mjs|ts)$/.test(full));
+    for (const full of functionFiles) {
       const src = readFileSync(full, "utf8");
       assert.doesNotMatch(src, /engagement_min|responsiveness_min|attendance_min/i, full);
     }

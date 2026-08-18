@@ -1,10 +1,9 @@
 import { getSupabaseAdmin, readJson } from "./_lib/supabase.js";
-import { recordSignupEmail, formatSignupEmailFile, getLocalSignupEmailsPath } from "./_lib/recordSignupEmail.js";
+import { recordSignupEmail, formatSignupEmailFile } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimit } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { secretsEqual } from "./_lib/secureCompare.js";
-import fs from "node:fs";
 
 /**
  * POST — log a signup email (used by client fallback path)
@@ -40,22 +39,16 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      let text = "";
       const { data, error } = await admin
         .from("signup_emails")
         .select("email, full_name, source, created_at")
         .order("created_at", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length) {
-        text = formatSignupEmailFile(data);
-      } else {
-        try {
-          text = fs.readFileSync(getLocalSignupEmailsPath(), "utf8");
-        } catch {
-          text = "# TitanOS signup emails\n";
-        }
+      if (error) {
+        return res.status(503).json({ error: "Signup export is temporarily unavailable" });
       }
 
+      const text = formatSignupEmailFile(Array.isArray(data) ? data : []);
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.setHeader("Content-Disposition", 'attachment; filename="signup-emails.txt"');
       return res.status(200).send(text);

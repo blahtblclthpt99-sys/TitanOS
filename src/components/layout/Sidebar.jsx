@@ -8,7 +8,7 @@ import NavBadge from "@/components/shared/NavBadge";
 import { NAV_GROUP_META, NAV_GROUP_ORDER, navItemsForUser } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
 import { useAuth } from "@/lib/AuthContext";
-import { isBusinessAccount } from "@/lib/accountExperience";
+import { accountHomePath, accountLabel } from "@/lib/accountExperience";
 import TitanMark from "@/components/brand/TitanMark";
 import TitanWordmark from "@/components/brand/TitanWordmark";
 
@@ -45,7 +45,8 @@ export default function Sidebar() {
   const badges = useNavBadges();
   const pathname = normalizeAppPath(location.pathname);
   const items = useMemo(() => navItemsForUser(user), [user]);
-  const business = isBusinessAccount(user);
+  const homePath = accountHomePath(user);
+  const workspaceLabel = accountLabel(user);
 
   const grouped = useMemo(() => {
     const map = {};
@@ -63,20 +64,20 @@ export default function Sidebar() {
   return (
     <aside
       className={`titan-sidebar hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40 transition-[width] duration-200 ${expanded ? "w-64" : "w-[72px]"}`}
-      aria-label={business ? "TitanOS Business navigation" : "TitanOS Job Seeker navigation"}
+      aria-label={`TitanOS ${workspaceLabel} navigation`}
     >
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-2.5">
         <Link
-          to={business ? "/" : "/hire/matches"}
+          to={homePath}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1 py-1.5 focus-ring"
-          aria-label={business ? "TitanOS business home" : "TitanOS available jobs"}
+          aria-label={`TitanOS ${workspaceLabel} home`}
         >
           <TitanMark className="h-10 w-10 flex-shrink-0" />
           {expanded ? (
             <div className="min-w-0 overflow-hidden">
               <TitanWordmark size="sm" />
               <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-primary/75">
-                {business ? "Business OS" : "Job Seeker"}
+                {workspaceLabel}
               </p>
             </div>
           ) : null}

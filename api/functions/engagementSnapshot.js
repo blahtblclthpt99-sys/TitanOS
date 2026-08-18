@@ -22,42 +22,65 @@ function safeEvent(row) {
 }
 
 async function canReviewSubject(auth, subjectUserId, opportunityId) {
-  if (subjectUserId === auth.user.id) return { allowed: true, own: true };
-  if (!opportunityId) return { allowed: false, own: false };
+  if (subjectUserId === auth.user.id) {
+    const { data: ownProfile } = await auth.admin
+      .from("profiles")
+      .select("active_workspace")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    return {
+      allowed: true,
+      own: true,
+      subjectKind: clean(ownProfile?.active_workspace) === "business" ? "business" : "worker",
+    };
+  }
+  if (!opportunityId) return { allowed: false, own: false, subjectKind: "worker" };
 
   const { data: opportunity, error } = await auth.admin
     .from("hire_jobs")
-    .select("id,customer_id,created_by_id,relationship_type")
+    .select("id,status,customer_id,created_by_id,relationship_type")
     .eq("id", opportunityId)
     .maybeSingle();
-  if (error || !opportunity) return { allowed: false, own: false };
+  if (error || !opportunity) return { allowed: false, own: false, subjectKind: "worker" };
 
-  const ownerId = opportunity.customer_id || opportunity.created_by_id;
+  const ownerId = String(opportunity.customer_id || opportunity.created_by_id || "");
+  const requesterId = String(auth.user.id);
+  const requesterOwns = ownerId === requesterId;
   const admin = auth.user.app_metadata?.role === "admin";
-  if (ownerId !== auth.user.id && !admin) return { allowed: false, own: false };
-
   const relationship = clean(opportunity.relationship_type || "employment");
-  if (relationship === "employment") {
-    const { data } = await auth.admin
-      .from("driver_profiles")
-      .select("user_id")
-      .eq("user_id", subjectUserId)
-      .eq("published", true)
-      .maybeSingle();
-    return { allowed: Boolean(data), own: false };
+
+  if (requesterOwns || admin) {
+    if (relationship === "employment") {
+      const { data } = await auth.admin
+        .from("employment_profiles")
+        .select("user_id")
+        .eq("user_id", subjectUserId)
+        .eq("discoverable", true)
+        .maybeSingle();
+      return { allowed: Boolean(data), own: false, subjectKind: "worker" };
+    }
+
+    if (relationship === "contract" || relationship === "customer_request") {
+      const { data } = await auth.admin
+        .from("service_profiles")
+        .select("user_id")
+        .eq("user_id", subjectUserId)
+        .eq("published", true)
+        .maybeSingle();
+      return { allowed: Boolean(data), own: false, subjectKind: "worker" };
+    }
+
+    return { allowed: false, own: false, subjectKind: "worker" };
   }
 
-  if (relationship === "contract" || relationship === "customer_request") {
-    const { data } = await auth.admin
-      .from("service_profiles")
-      .select("user_id")
-      .eq("user_id", subjectUserId)
-      .eq("published", true)
-      .maybeSingle();
-    return { allowed: Boolean(data), own: false };
+  // Symmetric trust: a worker considering a currently open opportunity may see
+  // the opportunity owner's business Engagement. This is not a general user
+  // lookup and does not expose arbitrary accounts.
+  if (String(subjectUserId) === ownerId && clean(opportunity.status) === "open") {
+    return { allowed: true, own: false, subjectKind: "business" };
   }
 
-  return { allowed: false, own: false };
+  return { allowed: false, own: false, subjectKind: "worker" };
 }
 
 export default async function handler(req, res) {
@@ -74,9 +97,22 @@ export default async function handler(req, res) {
   const opportunityId = String(body.opportunity_id || body.opportunityId || "").trim();
   if (!subjectUserId) return res.status(400).json({ error: "Subject is required" });
 
+  // Engagement is never a filtering API. Reject filter-shaped inputs rather than
+  // quietly accepting a contract that could later be abused for candidate exclusion.
+  const forbiddenFilterKeys = [
+    "engagement_min",
+    "engagement_max",
+    "responsiveness_min",
+    "attendance_min",
+    "minimum_engagement",
+  ];
+  if (forbiddenFilterKeys.some((key) => body[key] !== undefined)) {
+    return res.status(400).json({ error: "Engagement is informational and cannot be used as an eligibility or candidate filter." });
+  }
+
   const access = await canReviewSubject(auth, subjectUserId, opportunityId);
   if (!access.allowed) {
-    return res.status(403).json({ error: "Engagement information is only available for your own account or published profiles attached to an opportunity you own." });
+    return res.status(403).json({ error: "Engagement information is only available for your own account or a participant in a specific opportunity you are allowed to review." });
   }
 
   const since = new Date(Date.now() - 366 * 86_400_000).toISOString();
@@ -90,7 +126,7 @@ export default async function handler(req, res) {
   if (error) return res.status(400).json({ error: "Could not load Engagement information." });
 
   const snapshot = deriveEngagementSnapshot(rows || [], {
-    subjectKind: rows?.[0]?.subject_kind || "worker",
+    subjectKind: rows?.[0]?.subject_kind || access.subjectKind || "worker",
   });
 
   const eventSummaries = snapshot.events.map((event) => safeEvent(event));
@@ -104,6 +140,7 @@ export default async function handler(req, res) {
       policy: snapshot.policy,
       events: eventSummaries,
       own: access.own,
+      subject_kind: access.subjectKind,
       informational_only: true,
       eligibility_input: false,
       ranking_input: false,

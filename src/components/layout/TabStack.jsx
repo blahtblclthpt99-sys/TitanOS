@@ -1,7 +1,6 @@
 /**
- * TabStack — keeps a small LRU of high-frequency tabs mounted so scroll/state survive
- * nearby switches. Lower-frequency pages render normally and merged legacy routes
- * redirect to their canonical TitanOS destination.
+ * TabStack keeps only the four Titan product pillars mounted between switches.
+ * Legacy pages remain lazy compatibility routes and do not stay alive in memory.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -13,31 +12,40 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
-const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
-const TAB_LRU_SIZE = 3;
-
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Jobs = lazy(() => import("@/pages/Jobs"));
-const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
-const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
-const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
+const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const SecondMe = lazy(() => import("@/pages/SecondMe"));
+const Autopilot = lazy(() => import("@/pages/Autopilot"));
 
+const TAB_PATHS = ["/", "/hire/matches", "/second-me", "/autopilot"];
+const TAB_LRU_SIZE = 4;
 const TAB_COMPONENTS = {
   "/": Dashboard,
-  "/driver": DriverHubTab,
-  "/comms": TitanCommsTab,
-  "/jobs": Jobs,
-  "/more": MoreMenu,
+  "/hire/matches": JobMatches,
+  "/second-me": SecondMe,
+  "/autopilot": Autopilot,
 };
 
+// Core business routes.
+const Jobs = lazy(() => import("@/pages/Jobs"));
 const Customers = lazy(() => import("@/pages/Customers"));
-const Invoices = lazy(() => import("@/pages/Invoices"));
-const Marketplace = lazy(() => import("@/pages/Marketplace"));
-const Profile = lazy(() => import("@/pages/Profile"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
-const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
+const Payments = lazy(() => import("@/pages/Payments"));
+
+// 2nd Self / Titan Auto internal workflows.
+const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const Leads = lazy(() => import("@/pages/Leads"));
+const FollowUps = lazy(() => import("@/pages/FollowUps"));
+
+// Compatibility-only routes. They remain code-split and hidden from primary nav.
+const DriverHub = lazy(() => import("@/pages/DriverHub"));
+const TitanComms = lazy(() => import("@/pages/TitanComms"));
+const Marketplace = lazy(() => import("@/pages/Marketplace"));
+const Profile = lazy(() => import("@/pages/Profile"));
 const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const Finances = lazy(() => import("@/pages/Finances"));
 const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
@@ -45,11 +53,9 @@ const Fleet = lazy(() => import("@/pages/Fleet"));
 const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
-const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
-const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
@@ -60,16 +66,12 @@ const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
 const Booking = lazy(() => import("@/pages/Booking"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
-const Payments = lazy(() => import("@/pages/Payments"));
 const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
 const Companies = lazy(() => import("@/pages/Companies"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
-const FollowUps = lazy(() => import("@/pages/FollowUps"));
-const Autopilot = lazy(() => import("@/pages/Autopilot"));
 const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
-const Leads = lazy(() => import("@/pages/Leads"));
 const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
 const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -78,19 +80,14 @@ const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
 const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
 const ShareReport = lazy(() => import("@/pages/ShareReport"));
 const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
-const SecondMe = lazy(() => import("@/pages/SecondMe"));
 
-/**
- * Compatibility map: preserve old bookmarks without keeping duplicate product concepts.
- * Removed/postponed high-liability features return to Home; their code remains in source
- * until separately archived after dependency/runtime verification.
- */
 const LEGACY_REDIRECTS = {
+  "/more": "/",
   "/messages": "/comms",
-  "/titan-score": "/analytics?titanScore=1",
-  "/growth-coach": "/assistant?mode=growth",
-  "/marketing": "/assistant?mode=marketing",
-  "/phone": "/assistant?mode=phone-script",
+  "/titan-score": "/",
+  "/growth-coach": "/second-me",
+  "/marketing": "/second-me",
+  "/phone": "/second-me",
   "/community": "/",
   "/emergency": "/",
   "/deals": "/",
@@ -98,8 +95,22 @@ const LEGACY_REDIRECTS = {
 };
 
 const NON_TAB_ROUTES = {
+  // Titan Business
+  "/jobs": Jobs,
   "/schedule": Schedule,
+  "/customers": Customers,
   "/estimates": Estimates,
+  "/invoices": Invoices,
+  "/payments": Payments,
+
+  // Internal parts of 2nd Self and Titan Auto
+  "/assistant": AIAssistant,
+  "/leads": Leads,
+  "/follow-ups": FollowUps,
+
+  // Compatibility routes
+  "/driver": DriverHub,
+  "/comms": TitanComms,
   "/job-estimator": JobEstimator,
   "/finances": Finances,
   "/receipts": ReceiptScanner,
@@ -107,15 +118,10 @@ const NON_TAB_ROUTES = {
   "/tax-center": TaxCenter,
   "/reports": Reports,
   "/analytics": Analytics,
-  "/customers": Customers,
-  "/invoices": Invoices,
-  "/assistant": AIAssistant,
-  "/second-me": SecondMe,
   "/business-documents": BusinessDocuments,
   "/insurance": Insurance,
   "/referral": Referral,
   "/hire": Hire,
-  "/hire/matches": JobMatches,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
@@ -126,16 +132,12 @@ const NON_TAB_ROUTES = {
   "/admin": AdminControlCenter,
   "/booking": Booking,
   "/contracts": Contracts,
-  "/payments": Payments,
   "/routes": RoutePlanner,
   "/companies": Companies,
   "/employees": Employees,
   "/inventory": Inventory,
-  "/follow-ups": FollowUps,
-  "/autopilot": Autopilot,
   "/reputation": Reputation,
   "/credentials": Credentials,
-  "/leads": Leads,
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
@@ -209,13 +211,13 @@ export default function TabStack() {
   const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
-
   const isTab = TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
 
   if (activeTab) {
-    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
+    recentTabs.current = [activeTab, ...recentTabs.current.filter((path) => path !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
+
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
 
@@ -225,7 +227,6 @@ export default function TabStack() {
         const Page = TAB_COMPONENTS[path];
         const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
-
         if (!isMounted) return null;
 
         return (
@@ -235,7 +236,7 @@ export default function TabStack() {
             aria-hidden={!isActive}
             className={isActive && !reduceMotion ? "page-enter" : undefined}
           >
-            <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
+            <ErrorBoundary message="This Titan pillar failed to load. Try switching away and back, or refresh.">
               <Suspense fallback={<Spinner label="Loading" />}>
                 <Page isActive={isActive} />
               </Suspense>
@@ -244,7 +245,7 @@ export default function TabStack() {
         );
       })}
 
-      {!isTab && (
+      {!isTab ? (
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}
@@ -254,12 +255,12 @@ export default function TabStack() {
             transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
             className="relative w-full"
           >
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home.">
+            <ErrorBoundary key={pathname} message="This page failed to load. Try again or return to Business Home.">
               <NonTabPage />
             </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
-      )}
+      ) : null}
     </div>
   );
 }

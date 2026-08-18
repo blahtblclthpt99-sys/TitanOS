@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, MapPin, ShieldCheck, Wrench } from "lucide-react
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import EngagementSignal from "@/components/trust/EngagementSignal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -155,6 +156,16 @@ export default function ServiceProfile() {
           <Button asChild type="button" variant="outline"><Link to="/work-opportunities">View opportunities</Link></Button>
         </div>
       </form>
+
+      {user?.id ? (
+        <section className="space-y-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your Titan Engagement</p>
+            <p className="mt-1 text-sm text-muted-foreground">Your communication history is transparent to you and separate from independent-work qualification matching. You can dispute an incorrect Titan interaction.</p>
+          </div>
+          <EngagementSignal subjectUserId={user.id} />
+        </section>
+      ) : null}
     </PageShell>
   );
 }

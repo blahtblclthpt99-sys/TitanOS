@@ -108,7 +108,8 @@ describe("opportunity relationship separation", () => {
   it("business-side matching never crosses profile pools and never imports Engagement", () => {
     const src = read("src/lib/employerWorkerMatchApi.js");
     assert.match(src, /relationship === "employment"/);
-    assert.match(src, /listPublishedDrivers/);
+    assert.match(src, /listPublishedEmploymentProfiles/);
+    assert.doesNotMatch(src, /listPublishedDrivers/);
     assert.match(src, /relationship === "contract" \|\| relationship === "customer_request"/);
     assert.match(src, /listPublishedServiceProfiles/);
     assert.doesNotMatch(src, /from ["'][^"']*engagement/i);
@@ -212,8 +213,19 @@ describe("Engagement architecture separation", () => {
     assert.doesNotMatch(src, /filter\([^\n]*engagement/i);
   });
 
-  it("candidate API implementations expose no Engagement threshold filter", () => {
-    const functionFiles = filesUnder("api/functions", (full) => /\.(js|mjs|ts)$/.test(full));
+  it("candidate APIs reject Engagement thresholds and expose no filtering implementation", () => {
+    const batch = read("api/functions/engagementBatch.js");
+    assert.match(batch, /forbiddenFilterKeys/);
+    assert.match(batch, /"engagement_min"/);
+    assert.match(batch, /"responsiveness_min"/);
+    assert.match(batch, /"attendance_min"/);
+    assert.match(batch, /Engagement is informational and cannot filter, rank, or exclude candidates/);
+    assert.match(batch, /ordering_unchanged: true/);
+
+    const functionFiles = filesUnder(
+      "api/functions",
+      (full) => /\.(js|mjs|ts)$/.test(full) && !full.endsWith("/engagementBatch.js")
+    );
     for (const full of functionFiles) {
       const src = readFileSync(full, "utf8");
       assert.doesNotMatch(src, /engagement_min|responsiveness_min|attendance_min/i, full);
@@ -226,7 +238,7 @@ describe("Engagement architecture separation", () => {
     for (const src of [context, live]) {
       assert.match(src, /Never use Engagement|Never use it to qualify|Never use Engagement, responsiveness/i);
       assert.match(src, /filter, hide, exclude|qualify, filter, hide, exclude/i);
-      assert.match(src, /otherwise-qualified candidates remain visible/i);
+      assert.match(src, /(?:keeps all|all) otherwise-qualified candidates (?:remain )?visible/i);
     }
   });
 

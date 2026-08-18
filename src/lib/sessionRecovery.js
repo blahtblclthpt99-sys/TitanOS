@@ -1,7 +1,9 @@
 import { supabase } from "@/api/supabaseClient";
 
 const DEFAULT_MIN_VALIDITY_MS = 120_000;
+const REFRESH_REUSE_WINDOW_MS = 10_000;
 let refreshInFlight = null;
+let lastSuccessfulRefreshAt = 0;
 
 function accessToken(session) {
   return String(session?.access_token || "").trim() || null;
@@ -35,6 +37,7 @@ export async function refreshSessionSingleFlight() {
       try {
         const refreshed = await supabase.auth.refreshSession();
         if (!refreshed.error && accessToken(refreshed.data?.session)) {
+          lastSuccessfulRefreshAt = Date.now();
           return refreshed.data.session;
         }
 
@@ -56,6 +59,17 @@ export async function getFreshSession({ forceRefresh = false, minValidityMs = DE
   const current = await readCurrentSession();
 
   if (!forceRefresh && !sessionNeedsRefresh(current, minValidityMs)) {
+    return current;
+  }
+
+  // A server 401 immediately after a successful refresh is not fixed by
+  // rotating the refresh token again. Reuse the fresh access token briefly so
+  // configuration/authorization failures cannot create a refresh storm.
+  if (
+    forceRefresh &&
+    !sessionNeedsRefresh(current, 0) &&
+    Date.now() - lastSuccessfulRefreshAt < REFRESH_REUSE_WINDOW_MS
+  ) {
     return current;
   }
 

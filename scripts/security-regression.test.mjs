@@ -114,8 +114,12 @@ describe("security regression", () => {
     ];
     for (const file of files) {
       const src = read(file);
-      assert.match(src, /app_metadata\?\.role === "admin"/, `${file} must use Auth metadata for admin authority`);
-      assert.doesNotMatch(src, /profile\?\.role\s*===\s*"admin"/, `${file} must not grant admin via profile role`);
+      assert.match(
+        src,
+        /app_metadata\?\.role\s*(?:===|!==)\s*"admin"/,
+        `${file} must use Auth metadata for admin authority`
+      );
+      assert.doesNotMatch(src, /profile\?\.role\s*(?:===|!==)\s*"admin"/, `${file} must not grant admin via profile role`);
     }
   });
 

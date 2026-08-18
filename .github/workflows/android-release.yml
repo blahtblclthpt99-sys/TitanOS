@@ -23,6 +23,9 @@ permissions:
 jobs:
   bundle:
     runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE_URL: https://titanos-web.vercel.app
+      VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
     steps:
       - uses: actions/checkout@v4
 
@@ -45,9 +48,10 @@ jobs:
 
       - name: Verify release metadata
         run: |
-          grep -q 'versionCode 36' android/app/build.gradle
-          grep -q 'versionName "2.0.3"' android/app/build.gradle
+          grep -q 'versionCode 37' android/app/build.gradle
+          grep -q 'versionName "2.0.4"' android/app/build.gradle
           grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
+          test "$VITE_API_BASE_URL" = "https://titanos-web.vercel.app"
 
       - name: Restore existing Play upload key when configured
         env:
@@ -88,14 +92,15 @@ jobs:
             echo "AAB_SIGNED=false" | tee -a aab-build-info.txt
           fi
           echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED" | tee -a aab-build-info.txt
-          echo "VERSION_NAME=2.0.3" | tee -a aab-build-info.txt
-          echo "VERSION_CODE=36" | tee -a aab-build-info.txt
+          echo "VERSION_NAME=2.0.4" | tee -a aab-build-info.txt
+          echo "VERSION_CODE=37" | tee -a aab-build-info.txt
           echo "APPLICATION_ID=com.titanos.myapp" | tee -a aab-build-info.txt
+          echo "API_BASE_URL=$VITE_API_BASE_URL" | tee -a aab-build-info.txt
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TitanOS-2.0.3-code36-AAB
+          name: TitanOS-2.0.4-code37-AAB
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             aab-sha256.txt

@@ -1,16 +1,16 @@
 /**
- * Stripe webhook settlement policy unit tests (pure logic mirrors).
+ * Stripe webhook settlement policy unit tests.
  * Run: node --test scripts/stripe-webhook-policy.test.mjs
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { checkoutSettlementAction } from "../api/_lib/stripeSettlement.js";
 
 function shouldAcceptCheckoutAmount({ amountTotalCents, balanceDue, total }) {
   const paid = Number(amountTotalCents) / 100;
   const due = Number(balanceDue ?? total ?? 0);
   if (!Number.isFinite(paid) || paid <= 0) return false;
   if (!Number.isFinite(due) || due <= 0) return false;
-  // Allow 1 cent rounding tolerance
   return paid + 0.01 >= due;
 }
 
@@ -26,6 +26,59 @@ function ownerMismatchAction({ expectedUserId, invoiceOwnerId }) {
   }
   return "continue";
 }
+
+describe("checkout settlement state", () => {
+  it("settles an immediately paid Checkout session", () => {
+    assert.equal(
+      checkoutSettlementAction("checkout.session.completed", {
+        mode: "payment",
+        payment_status: "paid",
+      }),
+      "settle_payment"
+    );
+  });
+
+  it("does not settle a completed but unpaid delayed payment", () => {
+    assert.equal(
+      checkoutSettlementAction("checkout.session.completed", {
+        mode: "payment",
+        payment_status: "unpaid",
+      }),
+      "await_payment"
+    );
+  });
+
+  it("settles delayed payment only after async success", () => {
+    assert.equal(
+      checkoutSettlementAction("checkout.session.async_payment_succeeded", {
+        mode: "payment",
+        payment_status: "paid",
+      }),
+      "settle_payment"
+    );
+  });
+
+  it("keeps subscription checkout on the subscription sync path", () => {
+    assert.equal(
+      checkoutSettlementAction("checkout.session.completed", {
+        mode: "subscription",
+        payment_status: "paid",
+      }),
+      "sync_subscription"
+    );
+  });
+
+  it("maps delayed failure and expiry to cancellation", () => {
+    assert.equal(
+      checkoutSettlementAction("checkout.session.async_payment_failed", { mode: "payment" }),
+      "cancel_payment"
+    );
+    assert.equal(
+      checkoutSettlementAction("checkout.session.expired", { mode: "payment" }),
+      "cancel_payment"
+    );
+  });
+});
 
 describe("checkout amount settlement", () => {
   it("accepts full payment", () => {

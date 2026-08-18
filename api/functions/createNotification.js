@@ -90,8 +90,7 @@ export default async function handler(req, res) {
     const link = sanitizeAppPath(body.link);
 
     const { admin, user } = auth;
-    const { data: profile } = await admin.from("profiles").select("role").eq("id", user.id).maybeSingle();
-    const isAdmin = profile?.role === "admin" || user.app_metadata?.role === "admin";
+    const isAdmin = user.app_metadata?.role === "admin";
 
     const { data: recipient } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
     if (!recipient) {

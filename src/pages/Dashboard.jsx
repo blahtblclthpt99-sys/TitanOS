@@ -8,8 +8,12 @@ import {
   Calendar,
   CreditCard,
   FileText,
+  FolderKanban,
+  Package,
   Receipt,
   RefreshCw,
+  Truck,
+  UserRoundCog,
   Users,
   Workflow,
 } from "lucide-react";
@@ -23,33 +27,40 @@ import PageHeader from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatCurrency";
 
-const BUSINESS_LINKS = [
-  { label: "Jobs", description: "Plan and complete work", path: "/jobs", icon: Briefcase },
-  { label: "Schedule", description: "See what is next", path: "/schedule", icon: Calendar },
-  { label: "Customers", description: "People and companies you serve", path: "/customers", icon: Users },
-  { label: "Estimates", description: "Price and win work", path: "/estimates", icon: FileText },
-  { label: "Invoices", description: "Bill and collect", path: "/invoices", icon: Receipt },
+const DAILY_OPERATIONS = [
+  { label: "Jobs", description: "Create, assign, and complete work", path: "/jobs", icon: Briefcase },
+  { label: "Schedule", description: "Plan the day and upcoming work", path: "/schedule", icon: Calendar },
+  { label: "Customers", description: "Manage every customer relationship", path: "/customers", icon: Users },
+  { label: "Estimates", description: "Price work and win approvals", path: "/estimates", icon: FileText },
+  { label: "Invoices", description: "Bill completed work", path: "/invoices", icon: Receipt },
   { label: "Payments", description: "Track money received", path: "/payments", icon: CreditCard },
 ];
 
-const PILLARS = [
+const BUSINESS_MANAGEMENT = [
+  { label: "Employees", description: "Team roster, roles, and field staff", path: "/employees", icon: UserRoundCog },
+  { label: "Fleet", description: "Vehicles, equipment, service, and fleet operations", path: "/fleet", icon: Truck },
+  { label: "Inventory", description: "Supplies, parts, costs, and low-stock alerts", path: "/inventory", icon: Package },
+  { label: "Business Documents", description: "Credentials, contracts, and insurance", path: "/business-documents", icon: FolderKanban },
+];
+
+const EXTENSIONS = [
   {
     label: "Find Work",
-    description: "Match your skills to available work and keep applications moving.",
+    description: "Find additional work when the business needs more jobs.",
     path: "/hire/matches",
     icon: Briefcase,
   },
   {
-    label: "2nd Self",
-    description: "Memory, context, the Invisible Interface, and approved actions.",
-    path: "/second-me",
-    icon: Brain,
-  },
-  {
     label: "Titan Auto + Leads",
-    description: "Build the pipeline and automate repetitive growth work with approval.",
+    description: "Build the lead pipeline and automate approved repetitive work.",
     path: "/autopilot",
     icon: Workflow,
+  },
+  {
+    label: "2nd Self",
+    description: "Use Titan intelligence, memory, and approved actions across the business.",
+    path: "/second-me",
+    icon: Brain,
   },
 ];
 
@@ -59,6 +70,26 @@ function Metric({ label, value, hint }) {
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 text-2xl font-bold tabular-nums text-foreground">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function WorkspaceGrid({ items, columns = "lg:grid-cols-3" }) {
+  const navigate = useNavigate();
+  return (
+    <div className={`mt-4 grid gap-2 sm:grid-cols-2 ${columns}`}>
+      {items.map((item) => (
+        <button
+          key={item.path}
+          type="button"
+          onClick={() => navigate(item.path)}
+          className="group rounded-xl border border-border bg-muted/20 p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-ring"
+        >
+          <item.icon className="h-5 w-5 text-primary" aria-hidden="true" />
+          <p className="mt-3 font-semibold text-foreground">{item.label}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+        </button>
+      ))}
     </div>
   );
 }
@@ -99,9 +130,9 @@ export default function Dashboard({ isActive = true }) {
   return (
     <PageShell maxWidth="xl" className="space-y-6">
       <PageHeader
-        eyebrow="Titan Business"
+        eyebrow="Business Operating System"
         title={`${greeting}, ${name}`}
-        subtitle="Run the work, customers, and money from one focused operating view."
+        subtitle="Run jobs, customers, people, fleet, inventory, billing, and payments from one business-first operating view."
         actions={
           <Button type="button" variant="outline" onClick={refresh} disabled={refreshing} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
@@ -129,24 +160,11 @@ export default function Dashboard({ isActive = true }) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">Operate</p>
-              <h2 className="mt-1 text-lg font-semibold text-foreground">Business operations</h2>
+              <h2 className="mt-1 text-lg font-semibold text-foreground">Daily business operations</h2>
             </div>
             <Building2 className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {BUSINESS_LINKS.map((item) => (
-              <button
-                key={item.path}
-                type="button"
-                onClick={() => navigate(item.path)}
-                className="group rounded-xl border border-border bg-muted/20 p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-ring"
-              >
-                <item.icon className="h-5 w-5 text-primary" aria-hidden="true" />
-                <p className="mt-3 font-semibold text-foreground">{item.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
-              </button>
-            ))}
-          </div>
+          <WorkspaceGrid items={DAILY_OPERATIONS} />
         </div>
 
         <div className="titan-surface p-5">
@@ -214,22 +232,37 @@ export default function Dashboard({ isActive = true }) {
         )}
       </section>
 
-      <section aria-label="Other Titan pillars" className="grid gap-3 md:grid-cols-3">
-        {PILLARS.map((item) => (
-          <button
-            key={item.path}
-            type="button"
-            onClick={() => navigate(item.path)}
-            className="titan-surface group p-5 text-left transition-colors hover:border-primary/40 focus-ring"
-          >
-            <item.icon className="h-6 w-6 text-primary" aria-hidden="true" />
-            <h2 className="mt-4 font-semibold text-foreground">{item.label}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-            <p className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-              Open <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </p>
-          </button>
-        ))}
+      <section className="titan-surface p-5" aria-label="Business management">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Manage the company</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">People, fleet, inventory, and records</h2>
+          <p className="mt-1 text-sm text-muted-foreground">The operating infrastructure behind the jobs.</p>
+        </div>
+        <WorkspaceGrid items={BUSINESS_MANAGEMENT} columns="lg:grid-cols-4" />
+      </section>
+
+      <section aria-label="Business extensions">
+        <div className="mb-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Business extensions</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Add intelligence and growth when you need it</h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {EXTENSIONS.map((item) => (
+            <button
+              key={item.path}
+              type="button"
+              onClick={() => navigate(item.path)}
+              className="titan-surface group p-5 text-left transition-colors hover:border-primary/40 focus-ring"
+            >
+              <item.icon className="h-6 w-6 text-primary" aria-hidden="true" />
+              <h3 className="mt-4 font-semibold text-foreground">{item.label}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+              <p className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                Open <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </p>
+            </button>
+          ))}
+        </div>
       </section>
     </PageShell>
   );

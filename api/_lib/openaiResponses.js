@@ -29,6 +29,12 @@ export async function requestTitanOpenAI({
     .slice(-8)
     .map((m) => ({ role: m.role, content: String(m.content).slice(0, 3000) }));
 
+  const requestedModel = String(model || "").trim();
+  const selectedModel =
+    process.env.TITAN_AI_OPENAI_MODEL ||
+    (requestedModel === "gpt-4o-mini" ? "gpt-5.6" : requestedModel) ||
+    "gpt-5.6";
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25_000);
   try {
@@ -40,10 +46,11 @@ export async function requestTitanOpenAI({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: selectedModel,
         instructions: String(systemPrompt || "").slice(0, 60_000),
         input,
         max_output_tokens: Math.max(200, Math.min(1600, Number(maxOutputTokens) || 700)),
+        store: false,
       }),
     });
 

@@ -13,6 +13,7 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
   const headers = read("public/_headers");
   const adapter = read("functions/_lib/vercelAdapter.js");
   const router = read("functions/api/functions/[name].js");
+  const mppBoundary = read("functions/api/functions/mppPaid.js");
   const register = read("functions/api/register.js");
   const serverTelemetry = read("api/_lib/sentry.js");
 
@@ -70,6 +71,14 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     ]) {
       assert.match(router, new RegExp(`\\b${name}:`), `${name} must be routed on Cloudflare`);
     }
+  });
+
+  it("quarantines only the experimental MPP route from the core Worker", () => {
+    assert.doesNotMatch(router, /\bmppPaid:/);
+    assert.match(mppBoundary, /mpp_worker_unavailable/);
+    assert.match(mppBoundary, /alternative:\s*"standard_stripe"/);
+    assert.match(mppBoundary, /status:\s*503/);
+    assert.doesNotMatch(mppBoundary, /mppx|mpp-sdk/);
   });
 
   it("moves the public security policy to TitanfieldOS without making Vercel a runtime dependency", () => {

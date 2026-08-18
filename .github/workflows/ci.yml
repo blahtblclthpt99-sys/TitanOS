@@ -43,6 +43,9 @@ jobs:
       - name: Engagement and recruiting boundary
         run: node --test scripts/engagement-boundary.test.mjs
 
+      - name: Ad monetization safety
+        run: node --test scripts/ad-monetization.test.mjs
+
       - name: Private Storage URL safety
         run: node --test scripts/storage-url-security.test.mjs
 

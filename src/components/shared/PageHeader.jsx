@@ -37,7 +37,7 @@ export default function PageHeader({
       initial={reduceMotion ? false : { opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className={cn("flex items-start justify-between gap-4 mb-6", className)}
+      className={cn("titan-page-header titan-editorial-header flex items-start justify-between gap-4 mb-6", className)}
     >
       <div className="min-w-0 space-y-1.5">
         {crumbs.length > 0 ? (
@@ -63,14 +63,14 @@ export default function PageHeader({
             </BreadcrumbList>
           </Breadcrumb>
         ) : eyebrow ? (
-          <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>
+          <p className="titan-page-eyebrow text-xs font-medium text-muted-foreground">{eyebrow}</p>
         ) : null}
-        <h1 className="text-title text-foreground tracking-tight">{title}</h1>
+        <h1 className="titan-page-title text-title text-foreground tracking-tight">{title}</h1>
         {subtitle && (
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{subtitle}</p>
+          <p className="titan-page-subtitle text-sm text-muted-foreground leading-relaxed max-w-2xl">{subtitle}</p>
         )}
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="titan-page-actions flex items-center gap-2 flex-shrink-0">
         {actions}
         {onAdd && (
           <Button onClick={onAdd} className="gap-2 min-h-[44px]">

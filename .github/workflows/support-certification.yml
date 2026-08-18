@@ -1,0 +1,49 @@
+name: Titan Support Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "api/_lib/support.js"
+      - "api/functions/support*.js"
+      - "src/lib/supportApi.js"
+      - "src/pages/SupportCenter.jsx"
+      - "src/pages/SupportCommandCenter.jsx"
+      - "src/components/shared/TitanSupportButton.jsx"
+      - "src/components/layout/AppLayout.jsx"
+      - "supabase/migrations/*titan_support*.sql"
+      - "scripts/support-security.test.mjs"
+      - ".github/workflows/support-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  support-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Support security regression tests
+        run: node --test scripts/support-security.test.mjs
+
+      - name: Production build
+        run: npm run build

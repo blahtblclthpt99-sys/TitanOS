@@ -3,12 +3,13 @@ import { BriefcaseBusiness, MapPin, ShieldCheck, UserSearch } from "lucide-react
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
 import PageLoader from "@/components/shared/PageLoader";
+import EngagementSignal from "@/components/trust/EngagementSignal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
-import { getMyDriverProfile, saveMyDriverProfile } from "@/lib/driverProfilesApi";
+import { getMyEmploymentProfile, saveMyEmploymentProfile } from "@/lib/employmentProfilesApi";
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
 
 const split = (value) => String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
@@ -43,26 +44,26 @@ export default function JobSeekerProfile() {
     setLoading(true);
     try {
       const [profile, prefs] = await Promise.all([
-        getMyDriverProfile(user.id),
+        getMyEmploymentProfile(user.id),
         getMyJobMatchPreferences(user.id).catch(() => null),
       ]);
       setForm({
         name: profile?.name || user.full_name || "",
-        city: profile?.city?.split(",")[0]?.trim() || user.city || "",
-        state: profile?.city?.split(",")[1]?.trim() || user.state || "",
+        city: profile?.city || user.city || "",
+        state: profile?.state || user.state || "",
         bio: profile?.bio || "",
-        skills: join(profile?.skills || prefs?.skills),
-        certifications: join(profile?.certifications || prefs?.certifications),
-        yearsExperience: Number(profile?.yearsExperience || prefs?.years_experience || 0),
+        skills: join(profile?.skills),
+        certifications: join(profile?.qualifications || profile?.certifications),
+        yearsExperience: Number(profile?.yearsExperience || 0),
         interests: join(prefs?.job_interests),
         schedule: join(prefs?.preferred_schedule),
         radius: Number(prefs?.work_radius_miles || 50),
         desiredPay: Number(prefs?.desired_pay_min || 0),
         payType: prefs?.desired_pay_type || "hourly",
-        searchLat: prefs?.search_lat ?? profile?.lat ?? null,
-        searchLng: prefs?.search_lng ?? profile?.lng ?? null,
+        searchLat: prefs?.search_lat ?? null,
+        searchLng: prefs?.search_lng ?? null,
         externalConsent: Boolean(prefs?.external_job_search_consent),
-        discoverable: Boolean(profile?.published),
+        discoverable: Boolean(profile?.discoverable),
         available: profile?.availability !== "offline",
       });
     } catch (error) {
@@ -98,24 +99,23 @@ export default function JobSeekerProfile() {
       toast({ variant: "destructive", title: "Add your name" });
       return;
     }
-    if (!split(form.skills).length && !split(form.interests).length) {
-      toast({ variant: "destructive", title: "Add at least one skill or job interest" });
+    if (form.discoverable && !split(form.skills).length && !split(form.certifications).length) {
+      toast({ variant: "destructive", title: "Add a skill or qualification before making your profile discoverable" });
       return;
     }
 
     setSaving(true);
     try {
-      await saveMyDriverProfile(user.id, {
-        name: form.name.trim(),
-        city: [form.city.trim(), form.state.trim()].filter(Boolean).join(", "),
+      await saveMyEmploymentProfile(user.id, {
+        displayName: form.name.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
         bio: form.bio.trim(),
-        lat: form.searchLat,
-        lng: form.searchLng,
         skills: split(form.skills),
-        certifications: split(form.certifications),
+        qualifications: split(form.certifications),
         yearsExperience: Number(form.yearsExperience) || 0,
         availability: form.available ? "available" : "offline",
-        published: Boolean(form.discoverable),
+        discoverable: Boolean(form.discoverable),
       });
 
       await saveMyJobMatchPreferences(user.id, {
@@ -132,7 +132,7 @@ export default function JobSeekerProfile() {
       toast({
         title: "Job profile saved",
         description: form.discoverable
-          ? "Titan can now match you to jobs and show your published qualifications to nearby businesses with matching needs."
+          ? "Titan can now match you to jobs and show your professional qualifications to businesses with matching employee needs."
           : "Titan will use the profile for your private job matching. Businesses cannot discover it until you opt in.",
       });
       await load();
@@ -150,24 +150,24 @@ export default function JobSeekerProfile() {
       <PageHeader
         eyebrow="Job Seeker"
         title="Your Job Profile"
-        subtitle="The more complete this is, the less random the job search becomes. Titan uses it to rank nearby openings and, only when you opt in, let matching businesses discover you."
+        subtitle="The more complete this is, the less random the job search becomes. Titan uses it to rank employment openings and, only when you opt in, let matching businesses discover you."
       />
 
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="titan-surface p-4">
           <BriefcaseBusiness className="h-5 w-5 text-primary" aria-hidden="true" />
           <p className="mt-3 font-semibold text-foreground">Jobs come to you</p>
-          <p className="mt-1 text-xs text-muted-foreground">Skills, qualifications, distance, pay, and schedule narrow the feed.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Skills, qualifications, distance, pay, and schedule progressively narrow the employment feed.</p>
         </div>
         <div className="titan-surface p-4">
           <UserSearch className="h-5 w-5 text-primary" aria-hidden="true" />
           <p className="mt-3 font-semibold text-foreground">Businesses can find you</p>
-          <p className="mt-1 text-xs text-muted-foreground">Published profiles can appear in a business's ranked candidate list for a matching job.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Only your neutral professional employment profile can appear in business recruiting—not Driver, vehicle, or rating data.</p>
         </div>
         <div className="titan-surface p-4">
           <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
           <p className="mt-3 font-semibold text-foreground">You control visibility</p>
-          <p className="mt-1 text-xs text-muted-foreground">Pay preferences and precise search location remain private. Business discovery is opt-in.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Pay preferences and precise search location stay private. Business discovery is explicit opt-in.</p>
         </div>
       </section>
 
@@ -179,7 +179,7 @@ export default function JobSeekerProfile() {
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-foreground">Years of experience</span>
-            <Input type="number" min="0" max="70" value={form.yearsExperience} onChange={(e) => set("yearsExperience", e.target.value)} />
+            <Input type="number" min="0" max="80" value={form.yearsExperience} onChange={(e) => set("yearsExperience", e.target.value)} />
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-foreground">City</span>
@@ -232,13 +232,13 @@ export default function JobSeekerProfile() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-foreground">Private radius matching</p>
-              <p className="mt-1 text-xs text-muted-foreground">Use device location to rank jobs by distance. Exact coordinates are not shown in your published profile.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Use device location to rank jobs by distance. Exact coordinates are stored only in private matching preferences and never in the published employment profile.</p>
             </div>
             <Button type="button" variant="outline" onClick={useCurrentLocation} className="gap-2">
               <MapPin className="h-4 w-4" aria-hidden="true" />Use my location
             </Button>
           </div>
-          {form.searchLat != null && form.searchLng != null ? <p className="mt-2 text-xs font-semibold text-primary">Location is ready for distance matching.</p> : null}
+          {form.searchLat != null && form.searchLng != null ? <p className="mt-2 text-xs font-semibold text-primary">Location is ready for private distance matching.</p> : null}
         </div>
 
         <div className="space-y-3 rounded-xl border border-border p-4">
@@ -246,21 +246,21 @@ export default function JobSeekerProfile() {
             <input type="checkbox" className="mt-1 h-4 w-4" checked={form.discoverable} onChange={(e) => set("discoverable", e.target.checked)} />
             <span>
               <span className="block text-sm font-semibold text-foreground">Let matching businesses find me</span>
-              <span className="block text-xs text-muted-foreground">Publishes your professional qualifications, general location, experience, and availability so businesses can rank you for jobs. Private pay/search preferences stay private.</span>
+              <span className="block text-xs text-muted-foreground">Publishes only your professional qualifications, general city/state, experience, and availability for employee recruiting.</span>
             </span>
           </label>
           <label className="flex items-start gap-3">
             <input type="checkbox" className="mt-1 h-4 w-4" checked={form.available} onChange={(e) => set("available", e.target.checked)} />
             <span>
               <span className="block text-sm font-semibold text-foreground">I'm available for opportunities</span>
-              <span className="block text-xs text-muted-foreground">Signals availability in business candidate matching.</span>
+              <span className="block text-xs text-muted-foreground">Signals current availability in qualification matching.</span>
             </span>
           </label>
           <label className="flex items-start gap-3">
             <input type="checkbox" className="mt-1 h-4 w-4" checked={form.externalConsent} onChange={(e) => set("externalConsent", e.target.checked)} />
             <span>
               <span className="block text-sm font-semibold text-foreground">Include approved outside job sources</span>
-              <span className="block text-xs text-muted-foreground">Allows Titan to supplement Titan jobs with approved external listings when the integration is available.</span>
+              <span className="block text-xs text-muted-foreground">Allows Titan to supplement Titan employment openings with approved external listings when available. Titan never applies without you choosing to continue.</span>
             </span>
           </label>
         </div>
@@ -270,6 +270,16 @@ export default function JobSeekerProfile() {
           <Button type="button" variant="outline" onClick={() => { window.location.href = "/hire/matches"; }}>View available jobs</Button>
         </div>
       </form>
+
+      {user?.id ? (
+        <section className="space-y-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your Titan Engagement</p>
+            <p className="mt-1 text-sm text-muted-foreground">This is your own interaction history. It is separate from job matching and never determines whether you qualify or appear to a business.</p>
+          </div>
+          <EngagementSignal subjectUserId={user.id} />
+        </section>
+      ) : null}
     </PageShell>
   );
 }

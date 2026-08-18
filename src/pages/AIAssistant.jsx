@@ -1,63 +1,40 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { api } from "@/api/apiClient";
-import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles, Zap, RotateCcw, RefreshCw, Scale, ShieldAlert } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckCircle2, RefreshCw, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
+import { api } from "@/api/apiClient";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import ConfirmationCard from "@/components/ai/ConfirmationCard";
 import InvisibleInterface from "@/components/ai/InvisibleInterface";
 import ActionResult from "@/components/ai/ActionResult";
+import { safeMarkdownComponents } from "@/components/ai/safeMarkdown";
 import { buildBusinessSummary } from "@/lib/ai-business-summary";
 import { buildAiPageContext } from "@/lib/aiPageContext";
 import { useAuth } from "@/lib/AuthContext";
-import { isOwnerAccount } from "@/lib/ownerAccount";
-import { fetchUserInstalls, hasLawMastermind } from "@/lib/marketplaceApi";
-import { appendAiConversationTurn, listAiConversationDocs } from "@/lib/aiConversationStore";
-import { upsertSearchDocs } from "@/lib/searchIndex";
 import { confirmedActionErrorMessage, rollbackMessage, shouldRetainRollback } from "@/lib/secondMeActionUi";
 import { ensureSecondMeActionId } from "@/lib/secondMeActionId";
-import {
-  appendTitanActionLog,
-  clearTitanActionLogs,
-  getTitanOpsState,
-  setTitanKillSwitch,
-  setTitanRoutineEnabled,
-} from "@/lib/titanAiOpsMemory";
 
 const SUGGESTIONS = [
-  { label: "What am I forgetting?", prompt: "What am I forgetting or leaving unresolved right now?" },
-  { label: "Today's jobs", prompt: "What jobs do I have scheduled today?" },
-  { label: "Who owes money?", prompt: "Which customers have outstanding invoices?" },
-  { label: "What should I do next?", prompt: "Based on what you know, what deserves my attention next?" },
-  { label: "Schedule a job", prompt: "I need to schedule a job" },
-  { label: "Create an estimate", prompt: "Create an estimate for a customer" },
-  { label: "Remember something", prompt: "I want you to remember something" },
-  { label: "From now on…", prompt: "I want to create a from-now-on rule" },
+  ["What am I forgetting?", "What am I forgetting or leaving unresolved right now?"],
+  ["What should I do next?", "Based on my Titan context, what deserves my attention next?"],
+  ["Today's jobs", "What jobs do I have scheduled today?"],
+  ["Who owes me money?", "Which customers have outstanding invoices?"],
+  ["Remember something", "I want you to remember something"],
+  ["From now on…", "I want to create a from-now-on rule"],
 ];
 
-const LAW_SUGGESTIONS = [
-  { label: "Contract red flags", prompt: "What red flags should I look for in a service contract?" },
-  { label: "Invoice dispute", prompt: "A customer disputes an invoice — what are my options and risks?" },
-  { label: "Independent contractor", prompt: "Explain independent contractor vs employee risk in plain language." },
-  { label: "Liability basics", prompt: "What liability issues should a field service business watch for?" },
-  { label: "NDA outline", prompt: "Outline a simple NDA checklist before I share client data." },
-  { label: "Late payment", prompt: "What steps can I take when a client is late on payment?" },
-];
+function userMessage(content) {
+  return { role: "user", content, type: "text" };
+}
 
-const WORKFLOW_PROMPTS = Object.freeze({
-  morning_ops: "Run morning ops workflow",
-  cash_recovery: "Run cash recovery sprint",
-  closeout: "Run daily closeout workflow",
-});
+function assistantLoading() {
+  return { role: "assistant", content: "", type: "loading" };
+}
 
 export default function AIAssistant() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const ownerMode = isOwnerAccount(user);
   const [params] = useSearchParams();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -66,109 +43,44 @@ export default function AIAssistant() {
   const [businessSummary, setBusinessSummary] = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
-  const [lawMastermind, setLawMastermind] = useState(false);
-  const [ownerAutopilot, setOwnerAutopilot] = useState(false);
-  const [opsState, setOpsState] = useState({ killSwitch: false, routines: [], logs: [] });
-  const [rollbackingId, setRollbackingId] = useState(null);
   const [actionHistory, setActionHistory] = useState([]);
+  const [rollbackingId, setRollbackingId] = useState(null);
+  const seededQ = useRef(false);
+  const actionInFlight = useRef(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const seededQ = useRef(false);
-  const actionInFlightRef = useRef(false);
 
-  useEffect(() => {
-    if (!ownerMode) {
-      setOwnerAutopilot(false);
-      return;
-    }
-    try {
-      const saved = window.localStorage.getItem("titanai_owner_autopilot");
-      setOwnerAutopilot(saved === "1");
-    } catch {
-      setOwnerAutopilot(false);
-    }
-  }, [ownerMode]);
-
-  const setAutopilot = useCallback(
-    (enabled) => {
-      if (!ownerMode) return;
-      setOwnerAutopilot(Boolean(enabled));
-      try {
-        window.localStorage.setItem("titanai_owner_autopilot", enabled ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-    },
-    [ownerMode]
-  );
-
-  useEffect(() => {
-    if (!ownerMode || !user?.id) {
-      setOpsState({ killSwitch: false, routines: [], logs: [] });
-      return;
-    }
-    setOpsState(getTitanOpsState(user.id));
-  }, [ownerMode, user?.id]);
+  const replaceLastMessage = useCallback((message) => {
+    setMessages((current) => [...current.slice(0, -1), message]);
+  }, []);
 
   const loadActionHistory = useCallback(async () => {
-    if (!user?.id || lawMastermind) { setActionHistory([]); return; }
+    if (!user?.id) {
+      setActionHistory([]);
+      return;
+    }
     try {
-      const result = await api.functions.invoke("titanAI", { messages: [], historyRequest: true, historyLimit: 6, secondSelf: true });
+      const result = await api.functions.invoke("titanAI", {
+        messages: [],
+        historyRequest: true,
+        historyLimit: 6,
+        secondSelf: true,
+      });
       setActionHistory(Array.isArray(result?.data?.items) ? result.data.items : []);
     } catch {
       setActionHistory([]);
     }
-  }, [lawMastermind, user?.id]);
+  }, [user?.id]);
 
-  useEffect(() => { void loadActionHistory(); }, [loadActionHistory]);
+  useEffect(() => {
+    void loadActionHistory();
+  }, [loadActionHistory]);
 
-  const refreshOpsState = useCallback(() => {
-    if (!user?.id || !ownerMode) return;
-    setOpsState(getTitanOpsState(user.id));
-  }, [ownerMode, user?.id]);
-
-  const setKillSwitch = useCallback(
-    (enabled) => {
-      if (!user?.id || !ownerMode) return;
-      setTitanKillSwitch(user.id, enabled);
-      appendTitanActionLog(user.id, {
-        status: enabled ? "warn" : "ok",
-        title: enabled ? "Kill switch enabled" : "Kill switch disabled",
-        detail: enabled
-          ? "All 2nd Me write actions are blocked until disabled."
-          : "2nd Me write actions can run again.",
-      });
-      refreshOpsState();
-    },
-    [ownerMode, refreshOpsState, user?.id]
-  );
-
-  const setRoutineEnabled = useCallback(
-    (routineId, enabled) => {
-      if (!user?.id || !ownerMode) return;
-      setTitanRoutineEnabled(user.id, routineId, enabled);
-      appendTitanActionLog(user.id, {
-        status: "ok",
-        title: `${enabled ? "Enabled" : "Disabled"} routine`,
-        detail: routineId,
-      });
-      refreshOpsState();
-    },
-    [ownerMode, refreshOpsState, user?.id]
-  );
-
-  const runWorkflow = useCallback(
-    (workflowId) => {
-      const enabled = opsState.routines.find((r) => r.id === workflowId)?.enabled !== false;
-      if (!enabled || !WORKFLOW_PROMPTS[workflowId]) return;
-      sendMessage(WORKFLOW_PROMPTS[workflowId]);
-    },
-    [opsState.routines]
-  );
-
-  const loadBusinessData = useCallback(async () => {
+  useEffect(() => {
+    let alive = true;
     setDataLoading(true);
     setDataError(false);
+
     const safeList = async (loader) => {
       try {
         const rows = await loader();
@@ -178,394 +90,284 @@ export default function AIAssistant() {
       }
     };
 
-    try {
-      const [jobsResult, invoicesResult, customersResult, expensesResult, employeesResult] = await Promise.all([
+    (async () => {
+      const [jobs, invoices, customers] = await Promise.all([
         safeList(() => api.entities.Job.list("-created_date", 40)),
         safeList(() => api.entities.Invoice.list("-created_date", 40)),
         safeList(() => api.entities.Customer.list("-created_date", 40)),
-        safeList(() => api.entities.Expense.list("-date", 30)),
-        safeList(() => api.entities.Employee.list("-created_date", 20)),
       ]);
+      if (!alive) return;
       setBusinessSummary(
         buildBusinessSummary({
-          jobs: jobsResult.rows,
-          invoices: invoicesResult.rows,
-          customers: customersResult.rows,
-          expenses: expensesResult.rows,
-          employees: employeesResult.rows,
+          jobs: jobs.rows,
+          invoices: invoices.rows,
+          customers: customers.rows,
+          expenses: [],
+          employees: [],
         })
       );
-      setDataError([
-        jobsResult,
-        invoicesResult,
-        customersResult,
-        expensesResult,
-        employeesResult,
-      ].some((result) => result.failed));
-    } catch {
-      setBusinessSummary(buildBusinessSummary({ jobs: [], invoices: [], customers: [], expenses: [], employees: [] }));
-      setDataError(true);
-    } finally {
+      setDataError(jobs.failed || invoices.failed || customers.failed);
       setDataLoading(false);
-    }
-  }, []);
+    })().catch(() => {
+      if (!alive) return;
+      setBusinessSummary(null);
+      setDataError(true);
+      setDataLoading(false);
+    });
 
-  useEffect(() => {
-    loadBusinessData();
-  }, [loadBusinessData]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setLawMastermind(false);
-      return undefined;
-    }
-    let alive = true;
-    fetchUserInstalls(user.id)
-      .then((installs) => {
-        if (alive) setLawMastermind(hasLawMastermind(installs));
-      })
-      .catch(() => {
-        if (alive) setLawMastermind(false);
-      });
     return () => {
       alive = false;
     };
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const replaceLastMessage = (msg) => setMessages((prev) => [...prev.slice(0, -1), msg]);
+  const sendMessage = useCallback(
+    async (text) => {
+      const content = String(text ?? input).trim();
+      if (!content || loading || confirming) return;
 
-  const sendMessage = async (text) => {
-    const userMsg = (text || input).trim();
-    if (!userMsg || loading || confirming) return;
-    setInput("");
-    inputRef.current?.focus();
-
-    const userEntry = { role: "user", content: userMsg, type: "text" };
-    const placeholder = { role: "assistant", content: "", type: "loading" };
-    setMessages((prev) => [...prev, userEntry, placeholder]);
-    setLoading(true);
-
-    if (user?.id) {
-      appendAiConversationTurn(user.id, { role: "user", text: userMsg });
-      upsertSearchDocs(user.id, listAiConversationDocs(user.id));
-    }
-
-    try {
-      const history = [...messages, userEntry]
-        .filter((m) => m.type !== "loading")
+      const entry = userMessage(content);
+      const history = [...messages, entry]
+        .filter((message) => message.type !== "loading")
         .slice(-8)
-        .map((m) => ({ role: m.role, content: m.content || m.meta?.summary || "" }));
+        .map((message) => ({
+          role: message.role,
+          content: message.content || message.meta?.summary || "",
+        }));
 
-      const pageContext = buildAiPageContext({
-        pathname: "/assistant",
-        workflow: lawMastermind ? "law_mastermind" : "second_self",
-      });
+      setInput("");
+      setMessages((current) => [...current, entry, assistantLoading()]);
+      setLoading(true);
 
-      const result = await api.functions.invoke("titanAI", {
-        messages: history,
-        pageContext,
-        offlineSnapshot: businessSummary || undefined,
-        lawMastermind,
-        ownerAutopilot: ownerMode && ownerAutopilot,
-        secondSelf: !lawMastermind,
-        guardrails: {
-          killSwitch: ownerMode && opsState.killSwitch,
-        },
-      });
-
-      const data = result.data;
-
-      if (data.type === "response" || data.type === "clarify") {
-        replaceLastMessage({
-          role: "assistant",
-          content: data.message,
-          type: "text",
-          source: data.source,
-          dataBasis: data.dataBasis,
-          generalKnowledge: data.generalKnowledge,
-          interface: data.interface || null,
+      try {
+        const result = await api.functions.invoke("titanAI", {
+          messages: history,
+          pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
+          offlineSnapshot: businessSummary || undefined,
+          secondSelf: true,
         });
-        if (user?.id && data.message) {
-          appendAiConversationTurn(user.id, { role: "assistant", text: data.message });
-          upsertSearchDocs(user.id, listAiConversationDocs(user.id));
-        }
-      } else if (data.type === "confirm") {
-        replaceLastMessage({
-          role: "assistant",
-          content: "",
-          type: "confirm",
-          interface: data.interface || null,
-          meta: {
-            intent: data.intent,
-            params: data.params,
-            summary: data.confirmationSummary,
-            details: data.confirmationDetails || [],
-            actionId: ensureSecondMeActionId({}),
-          },
-        });
-        setConfirming(true);
-      } else if (data.type === "done" || data.type === "workflow_done") {
-        const workflowDetails =
-          data.type === "workflow_done" && Array.isArray(data.steps) && data.steps.length
-            ? `\n\n${data.steps.map((s, i) => `${i + 1}. ${s.message || s.intent}`).join("\n")}`
-            : "";
-        replaceLastMessage({
-          role: "assistant",
-          content: `${data.message || "Action completed."}${workflowDetails}`,
-          type: "done",
-          rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || null } : null,
-        });
-        if (user?.id && ownerMode) {
-          appendTitanActionLog(user.id, {
-            status: "ok",
-            title: data.type === "workflow_done" ? "Workflow completed" : "Action completed",
-            detail: data.message || "2nd Me action completed.",
-            rollback: data.rollback || null,
+        const data = result?.data || {};
+
+        if (data.type === "confirm") {
+          replaceLastMessage({
+            role: "assistant",
+            type: "confirm",
+            content: "",
+            interface: data.interface || null,
+            meta: {
+              intent: data.intent,
+              params: data.params,
+              summary: data.confirmationSummary || "Confirm this action?",
+              details: data.confirmationDetails || [],
+              actionId: ensureSecondMeActionId({}),
+            },
           });
-          refreshOpsState();
+          setConfirming(true);
+          return;
         }
-      } else {
+
+        if (data.type === "done" || data.type === "workflow_done") {
+          const steps =
+            data.type === "workflow_done" && Array.isArray(data.steps) && data.steps.length
+              ? `\n\n${data.steps.map((step, index) => `${index + 1}. ${step.message || step.intent}`).join("\n")}`
+              : "";
+          replaceLastMessage({
+            role: "assistant",
+            type: "done",
+            content: `${data.message || "Action completed."}${steps}`,
+            interface: data.interface || null,
+            rollback: data.rollback
+              ? { ...data.rollback, correlationId: data.correlationId || data.actionId || null }
+              : null,
+          });
+          void loadActionHistory();
+          return;
+        }
+
         replaceLastMessage({
           role: "assistant",
+          type: data.type === "error" ? "error" : "text",
           content: data.message || "I need a little more context to help with that.",
-          type: "text",
-          source: data.source,
           interface: data.interface || null,
+          source: data.source || null,
         });
-      }
-    } catch (e) {
-      const msg =
-        e?.status === 401
-          ? "Please sign in again to use 2nd Me."
-          : "I couldn't reach one of Titan's data services, but you can keep talking to me. Try the request again while I use the context I still have.";
-      replaceLastMessage({ role: "assistant", content: msg, type: "error" });
-      if (user?.id && ownerMode) {
-        appendTitanActionLog(user.id, {
-          status: "error",
-          title: "2nd Me request failed",
-          detail: e?.message || msg,
+      } catch (error) {
+        replaceLastMessage({
+          role: "assistant",
+          type: "error",
+          content:
+            Number(error?.status || 0) === 401
+              ? "Your session needs to be refreshed. Return to 2nd Self and try again after Titan reconnects your account."
+              : "I couldn't reach Titan's live intelligence service. Your business data was not changed. Try again when the connection recovers.",
         });
-        refreshOpsState();
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [businessSummary, confirming, input, loadActionHistory, loading, messages, replaceLastMessage]
+  );
 
   useEffect(() => {
     const q = params.get("q")?.trim();
     if (!q || seededQ.current || dataLoading || loading || confirming) return;
     seededQ.current = true;
     void sendMessage(q);
-  }, [params, dataLoading, loading, confirming]);
+  }, [confirming, dataLoading, loading, params, sendMessage]);
 
-  const handleConfirm = async (msgIndex) => {
-    const confirmMsg = messages[msgIndex];
-    if (!confirmMsg?.meta || actionInFlightRef.current) return;
-    actionInFlightRef.current = true;
-    const actionId = ensureSecondMeActionId(confirmMsg.meta);
+  const handleConfirm = async (index) => {
+    const message = messages[index];
+    if (!message?.meta || actionInFlight.current) return;
+    actionInFlight.current = true;
+    const actionId = ensureSecondMeActionId(message.meta);
     setConfirming(true);
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, type: "executing", meta: { ...m.meta, actionId } } : m)));
+    setMessages((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, type: "executing", meta: { ...item.meta, actionId } }
+          : item
+      )
+    );
 
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
-        confirmedAction: { intent: confirmMsg.meta.intent, params: confirmMsg.meta.params, actionId },
-        ownerAutopilot: ownerMode && ownerAutopilot,
+        confirmedAction: {
+          intent: message.meta.intent,
+          params: message.meta.params,
+          actionId,
+        },
         secondSelf: true,
-        guardrails: { killSwitch: ownerMode && opsState.killSwitch },
       });
-      const data = result.data;
+      const data = result?.data || {};
       const isError = data.type === "error";
-      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
-        role: "assistant",
-        content: data.message,
-        type: isError ? "error" : "done",
-        rollback: data.rollback ? { ...data.rollback, correlationId: data.correlationId || data.actionId || actionId } : null,
-        correlationId: data.correlationId || data.actionId || actionId,
-      } : m));
-      if (user?.id && ownerMode) {
-        appendTitanActionLog(user.id, {
-          status: isError ? "error" : "ok",
-          title: isError ? "Confirmed action failed" : "Confirmed action completed",
-          detail: data.message || "2nd Me completed a confirmed action.",
-          rollback: data.rollback || null,
-          correlationId: data.correlationId || data.actionId || confirmMsg.meta.actionId,
-        });
-        refreshOpsState();
-      }
-      if (!isError) { loadBusinessData(); void loadActionHistory(); }
+      setMessages((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                role: "assistant",
+                content: data.message || (isError ? "The action failed." : "Action completed."),
+                type: isError ? "error" : "done",
+                interface: data.interface || null,
+                rollback: data.rollback
+                  ? { ...data.rollback, correlationId: data.correlationId || data.actionId || actionId }
+                  : null,
+              }
+            : item
+        )
+      );
+      if (!isError) void loadActionHistory();
     } catch (error) {
-      const message = confirmedActionErrorMessage(error);
-      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
-        ...m,
-        role: "assistant",
-        content: "",
-        type: "confirm",
-        retryError: message,
-        meta: { ...confirmMsg.meta, actionId },
-      } : m));
-      if (user?.id && ownerMode) {
-        appendTitanActionLog(user.id, {
-          status: "error",
-          title: "Confirmed action failed",
-          detail: error?.message || message,
-          correlationId: actionId,
-        });
-        refreshOpsState();
-      }
+      const retryMessage = confirmedActionErrorMessage(error);
+      setMessages((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...message,
+                type: "confirm",
+                retryError: retryMessage,
+                meta: { ...message.meta, actionId },
+              }
+            : item
+        )
+      );
     } finally {
-      actionInFlightRef.current = false;
+      actionInFlight.current = false;
       setConfirming(false);
     }
   };
 
-  const handleCancel = (msgIndex) => {
-    setMessages((prev) => prev.map((m, i) => i === msgIndex ? { role: "assistant", content: "Action cancelled. Nothing was changed.", type: "text" } : m));
+  const handleCancel = (index) => {
+    setMessages((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? { role: "assistant", content: "Action cancelled. Nothing was changed.", type: "text" }
+          : item
+      )
+    );
     setConfirming(false);
   };
 
-  const handleRollback = async (message, msgIndex) => {
+  const handleRollback = async (message, index) => {
     if (!message?.rollback || rollbackingId != null) return;
-    const rollback = message.rollback;
-    setRollbackingId(msgIndex);
+    setRollbackingId(index);
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
         secondSelf: true,
-        rollbackAction: rollback,
+        rollbackAction: message.rollback,
       });
-      const data = result.data;
-      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
-        ...m,
-        content: `${m.content || "Action completed."}\n\n${rollbackMessage(data)}`,
-        rollback: shouldRetainRollback(data) ? rollback : null,
-      } : m));
-      if (user?.id && ownerMode) {
-        appendTitanActionLog(user.id, {
-          status: data.type === "error" ? "error" : "ok",
-          title: data.type === "error" ? "Rollback failed" : "Rollback completed",
-          detail: data.message || "2nd Me rollback completed.",
-        });
-        refreshOpsState();
-      }
-      if (data.type !== "error") { loadBusinessData(); void loadActionHistory(); }
+      const data = result?.data || {};
+      setMessages((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...item,
+                content: `${item.content || "Action completed."}\n\n${rollbackMessage(data)}`,
+                rollback: shouldRetainRollback(data) ? message.rollback : null,
+              }
+            : item
+        )
+      );
+      if (data.type !== "error") void loadActionHistory();
     } catch (error) {
-      setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
-        ...m,
-        content: `${m.content || "Action completed."}\n\n${rollbackMessage({ type: "error", message: error?.message })}`,
-      } : m));
+      setMessages((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...item,
+                content: `${item.content || "Action completed."}\n\n${rollbackMessage({ type: "error", message: error?.message })}`,
+              }
+            : item
+        )
+      );
     } finally {
       setRollbackingId(null);
     }
   };
 
-  const clearOpsLogs = () => {
-    if (!user?.id || !ownerMode) return;
-    clearTitanActionLogs(user.id);
-    refreshOpsState();
-  };
-
-  const suggestions = lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS;
-
   return (
-    <div className="page-pad max-w-5xl mx-auto pb-28">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div className="page-pad mx-auto max-w-5xl pb-28">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Invisible Interface</p>
           <h1 className="text-2xl font-bold text-foreground">2nd Self</h1>
           <p className="mt-1 text-sm text-muted-foreground">Ask, remember, understand, and take approved actions across Titan.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate("/second-me")}
-          className="rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground focus-ring"
-        >
-          2nd Self home
-        </button>
+        <Button type="button" variant="outline" onClick={() => navigate("/second-me")}>2nd Self home</Button>
       </div>
 
       {dataError ? (
         <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-muted-foreground">
-          Some live business context could not load. 2nd Self can still respond with the context that is available.
+          Some local fallback context could not refresh. Live server context will still be used when available.
         </div>
       ) : null}
 
-      {ownerMode && !lawMastermind ? (
-        <section className="titan-surface p-4 mb-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold">Owner action controls</p>
-              <p className="text-xs text-muted-foreground">Extra automation controls for the owner account only.</p>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <span>Owner autopilot</span>
-              <Switch checked={ownerAutopilot} onCheckedChange={setAutopilot} />
-            </label>
-          </div>
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
-            <span>
-              <span className="block font-semibold">Kill switch</span>
-              <span className="block text-xs text-muted-foreground">Block 2nd Self write actions immediately.</span>
-            </span>
-            <Switch checked={opsState.killSwitch} onCheckedChange={setKillSwitch} />
-          </label>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {opsState.routines.map((routine) => (
-              <div key={routine.id} className="rounded-lg border border-border p-3">
-                <label className="flex items-center gap-2 text-sm font-semibold">
-                  <Checkbox checked={routine.enabled !== false} onCheckedChange={(checked) => setRoutineEnabled(routine.id, Boolean(checked))} />
-                  {routine.label}
-                </label>
-                <Button size="sm" variant="outline" className="mt-3 w-full" disabled={routine.enabled === false || loading || confirming || opsState.killSwitch} onClick={() => runWorkflow(routine.id)}>
-                  Run now
-                </Button>
-              </div>
-            ))}
-          </div>
-          {opsState.logs.length ? (
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent owner operations</p>
-                <button type="button" onClick={clearOpsLogs} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-              </div>
-              <div className="mt-2 space-y-1">
-                {opsState.logs.slice(0, 5).map((log) => (
-                  <p key={log.id} className="text-xs text-muted-foreground">{log.title} · {log.detail}</p>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       {!messages.length ? (
-        <section className="titan-surface p-5 mb-4">
+        <section className="titan-surface mb-4 p-5">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="h-5 w-5" />
+              <Sparkles className="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
-              <p className="font-semibold">What can I help with?</p>
-              <p className="mt-1 text-sm text-muted-foreground">Ask about Titan Business data, unresolved work, memory, or an action you want to take.</p>
+              <p className="font-semibold text-foreground">What can I help with?</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ask about business data, open loops, memory, or an action you want to take.</p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {suggestions.map((suggestion) => (
+            {SUGGESTIONS.map(([label, prompt]) => (
               <button
-                key={suggestion.label}
+                key={label}
                 type="button"
-                onClick={() => void sendMessage(suggestion.prompt)}
                 disabled={dataLoading || loading || confirming}
-                className="rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50 focus-ring"
+                onClick={() => void sendMessage(prompt)}
+                className="rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50 focus-ring"
               >
-                {suggestion.label}
+                {label}
               </button>
             ))}
           </div>
@@ -573,54 +375,88 @@ export default function AIAssistant() {
       ) : null}
 
       <section className="space-y-3" aria-live="polite">
-        <AnimatePresence initial={false}>
-          {messages.map((message, index) => (
-            <motion.div
-              key={`${index}-${message.type}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div className={`max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[78%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "titan-surface"}`}>
-                {message.type === "loading" ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> Thinking…</div>
-                ) : message.type === "confirm" || message.type === "executing" ? (
-                  <ConfirmationCard
-                    message={message}
-                    executing={message.type === "executing"}
-                    onConfirm={() => handleConfirm(index)}
-                    onCancel={() => handleCancel(index)}
-                  />
-                ) : (
-                  <>
-                    {message.content ? (
-                      <ReactMarkdown components={safeMarkdownComponents}>{message.content}</ReactMarkdown>
-                    ) : null}
-                    {message.interface ? <InvisibleInterface spec={message.interface} onNavigate={(path) => navigate(path)} /> : null}
-                    {message.type === "done" ? (
-                      <ActionResult
-                        message={message}
-                        rollbacking={rollbackingId === index}
-                        onRollback={message.rollback ? () => handleRollback(message, index) : undefined}
-                      />
-                    ) : null}
-                  </>
-                )}
+        {messages.map((message, index) => {
+          if (message.type === "loading") {
+            return (
+              <div key={`${index}-loading`} className="flex justify-start">
+                <div className="titan-surface flex items-center gap-2 rounded-2xl px-4 py-3 text-sm text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> Thinking…
+                </div>
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            );
+          }
+
+          if (message.type === "confirm" || message.type === "executing") {
+            return (
+              <ConfirmationCard
+                key={`${index}-confirm`}
+                summary={message.meta?.summary || "Confirm this action?"}
+                details={message.retryError ? [...(message.meta?.details || []), `Retry note: ${message.retryError}`] : message.meta?.details || []}
+                loading={message.type === "executing"}
+                onConfirm={() => handleConfirm(index)}
+                onCancel={() => handleCancel(index)}
+              />
+            );
+          }
+
+          if (message.type === "done") {
+            return (
+              <div key={`${index}-done`} className="space-y-2">
+                <ActionResult
+                  message={message.content || "Action completed."}
+                  onRollback={message.rollback ? () => handleRollback(message, index) : null}
+                  rollbackLoading={rollbackingId === index}
+                />
+                {message.interface ? (
+                  <InvisibleInterface
+                    spec={message.interface}
+                    onNavigate={navigate}
+                    onPrompt={(prompt) => void sendMessage(prompt)}
+                  />
+                ) : null}
+              </div>
+            );
+          }
+
+          return (
+            <div key={`${index}-${message.type}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm md:max-w-[78%] ${
+                  message.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : message.type === "error"
+                      ? "border border-destructive/25 bg-destructive/5 text-foreground"
+                      : "titan-surface text-foreground"
+                }`}
+              >
+                <ReactMarkdown components={safeMarkdownComponents}>{message.content || ""}</ReactMarkdown>
+                {message.interface ? (
+                  <div className="mt-3">
+                    <InvisibleInterface
+                      spec={message.interface}
+                      onNavigate={navigate}
+                      onPrompt={(prompt) => void sendMessage(prompt)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </section>
 
-      {actionHistory.length && !lawMastermind ? (
-        <section className="mt-5 titan-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent approved actions</p>
-          <div className="mt-2 space-y-2">
-            {actionHistory.map((item) => (
-              <div key={item.id} className="flex items-start gap-2 text-sm">
-                {item.status === "failed" ? <ShieldAlert className="mt-0.5 h-4 w-4 text-warning" /> : <Zap className="mt-0.5 h-4 w-4 text-primary" />}
-                <div className="min-w-0"><p className="font-medium">{item.intent || "Action"}</p><p className="truncate text-xs text-muted-foreground">{item.status}</p></div>
+      {actionHistory.length ? (
+        <section className="titan-surface mt-5 p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent approved actions</p>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {actionHistory.slice(0, 6).map((item) => (
+              <div key={item.id} className="rounded-lg border border-border p-3">
+                <p className="truncate text-sm font-semibold text-foreground">{item.intent || "Action"}</p>
+                <p className="mt-1 text-xs capitalize text-muted-foreground">{item.status || "completed"}</p>
               </div>
             ))}
           </div>
@@ -642,8 +478,13 @@ export default function AIAssistant() {
           disabled={loading || confirming}
           className="min-h-[44px] border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
-        <Button type="submit" disabled={!input.trim() || loading || confirming} className="min-h-[44px] min-w-[44px] px-3" aria-label="Send to 2nd Self">
-          <Send className="h-4 w-4" />
+        <Button
+          type="submit"
+          disabled={!input.trim() || loading || confirming}
+          className="min-h-[44px] min-w-[44px] px-3"
+          aria-label="Send to 2nd Self"
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
         </Button>
       </form>
     </div>

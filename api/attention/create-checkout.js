@@ -60,11 +60,12 @@ export default async function handler(req, res) {
         if (existing.status === "open" && existing.url) return json(res, 200, { url: existing.url, reused: true });
         if (existing.payment_status === "paid") return json(res, 409, { error: "Funding payment already completed" });
       } catch {
-        // Create a fresh session below if the prior session is no longer usable.
+        // A missing/expired prior session is replaced below.
       }
     }
 
-    const origin = process.env.APP_ORIGIN || `https://${req.headers.host}`;
+    const origin = String(process.env.APP_ORIGIN || "https://titanfieldos.com").replace(/\/$/, "");
+    const campaignVersion = Number.isFinite(Date.parse(campaign.updated_at)) ? Date.parse(campaign.updated_at) : 0;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       success_url: `${origin}/?funding=success&campaign=${encodeURIComponent(campaign.id)}`,
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
           expected_amount_cents: String(amount),
         },
       },
-    }, { idempotencyKey: `attention-fund-${campaign.id}-${amount}` });
+    }, { idempotencyKey: `attention-fund-${campaign.id}-${amount}-${campaignVersion}` });
 
     const { error: updateError } = await admin
       .from("attention_campaigns")

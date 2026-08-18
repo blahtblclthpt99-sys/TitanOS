@@ -93,6 +93,17 @@ describe("security regression", () => {
     assert.doesNotMatch(src, /select\("role,/);
   });
 
+  it("database admin authority uses auth app_metadata and trigger helpers are not RPCs", () => {
+    const migration = read("supabase/migrations/20260818073500_align_admin_authority_and_revoke_trigger_rpc.sql");
+    assert.match(migration, /auth\.jwt\(\)/);
+    assert.match(migration, /'app_metadata'/);
+    assert.match(migration, /->> 'role'\) = 'admin'/);
+    assert.doesNotMatch(migration, /from public\.profiles/i);
+    assert.match(migration, /revoke execute on function public\.enforce_marketplace_message_block\(\) from public/i);
+    assert.match(migration, /from anon/i);
+    assert.match(migration, /from authenticated/i);
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

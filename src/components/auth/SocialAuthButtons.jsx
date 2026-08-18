@@ -16,17 +16,30 @@ function GoogleIcon({ className }) {
 }
 
 const PROVIDERS = [{ id: "google", label: "Continue with Google", Icon: GoogleIcon }];
+const ALLOWED = new Set(["job_seeker", "self_employed", "business"]);
 
-export default function SocialAuthButtons({ onError, returnTo, accountType = "" }) {
+function pendingWorkspacePayload(enabledWorkspaces, activeWorkspace, accountType) {
+  const enabled = [...new Set((Array.isArray(enabledWorkspaces) ? enabledWorkspaces : [accountType])
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter((value) => ALLOWED.has(value)))];
+  if (!enabled.length) return null;
+  const active = enabled.includes(activeWorkspace) ? activeWorkspace : enabled[0];
+  return { enabled_workspaces: enabled, active_workspace: active };
+}
+
+export default function SocialAuthButtons({ onError, returnTo, enabledWorkspaces = [], activeWorkspace = "", accountType = "" }) {
   const [loadingProvider, setLoadingProvider] = useState("");
 
   const start = async (provider) => {
     setLoadingProvider(provider);
     try {
       if (returnTo) rememberReturnTo(returnTo);
-      if (accountType === "business" || accountType === "job_seeker") {
+      const payload = pendingWorkspacePayload(enabledWorkspaces, activeWorkspace, accountType);
+      if (payload) {
         try {
-          sessionStorage.setItem("titanos_pending_account_type", accountType);
+          sessionStorage.setItem("titanos_pending_workspaces", JSON.stringify(payload));
+          // Remove old single-mode handoff so it cannot override the new model.
+          sessionStorage.removeItem("titanos_pending_account_type");
         } catch {
           /* ignore storage restrictions */
         }

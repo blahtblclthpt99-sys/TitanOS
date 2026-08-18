@@ -1,5 +1,5 @@
 import { api } from "@/api/apiClient";
-import { listPublishedDrivers } from "@/lib/driverProfilesApi";
+import { listPublishedEmploymentProfiles } from "@/lib/employmentProfilesApi";
 import { listPublishedServiceProfiles } from "@/lib/serviceProfilesApi";
 import { rankPublishedWorkerMatches } from "@/lib/workerMatch";
 import { rankPublishedServiceMatches } from "@/lib/serviceMatch";
@@ -7,10 +7,10 @@ import { rankPublishedServiceMatches } from "@/lib/serviceMatch";
 /**
  * Business-side opportunity matching.
  *
- * Employment opportunities rank published Job Seeker professional profiles.
- * Contract/customer-request opportunities rank published Service Profiles.
- * The two profile pools never cross. Private worker/search preferences are never
- * queried here, and Engagement is deliberately not imported or used.
+ * Employment opportunities rank opt-in neutral Employment Profiles.
+ * Contract/customer-request opportunities rank opt-in Service Profiles.
+ * The two profile pools never cross. Driver/vehicle data, private search/pay
+ * preferences, public ratings, and Engagement are deliberately not imported.
  */
 export async function loadEmployerWorkerMatches(user, jobId) {
   if (!user?.id) throw new Error("Sign in to view matches.");
@@ -26,14 +26,11 @@ export async function loadEmployerWorkerMatches(user, jobId) {
 
   const relationship = String(job.relationship_type || "employment").toLowerCase();
   if (relationship === "employment") {
-    const hasPoint = Number.isFinite(Number(job.lat)) && Number.isFinite(Number(job.lng));
-    const drivers = await listPublishedDrivers(
-      hasPoint ? { viewerLat: Number(job.lat), viewerLng: Number(job.lng) } : {}
-    );
+    const profiles = await listPublishedEmploymentProfiles();
     return {
       job,
       profileKind: "employment",
-      matches: rankPublishedWorkerMatches(job, drivers, { ownerUserId: user.id }).map((row) => ({ ...row, profileKind: "employment" })),
+      matches: rankPublishedWorkerMatches(job, profiles, { ownerUserId: user.id }).map((row) => ({ ...row, profileKind: "employment" })),
     };
   }
 

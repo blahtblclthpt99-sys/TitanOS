@@ -5,10 +5,11 @@ import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { isSupportAdmin, writeSupportAudit } from "../_lib/support.js";
 
-function averageMinutes(values) {
+function average(values, precision = 1) {
   const numbers = values.filter((n) => Number.isFinite(n) && n >= 0);
   if (!numbers.length) return null;
-  return Math.round((numbers.reduce((a, b) => a + b, 0) / numbers.length) * 10) / 10;
+  const factor = 10 ** precision;
+  return Math.round((numbers.reduce((a, b) => a + b, 0) / numbers.length) * factor) / factor;
 }
 
 export default async function handler(req, res) {
@@ -41,19 +42,20 @@ export default async function handler(req, res) {
     const resolved = cases.filter((row) => ["RESOLVED", "CLOSED"].includes(row.status));
     const escalated = cases.filter((row) => row.escalated_at);
     const aiHandled = cases.filter((row) => !row.escalated_at && ["AI_WORKING", "NEEDS_USER", "RESOLVED", "CLOSED"].includes(row.status));
+    const ratings = csat.map((row) => Number(row.rating)).filter((n) => Number.isFinite(n) && n >= 1 && n <= 5);
 
     const analytics = {
       window_days: 30,
       total_cases: cases.length,
       open_cases: cases.filter((row) => !["RESOLVED", "CLOSED"].includes(row.status)).length,
       urgent_cases: cases.filter((row) => ["P0", "P1"].includes(row.priority) && !["RESOLVED", "CLOSED"].includes(row.status)).length,
-      average_first_response_minutes: averageMinutes(firstResponseMinutes),
-      average_resolution_minutes: averageMinutes(resolutionMinutes),
+      average_first_response_minutes: average(firstResponseMinutes),
+      average_resolution_minutes: average(resolutionMinutes),
       human_escalation_percentage: cases.length ? Math.round((escalated.length / cases.length) * 1000) / 10 : 0,
       ai_handled_percentage: cases.length ? Math.round((aiHandled.length / cases.length) * 1000) / 10 : 0,
       resolved_percentage: cases.length ? Math.round((resolved.length / cases.length) * 1000) / 10 : 0,
       solved_csat_percentage: csat.length ? Math.round((csat.filter((row) => row.solved).length / csat.length) * 1000) / 10 : null,
-      average_csat_rating: averageMinutes(csat.map((row) => Number(row.rating))).toFixed ? undefined : undefined,
+      average_csat_rating: average(ratings, 2),
       by_category: countBy("category"),
       by_platform: countBy("platform"),
       by_version: countBy("app_version"),
@@ -63,8 +65,6 @@ export default async function handler(req, res) {
         p0_p1: incidents.filter((row) => ["P0", "P1"].includes(row.severity)).length,
       },
     };
-    const ratings = csat.map((row) => Number(row.rating)).filter((n) => Number.isFinite(n) && n >= 1 && n <= 5);
-    analytics.average_csat_rating = ratings.length ? Math.round((ratings.reduce((a,b) => a+b, 0) / ratings.length) * 100) / 100 : null;
 
     await writeSupportAudit(auth.admin, { actorUserId: auth.user.id, action: "support_analytics_viewed", targetType: "support_analytics", metadata: { window_days: 30 } });
     return res.status(200).json({ analytics });

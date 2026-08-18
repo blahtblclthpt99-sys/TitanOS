@@ -14,6 +14,7 @@ import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
 import AppUpdateGate from "@/components/shared/AppUpdateGate";
 import SupportCenter from "@/pages/SupportCenter";
+import SupportCommandCenter from "@/pages/SupportCommandCenter";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { normalizeAppPath } from "@/lib/routing";
 
@@ -22,6 +23,7 @@ export default function AppLayout() {
   const location = useLocation();
   const pathname = normalizeAppPath(location.pathname);
   const isSupportCenter = pathname === "/support";
+  const isSupportCommandCenter = pathname === "/admin/support";
 
   useEffect(() => {
     const pref = getStoredTheme();
@@ -64,7 +66,7 @@ export default function AppLayout() {
         }}
       >
         <div className="page-enter">
-          {isSupportCenter ? <SupportCenter /> : <TabStack />}
+          {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
         </div>
       </main>
 

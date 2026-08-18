@@ -94,6 +94,11 @@ export function buildTitanSystemPrompt({
   const pageBlock = pageContext
     ? `CURRENT PAGE CONTEXT:\n${JSON.stringify(pageContext)}\n`
     : "CURRENT PAGE CONTEXT: (not provided)\n";
+  const effectiveKnowledge = Array.isArray(knowledgeContext) && knowledgeContext.length
+    ? knowledgeContext
+    : Array.isArray(memoryContext)
+      ? memoryContext.filter((item) => item?.classification === "TITAN_KNOWLEDGE")
+      : [];
 
   const grounding = `
 DATA RULES (mandatory):
@@ -116,7 +121,7 @@ DATA RULES (mandatory):
       grounding,
       TITAN_PAGE_CATALOG,
       pageBlock,
-      `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(knowledgeContext)}`,
+      `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(effectiveKnowledge)}`,
       `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
       `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
     ].join("\n\n");
@@ -129,7 +134,7 @@ DATA RULES (mandatory):
     grounding,
     TITAN_PAGE_CATALOG,
     pageBlock,
-    `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(knowledgeContext)}`,
+    `TITAN KNOWLEDGE (RETRIEVED PLATFORM CONTEXT):\n${formatTitanKnowledgeForPrompt(effectiveKnowledge)}`,
     `DURABLE MEMORY (AUTHORIZED USER DATA):\n${formatTitanMemoryForPrompt(memoryContext)}`,
     `BUSINESS SNAPSHOT (YOUR DATA):\n${formatSummaryForPrompt(summary)}`,
   ].join("\n\n");

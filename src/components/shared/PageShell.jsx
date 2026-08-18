@@ -22,7 +22,7 @@ const PageShell = forwardRef(function PageShell(
       ref={ref}
       style={style}
       className={cn(
-        "page-pad mx-auto w-full overflow-x-hidden",
+        "titan-reference-page page-pad mx-auto w-full overflow-x-hidden",
         dense ? "pb-24" : "pb-28 md:pb-10",
         MAX[maxWidth] || MAX.lg,
         className

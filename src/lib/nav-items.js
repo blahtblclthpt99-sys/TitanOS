@@ -10,59 +10,76 @@ import {
   Workflow,
   Brain,
   ContactRound,
+  UserRoundCog,
+  Truck,
+  Package,
+  FolderKanban,
+  MoreHorizontal,
 } from "lucide-react";
 
 /**
- * TitanOS core navigation.
+ * TitanOS primary navigation.
  *
- * Product rule: the app exposes four product pillars only:
- * 1. Titan Business — run the business.
- * 2. Find Work — find and manage job opportunities.
- * 3. 2nd Self — memory, context, and the invisible interface.
- * 4. Titan Auto — leads and approved automation.
- *
- * Legacy routes stay mounted for compatibility while they are audited/migrated, but
- * they are intentionally excluded from primary navigation so TitanOS can stay focused.
+ * Product rule: TitanOS is a Business Operating System first.
+ * Jobs, customers, scheduling, estimates, invoices, payments, people, fleet,
+ * inventory, and business records are the core product. Growth and intelligence
+ * are extensions layered on top of that operating system, not equal competing apps.
  */
 export const APP_NAV_ITEMS = [
-  // TITAN BUSINESS
-  { icon: LayoutDashboard, label: "Business Home", path: "/", group: "business" },
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "business" },
-  { icon: Calendar, label: "Schedule", path: "/schedule", group: "business" },
-  { icon: Users, label: "Customers", path: "/customers", group: "business" },
-  { icon: FileText, label: "Estimates", path: "/estimates", group: "business" },
-  { icon: Receipt, label: "Invoices", path: "/invoices", group: "business" },
-  { icon: CreditCard, label: "Payments", path: "/payments", group: "business" },
+  // OPERATIONS — the daily business OS
+  { icon: LayoutDashboard, label: "Business Home", path: "/", group: "operations" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "operations" },
+  { icon: Calendar, label: "Schedule", path: "/schedule", group: "operations" },
+  { icon: Users, label: "Customers", path: "/customers", group: "operations" },
 
-  // FIND WORK
-  { icon: Briefcase, label: "Find Work", path: "/hire/matches", group: "find_work" },
+  // SALES & MONEY
+  { icon: FileText, label: "Estimates", path: "/estimates", group: "money" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "money" },
+  { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
 
-  // 2ND SELF / INVISIBLE INTERFACE
-  { icon: Brain, label: "2nd Self", path: "/second-me", group: "second_me" },
+  // BUSINESS MANAGEMENT
+  { icon: UserRoundCog, label: "Employees", path: "/employees", group: "management" },
+  { icon: Truck, label: "Fleet", path: "/fleet", group: "management" },
+  { icon: Package, label: "Inventory", path: "/inventory", group: "management" },
+  { icon: FolderKanban, label: "Business Documents", path: "/business-documents", group: "management" },
 
-  // TITAN AUTO + LEADS
-  { icon: Workflow, label: "Titan Auto + Leads", path: "/autopilot", group: "growth" },
+  // EXTENSIONS — useful, but intentionally secondary to running the business
+  { icon: Briefcase, label: "Find Work", path: "/hire/matches", group: "extensions" },
+  { icon: Workflow, label: "Titan Auto + Leads", path: "/autopilot", group: "extensions" },
+  { icon: Brain, label: "2nd Self", path: "/second-me", group: "extensions" },
 ];
 
 /**
- * Preserved internal/legacy workflows. These routes remain available to existing
- * links and data flows but are deliberately absent from product navigation.
+ * Preserved internal workflows and utilities. These remain reachable without
+ * becoming top-level product destinations.
  */
 export const INTERNAL_WORKFLOW_ITEMS = [
-  { label: "Titan AI", path: "/assistant", group: "second_me", hidden: true },
-  { label: "Leads", path: "/leads", group: "growth", hidden: true },
-  { label: "Follow-ups", path: "/follow-ups", group: "growth", hidden: true },
-  { label: "Job Match Profile", path: "/hire/matches", group: "find_work", hidden: true },
-  { label: "Match-ready job", path: "/hire/post-match-ready", group: "business", hidden: true },
-  { label: "Profile", path: "/profile", group: "business", hidden: true },
-  { label: "Settings", path: "/settings", group: "business", hidden: true },
-  { label: "Titan Support", path: "/support", group: "business", hidden: true },
+  { label: "Fleet Operations", path: "/driver", group: "management", hidden: true },
+  { label: "Route Planner", path: "/routes", group: "management", hidden: true },
+  { label: "Credentials", path: "/credentials", group: "management", hidden: true },
+  { label: "Contracts", path: "/contracts", group: "management", hidden: true },
+  { label: "Insurance", path: "/insurance", group: "management", hidden: true },
+  { label: "Titan AI", path: "/assistant", group: "extensions", hidden: true },
+  { label: "Leads", path: "/leads", group: "extensions", hidden: true },
+  { label: "Follow-ups", path: "/follow-ups", group: "extensions", hidden: true },
+  { label: "Job Match Profile", path: "/hire/matches", group: "extensions", hidden: true },
+  { label: "Match-ready job", path: "/hire/post-match-ready", group: "operations", hidden: true },
+  { label: "Profile", path: "/profile", group: "utilities", hidden: true },
+  { label: "Settings", path: "/settings", group: "utilities", hidden: true },
+  { label: "Subscription", path: "/subscription", group: "utilities", hidden: true },
+  { label: "Titan Support", path: "/support", group: "utilities", hidden: true },
+  { label: "Trust & Safety", path: "/trust-safety", group: "utilities", hidden: true },
 ];
 
 export const INTERNAL_WORKFLOW_GROUPS = [
   {
-    title: "Compatibility",
+    title: "Business utilities",
     paths: [
+      "/driver",
+      "/routes",
+      "/credentials",
+      "/contracts",
+      "/insurance",
       "/assistant",
       "/leads",
       "/follow-ups",
@@ -71,32 +88,53 @@ export const INTERNAL_WORKFLOW_GROUPS = [
       "/hire/find-workers",
       "/profile",
       "/settings",
+      "/subscription",
       "/support",
+      "/trust-safety",
     ],
   },
 ];
 
 export const NAV_GROUP_META = {
-  business: { label: "Titan Business", collapsible: false, defaultOpen: true },
-  find_work: { label: "Find Work", collapsible: false, defaultOpen: true },
-  second_me: { label: "2nd Self", collapsible: false, defaultOpen: true },
-  growth: { label: "Titan Auto", collapsible: false, defaultOpen: true },
+  operations: { label: "Operations", collapsible: false, defaultOpen: true },
+  money: { label: "Sales & Money", collapsible: false, defaultOpen: true },
+  management: { label: "Business Management", collapsible: false, defaultOpen: true },
+  extensions: { label: "Growth & Intelligence", collapsible: false, defaultOpen: true },
 };
 
-export const NAV_GROUP_ORDER = ["business", "find_work", "second_me", "growth"];
+export const NAV_GROUP_ORDER = ["operations", "money", "management", "extensions"];
 
-/** Exactly four mobile roots: one for each Titan product pillar. */
+/** Mobile prioritizes daily business work. Secondary tools live under More. */
 export const MOBILE_TAB_ITEMS = [
-  { icon: Building2, label: "Business", path: "/" },
-  { icon: Briefcase, label: "Find Work", path: "/hire/matches" },
-  { icon: Brain, label: "2nd Self", path: "/second-me" },
-  { icon: Workflow, label: "Titan Auto", path: "/autopilot" },
+  { icon: Building2, label: "Home", path: "/" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs" },
+  { icon: Users, label: "Customers", path: "/customers" },
+  { icon: Receipt, label: "Money", path: "/invoices" },
+  { icon: MoreHorizontal, label: "More", path: "/more" },
 ];
 
 export const MOBILE_ROOT_PATHS = MOBILE_TAB_ITEMS.map((item) => item.path);
 
-/** Kept for compatibility with older More-menu imports. The core shell no longer uses it. */
-export const MORE_MENU_GROUPS = [];
+export const MORE_MENU_GROUPS = [
+  {
+    title: "Run the business",
+    description: "Daily operations, money, people, fleet, inventory, and records.",
+    paths: [
+      "/schedule",
+      "/estimates",
+      "/payments",
+      "/employees",
+      "/fleet",
+      "/inventory",
+      "/business-documents",
+    ],
+  },
+  {
+    title: "Growth & intelligence",
+    description: "Optional tools that extend the business OS.",
+    paths: ["/hire/matches", "/autopilot", "/second-me"],
+  },
+];
 
 export const QUICK_CREATE_ACTIONS = [
   { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
@@ -111,10 +149,12 @@ export function resolveNavDomain(pathname = "/") {
     APP_NAV_ITEMS.find((n) => n.path === path) ||
     APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
   if (item?.group) return item.group;
-  if (path.startsWith("/hire")) return "find_work";
-  if (path.startsWith("/second-me") || path.startsWith("/assistant")) return "second_me";
-  if (path.startsWith("/autopilot") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return "growth";
-  return "business";
+  if (path.startsWith("/driver") || path.startsWith("/routes")) return "management";
+  if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) return "management";
+  if (path.startsWith("/hire") || path.startsWith("/second-me") || path.startsWith("/assistant")) return "extensions";
+  if (path.startsWith("/autopilot") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return "extensions";
+  if (path.startsWith("/invoices") || path.startsWith("/estimates") || path.startsWith("/payments")) return "money";
+  return "operations";
 }
 
 export function navItemsByPaths(paths) {
@@ -126,9 +166,9 @@ export function filterNavItems(items) {
 }
 
 const LEGACY_TITLES = {
-  "/more": "Business Home",
+  "/more": "Business Tools",
   "/notifications": "Notifications",
-  "/driver": "Driver Hub",
+  "/driver": "Fleet Operations",
   "/routes": "Route Planner",
   "/booking": "Booking",
   "/employees": "Employees",
@@ -167,8 +207,7 @@ export function resolvePageTitle(pathname = "/") {
   if (path === "/admin") return "Control Center";
   if (path.startsWith("/admin/fees")) return "Fee Management";
   if (path.startsWith("/admin/tax-rules")) return "Tax Rules";
-  if (path.startsWith("/driver/trip")) return "Trip detail";
-  if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
+  if (path.startsWith("/driver")) return "Fleet Operations";
   if (path.startsWith("/book/")) return "Booking";
   if (path.startsWith("/u/")) return "Public profile";
   if (path.startsWith("/sign/")) return "Sign document";
@@ -184,6 +223,10 @@ export function resolvePageTitle(pathname = "/") {
 
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
+  if (path.startsWith("/driver") || path.startsWith("/routes")) return { label: "Fleet", path: "/fleet" };
+  if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
+    return { label: "Business Documents", path: "/business-documents" };
+  }
   if (path.startsWith("/hire")) return { label: "Find Work", path: "/hire/matches" };
   if (path.startsWith("/assistant") || path.startsWith("/second-me")) return { label: "2nd Self", path: "/second-me" };
   if (path.startsWith("/autopilot") || path.startsWith("/leads") || path.startsWith("/follow-ups")) {
@@ -194,5 +237,8 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
   if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
   if (path.startsWith("/payments")) return { label: "Payments", path: "/payments" };
+  if (path.startsWith("/employees")) return { label: "Employees", path: "/employees" };
+  if (path.startsWith("/fleet")) return { label: "Fleet", path: "/fleet" };
+  if (path.startsWith("/inventory")) return { label: "Inventory", path: "/inventory" };
   return { label: "Business Home", path: "/" };
 }

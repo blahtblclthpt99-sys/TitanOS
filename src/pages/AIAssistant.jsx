@@ -357,11 +357,11 @@ export default function AIAssistant() {
   };
 
   useEffect(() => {
-    const q = params.get("q");
-    if (!q || seededQ.current || dataLoading) return;
+    const q = params.get("q")?.trim();
+    if (!q || seededQ.current || dataLoading || loading || confirming) return;
     seededQ.current = true;
-    setInput(q);
-  }, [params, dataLoading]);
+    void sendMessage(q);
+  }, [params, dataLoading, loading, confirming]);
 
   const handleConfirm = async (msgIndex) => {
     const confirmMsg = messages[msgIndex];
@@ -425,111 +425,227 @@ export default function AIAssistant() {
     }
   };
 
-  const handleRollback = async (msgIndex) => {
-    const row = messages[msgIndex];
-    const rollback = row?.rollback;
-    if (!rollback || !user?.id || !ownerMode || rollbackingId || actionInFlightRef.current) return;
-    actionInFlightRef.current = true;
-    setRollbackingId(row?.rollback?.id || `msg-${msgIndex}`);
+  const handleCancel = (msgIndex) => {
+    setMessages((prev) => prev.map((m, i) => i === msgIndex ? { role: "assistant", content: "Action cancelled. Nothing was changed.", type: "text" } : m));
+    setConfirming(false);
+  };
+
+  const handleRollback = async (message, msgIndex) => {
+    if (!message?.rollback || rollbackingId != null) return;
+    const rollback = message.rollback;
+    setRollbackingId(msgIndex);
     try {
       const result = await api.functions.invoke("titanAI", {
         messages: [],
         pageContext: buildAiPageContext({ pathname: "/assistant", workflow: "second_self" }),
-        rollbackAction: { ...rollback, correlationId: rollback.correlationId || row?.correlationId || null },
-        ownerAutopilot: ownerMode && ownerAutopilot,
         secondSelf: true,
-        guardrails: { killSwitch: ownerMode && opsState.killSwitch },
+        rollbackAction: rollback,
       });
-      const data = result.data || {};
-      const retainRollback = shouldRetainRollback(data);
+      const data = result.data;
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
         ...m,
-        content: rollbackMessage(m.content, data),
-        rollback: retainRollback ? m.rollback : null,
+        content: `${m.content || "Action completed."}\n\n${rollbackMessage(data)}`,
+        rollback: shouldRetainRollback(data) ? rollback : null,
       } : m));
-      appendTitanActionLog(user.id, {
-        status: data.type === "error" ? "error" : "ok",
-        title: data.type === "error" ? "Rollback failed" : "Rollback completed",
-        detail: data.message || "Rollback result.",
-        correlationId: data.correlationId || rollback.correlationId || null,
-      });
-      refreshOpsState();
-      if (!shouldRetainRollback(data)) { loadBusinessData(); void loadActionHistory(); }
+      if (user?.id && ownerMode) {
+        appendTitanActionLog(user.id, {
+          status: data.type === "error" ? "error" : "ok",
+          title: data.type === "error" ? "Rollback failed" : "Rollback completed",
+          detail: data.message || "2nd Me rollback completed.",
+        });
+        refreshOpsState();
+      }
+      if (data.type !== "error") { loadBusinessData(); void loadActionHistory(); }
     } catch (error) {
-      const data = { type: "error", message: error?.message || "Rollback could not be completed." };
       setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
         ...m,
-        content: rollbackMessage(m.content, data),
-        rollback: m.rollback,
+        content: `${m.content || "Action completed."}\n\n${rollbackMessage({ type: "error", message: error?.message })}`,
       } : m));
-      appendTitanActionLog(user.id, {
-        status: "error",
-        title: "Rollback failed",
-        detail: data.message,
-      });
-      refreshOpsState();
     } finally {
-      actionInFlightRef.current = false;
       setRollbackingId(null);
     }
   };
 
-  const handleCancel = (msgIndex) => {
-    setMessages((prev) => prev.map((m, i) => i === msgIndex ? {
-      role: "assistant",
-      content: "Cancelled. I didn't change anything.",
-      type: "text",
-    } : m));
-    setConfirming(false);
+  const clearOpsLogs = () => {
+    if (!user?.id || !ownerMode) return;
+    clearTitanActionLogs(user.id);
+    refreshOpsState();
   };
 
-  const clearChat = () => {
-    setMessages([]);
-    setConfirming(false);
-  };
-
-  const isInputDisabled = loading || confirming;
-
-  const renderMessage = (msg, i) => {
-    if (msg.role === "user") {
-      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end"><div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 max-w-[85%] md:max-w-[65%]"><p className="text-sm font-medium">{msg.content}</p></div></motion.div>;
-    }
-    if (msg.type === "loading") {
-      return <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3"><div className="flex items-center gap-1.5">{[0,150,300].map((delay) => <div key={delay} className="w-2 h-2 bg-titan-cyan rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />)}</div></div></motion.div>;
-    }
-    if (msg.type === "executing") {
-      return <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3 border border-titan-cyan/20 flex items-center gap-3"><div className="w-4 h-4 border-2 border-titan-cyan/30 border-t-titan-cyan rounded-full animate-spin flex-shrink-0"/><span className="text-xs text-muted-foreground">Executing…</span></div></motion.div>;
-    }
-    if (msg.type === "confirm") {
-      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="space-y-2 w-full max-w-2xl"><InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/>{msg.retryError ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{msg.retryError} Retry uses the same protected action ID.</div> : null}<ConfirmationCard summary={msg.meta.summary} details={msg.meta.details} onConfirm={() => handleConfirm(i)} onCancel={() => handleCancel(i)} loading={confirming}/></div></motion.div>;
-    }
-    if (msg.type === "done" || msg.type === "error") {
-      return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><ActionResult message={msg.content} isError={msg.type === "error"} onRollback={msg.rollback ? () => handleRollback(i) : null} rollbackLoading={rollbackingId === (msg?.rollback?.id || `msg-${i}`)}/></motion.div>;
-    }
-    return <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start"><div className="titan-surface rounded-bl-md px-4 py-3 max-w-[92%] md:max-w-[72%] space-y-2">{(msg.source || msg.dataBasis) && <div className="flex flex-wrap gap-1.5">{msg.dataBasis === "server_snapshot" || msg.source === "local" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-primary/10 text-primary px-1.5 py-0.5">Your data</span> : null}{msg.generalKnowledge || msg.source === "openai" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-muted text-muted-foreground px-1.5 py-0.5">General knowledge</span> : null}{msg.source === "offline" || msg.dataBasis === "device_cache" ? <span className="text-[10px] font-semibold uppercase tracking-wide rounded-md bg-warning/15 text-warning-foreground px-1.5 py-0.5">Device context</span> : null}</div>}<InvisibleInterface spec={msg.interface} onNavigate={navigate} onPrompt={sendMessage}/><ReactMarkdown className="text-sm prose prose-sm dark:prose-invert max-w-none [&_p]:text-foreground [&_li]:text-foreground [&_strong]:text-foreground [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5" components={safeMarkdownComponents}>{msg.content}</ReactMarkdown></div></motion.div>;
-  };
+  const suggestions = lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS;
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))", maxHeight: "calc(100svh - 8rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))" }}>
-      <div className="flex items-center justify-between px-4 md:px-8 pt-5 pb-4 border-b border-border flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-titan-cyan to-titan-indigo flex items-center justify-center flex-shrink-0">{lawMastermind ? <Scale className="w-5 h-5 text-foreground"/> : <Bot className="w-5 h-5 text-foreground"/>}</div>
-          <div>
-            <h1 className="text-base font-bold text-foreground leading-tight">{lawMastermind ? "Law Mastermind AI" : "2nd Me"}</h1>
-            <div className="flex items-center gap-1.5">{dataLoading ? <span className="text-xs text-muted-foreground">Connecting context…</span> : dataError ? <><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/><span className="text-xs text-muted-foreground">Partial context available · conversation still works</span><button onClick={loadBusinessData} className="text-muted-foreground hover:text-foreground/60 transition-colors" aria-label="Retry context"><RefreshCw className="w-3 h-3"/></button></> : <><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs text-muted-foreground">Memory + context ready</span></>}</div>
-            {ownerMode && !lawMastermind ? <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={ownerAutopilot} onCheckedChange={setAutopilot} aria-label="Owner autopilot"/>Owner autopilot</label> : null}
-          </div>
+    <div className="page-pad max-w-5xl mx-auto pb-28">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Invisible Interface</p>
+          <h1 className="text-2xl font-bold text-foreground">2nd Self</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Ask, remember, understand, and take approved actions across Titan.</p>
         </div>
-        {messages.length > 0 && <button onClick={clearChat} className="text-muted-foreground hover:text-foreground/60 transition-colors p-2 rounded-xl hover:bg-muted" title="New conversation"><RotateCcw className="w-4 h-4"/></button>}
+        <button
+          type="button"
+          onClick={() => navigate("/second-me")}
+          className="rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground focus-ring"
+        >
+          2nd Self home
+        </button>
       </div>
 
-      {!lawMastermind && actionHistory.length > 0 ? <div className="px-4 md:px-8 pt-3 flex-shrink-0"><div className="titan-surface titan-bento-card max-w-4xl mx-auto px-3 py-2"><div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Recent 2nd Me actions</div><div className="titan-action-rail pb-1">{actionHistory.map((item) => <div key={item.correlationId} className="titan-action-chip"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold truncate">{String(item.intent || "action").replaceAll("_", " ")}</span><span className={`text-[10px] ${item.status === "completed" ? "text-emerald-500" : item.status === "failed" ? "text-destructive" : "text-amber-500"}`}>{item.status}</span></div><div className="text-[10px] text-muted-foreground mt-1 truncate">{item.message}</div><div className="text-[9px] text-muted-foreground/70 mt-1 font-mono" title={item.correlationId}>ID {String(item.correlationId).slice(-10)}</div></div>)}</div></div></div> : null}
+      {dataError ? (
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-muted-foreground">
+          Some live business context could not load. 2nd Self can still respond with the context that is available.
+        </div>
+      ) : null}
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4">
-        {messages.length === 0 ? <div className="max-w-2xl mx-auto py-8"><div className="text-center mb-6"><Sparkles className="w-8 h-8 text-titan-cyan mx-auto mb-3"/><h2 className="text-xl font-bold text-foreground">What are we doing?</h2><p className="text-sm text-muted-foreground mt-2">Tell me naturally. I’ll use what I know, figure out what’s missing, and bring up the right interface or action.</p></div><div className="grid gap-2 sm:grid-cols-2">{(lawMastermind ? LAW_SUGGESTIONS : SUGGESTIONS).map((s) => <button key={s.label} onClick={() => sendMessage(s.prompt)} className="rounded-xl border border-border bg-card/70 px-3 py-3 text-left text-sm hover:bg-muted transition-colors">{s.label}</button>)}</div></div> : <div className="space-y-4 max-w-4xl mx-auto">{messages.map(renderMessage)}<div ref={messagesEndRef}/></div>}
-      </div>
+      {ownerMode && !lawMastermind ? (
+        <section className="titan-surface p-4 mb-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Owner action controls</p>
+              <p className="text-xs text-muted-foreground">Extra automation controls for the owner account only.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <span>Owner autopilot</span>
+              <Switch checked={ownerAutopilot} onCheckedChange={setAutopilot} />
+            </label>
+          </div>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+            <span>
+              <span className="block font-semibold">Kill switch</span>
+              <span className="block text-xs text-muted-foreground">Block 2nd Self write actions immediately.</span>
+            </span>
+            <Switch checked={opsState.killSwitch} onCheckedChange={setKillSwitch} />
+          </label>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {opsState.routines.map((routine) => (
+              <div key={routine.id} className="rounded-lg border border-border p-3">
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <Checkbox checked={routine.enabled !== false} onCheckedChange={(checked) => setRoutineEnabled(routine.id, Boolean(checked))} />
+                  {routine.label}
+                </label>
+                <Button size="sm" variant="outline" className="mt-3 w-full" disabled={routine.enabled === false || loading || confirming || opsState.killSwitch} onClick={() => runWorkflow(routine.id)}>
+                  Run now
+                </Button>
+              </div>
+            ))}
+          </div>
+          {opsState.logs.length ? (
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent owner operations</p>
+                <button type="button" onClick={clearOpsLogs} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+              </div>
+              <div className="mt-2 space-y-1">
+                {opsState.logs.slice(0, 5).map((log) => (
+                  <p key={log.id} className="text-xs text-muted-foreground">{log.title} · {log.detail}</p>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
-      <div className="px-4 md:px-8 py-3 border-t border-border flex-shrink-0"><form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="max-w-4xl mx-auto flex gap-2"><Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder={lawMastermind ? "Ask Law Mastermind…" : "What are we doing?"} disabled={isInputDisabled} className="flex-1"/><button type="submit" disabled={isInputDisabled || !input.trim()} className="h-9 w-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40" aria-label="Send"><Send className="w-4 h-4"/></button></form></div>
+      {!messages.length ? (
+        <section className="titan-surface p-5 mb-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-semibold">What can I help with?</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ask about Titan Business data, unresolved work, memory, or an action you want to take.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.label}
+                type="button"
+                onClick={() => void sendMessage(suggestion.prompt)}
+                disabled={dataLoading || loading || confirming}
+                className="rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50 focus-ring"
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="space-y-3" aria-live="polite">
+        <AnimatePresence initial={false}>
+          {messages.map((message, index) => (
+            <motion.div
+              key={`${index}-${message.type}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[78%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "titan-surface"}`}>
+                {message.type === "loading" ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> Thinking…</div>
+                ) : message.type === "confirm" || message.type === "executing" ? (
+                  <ConfirmationCard
+                    message={message}
+                    executing={message.type === "executing"}
+                    onConfirm={() => handleConfirm(index)}
+                    onCancel={() => handleCancel(index)}
+                  />
+                ) : (
+                  <>
+                    {message.content ? (
+                      <ReactMarkdown components={safeMarkdownComponents}>{message.content}</ReactMarkdown>
+                    ) : null}
+                    {message.interface ? <InvisibleInterface spec={message.interface} onNavigate={(path) => navigate(path)} /> : null}
+                    {message.type === "done" ? (
+                      <ActionResult
+                        message={message}
+                        rollbacking={rollbackingId === index}
+                        onRollback={message.rollback ? () => handleRollback(message, index) : undefined}
+                      />
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
+      </section>
+
+      {actionHistory.length && !lawMastermind ? (
+        <section className="mt-5 titan-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent approved actions</p>
+          <div className="mt-2 space-y-2">
+            {actionHistory.map((item) => (
+              <div key={item.id} className="flex items-start gap-2 text-sm">
+                {item.status === "failed" ? <ShieldAlert className="mt-0.5 h-4 w-4 text-warning" /> : <Zap className="mt-0.5 h-4 w-4 text-primary" />}
+                <div className="min-w-0"><p className="font-medium">{item.intent || "Action"}</p><p className="truncate text-xs text-muted-foreground">{item.status}</p></div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void sendMessage();
+        }}
+        className="sticky bottom-4 mt-5 flex gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-lift backdrop-blur-xl"
+      >
+        <Input
+          ref={inputRef}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Ask 2nd Self…"
+          disabled={loading || confirming}
+          className="min-h-[44px] border-0 bg-transparent shadow-none focus-visible:ring-0"
+        />
+        <Button type="submit" disabled={!input.trim() || loading || confirming} className="min-h-[44px] min-w-[44px] px-3" aria-label="Send to 2nd Self">
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
     </div>
   );
 }

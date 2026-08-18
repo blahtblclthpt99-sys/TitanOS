@@ -6,6 +6,8 @@ import { assertRateLimit } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
+const ACCOUNT_TYPES = new Set(["job_seeker", "business"]);
+
 /**
  * Server-side registration.
  * Production (VERCEL_ENV=production) requires email confirm unless
@@ -24,11 +26,11 @@ export default async function handler(req, res) {
 
   try {
     const body = readJson(req);
-    const email = String(body.email || "")
-      .trim()
-      .toLowerCase();
+    const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
+    const requestedAccountType = String(body.accountType || body.account_type || "job_seeker").trim().toLowerCase();
+    const accountType = ACCOUNT_TYPES.has(requestedAccountType) ? requestedAccountType : "job_seeker";
     const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
     const requireConfirm =
       flag != null && String(flag).trim() !== ""
@@ -50,7 +52,10 @@ export default async function handler(req, res) {
       email,
       password,
       email_confirm: !requireConfirm,
-      user_metadata: fullName ? { full_name: fullName } : undefined,
+      user_metadata: {
+        ...(fullName ? { full_name: fullName } : {}),
+        account_type: accountType,
+      },
     });
 
     if (createError) {
@@ -74,14 +79,38 @@ export default async function handler(req, res) {
       });
     }
 
-    await recordSignupEmail(admin, { email, fullName, source: "register" });
+    await recordSignupEmail(admin, { email, fullName, source: `register:${accountType}` });
 
-    // Founding 100 claim (also runs from profiles AFTER INSERT trigger — best-effort here)
     if (created.user?.id) {
+      // Founding claim first so choosing a UX experience cannot overwrite a real
+      // subscription/founding plan. account_type is product UX, plan_tier is billing.
       try {
         await admin.rpc("claim_founding_slot", { p_user_id: created.user.id });
       } catch {
         /* trigger may already have claimed; ignore */
+      }
+
+      try {
+        const { data: profile } = await admin
+          .from("profiles")
+          .select("plan_tier")
+          .eq("id", created.user.id)
+          .maybeSingle();
+        const row = {
+          id: created.user.id,
+          ...(fullName ? { full_name: fullName } : {}),
+          account_type: accountType,
+        };
+        if (!String(profile?.plan_tier || "").trim()) row.plan_tier = "worker_free";
+        const { error: profileError } = await admin
+          .from("profiles")
+          .upsert(row, { onConflict: "id" });
+        if (profileError) throw profileError;
+      } catch (profileError) {
+        // Do not orphan an Auth account because profile enrichment failed. The
+        // app treats an unclassified legacy account as job_seeker and the user
+        // can choose again from Account Type after sign-in.
+        logError("api/register:accountType", profileError);
       }
     }
 
@@ -91,6 +120,7 @@ export default async function handler(req, res) {
           id: created.user?.id,
           email: created.user?.email || email,
         },
+        accountType,
         session: null,
         needsEmailVerification: true,
         verificationMode: "email_link",
@@ -117,6 +147,7 @@ export default async function handler(req, res) {
           id: created.user?.id,
           email: created.user?.email || email,
         },
+        accountType,
         session: null,
         needsEmailVerification: true,
         verificationMode: "email_link",
@@ -129,6 +160,7 @@ export default async function handler(req, res) {
         id: signedIn.user.id,
         email: signedIn.user.email,
       },
+      accountType,
       session: {
         access_token: signedIn.session.access_token,
         refresh_token: signedIn.session.refresh_token,

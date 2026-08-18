@@ -1,4 +1,4 @@
-# Keep Vercel deploys small — web app only
+# Titan Attention production deployment only
 .tools
 .android-sdk
 android
@@ -23,7 +23,14 @@ test-results
 TitanOS
 TitatnCl
 
-# Binaries & local tooling
+# Retired TitanOS server routes. Keep only the new funding checkout,
+# the Stripe webhook endpoint, and shared server helpers they import.
+api/functions/**
+!api/functions/stripeWebhook.js
+api/register.js
+api/signup-emails.js
+
+# Retired downloads / binaries
 *.apk
 *.aab
 *.zip
@@ -32,7 +39,7 @@ TitatnCl
 public/downloads
 public/static
 
-# Never upload deps/build caches (Vercel installs fresh)
+# Dependencies and build artifacts are recreated by Vercel
 node_modules
 dist
 coverage

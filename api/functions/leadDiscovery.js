@@ -10,6 +10,7 @@ const MAX_RESULTS = 20;
 const MAX_RADIUS_M = 40_000;
 const CACHE_TTL_MS = 15 * 60_000;
 const REQUEST_TIMEOUT_MS = 10_000;
+const SEARCH_COORD_DECIMALS = 3;
 
 const cache = globalThis.__titanLeadDiscoveryCache || new Map();
 globalThis.__titanLeadDiscoveryCache = cache;
@@ -40,6 +41,24 @@ function finiteNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function roundedCoordinate(value) {
+  const scale = 10 ** SEARCH_COORD_DECIMALS;
+  return Math.round(value * scale) / scale;
+}
+
+function safeHttpUrl(value) {
+  const raw = cleanText(value, 300);
+  if (!raw) return "";
+  try {
+    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return "";
+    return parsed.toString().slice(0, 300);
+  } catch {
+    return "";
+  }
+}
+
 function escapeRegex(value) {
   return String(value || "")
     .replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")
@@ -61,8 +80,6 @@ function buildOverpassQuery({ query, lat, lng, radiusM, limit }) {
     statements.push(`nwr(around:${radiusM},${lat},${lng})["name"]${filter};`);
   }
 
-  // Always include a conservative name match so niche business searches can work
-  // without maintaining an exhaustive category dictionary.
   if (safeQuery.length >= 2) {
     statements.push(`nwr(around:${radiusM},${lat},${lng})["name"~"${safeQuery}",i];`);
   }
@@ -91,7 +108,7 @@ function normalizeElement(element = {}) {
   const id = String(element.id || "").replace(/[^0-9]/g, "");
   const phone = cleanText(tags["contact:phone"] || tags.phone, 80);
   const email = cleanText(tags["contact:email"] || tags.email, 160);
-  const website = cleanText(tags["contact:website"] || tags.website || tags.url, 300);
+  const website = safeHttpUrl(tags["contact:website"] || tags.website || tags.url);
   const category = cleanText(
     tags.amenity || tags.shop || tags.craft || tags.office || tags.tourism || tags.leisure || "business",
     80
@@ -154,12 +171,10 @@ async function fetchNearbyBusinesses(input) {
     }
 
     const body = await response.json().catch(() => ({}));
-    const results = dedupe((Array.isArray(body.elements) ? body.elements : []).map(normalizeElement))
-      .slice(0, input.limit);
+    const results = dedupe((Array.isArray(body.elements) ? body.elements : []).map(normalizeElement)).slice(0, input.limit);
     const value = { results, provider: "OpenStreetMap", cached: false };
     cache.set(key, { at: Date.now(), value });
 
-    // Bound memory growth on long-lived server instances.
     if (cache.size > 100) {
       const oldest = [...cache.entries()].sort((a, b) => a[1].at - b[1].at).slice(0, cache.size - 80);
       for (const [oldKey] of oldest) cache.delete(oldKey);
@@ -193,10 +208,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "A valid search location is required." });
     }
 
+    // Nearby discovery does not require exact device coordinates. Reduce precision
+    // before transmitting the lookup to the public place-data provider.
+    const searchLat = roundedCoordinate(lat);
+    const searchLng = roundedCoordinate(lng);
     const result = await fetchNearbyBusinesses({
       query,
-      lat,
-      lng,
+      lat: searchLat,
+      lng: searchLng,
       radiusM: Math.min(MAX_RADIUS_M, Math.round(radiusMiles * 1609.344)),
       limit,
     });
@@ -206,6 +225,7 @@ export default async function handler(req, res) {
         ...result,
         query,
         radius_miles: radiusMiles,
+        location_precision: `${SEARCH_COORD_DECIMALS} decimal places`,
         attribution: "Business place data © OpenStreetMap contributors",
       },
     });

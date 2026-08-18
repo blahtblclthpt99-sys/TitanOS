@@ -2,7 +2,6 @@ import titanAIHandler from "./titanAI.js";
 import { logError } from "../_lib/safeLog.js";
 import { captureApiException } from "../_lib/sentry.js";
 
-const DEFAULT_OPENAI_MODEL = "gpt-5.6";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.6-sol";
 const MAX_RECENT_MESSAGES = 8;
 const MAX_MESSAGE_CHARS = 2_000;
@@ -47,27 +46,14 @@ function extractOutputText(payload) {
   return chunks.join("\n").trim();
 }
 
-function providerConfig() {
-  const openAiKey = process.env.OPENAI_API_KEY;
-  if (openAiKey) {
-    return {
-      credential: openAiKey,
-      url: "https://api.openai.com/v1/responses",
-      model: process.env.TITAN_AI_OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
-      source: "openai-responses",
-      gateway: false,
-    };
-  }
-
-  const gatewayCredential = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (!gatewayCredential) return null;
-
+function gatewayConfig() {
+  const credential = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+  if (!credential) return null;
   return {
-    credential: gatewayCredential,
+    credential,
     url: "https://ai-gateway.vercel.sh/v1/responses",
     model: process.env.TITAN_AI_GATEWAY_MODEL || DEFAULT_GATEWAY_MODEL,
     source: "vercel-ai-gateway",
-    gateway: true,
   };
 }
 
@@ -93,28 +79,12 @@ function providerInstructions(req, trustedServerAnswer) {
   ].join("\n");
 }
 
-async function enhanceWithLiveProvider(req, originalPayload) {
-  const provider = providerConfig();
+async function enhanceLocalWithGateway(req, originalPayload) {
+  const provider = gatewayConfig();
   if (!provider) return originalPayload;
 
   const input = recentConversation(req);
   if (!input.length) return originalPayload;
-
-  const requestBody = {
-    model: provider.model,
-    instructions: providerInstructions(req, originalPayload?.data?.message),
-    input,
-    max_output_tokens: 700,
-    store: false,
-  };
-
-  if (provider.gateway) {
-    requestBody.providerOptions = {
-      gateway: {
-        disallowPromptTraining: true,
-      },
-    };
-  }
 
   const response = await fetch(provider.url, {
     method: "POST",
@@ -122,12 +92,23 @@ async function enhanceWithLiveProvider(req, originalPayload) {
       Authorization: `Bearer ${provider.credential}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({
+      model: provider.model,
+      instructions: providerInstructions(req, originalPayload?.data?.message),
+      input,
+      max_output_tokens: 700,
+      store: false,
+      providerOptions: {
+        gateway: {
+          disallowPromptTraining: true,
+        },
+      },
+    }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    const error = new Error(`TitanAI live provider returned ${response.status}`);
+    const error = new Error(`TitanAI gateway returned ${response.status}`);
     error.status = response.status;
     error.detail = text.slice(0, 500);
     throw error;
@@ -153,20 +134,19 @@ export default async function handler(req, res) {
   const originalJson = res.json.bind(res);
 
   res.json = (payload) => {
-    const source = payload?.data?.source;
     const shouldEnhance =
       res.statusCode >= 200 &&
       res.statusCode < 300 &&
       payload?.data?.type === "response" &&
-      (source === "local" || source === "openai");
+      payload?.data?.source === "local";
 
     if (!shouldEnhance) return originalJson(payload);
 
-    return enhanceWithLiveProvider(req, payload)
+    return enhanceLocalWithGateway(req, payload)
       .then((enhanced) => originalJson(enhanced))
       .catch((error) => {
-        logError("titanAI:live_provider", error?.detail || error);
-        captureApiException(error, { tags: { route: "titanAILive", phase: "live_provider" } });
+        logError("titanAI:gateway", error?.detail || error);
+        captureApiException(error, { tags: { route: "titanAILive", phase: "gateway_fallback" } });
         return originalJson(payload);
       });
   };

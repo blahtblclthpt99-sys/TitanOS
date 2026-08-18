@@ -8,6 +8,7 @@ import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
 import { buildInvisibleInterface, buildConfirmationInterface } from "../_lib/invisibleInterface.js";
 import { loadTitanMemoryContext } from "../_lib/titanMemoryContext.js";
+import { requestTitanOpenAI } from "../_lib/openaiResponses.js";
 import {
   detectSecondMeMemoryIntent,
   executeSecondMeMemoryAction,
@@ -569,7 +570,7 @@ export default async function handler(req, res) {
     const recent = messages
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
       .slice(-8)
-      .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+      .map((m) => ({ role: m.role, content: String(m.content).slice(0, 3000) }));
 
     if (!openAiKey) {
       const c = summary.counts || {};
@@ -588,23 +589,21 @@ export default async function handler(req, res) {
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        temperature: 0.3,
-        max_tokens: 450,
-        messages: [
-          { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
-          ...recent,
-        ],
+    const provider = await requestTitanOpenAI({
+      apiKey: openAiKey,
+      model: process.env.OPENAI_MODEL || "gpt-5.6",
+      maxOutputTokens: process.env.OPENAI_MAX_OUTPUT_TOKENS || 700,
+      systemPrompt: buildTitanSystemPrompt({
+        summary,
+        pageContext,
+        lawMastermind: Boolean(lawMastermind),
+        memoryContext,
       }),
+      recentMessages: recent,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      logError("titanAI:openai", errText.slice(0, 500));
+    if (!provider.ok) {
+      logError("titanAI:openai", String(provider.error || "provider_error").slice(0, 500));
       return res.status(200).json({
         data: {
           type: "response",
@@ -617,12 +616,10 @@ export default async function handler(req, res) {
       });
     }
 
-    const completion = await response.json();
-    const content = completion.choices?.[0]?.message?.content || "No response.";
     return res.status(200).json({
       data: {
         type: "response",
-        message: content,
+        message: provider.text || "No response.",
         source: "openai",
         dataBasis: "server_snapshot",
         generalKnowledge: true,

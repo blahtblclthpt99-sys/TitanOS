@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formatTitanKnowledgeForPrompt, normalizeKnowledgeQuery } from "../api/_lib/titanKnowledgeContext.js";
-import { extractOpenAIResponseText } from "../api/_lib/openaiResponses.js";
+import { extractOpenAIResponseText, requestTitanOpenAI } from "../api/_lib/openaiResponses.js";
 import { buildTitanSystemPrompt } from "../api/_lib/aiContext.js";
 
 describe("TitanAI knowledge retrieval contract", () => {
@@ -45,7 +45,7 @@ describe("TitanAI knowledge retrieval contract", () => {
   });
 });
 
-describe("OpenAI Responses payload parsing", () => {
+describe("OpenAI Responses transport", () => {
   it("extracts SDK-style output_text", () => {
     assert.equal(extractOpenAIResponseText({ output_text: "Titan ready" }), "Titan ready");
   });
@@ -53,5 +53,33 @@ describe("OpenAI Responses payload parsing", () => {
   it("extracts raw Responses API message output", () => {
     const payload = { output: [{ type: "message", content: [{ type: "output_text", text: "Titan answer" }] }] };
     assert.equal(extractOpenAIResponseText(payload), "Titan answer");
+  });
+
+  it("uses Responses API, GPT-5.6, bounded output, and disables provider storage", async () => {
+    let capturedUrl = "";
+    let capturedOptions = null;
+    const result = await requestTitanOpenAI({
+      apiKey: "test-key",
+      systemPrompt: "System",
+      recentMessages: [{ role: "user", content: "Hello Titan" }],
+      model: "gpt-4o-mini",
+      maxOutputTokens: 99999,
+      fetchImpl: async (url, options) => {
+        capturedUrl = url;
+        capturedOptions = options;
+        return {
+          ok: true,
+          status: 200,
+          async json() { return { output_text: "Titan ready" }; },
+        };
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(capturedUrl, "https://api.openai.com/v1/responses");
+    const body = JSON.parse(capturedOptions.body);
+    assert.equal(body.model, process.env.TITAN_AI_OPENAI_MODEL || "gpt-5.6");
+    assert.equal(body.max_output_tokens, 1600);
+    assert.equal(body.store, false);
   });
 });

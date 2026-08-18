@@ -2,6 +2,7 @@ import titanAIHandler from "./titanAI.js";
 import { logError } from "../_lib/safeLog.js";
 import { captureApiException } from "../_lib/sentry.js";
 
+const DEFAULT_OPENAI_MODEL = "gpt-5.6";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.6-sol";
 const MAX_RECENT_MESSAGES = 8;
 const MAX_MESSAGE_CHARS = 2_000;
@@ -46,7 +47,31 @@ function extractOutputText(payload) {
   return chunks.join("\n").trim();
 }
 
-function gatewayInstructions(req, trustedServerAnswer) {
+function providerConfig() {
+  const openAiKey = process.env.OPENAI_API_KEY;
+  if (openAiKey) {
+    return {
+      credential: openAiKey,
+      url: "https://api.openai.com/v1/responses",
+      model: process.env.TITAN_AI_OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
+      source: "openai-responses",
+      gateway: false,
+    };
+  }
+
+  const gatewayCredential = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+  if (!gatewayCredential) return null;
+
+  return {
+    credential: gatewayCredential,
+    url: "https://ai-gateway.vercel.sh/v1/responses",
+    model: process.env.TITAN_AI_GATEWAY_MODEL || DEFAULT_GATEWAY_MODEL,
+    source: "vercel-ai-gateway",
+    gateway: true,
+  };
+}
+
+function providerInstructions(req, trustedServerAnswer) {
   const body = req?.body && typeof req.body === "object" ? req.body : {};
   const mode = body.lawMastermind ? "Law Mastermind" : "2nd Me";
   const trusted = String(trustedServerAnswer || "").slice(0, MAX_TRUSTED_CONTEXT_CHARS);
@@ -68,37 +93,41 @@ function gatewayInstructions(req, trustedServerAnswer) {
   ].join("\n");
 }
 
-async function enhanceWithGateway(req, originalPayload) {
-  const credential = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (!credential) return originalPayload;
+async function enhanceWithLiveProvider(req, originalPayload) {
+  const provider = providerConfig();
+  if (!provider) return originalPayload;
 
   const input = recentConversation(req);
   if (!input.length) return originalPayload;
 
-  const model = process.env.TITAN_AI_GATEWAY_MODEL || DEFAULT_GATEWAY_MODEL;
-  const response = await fetch("https://ai-gateway.vercel.sh/v1/responses", {
+  const requestBody = {
+    model: provider.model,
+    instructions: providerInstructions(req, originalPayload?.data?.message),
+    input,
+    max_output_tokens: 700,
+    store: false,
+  };
+
+  if (provider.gateway) {
+    requestBody.providerOptions = {
+      gateway: {
+        disallowPromptTraining: true,
+      },
+    };
+  }
+
+  const response = await fetch(provider.url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${credential}`,
+      Authorization: `Bearer ${provider.credential}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      instructions: gatewayInstructions(req, originalPayload?.data?.message),
-      input,
-      max_output_tokens: 700,
-      store: false,
-      providerOptions: {
-        gateway: {
-          disallowPromptTraining: true,
-        },
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    const error = new Error(`TitanAI gateway returned ${response.status}`);
+    const error = new Error(`TitanAI live provider returned ${response.status}`);
     error.status = response.status;
     error.detail = text.slice(0, 500);
     throw error;
@@ -113,9 +142,9 @@ async function enhanceWithGateway(req, originalPayload) {
     data: {
       ...originalPayload.data,
       message,
-      source: "vercel-ai-gateway",
+      source: provider.source,
       generalKnowledge: true,
-      model,
+      model: provider.model,
     },
   };
 }
@@ -124,19 +153,20 @@ export default async function handler(req, res) {
   const originalJson = res.json.bind(res);
 
   res.json = (payload) => {
+    const source = payload?.data?.source;
     const shouldEnhance =
       res.statusCode >= 200 &&
       res.statusCode < 300 &&
       payload?.data?.type === "response" &&
-      payload?.data?.source === "local";
+      (source === "local" || source === "openai");
 
     if (!shouldEnhance) return originalJson(payload);
 
-    return enhanceWithGateway(req, payload)
+    return enhanceWithLiveProvider(req, payload)
       .then((enhanced) => originalJson(enhanced))
       .catch((error) => {
-        logError("titanAI:gateway", error?.detail || error);
-        captureApiException(error, { tags: { route: "titanAILive", phase: "gateway_fallback" } });
+        logError("titanAI:live_provider", error?.detail || error);
+        captureApiException(error, { tags: { route: "titanAILive", phase: "live_provider" } });
         return originalJson(payload);
       });
   };

@@ -26,20 +26,26 @@ function activeLabel(value) {
  * percentage into a badge without the warning/context; Engagement is not a
  * hiring-quality or eligibility signal.
  */
-export default function EngagementSignal({ subjectUserId, opportunityId, compact = false }) {
-  const [state, setState] = React.useState({ loading: true, data: null, error: "" });
+export default function EngagementSignal({ subjectUserId, opportunityId, snapshot = undefined, compact = false }) {
+  const hasProvidedSnapshot = snapshot !== undefined;
+  const [state, setState] = React.useState({ loading: !hasProvidedSnapshot, data: snapshot || null, error: "" });
 
   React.useEffect(() => {
     let alive = true;
+    if (hasProvidedSnapshot) {
+      setState({ loading: false, data: snapshot || null, error: "" });
+      return () => { alive = false; };
+    }
     if (!subjectUserId || !opportunityId) {
       setState({ loading: false, data: null, error: "" });
       return () => { alive = false; };
     }
+    setState({ loading: true, data: null, error: "" });
     getEngagementSnapshot({ subjectUserId, opportunityId })
       .then((data) => { if (alive) setState({ loading: false, data, error: "" }); })
       .catch((error) => { if (alive) setState({ loading: false, data: null, error: error?.message || "Unavailable" }); });
     return () => { alive = false; };
-  }, [subjectUserId, opportunityId]);
+  }, [subjectUserId, opportunityId, snapshot, hasProvidedSnapshot]);
 
   if (state.loading) {
     return <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">Loading Engagement…</div>;

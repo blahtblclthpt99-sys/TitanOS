@@ -42,7 +42,7 @@ const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
-const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
+const TalentProfile = lazy(() => import("@/pages/TalentProfile"));
 
 // Job seeker.
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
@@ -208,10 +208,9 @@ function NonTabPage() {
   }
 
   if (business && pathname.startsWith("/talent/worker/")) {
-    const workerId = pathname.slice("/talent/worker/".length);
     return (
       <Suspense fallback={<Spinner />}>
-        <DriverProfile forcedDriverId={workerId} />
+        <TalentProfile />
       </Suspense>
     );
   }

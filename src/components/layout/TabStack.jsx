@@ -62,12 +62,13 @@ const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Leads = lazy(() => import("@/pages/Leads"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
 
-// Utilities.
+// Utilities / transparency.
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
+const Engagement = lazy(() => import("@/pages/Engagement"));
 const AccountType = lazy(() => import("@/pages/AccountType"));
 const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
 const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
@@ -173,12 +174,13 @@ const NON_TAB_ROUTES = {
   "/leads": Leads,
   "/follow-ups": FollowUps,
 
-  // Utilities.
+  // Utilities / transparency.
   "/notifications": Notifications,
   "/profile": Profile,
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
+  "/engagement": Engagement,
   "/account-type": AccountType,
   "/admin": AdminControlCenter,
   "/admin/moderation": AdminModeration,

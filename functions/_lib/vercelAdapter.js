@@ -105,7 +105,11 @@ function populateProcessEnv(env) {
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === "string" && process.env[key] === undefined) process.env[key] = value;
   }
+  // Preserve the production behavior that existing handlers used on Vercel.
+  // Several security gates (registration confirmation, durable protections,
+  // telemetry labels) key off these environment names.
   if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
+  if (!process.env.VERCEL_ENV) process.env.VERCEL_ENV = "production";
   if (!process.env.PUBLIC_APP_URL) process.env.PUBLIC_APP_URL = "https://titanfieldos.com";
   if (!process.env.VITE_TITANOS_PUBLIC_ORIGIN) {
     process.env.VITE_TITANOS_PUBLIC_ORIGIN = "https://titanfieldos.com";

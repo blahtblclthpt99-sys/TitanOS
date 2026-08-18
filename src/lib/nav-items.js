@@ -94,6 +94,22 @@ export const APP_NAV_ITEMS = [
   { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
 ];
 
+/**
+ * Preserved internal workflows. These routes remain available to existing flows and
+ * bookmarks but are intentionally excluded from the primary navigation and More menu.
+ */
+export const INTERNAL_WORKFLOW_ITEMS = [
+  { label: "Job Matches", path: "/hire/matches", group: "live", hidden: true },
+  { label: "Match-ready job", path: "/hire/post-match-ready", group: "live", hidden: true },
+];
+
+export const INTERNAL_WORKFLOW_GROUPS = [
+  {
+    title: "Hiring",
+    paths: ["/hire/matches", "/hire/post-match-ready", "/hire/candidates", "/hire/find-workers"],
+  },
+];
+
 export const NAV_GROUP_META = {
   today: { label: "Today", collapsible: false, defaultOpen: true },
   work: { label: "Work", collapsible: true, defaultOpen: true },
@@ -211,6 +227,9 @@ export function resolvePageTitle(pathname = "/") {
   if (path.startsWith("/u/")) return "Public profile";
   if (path.startsWith("/sign/")) return "Sign document";
 
+  const internal = INTERNAL_WORKFLOW_ITEMS.find((item) => item.path === path);
+  if (internal) return internal.label;
+
   const exact = APP_NAV_ITEMS.find((item) => item.path === path);
   if (exact) return exact.label;
 
@@ -232,6 +251,7 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
   if (path.startsWith("/comms")) return { label: "Communications", path: "/comms" };
   if (path.startsWith("/assistant")) return { label: "TitanAI", path: "/assistant" };
+  if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
   if (path.startsWith("/business-documents") || path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
     return { label: "Business Documents", path: "/business-documents" };
   }

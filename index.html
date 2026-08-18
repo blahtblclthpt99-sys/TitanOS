@@ -1,96 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="canonical" href="https://titanos-web.vercel.app/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#2563EB" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#2563EB" />
-    <meta
-      name="description"
-      content="TitanOS — the AI operating system for service businesses. Jobs, invoices, drivers, schedule, and Command Center in one place."
-    />
+    <meta name="theme-color" content="#05080f" />
+    <meta name="description" content="Titan Attention is a verified human engagement marketplace where sponsors fund direct campaigns and viewers earn disclosed rewards for real active attention." />
     <meta name="robots" content="index, follow" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="TitanOS" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="TitanOS" />
-    <meta property="og:url" content="https://titanos-web.vercel.app/" />
-    <meta property="og:title" content="TitanOS — AI OS for Service Businesses" />
-    <meta
-      property="og:description"
-      content="Run jobs, invoices, drivers, and your Command Center from one app built for field service teams."
-    />
-    <meta property="og:image" content="https://titanos-web.vercel.app/pwa-512.png" />
-    <meta property="og:image:width" content="512" />
-    <meta property="og:image:height" content="512" />
-    <meta property="og:image:alt" content="TitanOS app icon" />
-
+    <meta property="og:site_name" content="Titan Attention" />
+    <meta property="og:title" content="Titan Attention — Verified Human Engagement" />
+    <meta property="og:description" content="Get paid for real attention. Buy sponsor engagement that is actually human." />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="TitanOS — AI OS for Service Businesses" />
-    <meta
-      name="twitter:description"
-      content="Run jobs, invoices, drivers, and your Command Center from one app built for field service teams."
-    />
-    <meta name="twitter:image" content="https://titanos-web.vercel.app/pwa-512.png" />
-
-    <link rel="dns-prefetch" href="https://vitals.vercel-insights.com" />
-    <link
-      rel="preload"
-      href="/fonts/plus-jakarta-sans-latin.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-    <title>TitanOS — AI OS for Service Businesses</title>
-    <script>
-      /* OAuth sometimes returns to /?code=… (Site URL). Forward before React boots. */
-      (function () {
-        try {
-          var p = new URLSearchParams(location.search);
-          var path = location.pathname || "/";
-          if (
-            path !== "/auth/callback" &&
-            path !== "/reset-password" &&
-            (p.has("code") || p.has("access_token") || p.get("error") === "access_denied" || p.has("error_description"))
-          ) {
-            location.replace("/auth/callback" + location.search + location.hash);
-          }
-        } catch (e) {}
-      })();
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "TitanOS",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web, Android",
-        "url": "https://titanos-web.vercel.app/",
-        "description": "The AI operating system for service businesses — jobs, invoices, drivers, and Command Center.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
-      }
-    </script>
+    <meta name="twitter:title" content="Titan Attention — Verified Human Engagement" />
+    <meta name="twitter:description" content="Direct sponsored campaigns with server-verified active engagement." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Titan Attention — Verified Human Engagement</title>
   </head>
   <body>
     <div id="root">
-      <div
-        id="boot-splash"
-        style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0A0A0B;color:#e5e7eb;font-family:system-ui,sans-serif"
-      >
-        <p style="margin:0;font-size:14px;letter-spacing:.04em;opacity:.85">Loading TitanOS…</p>
-      </div>
+      <div style="min-height:100vh;display:grid;place-items:center;background:#05080f;color:#cbd6e8;font:600 14px system-ui,sans-serif">Loading Titan Attention…</div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

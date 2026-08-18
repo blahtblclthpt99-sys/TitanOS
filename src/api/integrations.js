@@ -1,5 +1,8 @@
 import { supabase } from "./supabaseClient";
 
+const UPLOAD_BUCKET = "titanos-uploads";
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+
 function apiError(message, status = 400) {
   const error = new Error(message);
   error.status = status;
@@ -34,6 +37,61 @@ function apiCandidates(path) {
   return [...new Set(urls)];
 }
 
+function uploadObjectPath(value) {
+  if (!value || typeof value !== "string") return "";
+
+  if (value.startsWith(`storage://${UPLOAD_BUCKET}/`)) {
+    return value.slice(`storage://${UPLOAD_BUCKET}/`.length).replace(/^\/+/, "");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return "";
+  }
+
+  const markers = [
+    `/storage/v1/object/public/${UPLOAD_BUCKET}/`,
+    `/storage/v1/object/sign/${UPLOAD_BUCKET}/`,
+    `/storage/v1/object/authenticated/${UPLOAD_BUCKET}/`,
+  ];
+  for (const marker of markers) {
+    const index = parsed.pathname.indexOf(marker);
+    if (index >= 0) {
+      return decodeURIComponent(parsed.pathname.slice(index + marker.length)).replace(/^\/+/, "");
+    }
+  }
+  return "";
+}
+
+async function signUploadPath(path, expiresIn = SIGNED_URL_TTL_SECONDS) {
+  if (!path) return "";
+  const ttl = Number.isFinite(Number(expiresIn))
+    ? Math.max(60, Math.min(Number(expiresIn), 60 * 60 * 24 * 30))
+    : SIGNED_URL_TTL_SECONDS;
+  const { data, error } = await supabase.storage.from(UPLOAD_BUCKET).createSignedUrl(path, ttl);
+  if (error) return "";
+  return data?.signedUrl || "";
+}
+
+/**
+ * Convert durable/legacy TitanOS Storage references into a fresh signed URL.
+ * External URLs are returned untouched. Known TitanOS Storage URLs fail closed
+ * to an empty string when the caller is not allowed to read the object.
+ */
+export async function resolveStoredUploadUrl(value, expiresIn = SIGNED_URL_TTL_SECONDS) {
+  if (!value || typeof value !== "string") return "";
+  const path = uploadObjectPath(value);
+  if (!path) return value;
+  return signUploadPath(path, expiresIn);
+}
+
+export async function resolveStoredUploadUrls(values, expiresIn = SIGNED_URL_TTL_SECONDS) {
+  if (!Array.isArray(values) || values.length === 0) return [];
+  return Promise.all(values.map((value) => resolveStoredUploadUrl(value, expiresIn)));
+}
+
 async function uploadFile({ file, visibility = "private" }) {
   if (!file) throw apiError("No file provided");
   const allowed = new Set([
@@ -62,34 +120,30 @@ async function uploadFile({ file, visibility = "private" }) {
 
   const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
   const isPublic = visibility === "public";
-  // private: {uid}/…  |  public: public/{uid}/… (readable after migration 020)
+  // The bucket itself stays private. Public-facing objects live under public/{uid}/…
+  // and are readable by the dedicated storage policy; clients still use signed URLs.
   const path = isPublic
     ? `public/${user.id}/${crypto.randomUUID()}.${ext}`
     : `${user.id}/${crypto.randomUUID()}.${ext}`;
 
-  const { error } = await supabase.storage.from("titanos-uploads").upload(path, file, {
+  const { error } = await supabase.storage.from(UPLOAD_BUCKET).upload(path, file, {
     cacheControl: isPublic ? "86400" : "3600",
     upsert: false,
     contentType: type || undefined,
   });
   throwIfError(error);
 
-  if (isPublic) {
-    const { data } = supabase.storage.from("titanos-uploads").getPublicUrl(path);
-    // Until migration 020 makes the bucket private, publicUrl still works;
-    // after 020, public/ prefix remains readable via RLS.
-    return { file_url: data.publicUrl, file_path: path, visibility: "public" };
+  const signedUrl = await signUploadPath(path, SIGNED_URL_TTL_SECONDS);
+  if (!signedUrl) {
+    // Do not persist a known-broken /object/public URL for a private bucket.
+    throw apiError("Upload completed but the file could not be opened", 500);
   }
 
-  const { data: signed, error: signErr } = await supabase.storage
-    .from("titanos-uploads")
-    .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 year
-  throwIfError(signErr);
   return {
-    file_url: signed?.signedUrl || "",
+    file_url: signedUrl,
     file_path: path,
-    visibility: "private",
-    expires_in: 60 * 60 * 24 * 365,
+    visibility: isPublic ? "public" : "private",
+    expires_in: SIGNED_URL_TTL_SECONDS,
   };
 }
 
@@ -127,6 +181,8 @@ export function createIntegrationsModule() {
   return {
     Core: {
       UploadFile: uploadFile,
+      ResolveFileUrl: resolveStoredUploadUrl,
+      ResolveFileUrls: resolveStoredUploadUrls,
       SendEmail: sendEmail,
     },
   };

@@ -1,19 +1,22 @@
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { isRouteActive } from "@/lib/nav-utils";
 import { useNavBadges } from "@/hooks/useNavBadges";
 import NavBadge from "@/components/shared/NavBadge";
-import { MOBILE_TAB_ITEMS } from "@/lib/nav-items";
+import { mobileTabItemsForUser } from "@/lib/nav-items";
 import { normalizeAppPath } from "@/lib/routing";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function MobileNav() {
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const badges = useNavBadges();
   const pathname = normalizeAppPath(location.pathname);
   const touchStart = useRef(null);
+  const items = useMemo(() => mobileTabItemsForUser(user), [user]);
 
-  const activeIndex = MOBILE_TAB_ITEMS.findIndex((item) => isRouteActive(pathname, item.path));
+  const activeIndex = items.findIndex((item) => isRouteActive(pathname, item.path));
 
   const handleTab = (path) => {
     if (pathname === path) return;
@@ -35,20 +38,20 @@ export default function MobileNav() {
     if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     if (Date.now() - start.t > 600) return;
     const next = dx < 0 ? activeIndex + 1 : activeIndex - 1;
-    if (next < 0 || next >= MOBILE_TAB_ITEMS.length) return;
-    handleTab(MOBILE_TAB_ITEMS[next].path);
+    if (next < 0 || next >= items.length) return;
+    handleTab(items[next].path);
   };
 
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 shadow-soft backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Titan core navigation"
+      aria-label="Titan account navigation"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
       <div className="flex h-[64px] items-stretch justify-around px-1">
-        {MOBILE_TAB_ITEMS.map((item) => {
+        {items.map((item) => {
           const isActive = isRouteActive(pathname, item.path);
           return (
             <button

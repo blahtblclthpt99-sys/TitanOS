@@ -16,16 +16,17 @@ import {
   MoreHorizontal,
   UserSearch,
   UserCircle,
+  Hammer,
 } from "lucide-react";
-import { isBusinessAccount } from "@/lib/accountExperience";
+import { activeWorkspace, WORKSPACES } from "@/lib/accountExperience";
 
 /**
- * TitanOS is two account experiences over one platform:
- * - Business: the complete Business Operating System + TitanAUTO.
- * - Job Seeker: nearby jobs, a matching profile, and TitanAUTO.
+ * TitanOS has isolated workspaces over one account:
+ * - Job Seeker: employment discovery + professional profile.
+ * - Independent Work: opportunities + lightweight customer/work/money OS.
+ * - Business: full company operating system + recruiting/teams/fleet.
  *
- * Intelligence remains underneath both experiences instead of competing with
- * the primary work users came to Titan to do.
+ * TitanAUTO is shared and adapts to the active workspace.
  */
 export const APP_NAV_ITEMS = [
   // BUSINESS — daily operations
@@ -45,6 +46,16 @@ export const APP_NAV_ITEMS = [
   { icon: Truck, label: "Fleet", path: "/fleet", group: "management", audience: "business" },
   { icon: Package, label: "Inventory", path: "/inventory", group: "management", audience: "business" },
   { icon: FolderKanban, label: "Business Documents", path: "/business-documents", group: "management", audience: "business" },
+
+  // SELF-EMPLOYED — lightweight Business OS
+  { icon: Hammer, label: "Home", path: "/independent", group: "independent", audience: "self_employed" },
+  { icon: UserSearch, label: "Opportunities", path: "/work-opportunities", group: "independent", audience: "self_employed" },
+  { icon: Users, label: "Customers", path: "/customers", group: "independent", audience: "self_employed" },
+  { icon: Briefcase, label: "Work", path: "/jobs", group: "independent", audience: "self_employed" },
+  { icon: FileText, label: "Quotes", path: "/estimates", group: "independent_money", audience: "self_employed" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "independent_money", audience: "self_employed" },
+  { icon: CreditCard, label: "Money", path: "/payments", group: "independent_money", audience: "self_employed" },
+  { icon: UserCircle, label: "Service Profile", path: "/service-profile", group: "independent", audience: "self_employed" },
 
   // JOB SEEKER
   { icon: Briefcase, label: "Available Jobs", path: "/hire/matches", group: "seeker", audience: "job_seeker" },
@@ -66,8 +77,8 @@ export const INTERNAL_WORKFLOW_ITEMS = [
   { label: "Follow-ups", path: "/follow-ups", group: "shared", hidden: true },
   { label: "Candidate matches", path: "/hire/candidates", group: "management", hidden: true },
   { label: "Recruiting posts", path: "/hire/find-workers", group: "management", hidden: true },
-  { label: "Match-ready job", path: "/hire/post-match-ready", group: "management", hidden: true },
-  { label: "Account Type", path: "/account-type", group: "utilities", hidden: true },
+  { label: "Match-ready opportunity", path: "/hire/post-match-ready", group: "management", hidden: true },
+  { label: "Workspaces", path: "/account-type", group: "utilities", hidden: true },
   { label: "Profile", path: "/profile", group: "utilities", hidden: true },
   { label: "Settings", path: "/settings", group: "utilities", hidden: true },
   { label: "Subscription", path: "/subscription", group: "utilities", hidden: true },
@@ -79,11 +90,13 @@ export const NAV_GROUP_META = {
   operations: { label: "Operations", collapsible: false, defaultOpen: true },
   money: { label: "Sales & Money", collapsible: false, defaultOpen: true },
   management: { label: "Business Management", collapsible: false, defaultOpen: true },
+  independent: { label: "Independent Work", collapsible: false, defaultOpen: true },
+  independent_money: { label: "Quotes & Money", collapsible: false, defaultOpen: true },
   seeker: { label: "Job Seeker", collapsible: false, defaultOpen: true },
   shared: { label: "Titan", collapsible: false, defaultOpen: true },
 };
 
-export const NAV_GROUP_ORDER = ["operations", "money", "management", "seeker", "shared"];
+export const NAV_GROUP_ORDER = ["operations", "money", "management", "independent", "independent_money", "seeker", "shared"];
 
 const BUSINESS_MOBILE = [
   { icon: Building2, label: "Home", path: "/" },
@@ -93,6 +106,14 @@ const BUSINESS_MOBILE = [
   { icon: MoreHorizontal, label: "More", path: "/more" },
 ];
 
+const INDEPENDENT_MOBILE = [
+  { icon: Hammer, label: "Home", path: "/independent" },
+  { icon: UserSearch, label: "Opportunities", path: "/work-opportunities" },
+  { icon: Briefcase, label: "Work", path: "/jobs" },
+  { icon: Receipt, label: "Invoices", path: "/invoices" },
+  { icon: Workflow, label: "TitanAUTO", path: "/autopilot" },
+];
+
 const SEEKER_MOBILE = [
   { icon: Briefcase, label: "Jobs", path: "/hire/matches" },
   { icon: UserCircle, label: "Profile", path: "/job-profile" },
@@ -100,12 +121,15 @@ const SEEKER_MOBILE = [
 ];
 
 export function navItemsForUser(user) {
-  const audience = isBusinessAccount(user) ? "business" : "job_seeker";
+  const audience = activeWorkspace(user);
   return APP_NAV_ITEMS.filter((item) => item.audience === audience || item.audience === "shared");
 }
 
 export function mobileTabItemsForUser(user) {
-  return isBusinessAccount(user) ? BUSINESS_MOBILE : SEEKER_MOBILE;
+  const workspace = activeWorkspace(user);
+  if (workspace === WORKSPACES.BUSINESS) return BUSINESS_MOBILE;
+  if (workspace === WORKSPACES.SELF_EMPLOYED) return INDEPENDENT_MOBILE;
+  return SEEKER_MOBILE;
 }
 
 /** Kept as a compatibility export for older imports; prefer mobileTabItemsForUser. */
@@ -151,6 +175,7 @@ export function resolveNavDomain(pathname = "/") {
   if (path.startsWith("/talent") || path.startsWith("/hire/candidates") || path.startsWith("/hire/find-workers") || path.startsWith("/hire/post-match-ready")) return "management";
   if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) return "management";
   if (path.startsWith("/hire/matches") || path.startsWith("/job-profile")) return "seeker";
+  if (path.startsWith("/independent") || path.startsWith("/work-opportunities") || path.startsWith("/service-profile")) return "independent";
   if (path.startsWith("/autopilot") || path.startsWith("/second-me") || path.startsWith("/assistant") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return "shared";
   if (path.startsWith("/invoices") || path.startsWith("/estimates") || path.startsWith("/payments")) return "money";
   return "operations";
@@ -177,6 +202,9 @@ const LEGACY_TITLES = {
   "/inventory": "Inventory",
   "/business-documents": "Business Documents",
   "/job-profile": "Job Profile",
+  "/service-profile": "Service Profile",
+  "/independent": "Independent Work",
+  "/work-opportunities": "Opportunities",
   "/leads": "Leads",
   "/follow-ups": "Follow-ups",
   "/assistant": "2nd Self",
@@ -185,7 +213,7 @@ const LEGACY_TITLES = {
   "/support": "Titan Support",
   "/trust-safety": "Trust & Safety",
   "/subscription": "Subscription",
-  "/account-type": "Account Type",
+  "/account-type": "Workspaces",
 };
 
 export function resolvePageTitle(pathname = "/") {
@@ -193,6 +221,9 @@ export function resolvePageTitle(pathname = "/") {
   if (path.startsWith("/customers/") && path !== "/customers") return "Customer";
   if (path.startsWith("/invoices/") && path !== "/invoices") return "Invoice";
   if (path.startsWith("/hire/matches")) return "Available Jobs";
+  if (path.startsWith("/work-opportunities")) return "Work Opportunities";
+  if (path.startsWith("/service-profile")) return "Service Profile";
+  if (path.startsWith("/independent")) return "Independent Work";
   if (path.startsWith("/talent")) return "Talent";
   if (path.startsWith("/hire/candidates")) return "Candidate Matches";
   if (path.startsWith("/second-me") || path.startsWith("/assistant")) return "2nd Self";
@@ -217,15 +248,16 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/talent") || path.startsWith("/hire/candidates") || path.startsWith("/hire/find-workers") || path.startsWith("/hire/post-match-ready")) return { label: "Talent", path: "/talent" };
   if (path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) return { label: "Business Documents", path: "/business-documents" };
   if (path.startsWith("/hire/matches") || path.startsWith("/job-profile")) return { label: "Available Jobs", path: "/hire/matches" };
+  if (path.startsWith("/work-opportunities") || path.startsWith("/service-profile")) return { label: "Independent Work", path: "/independent" };
   if (path.startsWith("/assistant") || path.startsWith("/second-me")) return { label: "TitanAUTO", path: "/autopilot" };
   if (path.startsWith("/autopilot") || path.startsWith("/leads") || path.startsWith("/follow-ups")) return { label: "TitanAUTO", path: "/autopilot" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
-  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
-  if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
-  if (path.startsWith("/payments")) return { label: "Payments", path: "/payments" };
+  if (path.startsWith("/jobs")) return { label: "Work", path: "/jobs" };
+  if (path.startsWith("/estimates")) return { label: "Quotes", path: "/estimates" };
+  if (path.startsWith("/payments")) return { label: "Money", path: "/payments" };
   if (path.startsWith("/employees")) return { label: "Employees", path: "/employees" };
   if (path.startsWith("/fleet")) return { label: "Fleet", path: "/fleet" };
   if (path.startsWith("/inventory")) return { label: "Inventory", path: "/inventory" };
-  return { label: "Business Home", path: "/" };
+  return { label: "TitanOS", path: "/" };
 }

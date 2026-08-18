@@ -38,7 +38,9 @@ const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
+const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
 const Finances = lazy(() => import("@/pages/Finances"));
+const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
 const Fleet = lazy(() => import("@/pages/Fleet"));
 const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -85,8 +87,6 @@ const SecondMe = lazy(() => import("@/pages/SecondMe"));
  */
 const LEGACY_REDIRECTS = {
   "/messages": "/comms",
-  "/job-estimator": "/estimates?pricing=1",
-  "/receipts": "/finances?section=expenses&scan=1",
   "/titan-score": "/analytics?titanScore=1",
   "/growth-coach": "/assistant?mode=growth",
   "/marketing": "/assistant?mode=marketing",
@@ -100,7 +100,9 @@ const LEGACY_REDIRECTS = {
 const NON_TAB_ROUTES = {
   "/schedule": Schedule,
   "/estimates": Estimates,
+  "/job-estimator": JobEstimator,
   "/finances": Finances,
+  "/receipts": ReceiptScanner,
   "/fleet": Fleet,
   "/tax-center": TaxCenter,
   "/reports": Reports,

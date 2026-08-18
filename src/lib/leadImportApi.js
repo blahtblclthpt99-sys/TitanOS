@@ -1,5 +1,8 @@
 import { createLead, listLeads } from "@/lib/leadsApi";
 
+const MAX_CSV_CHARS = 250_000;
+const MAX_IMPORT_ROWS = 500;
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -20,9 +23,14 @@ function leadKey(lead = {}) {
   return `name:${normalizeName(lead.name)}|${normalizeName(lead.city)}|${normalizeName(lead.state)}`;
 }
 
-/** Parse simple CSV: name,email,phone,notes (header optional). */
+/** Parse bounded CSV: name,email,phone,notes (header optional). */
 export function parseLeadsCsv(text = "") {
-  const lines = String(text)
+  const raw = String(text);
+  if (raw.length > MAX_CSV_CHARS) {
+    throw new Error("Lead CSV is too large. Keep imports under 250 KB.");
+  }
+
+  const lines = raw
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -32,9 +40,15 @@ export function parseLeadsCsv(text = "") {
     const cells = [];
     let current = "";
     let quoted = false;
-    for (const char of line) {
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
       if (char === '"') {
-        quoted = !quoted;
+        if (quoted && line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
         continue;
       }
       if (char === "," && !quoted) {
@@ -53,15 +67,19 @@ export function parseLeadsCsv(text = "") {
   const hasHeader = first.includes("name") || first.includes("email") || first.includes("phone");
   if (hasHeader) start = 1;
 
+  if (lines.length - start > MAX_IMPORT_ROWS) {
+    throw new Error(`Import at most ${MAX_IMPORT_ROWS} leads at a time.`);
+  }
+
   const rows = [];
   for (let index = start; index < lines.length; index += 1) {
     const [name, email, phone, notes] = split(lines[index]);
     if (!name && !email && !phone) continue;
     rows.push({
-      name: name || email || "Lead",
-      email: email || "",
-      phone: phone || "",
-      notes: notes || "",
+      name: String(name || email || "Lead").slice(0, 160),
+      email: String(email || "").slice(0, 160),
+      phone: String(phone || "").slice(0, 80),
+      notes: String(notes || "").slice(0, 2000),
       source: "csv_import",
     });
   }
@@ -71,7 +89,7 @@ export function parseLeadsCsv(text = "") {
 export async function importLeadsFromCsv(user, csvText) {
   if (!user?.id) throw new Error("Sign in to import leads.");
   const parsed = parseLeadsCsv(csvText);
-  const existing = await listLeads(user.id).catch(() => []);
+  const existing = await listLeads(user.id);
   const seen = new Set((existing || []).map(leadKey));
   const created = [];
   let skipped = 0;

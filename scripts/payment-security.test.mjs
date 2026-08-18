@@ -8,6 +8,7 @@ import { resolveAppOrigin, allowedOrigins } from "../api/_lib/cors.js";
 
 const WEBHOOK_ONLY = new Set(["succeeded", "refunded", "paid"]);
 const CLIENT_ALLOWED = new Set(["pending", "canceled", "failed", "cancelled"]);
+const PRODUCTION_ORIGIN = "https://titanfieldos.com";
 
 function clientMaySetStatus(status) {
   const normalized = String(status || "").toLowerCase();
@@ -29,19 +30,19 @@ describe("payment status client policy", () => {
 });
 
 describe("checkout return origin allowlist (cors module)", () => {
-  it("includes production origin", () => {
-    assert.ok(allowedOrigins().includes("https://titanos-web.vercel.app"));
+  it("includes TitanfieldOS production origin", () => {
+    assert.ok(allowedOrigins().includes(PRODUCTION_ORIGIN));
   });
-  it("accepts allowlisted Origin header", () => {
+  it("accepts allowlisted TitanfieldOS Origin header", () => {
     assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://titanos-web.vercel.app" } }),
-      "https://titanos-web.vercel.app"
+      resolveAppOrigin({ headers: { origin: PRODUCTION_ORIGIN } }),
+      PRODUCTION_ORIGIN
     );
   });
-  it("rejects spoofed Origin header", () => {
+  it("rejects spoofed Origin header and falls back to TitanfieldOS", () => {
     assert.equal(
       resolveAppOrigin({ headers: { origin: "https://evil.example" } }),
-      "https://titanos-web.vercel.app"
+      PRODUCTION_ORIGIN
     );
   });
 });

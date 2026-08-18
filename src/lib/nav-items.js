@@ -60,7 +60,7 @@ export const APP_NAV_ITEMS = [
   { icon: Users, label: "Customers", path: "/customers", group: "customers" },
   { icon: ContactRound, label: "Leads", path: "/leads", group: "customers" },
   { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "customers" },
-  { icon: Radio, label: "Communications", path: "/comms", group: "customers" },
+  { icon: Radio, label: "Communications", legacyName: "TitanCom", path: "/comms", group: "customers" },
   { icon: Star, label: "Reputation", path: "/reputation", group: "customers" },
 
   // MONEY

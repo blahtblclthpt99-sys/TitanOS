@@ -42,6 +42,14 @@ test("tab cache keeps only the four product roots warm", () => {
   assert.doesNotMatch(tabs.match(/const TAB_PATHS = .*?;/)?.[0] || "", /\/driver|\/comms|\/more/);
 });
 
+test("retired product routes redirect instead of remaining mounted products", () => {
+  const retired = ["driver", "routes", "booking", "employees", "fleet", "inventory", "finances", "reports", "tax-center", "analytics", "marketplace", "comms"];
+  for (const route of retired) {
+    assert.match(tabs, new RegExp(`"\\/${route}": "\\/`));
+  }
+  assert.doesNotMatch(tabs, /const DriverHub = lazy|const TitanComms = lazy|const Marketplace = lazy|const Fleet = lazy|const Reports = lazy|const TaxCenter = lazy/);
+});
+
 test("Business Home stays focused on core operations", () => {
   assert.match(dashboard, /Titan Business/);
   assert.match(dashboard, /Business operations/);
@@ -62,11 +70,14 @@ test("Titan Auto combines lead discovery and approved automation", () => {
   assert.match(auto, /runAutopilotMembership/);
 });
 
-test("lead discovery is authenticated, rate limited, bounded, and attribution-aware", () => {
+test("lead discovery is authenticated, bounded, privacy-reduced, and attribution-aware", () => {
   assert.match(discovery, /requireUser\(req, res\)/);
   assert.match(discovery, /limit: 4, windowMs: 60_000, key: "leadDiscovery"/);
   assert.match(discovery, /const MAX_RESULTS = 20/);
   assert.match(discovery, /const MAX_RADIUS_M = 40_000/);
+  assert.match(discovery, /SEARCH_COORD_DECIMALS = 3/);
+  assert.match(discovery, /const searchLat = roundedCoordinate\(lat\)/);
+  assert.match(discovery, /safeHttpUrl/);
   assert.match(discovery, /OpenStreetMap contributors/);
   assert.doesNotMatch(discovery, /sendEmail|sendFollowUp|fetch\([^)]*website/);
 });

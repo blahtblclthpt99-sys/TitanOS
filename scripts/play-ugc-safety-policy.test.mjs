@@ -47,7 +47,10 @@ test("standalone Trust & Safety uses durable report/block implementation", () =>
   assert.match(trustPage, /await blockUser/);
 });
 
-test("release is unambiguously newer than code 35", () => {
-  assert.match(android, /versionCode 36/);
-  assert.match(android, /versionName "2\.0\.3"/);
+test("release remains unambiguously newer than code 35", () => {
+  const codeMatch = android.match(/versionCode\s+(\d+)/);
+  const nameMatch = android.match(/versionName\s+"(\d+\.\d+\.\d+)"/);
+  assert.ok(codeMatch, "Android versionCode must be present");
+  assert.ok(Number(codeMatch[1]) > 35, "UGC-safe Play release must remain newer than versionCode 35");
+  assert.ok(nameMatch, "Android versionName must be a semantic x.y.z version");
 });

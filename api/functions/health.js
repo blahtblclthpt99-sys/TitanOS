@@ -1,6 +1,7 @@
 import { applyCors, handleOptions } from "../_lib/cors.js";
 import { secretsEqual } from "../_lib/secureCompare.js";
 import { stripePlanCatalog } from "../_lib/stripeSubscriptions.js";
+import { isValidSentryDsn } from "../instrument.mjs";
 
 const EXPECTED_SUBSCRIPTION_PRICES = Object.freeze({
   starter: { unitAmount: 499, currency: "usd", interval: "month" },
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
   }
 
   const started = Date.now();
+  const sentryDsn = String(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN || "").trim();
   const checks = {
     api: "ok",
     stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
@@ -94,7 +96,8 @@ export default async function handler(req, res) {
       (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
         process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
-    sentryConfigured: Boolean(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN),
+    sentryDsnPresent: Boolean(sentryDsn),
+    sentryConfigured: isValidSentryDsn(sentryDsn),
     opsAlertConfigured: Boolean(
       process.env.OPS_ALERT_WEBHOOK_URL || process.env.SLACK_WEBHOOK_URL
     ),
@@ -178,7 +181,11 @@ export default async function handler(req, res) {
     moneyPath: moneyReady ? "ready" : "incomplete",
     subscriptionBilling: subscriptionReady ? "ready" : "incomplete",
     observability: {
-      sentry: checks.sentryConfigured ? "configured" : "missing_dsn",
+      sentry: checks.sentryConfigured
+        ? "configured"
+        : checks.sentryDsnPresent
+          ? "invalid_dsn"
+          : "missing_dsn",
       opsAlert: checks.opsAlertConfigured ? "configured" : "missing_webhook",
       analyticsIngest: checks.analyticsIngestEnabled ? "on" : "off",
     },

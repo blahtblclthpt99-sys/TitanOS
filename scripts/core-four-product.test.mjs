@@ -45,7 +45,7 @@ test("tab cache keeps only the four product roots warm", () => {
 test("retired product routes redirect instead of remaining mounted products", () => {
   const retired = ["driver", "routes", "booking", "employees", "fleet", "inventory", "finances", "reports", "tax-center", "analytics", "marketplace", "comms"];
   for (const route of retired) {
-    assert.match(tabs, new RegExp(`"\\/${route}": "\\/`));
+    assert.match(tabs, new RegExp(`"/${route}": "/`));
   }
   assert.doesNotMatch(tabs, /const DriverHub = lazy|const TitanComms = lazy|const Marketplace = lazy|const Fleet = lazy|const Reports = lazy|const TaxCenter = lazy/);
 });

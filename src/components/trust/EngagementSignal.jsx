@@ -1,6 +1,8 @@
 import React from "react";
-import { ChevronDown, MessageCircle, ShieldAlert } from "lucide-react";
-import { getEngagementSnapshot } from "@/lib/engagementApi";
+import { ChevronDown, Flag, MessageCircle, ShieldAlert } from "lucide-react";
+import { disputeEngagementEvent, getEngagementSnapshot } from "@/lib/engagementApi";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 
 function hours(value) {
   if (!Number.isFinite(Number(value))) return "Not enough data";
@@ -21,6 +23,12 @@ function activeLabel(value) {
   return new Date(ms).toLocaleDateString();
 }
 
+function eventLabel(event = {}) {
+  const type = String(event.interaction_type || "interaction").replaceAll("_", " ");
+  const status = String(event.status || "recorded").replaceAll("_", " ");
+  return `${type} · ${status}`;
+}
+
 /**
  * This component intentionally owns the mandatory warning. Do not extract the
  * percentage into a badge without the warning/context; Engagement is not a
@@ -29,6 +37,14 @@ function activeLabel(value) {
 export default function EngagementSignal({ subjectUserId, opportunityId, snapshot = undefined, compact = false }) {
   const hasProvidedSnapshot = snapshot !== undefined;
   const [state, setState] = React.useState({ loading: !hasProvidedSnapshot, data: snapshot || null, error: "" });
+  const [disputing, setDisputing] = React.useState("");
+
+  const reload = React.useCallback(async () => {
+    if (!subjectUserId) return null;
+    const data = await getEngagementSnapshot({ subjectUserId, opportunityId });
+    setState({ loading: false, data, error: "" });
+    return data;
+  }, [subjectUserId, opportunityId]);
 
   React.useEffect(() => {
     let alive = true;
@@ -36,7 +52,7 @@ export default function EngagementSignal({ subjectUserId, opportunityId, snapsho
       setState({ loading: false, data: snapshot || null, error: "" });
       return () => { alive = false; };
     }
-    if (!subjectUserId || !opportunityId) {
+    if (!subjectUserId) {
       setState({ loading: false, data: null, error: "" });
       return () => { alive = false; };
     }
@@ -46,6 +62,28 @@ export default function EngagementSignal({ subjectUserId, opportunityId, snapsho
       .catch((error) => { if (alive) setState({ loading: false, data: null, error: error?.message || "Unavailable" }); });
     return () => { alive = false; };
   }, [subjectUserId, opportunityId, snapshot, hasProvidedSnapshot]);
+
+  const dispute = async (event) => {
+    if (!event?.id || disputing) return;
+    const reason = window.prompt("What is incorrect about this Titan interaction record?");
+    if (reason == null) return;
+    const cleanReason = reason.trim();
+    if (cleanReason.length < 3) {
+      toast({ variant: "destructive", title: "Add a little more detail", description: "Please explain the issue in at least 3 characters." });
+      return;
+    }
+
+    setDisputing(event.id);
+    try {
+      await disputeEngagementEvent(event.id, cleanReason);
+      toast({ title: "Interaction disputed", description: "Titan will treat this event as neutral while the dispute is unresolved." });
+      if (!hasProvidedSnapshot) await reload();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Couldn't submit dispute", description: error?.message || "Try again." });
+    } finally {
+      setDisputing("");
+    }
+  };
 
   if (state.loading) {
     return <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">Loading Engagement…</div>;
@@ -58,6 +96,7 @@ export default function EngagementSignal({ subjectUserId, opportunityId, snapsho
   const score = data.probability;
   const confidence = data.confidence?.label || "New to Titan";
   const warning = data.policy?.warning || "Engagement is informational and is not a measure of qualifications or hiring suitability.";
+  const ownEvents = data.own && Array.isArray(data.events) ? data.events : [];
 
   return (
     <section className="rounded-xl border border-border bg-muted/15 p-3" aria-label="Engagement information">
@@ -90,6 +129,30 @@ export default function EngagementSignal({ subjectUserId, opportunityId, snapsho
             <div className="rounded-lg border border-border bg-background/40 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Last positive interaction</p><p className="mt-1 font-bold text-foreground">{activeLabel(data.stats?.lastActiveAt)}</p></div>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">Declining an opportunity, saying “not interested,” or communicating an appropriate cancellation/reschedule does not lower Engagement. Disputed, technical, mutual, and counterparty-caused events are neutral.</p>
+
+          {data.own ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs font-semibold text-foreground">Interaction records used by Titan</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">You can challenge an incorrect record. The raw event stays auditable, but a disputed event is neutral while the dispute is unresolved.</p>
+              {ownEvents.length ? (
+                <div className="mt-3 space-y-2">
+                  {ownEvents.map((event) => (
+                    <div key={event.id} className="flex flex-col gap-2 rounded-lg border border-border bg-background/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold capitalize text-foreground">{eventLabel(event)}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{event.occurred_at ? new Date(event.occurred_at).toLocaleString() : "Time unavailable"}{event.disputed ? " · disputed / neutral" : ""}</p>
+                      </div>
+                      {!event.disputed ? (
+                        <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={Boolean(disputing)} onClick={() => dispute(event)}>
+                          <Flag className="h-3.5 w-3.5" aria-hidden="true" />{disputing === event.id ? "Submitting…" : "Report incorrect interaction"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="mt-3 text-xs text-muted-foreground">No attributable Titan interaction history yet.</p>}
+            </div>
+          ) : null}
         </details>
       ) : null}
     </section>

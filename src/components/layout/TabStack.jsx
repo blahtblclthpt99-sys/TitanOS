@@ -1,10 +1,14 @@
 /**
- * TabStack keeps only the four Titan product pillars mounted between switches.
- * Legacy pages remain lazy compatibility routes and do not stay alive in memory.
+ * TitanOS authenticated route stack.
+ *
+ * Product surface is intentionally limited to four pillars:
+ * Business, Find Work, 2nd Self, and Titan Auto + Leads.
+ * Essential account/support/admin utilities remain reachable, while retired product
+ * routes redirect into the nearest core pillar instead of staying as parallel products.
  */
 import React, { Suspense, lazy, useRef } from "react";
 import { Navigate, useLocation } from "react-router";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Spinner from "@/components/shared/Spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { normalizeAppPath } from "@/lib/routing";
@@ -12,6 +16,7 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
+// Four product roots kept warm between switches.
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const SecondMe = lazy(() => import("@/pages/SecondMe"));
@@ -26,72 +31,77 @@ const TAB_COMPONENTS = {
   "/autopilot": Autopilot,
 };
 
-// Core business routes.
+// Titan Business workflows.
 const Jobs = lazy(() => import("@/pages/Jobs"));
+const Schedule = lazy(() => import("@/pages/Schedule"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
-const Schedule = lazy(() => import("@/pages/Schedule"));
 const Estimates = lazy(() => import("@/pages/Estimates"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Payments = lazy(() => import("@/pages/Payments"));
 
-// 2nd Self / Titan Auto internal workflows.
+// Internal workflows behind 2nd Self / Titan Auto.
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Leads = lazy(() => import("@/pages/Leads"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
 
-// Compatibility-only routes. They remain code-split and hidden from primary nav.
-const DriverHub = lazy(() => import("@/pages/DriverHub"));
-const TitanComms = lazy(() => import("@/pages/TitanComms"));
-const Marketplace = lazy(() => import("@/pages/Marketplace"));
-const Profile = lazy(() => import("@/pages/Profile"));
-const JobEstimator = lazy(() => import("@/pages/JobEstimator"));
-const Finances = lazy(() => import("@/pages/Finances"));
-const ReceiptScanner = lazy(() => import("@/pages/ReceiptScanner"));
-const Fleet = lazy(() => import("@/pages/Fleet"));
-const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
-const Reports = lazy(() => import("@/pages/Reports"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Insurance = lazy(() => import("@/pages/Insurance"));
-const Referral = lazy(() => import("@/pages/Referral"));
-const Hire = lazy(() => import("@/pages/Hire"));
+// Find Work compatibility workflows used by employer-side matching. They are not
+// separate product destinations and remain hidden from primary navigation.
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
+
+// Essential utilities, not product pillars.
 const Notifications = lazy(() => import("@/pages/Notifications"));
-const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
-const AdminFees = lazy(() => import("@/pages/AdminFees"));
-const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
-const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
-const Booking = lazy(() => import("@/pages/Booking"));
-const Contracts = lazy(() => import("@/pages/Contracts"));
-const RoutePlanner = lazy(() => import("@/pages/RoutePlanner"));
-const Companies = lazy(() => import("@/pages/Companies"));
-const Employees = lazy(() => import("@/pages/Employees"));
-const Inventory = lazy(() => import("@/pages/Inventory"));
-const Reputation = lazy(() => import("@/pages/Reputation"));
-const Credentials = lazy(() => import("@/pages/Credentials"));
-const DriverProfile = lazy(() => import("@/pages/DriverProfile"));
-const DriverTripDetail = lazy(() => import("@/pages/DriverTripDetail"));
+const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const TrustSafety = lazy(() => import("@/pages/TrustSafety"));
-const DesignSystem = lazy(() => import("@/pages/DesignSystem"));
-const ShareReport = lazy(() => import("@/pages/ShareReport"));
-const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
+const AdminControlCenter = lazy(() => import("@/pages/AdminControlCenter"));
+const AdminModeration = lazy(() => import("@/pages/AdminModeration"));
+const AdminFees = lazy(() => import("@/pages/AdminFees"));
+const AdminTaxRules = lazy(() => import("@/pages/AdminTaxRules"));
 
 const LEGACY_REDIRECTS = {
+  // Retired shell/product destinations -> Titan Business.
   "/more": "/",
-  "/messages": "/comms",
+  "/driver": "/",
+  "/routes": "/",
+  "/booking": "/",
+  "/employees": "/",
+  "/fleet": "/",
+  "/inventory": "/",
+  "/business-documents": "/",
+  "/contracts": "/",
+  "/insurance": "/",
+  "/credentials": "/",
+  "/finances": "/",
+  "/reports": "/",
+  "/tax-center": "/",
+  "/analytics": "/",
+  "/companies": "/",
+  "/job-estimator": "/estimates",
+  "/receipts": "/invoices",
+  "/marketplace": "/",
+  "/reputation": "/customers",
+  "/referral": "/customers",
+  "/comms": "/customers",
+  "/messages": "/customers",
   "/titan-score": "/",
-  "/growth-coach": "/second-me",
-  "/marketing": "/second-me",
-  "/phone": "/second-me",
   "/community": "/",
   "/emergency": "/",
   "/deals": "/",
   "/escrow": "/",
+
+  // Retired AI aliases -> 2nd Self.
+  "/ai-assistant": "/assistant",
+  "/growth-coach": "/second-me",
+  "/marketing": "/second-me",
+  "/phone": "/second-me",
+
+  // Old Hire landing -> current job-seeking pillar.
+  "/hire": "/hire/matches",
 };
 
 const NON_TAB_ROUTES = {
@@ -103,47 +113,26 @@ const NON_TAB_ROUTES = {
   "/invoices": Invoices,
   "/payments": Payments,
 
-  // Internal parts of 2nd Self and Titan Auto
+  // 2nd Self + Titan Auto internals
   "/assistant": AIAssistant,
   "/leads": Leads,
   "/follow-ups": FollowUps,
 
-  // Compatibility routes
-  "/driver": DriverHub,
-  "/comms": TitanComms,
-  "/job-estimator": JobEstimator,
-  "/finances": Finances,
-  "/receipts": ReceiptScanner,
-  "/fleet": Fleet,
-  "/tax-center": TaxCenter,
-  "/reports": Reports,
-  "/analytics": Analytics,
-  "/business-documents": BusinessDocuments,
-  "/insurance": Insurance,
-  "/referral": Referral,
-  "/hire": Hire,
+  // Find Work internal employer workflows
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
+
+  // Utilities
   "/notifications": Notifications,
-  "/admin/moderation": AdminModeration,
-  "/admin/fees": AdminFees,
-  "/admin/tax-rules": AdminTaxRules,
-  "/admin": AdminControlCenter,
-  "/booking": Booking,
-  "/contracts": Contracts,
-  "/routes": RoutePlanner,
-  "/companies": Companies,
-  "/employees": Employees,
-  "/inventory": Inventory,
-  "/reputation": Reputation,
-  "/credentials": Credentials,
+  "/profile": Profile,
   "/settings": Settings,
   "/subscription": Subscription,
   "/trust-safety": TrustSafety,
-  "/design-system": DesignSystem,
-  "/profile": Profile,
-  "/marketplace": Marketplace,
+  "/admin": AdminControlCenter,
+  "/admin/moderation": AdminModeration,
+  "/admin/fees": AdminFees,
+  "/admin/tax-rules": AdminTaxRules,
 };
 
 function NonTabPage() {
@@ -153,44 +142,26 @@ function NonTabPage() {
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
 
-  if (pathname.startsWith("/share/report/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <ShareReport />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/customers/")) {
+  if (pathname.startsWith("/customers/") && pathname !== "/customers") {
     return (
       <Suspense fallback={<Spinner />}>
         <CustomerDetail />
       </Suspense>
     );
   }
-  if (pathname.startsWith("/invoices/")) {
+
+  if (pathname.startsWith("/invoices/") && pathname !== "/invoices") {
     return (
       <Suspense fallback={<Spinner />}>
         <InvoiceDetail />
       </Suspense>
     );
   }
-  if (pathname.startsWith("/driver/trip/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverTripDetail />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/driver/") && pathname !== "/driver/") {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverProfile />
-      </Suspense>
-    );
-  }
 
-  const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
-  const Page = NON_TAB_ROUTES[routeKey];
+  // Old nested Driver routes are intentionally retired with Driver Hub.
+  if (pathname.startsWith("/driver/")) return <Navigate to="/" replace />;
+
+  const Page = NON_TAB_ROUTES[pathname];
   if (!Page) {
     return (
       <Suspense fallback={<Spinner />}>

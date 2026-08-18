@@ -4,12 +4,10 @@ import {
   BadgeCheck,
   Bookmark,
   Briefcase,
-  Clock,
   Heart,
   MapPin,
   MessageSquare,
   Shield,
-  Star,
   Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -179,17 +177,9 @@ export default memo(function DriverCard({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-              <Star className="h-3.5 w-3.5 fill-warning text-warning" aria-hidden="true" />
-              {Number(driver.rating).toFixed(1)}
-              <span className="font-normal text-muted-foreground">({driver.reviewCount})</span>
-            </span>
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />~{driver.responseTimeMin} min
-            </span>
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
-              {driver.completedJobs} jobs
+              {driver.completedJobs} completed jobs
             </span>
           </div>
         </div>

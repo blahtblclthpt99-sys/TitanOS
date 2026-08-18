@@ -24,24 +24,41 @@ function extractQuotedPaths(src, marker) {
   return [...new Set(paths)];
 }
 
-describe("final-qa: nav ↔ TabStack closure", () => {
-  it("every APP_NAV_ITEMS path is a tab or NON_TAB_ROUTE (or known detail host)", () => {
+describe("final-qa: nav ↔ app routing closure", () => {
+  it("every APP_NAV_ITEMS path is owned by TabStack or the authenticated shell", () => {
     const navSrc = read("src/lib/nav-items.js");
     const tabSrc = read("src/components/layout/TabStack.jsx");
+    const layoutSrc = read("src/components/layout/AppLayout.jsx");
 
-    // Only APP_NAV_ITEMS — ignore QUICK_CREATE_ACTIONS query paths
+    // Only APP_NAV_ITEMS — ignore internal workflows and QUICK_CREATE_ACTIONS query paths.
     const navBlock = navSrc.slice(
       navSrc.indexOf("export const APP_NAV_ITEMS"),
-      navSrc.indexOf("export const NAV_GROUP_META")
+      navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
     );
     const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]+)["']/g)].map((m) => m[1]);
     assert.ok(navPaths.length >= 30, "expected full nav catalog");
 
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
     const nonTabPaths = extractQuotedPaths(tabSrc, "NON_TAB_ROUTES");
-    const routed = new Set([...tabPaths, ...nonTabPaths]);
 
-    // Detail hosts covered by startsWith checks in TabStack
+    // Support deliberately renders at the authenticated-shell layer instead of TabStack.
+    const shellRoutes = [];
+    if (
+      /pathname\s*===\s*["']\/support["']/.test(layoutSrc) &&
+      /<SupportCenter\s*\/>/.test(layoutSrc)
+    ) {
+      shellRoutes.push("/support");
+    }
+    if (
+      /pathname\s*===\s*["']\/admin\/support["']/.test(layoutSrc) &&
+      /<SupportCommandCenter\s*\/>/.test(layoutSrc)
+    ) {
+      shellRoutes.push("/admin/support");
+    }
+
+    const routed = new Set([...tabPaths, ...nonTabPaths, ...shellRoutes]);
+
+    // Detail hosts covered by startsWith checks in TabStack.
     const detailHosts = ["/customers", "/invoices", "/driver"];
 
     const missing = navPaths.filter((p) => {

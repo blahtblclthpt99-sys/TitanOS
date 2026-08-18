@@ -37,6 +37,9 @@ jobs:
       - name: Unit / integration / regression pack
         run: npm test
 
+      - name: Private Storage URL safety
+        run: node --test scripts/storage-url-security.test.mjs
+
       - name: Existing-post worker matching regression
         run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/hire-existing-post-matches.test.mjs
 

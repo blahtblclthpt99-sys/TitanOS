@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
+import { resolveStoredUploadUrl } from "./integrations";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
 import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 
@@ -78,6 +79,10 @@ async function fetchProfile(userId) {
 
 async function buildUser(authUser, profile) {
   if (!authUser) return null;
+  const [avatarUrl, companyLogoUrl] = await Promise.all([
+    resolveStoredUploadUrl(profile?.avatar_url || ""),
+    resolveStoredUploadUrl(profile?.company_logo_url || ""),
+  ]);
   return {
     id: authUser.id,
     email: authUser.email,
@@ -100,7 +105,7 @@ async function buildUser(authUser, profile) {
     marketplace_pack_unlocked: profile?.marketplace_pack_unlocked === true,
     phone: profile?.phone || "",
     username: profile?.username || "",
-    avatar_url: profile?.avatar_url || "",
+    avatar_url: avatarUrl,
     bio: profile?.bio || "",
     city: profile?.city || "",
     state: profile?.state || "",
@@ -109,7 +114,7 @@ async function buildUser(authUser, profile) {
     company_city: profile?.company_city || "",
     company_state: profile?.company_state || "",
     company_zip: profile?.company_zip || "",
-    company_logo_url: profile?.company_logo_url || "",
+    company_logo_url: companyLogoUrl,
     theme_pref: profile?.theme_pref || "system",
     notification_prefs: profile?.notification_prefs || {},
     marketing_prefs: profile?.marketing_prefs || {},

@@ -1,4 +1,5 @@
 import { containsSensitiveMemoryText } from "./memorySafety.js";
+import { loadTitanKnowledgeContext } from "./titanKnowledgeContext.js";
 
 const ALLOWED_TYPES = new Set([
   "preference",
@@ -67,53 +68,61 @@ function relevance(memory, queryTerms, { openLoopQuestion = false } = {}) {
 }
 
 /**
- * Load a bounded, user-owned durable memory context.
- * Service-role reads are explicitly scoped by BOTH user_id and created_by_id
- * because service-role access bypasses RLS.
+ * Load a bounded, user-owned durable memory context plus a separately
+ * classified slice of global Titan platform knowledge.
+ *
+ * Service-role memory reads are explicitly scoped by BOTH user_id and
+ * created_by_id because service-role access bypasses RLS. Global Titan
+ * knowledge is stored in a service-only table and is never classified as
+ * user memory or current account data.
  */
 export async function loadTitanMemoryContext(admin, userId, question = "") {
   if (!admin || !userId) return [];
 
-  const { data, error } = await admin
-    .from("titan_memory_nodes")
-    .select("id,type,label,data,source,confidence,created_at,updated_at")
-    .eq("user_id", userId)
-    .eq("created_by_id", userId)
-    .eq("archived", false)
-    .order("updated_at", { ascending: false })
-    .limit(40);
-
-  if (error || !Array.isArray(data)) return [];
+  const [{ data, error }, knowledge] = await Promise.all([
+    admin
+      .from("titan_memory_nodes")
+      .select("id,type,label,data,source,confidence,created_at,updated_at")
+      .eq("user_id", userId)
+      .eq("created_by_id", userId)
+      .eq("archived", false)
+      .order("updated_at", { ascending: false })
+      .limit(40),
+    loadTitanKnowledgeContext(admin, question, { limit: 8 }).catch(() => []),
+  ]);
 
   const queryTerms = words(question);
   const openLoopQuestion = isOpenLoopQuestion(question);
-  return data
-    .filter((row) => ALLOWED_TYPES.has(String(row.type || "").toLowerCase()))
-    // Defense in depth for legacy/imported records: obvious secrets never enter
-    // model context even if they predate current write-time validation.
-    .filter((row) => !containsSensitiveMemoryText(row.label))
-    .map((row) => ({
-      id: String(row.id || ""),
-      type: String(row.type || "fact").toLowerCase(),
-      label: String(row.label || "").slice(0, 240),
-      data: safeData(row.data),
-      source: String(row.source || "user_memory").slice(0, 120),
-      confidence: Math.max(0, Math.min(1, Number(row.confidence ?? 0.5))),
-      createdAt: row.created_at || null,
-      updatedAt: row.updated_at || null,
-      // Durable memory is user-authorized remembered context, not automatically
-      // equivalent to a current authoritative business record.
-      classification: "REMEMBERED",
-    }))
-    .map((row) => ({ ...row, _score: relevance(row, queryTerms, { openLoopQuestion }) }))
-    .sort((a, b) => b._score - a._score)
-    .slice(0, 8)
-    .map(({ _score, ...row }) => row);
+  const memories = error || !Array.isArray(data)
+    ? []
+    : data
+        .filter((row) => ALLOWED_TYPES.has(String(row.type || "").toLowerCase()))
+        .filter((row) => !containsSensitiveMemoryText(row.label))
+        .map((row) => ({
+          id: String(row.id || ""),
+          type: String(row.type || "fact").toLowerCase(),
+          label: String(row.label || "").slice(0, 240),
+          data: safeData(row.data),
+          source: String(row.source || "user_memory").slice(0, 120),
+          confidence: Math.max(0, Math.min(1, Number(row.confidence ?? 0.5))),
+          createdAt: row.created_at || null,
+          updatedAt: row.updated_at || null,
+          classification: "REMEMBERED",
+        }))
+        .map((row) => ({ ...row, _score: relevance(row, queryTerms, { openLoopQuestion }) }))
+        .sort((a, b) => b._score - a._score)
+        .slice(0, 8)
+        .map(({ _score, ...row }) => row);
+
+  return [...memories, ...(Array.isArray(knowledge) ? knowledge : [])];
 }
 
 export function formatTitanMemoryForPrompt(memories = []) {
-  if (!Array.isArray(memories) || memories.length === 0) return "(no relevant durable memories)";
-  return memories
+  const durable = Array.isArray(memories)
+    ? memories.filter((memory) => memory?.classification !== "TITAN_KNOWLEDGE")
+    : [];
+  if (durable.length === 0) return "(no relevant durable memories)";
+  return durable
     .map((memory, index) => {
       const detail = Object.keys(memory.data || {}).length ? ` data=${JSON.stringify(memory.data)}` : "";
       return `${index + 1}. [${memory.classification || "REMEMBERED"}] ${memory.type}: ${memory.label}${detail} | source=${memory.source} | confidence=${memory.confidence} | updated=${memory.updatedAt || "unknown"}`;

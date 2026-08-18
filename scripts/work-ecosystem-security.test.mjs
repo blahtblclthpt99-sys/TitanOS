@@ -222,9 +222,22 @@ describe("Engagement architecture separation", () => {
     assert.match(batch, /Engagement is informational and cannot filter, rank, or exclude candidates/);
     assert.match(batch, /ordering_unchanged: true/);
 
+    const snapshot = read("api/functions/engagementSnapshot.js");
+    assert.match(snapshot, /forbiddenFilterKeys/);
+    assert.match(snapshot, /"engagement_min"/);
+    assert.match(snapshot, /"responsiveness_min"/);
+    assert.match(snapshot, /"attendance_min"/);
+    assert.match(snapshot, /Engagement is informational and cannot be used as an eligibility or candidate filter/);
+    assert.match(snapshot, /eligibility_input: false/);
+    assert.match(snapshot, /ranking_input: false/);
+
+    const filterRejectionEndpoints = new Set([
+      "engagementBatch.js",
+      "engagementSnapshot.js",
+    ]);
     const functionFiles = filesUnder(
       "api/functions",
-      (full) => /\.(js|mjs|ts)$/.test(full) && !full.endsWith("/engagementBatch.js")
+      (full) => /\.(js|mjs|ts)$/.test(full) && !filterRejectionEndpoints.has(full.split("/").pop())
     );
     for (const full of functionFiles) {
       const src = readFileSync(full, "utf8");

@@ -8,7 +8,9 @@ function requireUserId(userId) {
 
 export async function listLeads(userId) {
   const id = requireUserId(userId);
-  return api.entities.Lead.filter({ user_id: id }, "-created_date");
+  // Match the database authorization source exactly: leads_own is bound to
+  // created_by_id = auth.uid(). `user_id` remains legacy display/data metadata.
+  return api.entities.Lead.filter({ created_by_id: id }, "-created_date");
 }
 
 export async function createLead(user, values) {

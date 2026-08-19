@@ -1,0 +1,47 @@
+name: Titan Support Workspace Check
+
+on:
+  push:
+    branches:
+      - support/titan-support-workspace-hardening
+
+concurrency:
+  group: titan-support-workspace-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Titan Support security and workspace boundary
+        run: node --test scripts/support-security.test.mjs
+
+      - name: Unit / integration / regression pack
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanfieldos.com
+          VITE_API_BASE_URL: https://titanfieldos.com

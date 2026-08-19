@@ -40,6 +40,9 @@ jobs:
       - name: Titan Support security and workspace boundary
         run: node --test scripts/support-security.test.mjs
 
+      - name: Titan Support case-creation recovery
+        run: node --test scripts/support-create-case-recovery.test.mjs
+
       - name: Business OS product boundary
         run: node --test scripts/business-os-product.test.mjs
 

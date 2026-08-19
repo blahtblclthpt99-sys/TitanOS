@@ -34,9 +34,8 @@ create index if not exists support_cases_workspace_updated_idx
 comment on column public.support_cases.workspace is
   'TitanOS workspace active when the support case was created. Troubleshooting metadata only; never an entitlement or authorization grant.';
 
--- Support writes are server-API-owned. The browser keeps SELECT access for RLS-
--- protected Realtime delivery, but cannot forge priority/status/source/company/
--- workspace metadata through raw PostgREST requests.
+-- Support writes are server-API-owned. The browser keeps only the minimum SELECT
+-- access required for RLS-protected Realtime change notification.
 drop policy if exists support_cases_customer_insert on public.support_cases;
 drop policy if exists support_messages_customer_insert on public.support_messages;
 drop policy if exists support_diagnostics_customer_insert on public.support_diagnostics;
@@ -45,6 +44,17 @@ drop policy if exists support_csat_customer_insert on public.support_csat;
 
 revoke insert on public.support_cases, public.support_messages, public.support_diagnostics,
   public.support_attachments, public.support_csat from authenticated;
+
+-- Internal event history is API/staff-server data. Customers do not need direct
+-- PostgREST/Realtime access to actor ids, assignments, or internal event details.
+drop policy if exists support_events_customer_select on public.support_case_events;
+drop policy if exists support_events_staff_select on public.support_case_events;
+revoke select on public.support_case_events from authenticated;
+
+-- Message content is returned through ownership-checked Support APIs. Realtime only
+-- needs an identifier, case filter, and timestamp to trigger an authenticated refresh.
+revoke select on public.support_messages from authenticated;
+grant select (id, case_id, created_at) on public.support_messages to authenticated;
 
 -- Storage uploads remain client-assisted, but the path must reference a Support
 -- case actually owned by the signed-in user. Registration into support_attachments

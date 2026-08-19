@@ -18,6 +18,10 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
   const authRegisterRoute = read("functions/api/functions/auth/register.js");
   const register = read("functions/api/register.js");
   const serverTelemetry = read("api/_lib/sentry.js");
+  const authClient = read("src/api/auth.js");
+  const functionsClient = read("src/api/functions.js");
+  const integrationsClient = read("src/api/integrations.js");
+  const optimizedImage = read("src/components/shared/OptimizedImage.jsx");
   const topLevelApiHandlers = readdirSync(join(root, "api/functions"), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
     .map((entry) => entry.name.replace(/\.js$/, ""))
@@ -98,6 +102,18 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     assert.match(authMeRoute, /runVercelHandler/);
     assert.match(authRegisterRoute, /api\/functions\/auth\/register\.js/);
     assert.match(authRegisterRoute, /runVercelHandler/);
+  });
+
+  it("removes the legacy Vercel production origin from client runtime fallbacks", () => {
+    for (const [name, source] of [
+      ["auth client", authClient],
+      ["function client", functionsClient],
+      ["integrations client", integrationsClient],
+      ["optimized image", optimizedImage],
+    ]) {
+      assert.doesNotMatch(source, /titanos-web\.vercel\.app/, `${name} must not depend on the old Vercel origin`);
+      assert.match(source, /titanfieldos\.com/, `${name} must use TitanfieldOS as its canonical fallback`);
+    }
   });
 
   it("quarantines only the experimental MPP route from the core Worker", () => {

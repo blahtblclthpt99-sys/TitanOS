@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     if (isSupportAdmin(auth.user)) {
       const { data, error } = await auth.admin
         .from("support_cases")
-        .select("id,case_number,title,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at,escalated_at,resolved_at")
+        .select("id,case_number,workspace,title,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at,escalated_at,resolved_at")
         .neq("status", "CLOSED")
         .order("priority", { ascending: true })
         .order("updated_at", { ascending: false })
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       if (caseIds.length) {
         const { data, error } = await auth.admin
           .from("support_cases")
-          .select("id,case_number,title,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at,escalated_at,resolved_at")
+          .select("id,case_number,workspace,title,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at,escalated_at,resolved_at")
           .in("id", caseIds)
           .neq("status", "CLOSED")
           .order("updated_at", { ascending: false });

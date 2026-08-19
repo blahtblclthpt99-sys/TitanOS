@@ -22,6 +22,7 @@ function ensureAdSenseScript(client) {
   script.async = true;
   script.crossOrigin = "anonymous";
   script.referrerPolicy = "strict-origin-when-cross-origin";
+  script.dataset.adClient = client;
   script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
   document.head.appendChild(script);
   return script;
@@ -31,14 +32,15 @@ export default function AdPlacement() {
   const { user } = useAuth();
   const location = useLocation();
   const pathname = normalizeAppPath(location.pathname);
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
   const isNative = Capacitor.isNativePlatform();
   const placement = getAdPlacement(pathname);
   const slot = getAdSlot(placement);
   const renderedRef = useRef(false);
 
   const eligible = useMemo(
-    () => shouldShowWebAd({ user, pathname, isNative }),
-    [user, pathname, isNative]
+    () => shouldShowWebAd({ user, pathname, hostname, isNative }),
+    [user, pathname, hostname, isNative]
   );
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function AdPlacement() {
     if (!script) return undefined;
 
     const renderAd = () => {
-      if (renderedRef.current) return;
+      if (renderedRef.current || script.dataset.failed === "true") return;
       try {
         window.adsbygoogle = window.adsbygoogle || [];
         window.adsbygoogle.push({});
@@ -71,8 +73,15 @@ export default function AdPlacement() {
       script.dataset.loaded = "true";
       renderAd();
     };
+    const onError = () => {
+      script.dataset.failed = "true";
+    };
     script.addEventListener("load", onLoad, { once: true });
-    return () => script.removeEventListener("load", onLoad);
+    script.addEventListener("error", onError, { once: true });
+    return () => {
+      script.removeEventListener("load", onLoad);
+      script.removeEventListener("error", onError);
+    };
   }, [eligible, placement, slot]);
 
   if (!eligible) return null;

@@ -62,14 +62,33 @@ create policy support_storage_customer_insert on storage.objects
     )
   );
 
--- One message insert owns all message-derived case state. This prevents stale API
--- reads from overwriting newer human/AI state during concurrent replies.
+-- One message insert owns all message-derived case state. The case row is locked
+-- inside the message transaction so stale API reads cannot overwrite newer state.
 create or replace function public.titan_support_sync_first_response()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
+declare
+  current_status text;
 begin
+  select c.status
+  into current_status
+  from public.support_cases c
+  where c.id = new.case_id
+  for update;
+
+  if new.sender_kind in ('customer','support_ai')
+    and current_status in ('RESOLVED','CLOSED') then
+    raise exception 'support case does not accept customer/AI messages in % state', current_status
+      using errcode = '23514';
+  end if;
+
+  if new.sender_kind in ('agent','engineering') and current_status = 'CLOSED' then
+    raise exception 'closed support case does not accept staff replies'
+      using errcode = '23514';
+  end if;
+
   update public.support_cases
   set
     first_response_at = case

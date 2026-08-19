@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 
 const UPLOAD_BUCKET = "titanos-uploads";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+const TITAN_API_ORIGIN = "https://titanfieldos.com";
 
 function apiError(message, status = 400) {
   const error = new Error(message);
@@ -24,16 +25,16 @@ function apiCandidates(path) {
     if (
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
+      hostname.endsWith(".pages.dev") ||
       hostname.endsWith("titanfieldos.com")
     ) {
       urls.push(`${origin}${path}`);
       urls.push(path);
     }
-    // Capacitor / static hosts: always allow production API
-    urls.push(`https://titanos-web.vercel.app${path}`);
   }
 
+  // Native/static hosts always retain a canonical production API fallback.
+  urls.push(`${TITAN_API_ORIGIN}${path}`);
   return [...new Set(urls)];
 }
 

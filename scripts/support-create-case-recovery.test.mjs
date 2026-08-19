@@ -8,6 +8,7 @@ import { cleanSupportMessage, redactSupportText } from "../api/_lib/support.js";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const createCaseSource = readFileSync(join(root, "api/functions/supportCreateCase.js"), "utf8");
 const agentReplySource = readFileSync(join(root, "api/functions/supportAgentReply.js"), "utf8");
+const supportApiSource = readFileSync(join(root, "src/lib/supportApi.js"), "utf8");
 
 test("case creation does not return false failure when initial-message rollback also fails", () => {
   assert.match(createCaseSource, /if \(messageError\)/);
@@ -36,4 +37,11 @@ test("long plain support text is preserved while opaque token-like material is r
   const output = redactSupportText(`diagnostic ${opaque}`, 10000);
   assert.equal(output.includes(opaque), false);
   assert.match(output, /\[REDACTED_SECRET\]/);
+});
+
+test("failed attachment cleanup is observable without logging private storage paths", () => {
+  assert.match(supportApiSource, /operation: "attachment_cleanup"/);
+  assert.match(supportApiSource, /captureException\(cleanupError/);
+  assert.doesNotMatch(supportApiSource, /remove\(\[path\]\)\.catch\(\(\) => \{\}\)/);
+  assert.doesNotMatch(supportApiSource, /extra:\s*\{[^}]*path/);
 });

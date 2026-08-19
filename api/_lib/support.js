@@ -49,8 +49,8 @@ function text(value, max = MAX_DIAGNOSTIC_STRING) {
   return String(value ?? "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
 }
 
-export function redactSupportText(value) {
-  return text(value)
+export function redactSupportText(value, max = MAX_DIAGNOSTIC_STRING) {
+  return text(value, max)
     .replace(URI_CREDENTIAL_PATTERN, "$1[REDACTED]@")
     .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
     .replace(BEARER_PATTERN, "[REDACTED_BEARER]")
@@ -255,5 +255,5 @@ export async function writeSupportAudit(admin, {
 }
 
 export function cleanSupportMessage(value, max = 10000) {
-  return redactSupportText(value).slice(0, max);
+  return redactSupportText(value, max).slice(0, max);
 }

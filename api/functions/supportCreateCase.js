@@ -8,6 +8,7 @@ import {
   cleanSupportMessage,
   normalizeSupportCategory,
   normalizeSupportSource,
+  normalizeSupportWorkspace,
   sanitizeDiagnosticEnvelope,
   suggestedPriority,
   writeSupportAudit,
@@ -37,6 +38,7 @@ export default async function handler(req, res) {
     const title = cleanShort(body.title || description.slice(0, 90) || "TitanOS support request", 180);
     const category = normalizeSupportCategory(body.category);
     const source = normalizeSupportSource(body.source);
+    const workspace = normalizeSupportWorkspace(body.workspace);
     const platform = cleanShort(body.platform, 80) || null;
     const appVersion = cleanShort(body.app_version || body.appVersion, 40) || null;
     const companyId = cleanShort(body.company_id || body.companyId, 160) || null;
@@ -54,6 +56,7 @@ export default async function handler(req, res) {
       .insert({
         created_by_id: auth.user.id,
         company_id: companyId,
+        workspace,
         title,
         description,
         category,
@@ -63,7 +66,7 @@ export default async function handler(req, res) {
         platform,
         app_version: appVersion,
       })
-      .select("id,case_number,title,category,status,priority,platform,app_version,created_at,updated_at")
+      .select("id,case_number,workspace,title,category,status,priority,platform,app_version,created_at,updated_at")
       .single();
     if (caseError) throw caseError;
 
@@ -72,7 +75,7 @@ export default async function handler(req, res) {
       sender_user_id: auth.user.id,
       sender_kind: "customer",
       body: description,
-      metadata: { source },
+      metadata: { source, workspace },
     });
     if (messageError) throw messageError;
 
@@ -81,7 +84,7 @@ export default async function handler(req, res) {
       actor_user_id: auth.user.id,
       event_type: "case_created",
       to_status: "NEW",
-      details: { category, priority, source },
+      details: { category, priority, source, workspace },
     });
 
     let diagnosticAttached = false;
@@ -102,7 +105,7 @@ export default async function handler(req, res) {
           actorUserId: auth.user.id,
           action: "diagnostic_context_attached",
           targetType: "support_diagnostic",
-          metadata: { redaction_version: 1 },
+          metadata: { redaction_version: 1, workspace },
         });
       }
     }
@@ -113,7 +116,7 @@ export default async function handler(req, res) {
       action: "support_case_created",
       targetType: "support_case",
       targetId: supportCase.id,
-      metadata: { category, priority, source },
+      metadata: { category, priority, source, workspace },
     });
 
     return res.status(201).json({

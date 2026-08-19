@@ -5,7 +5,9 @@ import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { syncStripeSubscription } from "../_lib/stripeSubscriptions.js";
-import { loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
+
+const STRIPE_SUPPORT_TIMEOUT_MS = 10_000;
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -36,18 +38,22 @@ export default async function handler(req, res) {
       .limit(5);
     if (rowError) throw rowError;
     if (!rows?.length) {
-      await writeSupportAudit(auth.admin, {
+      await writeSupportAuditBestEffort(auth.admin, {
         caseId: supportCase.id,
         actorUserId: auth.user.id,
         action: "subscription_refresh_no_mapping",
         targetType: "support_action",
         metadata: { result: "no_subscription_mapping" },
-      });
+      }, "supportRefreshSubscription:noMappingAudit");
       return res.status(404).json({ error: "No TitanOS subscription mapping was found for this account." });
     }
 
     const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(stripeKey);
+    const stripe = new Stripe(stripeKey, {
+      timeout: STRIPE_SUPPORT_TIMEOUT_MS,
+      maxNetworkRetries: 1,
+      telemetry: false,
+    });
     let synced = null;
     let lastStatus = null;
     for (const row of rows) {
@@ -68,29 +74,31 @@ export default async function handler(req, res) {
     }
 
     if (!synced?.ok) {
-      await writeSupportAudit(auth.admin, {
+      await writeSupportAuditBestEffort(auth.admin, {
         caseId: supportCase.id,
         actorUserId: auth.user.id,
         action: "subscription_refresh_unrecognized",
         targetType: "support_action",
         metadata: { result: synced?.reason || "no_verified_subscription" },
-      });
+      }, "supportRefreshSubscription:unrecognizedAudit");
       return res.status(409).json({ error: "A verified Stripe subscription could not be reconciled to this TitanOS account." });
     }
 
-    await auth.admin.from("support_case_events").insert({
+    const { error: eventError } = await auth.admin.from("support_case_events").insert({
       case_id: supportCase.id,
       actor_user_id: auth.user.id,
       event_type: "support_action_executed",
       details: { action: "refresh_subscription_status", result: "success", status: lastStatus },
     });
-    await writeSupportAudit(auth.admin, {
+    if (eventError) logError("supportRefreshSubscription:event", eventError, { caseId: supportCase.id });
+
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "subscription_status_refreshed",
       targetType: "support_action",
       metadata: { status: lastStatus || "unknown", entitled: synced.entitled === true },
-    });
+    }, "supportRefreshSubscription:audit");
 
     return res.status(200).json({
       success: true,

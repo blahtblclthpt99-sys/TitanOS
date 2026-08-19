@@ -36,6 +36,9 @@ const DIAGNOSTIC_KEYS = new Set([
 ]);
 
 const SECRET_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)/i;
+const SECRET_ASSIGNMENT_PATTERN = /(["']?(?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi;
+const QUERY_SECRET_PATTERN = /([?&](?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)=)[^&#\s]*/gi;
+const URI_CREDENTIAL_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^:\s/@]+:)[^@\s/]+@/gi;
 const BEARER_PATTERN = /bearer\s+[a-z0-9._~+\/-]+=*/gi;
 const JWT_PATTERN = /eyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}/g;
 const SK_PATTERN = /\b(?:sk|rk|pk)_(?:live|test|proj)_[a-zA-Z0-9_-]{8,}\b/g;
@@ -47,6 +50,9 @@ function text(value, max = MAX_DIAGNOSTIC_STRING) {
 
 export function redactSupportText(value) {
   return text(value)
+    .replace(URI_CREDENTIAL_PATTERN, "$1[REDACTED]@")
+    .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
+    .replace(SECRET_ASSIGNMENT_PATTERN, "$1[REDACTED]")
     .replace(BEARER_PATTERN, "[REDACTED_BEARER]")
     .replace(JWT_PATTERN, "[REDACTED_JWT]")
     .replace(SK_PATTERN, "[REDACTED_KEY]")
@@ -137,6 +143,30 @@ export function suggestedPriority({ category, message }) {
   }
   if (/crash|won't open|cannot open|not sending|gps|mileage|payment failed|subscription/.test(body)) return "P2";
   return "P3";
+}
+
+export async function resolveAuthorizedSupportCompany(admin, userId, requestedCompanyId = null) {
+  let candidate = text(requestedCompanyId, 160) || null;
+  if (!candidate) {
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("active_company_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    candidate = text(profile?.active_company_id, 160) || null;
+  }
+  if (!candidate) return null;
+
+  const { data: memberships, error } = await admin
+    .from("company_members")
+    .select("company_id")
+    .eq("company_id", candidate)
+    .eq("user_id", String(userId))
+    .eq("status", "active")
+    .limit(1);
+  if (error) throw error;
+  return memberships?.length ? candidate : null;
 }
 
 export async function loadOwnedSupportCase(admin, userId, caseId) {

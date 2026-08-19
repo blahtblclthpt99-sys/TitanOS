@@ -118,15 +118,8 @@ export function normalizeSupportWorkspace(value) {
   return SUPPORT_WORKSPACES.has(workspace) ? workspace : "general";
 }
 
-export async function resolveAuthoritativeSupportWorkspace(admin, userId) {
-  const { data: profile, error } = await admin
-    .from("profiles")
-    .select("active_workspace,enabled_workspaces,account_type")
-    .eq("id", userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!profile) return "general";
-
+export function supportWorkspaceFromProfile(profile) {
+  if (!profile || typeof profile !== "object") return "general";
   const enabled = Array.isArray(profile.enabled_workspaces)
     ? profile.enabled_workspaces
         .map((value) => normalizeSupportWorkspace(value))
@@ -138,6 +131,16 @@ export async function resolveAuthoritativeSupportWorkspace(admin, userId) {
   const legacy = normalizeSupportWorkspace(profile.account_type);
   if (USER_WORKSPACES.has(legacy) && (!enabled.length || enabled.includes(legacy))) return legacy;
   return enabled[0] || "general";
+}
+
+export async function resolveAuthoritativeSupportWorkspace(admin, userId) {
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("active_workspace,enabled_workspaces,account_type")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return supportWorkspaceFromProfile(profile);
 }
 
 export function normalizeSupportCategory(value) {

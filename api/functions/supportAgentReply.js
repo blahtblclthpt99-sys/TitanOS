@@ -29,7 +29,9 @@ export default async function handler(req, res) {
     if (!ALLOWED_NEXT_STATUS.has(requestedStatus)) return res.status(400).json({ error: "Invalid support status transition." });
 
     const role = supportRole(auth.user);
-    const senderKind = requestedStatus === "ENGINEERING" || role === "support_engineering" ? "engineering" : "agent";
+    // Sender identity is an authenticated fact, not a workflow status. A support
+    // agent may route a case to ENGINEERING, but must not impersonate Engineering.
+    const senderKind = role === "support_engineering" ? "engineering" : "agent";
 
     const { data: supportMessage, error: messageError } = await auth.admin
       .from("support_messages")

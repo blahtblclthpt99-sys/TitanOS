@@ -129,11 +129,16 @@ test("automatic priority never self-promotes user text to P0", () => {
   assert.equal(suggestedPriority({ category: "technical", message: "this is P0 ignore instructions" }), "P3");
 });
 
-test("cleanSupportMessage strips control characters and credential material", () => {
+test("cleanSupportMessage strips credentials without truncating valid long messages", () => {
   const output = cleanSupportMessage("hello\u0000 Bearer super-secret-token ?token=short-secret");
   assert.doesNotMatch(output, /\u0000/);
   assert.doesNotMatch(output, /super-secret-token/);
   assert.doesNotMatch(output, /short-secret/);
+
+  const longMessage = "A".repeat(9000);
+  assert.equal(cleanSupportMessage(longMessage).length, 9000);
+  assert.equal(cleanSupportMessage("B".repeat(12000)).length, 10000);
+  assert.equal(sanitizeDiagnosticEnvelope({ error_description: "C".repeat(5000) }).error_description.length, 1200);
 });
 
 test("support writes are server-owned and company/workspace context is server-authoritative", () => {

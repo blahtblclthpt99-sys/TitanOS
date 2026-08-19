@@ -7,6 +7,22 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 
+function sourceFilesUnder(relativeDir) {
+  const found = [];
+  const visit = (current) => {
+    for (const entry of readdirSync(join(root, current), { withFileTypes: true })) {
+      const relativePath = `${current}/${entry.name}`;
+      if (entry.isDirectory()) {
+        visit(relativePath);
+      } else if (/\.(?:js|jsx|mjs|cjs|ts|tsx)$/.test(entry.name)) {
+        found.push(relativePath);
+      }
+    }
+  };
+  visit(relativeDir);
+  return found;
+}
+
 describe("TitanfieldOS Cloudflare hosting contract", () => {
   const wrangler = read("wrangler.jsonc");
   const redirects = read("public/_redirects");
@@ -26,6 +42,7 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
     .map((entry) => entry.name.replace(/\.js$/, ""))
     .sort();
+  const runtimeSources = ["src", "api", "functions"].flatMap(sourceFilesUnder);
 
   it("builds Vite output as a node-compatible Cloudflare Pages project", () => {
     assert.match(wrangler, /"pages_build_output_dir"\s*:\s*"\.\/dist"/);
@@ -113,6 +130,16 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     ]) {
       assert.doesNotMatch(source, /titanos-web\.vercel\.app/, `${name} must not depend on the old Vercel origin`);
       assert.match(source, /titanfieldos\.com/, `${name} must use TitanfieldOS as its canonical fallback`);
+    }
+  });
+
+  it("contains no hard-coded legacy Vercel production origin anywhere in runtime source", () => {
+    for (const file of runtimeSources) {
+      assert.doesNotMatch(
+        read(file),
+        /titanos-web\.vercel\.app/,
+        `${file} must not retain the old Vercel production origin`
+      );
     }
   });
 

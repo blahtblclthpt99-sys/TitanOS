@@ -13,6 +13,18 @@ const SUPPORT_STAFF_ROLES = new Set([
 const SUPPORT_ADMIN_ROLES = new Set(["support_admin", "admin"]);
 const SUPPORT_WORKSPACES = new Set(["general", "job_seeker", "self_employed", "business"]);
 const USER_WORKSPACES = new Set(["job_seeker", "self_employed", "business"]);
+const SUPPORT_SHARED_CATEGORIES = new Set([
+  "account","billing","titan_auto","titan_ai","invisible_interface","android","pwa",
+  "notifications","communications","files","import_export","technical","security","other",
+]);
+const SUPPORT_WORKSPACE_CATEGORIES = Object.freeze({
+  job_seeker: new Set(["jobs","job_seeker","opportunities","applications","profile"]),
+  self_employed: new Set(["opportunities","independent_work","profile","customers","jobs","scheduling","estimates","invoices","money"]),
+  business: new Set([
+    "business_os","jobs","customers","scheduling","estimates","invoices","money","recruiting",
+    "employees","fleet","driver_hub","gps","mileage","inventory","business_documents","leads",
+  ]),
+});
 
 const DIAGNOSTIC_KEYS = new Set([
   "timestamp",
@@ -155,6 +167,13 @@ export function normalizeSupportCategory(value) {
   ]);
   const category = String(value || "technical").trim().toLowerCase();
   return allowed.has(category) ? category : "technical";
+}
+
+export function normalizeSupportCategoryForWorkspace(value, workspace) {
+  const category = normalizeSupportCategory(value);
+  const normalizedWorkspace = normalizeSupportWorkspace(workspace);
+  if (SUPPORT_SHARED_CATEGORIES.has(category)) return category;
+  return SUPPORT_WORKSPACE_CATEGORIES[normalizedWorkspace]?.has(category) ? category : "technical";
 }
 
 export function normalizeSupportSource(value) {

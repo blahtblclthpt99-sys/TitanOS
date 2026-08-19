@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { buildTitanAiCapabilities } from "../api/functions/titanAICapabilities.js";
 import { loadTitanMemoryContext } from "../api/_lib/titanMemoryContext.js";
@@ -50,5 +51,15 @@ describe("Titan AI API contract", () => {
     assert.equal(memories[0].type, "workflow");
     assert.equal(memories[0].classification, "REMEMBERED");
     assert.equal(memories.length, 2);
+  });
+
+  it("keeps read-only 2nd Me useful when a live auth token needs reconnecting", () => {
+    const source = readFileSync(new URL("../src/api/functions.js", import.meta.url), "utf8");
+    assert.match(source, /error\?\.status === 401/);
+    assert.match(source, /getAccessToken\(\{ forceRefresh: true \}\)/);
+    assert.match(source, /functionName === "titanAI" && lastError\?\.status === 401/);
+    assert.match(source, /return localFallback\(functionName, payload\)/);
+    assert.match(source, /dataBasis: summary \? "device_cache" : "none"/);
+    assert.match(source, /Writes and every other 4xx remain fail-closed/);
   });
 });

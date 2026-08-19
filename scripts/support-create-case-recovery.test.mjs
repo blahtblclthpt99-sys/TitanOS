@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { cleanSupportMessage, redactSupportText } from "../api/_lib/support.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const createCaseSource = readFileSync(join(root, "api/functions/supportCreateCase.js"), "utf8");
@@ -27,4 +28,12 @@ test("support message sender identity comes from authenticated role, not request
   assert.match(agentReplySource, /const senderKind = role === "support_engineering" \? "engineering" : "agent"/);
   assert.doesNotMatch(agentReplySource, /requestedStatus === "ENGINEERING" \|\| role === "support_engineering"/);
   assert.match(agentReplySource, /requested_status: requestedStatus/);
+});
+
+test("long plain support text is preserved while opaque token-like material is redacted", () => {
+  assert.equal(cleanSupportMessage("A".repeat(9000)).length, 9000);
+  const opaque = "aB3_defG7hIj9KlM2nOp5QrS8tUv1WxY4zAb6CdE0fGh2IjK5LmN8OpQ";
+  const output = redactSupportText(`diagnostic ${opaque}`, 10000);
+  assert.equal(output.includes(opaque), false);
+  assert.match(output, /\[REDACTED_SECRET\]/);
 });

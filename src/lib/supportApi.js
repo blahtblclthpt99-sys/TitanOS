@@ -1,5 +1,6 @@
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
+import { captureException } from "@/lib/sentry";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -136,7 +137,20 @@ export async function uploadSupportAttachment({ caseId, userId, file }) {
     });
     return result.attachment;
   } catch (error) {
-    await supabase.storage.from("support-attachments").remove([path]).catch(() => {});
+    try {
+      const { error: cleanupError } = await supabase.storage.from("support-attachments").remove([path]);
+      if (cleanupError) {
+        captureException(cleanupError, {
+          tags: { feature: "titan_support", operation: "attachment_cleanup" },
+          extra: { caseId: String(caseId) },
+        });
+      }
+    } catch (cleanupError) {
+      captureException(cleanupError, {
+        tags: { feature: "titan_support", operation: "attachment_cleanup" },
+        extra: { caseId: String(caseId) },
+      });
+    }
     throw error;
   }
 }

@@ -5,6 +5,7 @@ import {
   isSupportAdmin,
   isSupportStaff,
   normalizeSupportCategory,
+  normalizeSupportWorkspace,
   redactSupportText,
   sanitizeDiagnosticEnvelope,
   suggestedPriority,
@@ -16,6 +17,7 @@ test("diagnostic envelope allowlists only support-safe fields", () => {
     route: "/invoices/123",
     feature: "invoices",
     operation: "send",
+    workspace: "business",
     error_code: "DELIVERY_FAILED",
     password: "do-not-keep",
     authorization: "Bearer secret-token",
@@ -26,12 +28,21 @@ test("diagnostic envelope allowlists only support-safe fields", () => {
   });
   assert.equal(payload.route, "/invoices/123");
   assert.equal(payload.feature, "invoices");
+  assert.equal(payload.workspace, "business");
   assert.equal(payload.retry_count, 3);
   assert.equal(payload.online, true);
   assert.equal("password" in payload, false);
   assert.equal("authorization" in payload, false);
   assert.equal("access_token" in payload, false);
   assert.equal("unrelated_customer_record" in payload, false);
+});
+
+test("support workspace context fails closed and never invents a workspace", () => {
+  assert.equal(normalizeSupportWorkspace("job_seeker"), "job_seeker");
+  assert.equal(normalizeSupportWorkspace("self_employed"), "self_employed");
+  assert.equal(normalizeSupportWorkspace("business"), "business");
+  assert.equal(normalizeSupportWorkspace("admin"), "general");
+  assert.equal(normalizeSupportWorkspace("business; drop table support_cases"), "general");
 });
 
 test("support text redacts bearer and JWT-shaped credentials", () => {
@@ -56,8 +67,12 @@ test("support role authority comes only from app_metadata", () => {
   assert.equal(isSupportAdmin(adminRole), true);
 });
 
-test("unsupported categories fail closed to technical", () => {
+test("support categories preserve legacy cases and allow focused workspace surfaces", () => {
   assert.equal(normalizeSupportCategory("gps"), "gps");
+  assert.equal(normalizeSupportCategory("job_seeker"), "job_seeker");
+  assert.equal(normalizeSupportCategory("independent_work"), "independent_work");
+  assert.equal(normalizeSupportCategory("business_os"), "business_os");
+  assert.equal(normalizeSupportCategory("titan_auto"), "titan_auto");
   assert.equal(normalizeSupportCategory("DROP TABLE support_cases"), "technical");
 });
 

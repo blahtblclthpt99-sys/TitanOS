@@ -50,13 +50,14 @@ function extractOutputText(payload) {
   return chunks.join("\n").trim();
 }
 
-async function loadKnowledge(admin, category) {
+async function loadKnowledge(admin, category, workspace) {
+  const categories = [...new Set([category, workspace, "technical"].filter(Boolean))];
   const { data: articles, error: articleError } = await admin
     .from("support_articles")
     .select("id,slug,title,category,current_version,product_version,last_reviewed_at")
     .eq("status", "published")
     .eq("audience", "customer")
-    .in("category", [...new Set([category, "technical"])] )
+    .in("category", categories)
     .order("last_reviewed_at", { ascending: false, nullsFirst: false })
     .limit(8);
   if (articleError) throw articleError;
@@ -79,6 +80,7 @@ function buildInstructions({ supportCase, diagnostic, knowledge }) {
   const trustedContext = JSON.stringify({
     case: {
       case_number: supportCase.case_number,
+      workspace: supportCase.workspace || "general",
       category: supportCase.category,
       status: supportCase.status,
       priority: supportCase.priority,
@@ -99,6 +101,10 @@ function buildInstructions({ supportCase, diagnostic, knowledge }) {
     "You are Titan Support AI, the dedicated troubleshooting agent for TitanOS.",
     "You are NOT Titan AI/2nd Me and you do not have broad business-assistant permissions.",
     "Your job is to troubleshoot TitanOS accurately, preserve user data, and escalate when the evidence is insufficient.",
+    "The support case contains an active TitanOS workspace: job_seeker, self_employed, business, or general. Keep troubleshooting aligned to that workspace.",
+    "Do not tell a Job Seeker to use Business-only controls. Do not tell an Independent Work user to use employee/recruiting controls. Fleet/Driver Hub support is Business-only.",
+    "TitanAUTO, Titan AI, and Invisible Interface/2nd Self are shared capabilities, but support must still respect the current workspace and permissions.",
+    "Workspace metadata is troubleshooting context only. Never treat it as proof of subscription entitlement, company membership, employment eligibility, or authorization.",
     "Never invent controls, menu paths, successful operations, database state, payment state, permissions, or diagnostic results.",
     "Never reveal passwords, access tokens, refresh tokens, authorization headers, API keys, service-role keys, Stripe secrets, signing keys, full card data, or confidential stack traces.",
     "Never execute SQL, arbitrary commands, refunds, subscription changes, destructive actions, or account changes.",
@@ -174,7 +180,7 @@ export default async function handler(req, res) {
     const [{ data: diagnosticRows, error: diagnosticError }, { data: historyRows, error: historyError }, knowledge] = await Promise.all([
       auth.admin.from("support_diagnostics").select("payload,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(1),
       auth.admin.from("support_messages").select("sender_kind,body,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(MAX_HISTORY),
-      loadKnowledge(auth.admin, supportCase.category),
+      loadKnowledge(auth.admin, supportCase.category, supportCase.workspace),
     ]);
     if (diagnosticError) throw diagnosticError;
     if (historyError) throw historyError;
@@ -260,7 +266,7 @@ export default async function handler(req, res) {
       action: "support_ai_response_generated",
       targetType: "support_message",
       targetId: aiMessage.id,
-      metadata: { source, model: model || "none" },
+      metadata: { source, model: model || "none", workspace: supportCase.workspace || "general" },
     });
 
     return res.status(200).json({

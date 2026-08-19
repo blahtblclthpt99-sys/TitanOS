@@ -30,7 +30,6 @@ export default async function handler(req, res) {
 
     const role = supportRole(auth.user);
     const senderKind = requestedStatus === "ENGINEERING" || role === "support_engineering" ? "engineering" : "agent";
-    const now = new Date().toISOString();
 
     const { data: supportMessage, error: messageError } = await auth.admin
       .from("support_messages")
@@ -39,14 +38,14 @@ export default async function handler(req, res) {
       .single();
     if (messageError) throw messageError;
 
+    const responseAt = supportMessage.created_at || new Date().toISOString();
     const patch = {
       status: requestedStatus,
-      first_response_at: supportCase.first_response_at || now,
-      last_message_at: now,
-      updated_at: now,
+      last_message_at: responseAt,
+      updated_at: responseAt,
     };
-    if (requestedStatus === "ENGINEERING" && !supportCase.escalated_at) patch.escalated_at = now;
-    if (requestedStatus === "RESOLVED") patch.resolved_at = now;
+    if (requestedStatus === "ENGINEERING" && !supportCase.escalated_at) patch.escalated_at = responseAt;
+    if (requestedStatus === "RESOLVED") patch.resolved_at = responseAt;
 
     const { error: updateError } = await auth.admin.from("support_cases").update(patch).eq("id", supportCase.id);
     if (updateError) throw updateError;

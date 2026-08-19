@@ -6,7 +6,7 @@ import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import {
   cleanSupportMessage,
-  normalizeSupportCategory,
+  normalizeSupportCategoryForWorkspace,
   normalizeSupportSource,
   resolveAuthoritativeSupportWorkspace,
   resolveAuthorizedSupportCompany,
@@ -39,10 +39,10 @@ export default async function handler(req, res) {
     const body = readJson(req);
     const description = cleanSupportMessage(body.description || body.message || "");
     const title = cleanShort(body.title || description.slice(0, 90) || "TitanOS support request", 180);
-    const category = normalizeSupportCategory(body.category);
     const requestedSource = normalizeSupportSource(body.source);
     const source = CUSTOMER_SOURCES.has(requestedSource) ? requestedSource : "support_center";
     const workspace = await resolveAuthoritativeSupportWorkspace(auth.admin, auth.user.id);
+    const category = normalizeSupportCategoryForWorkspace(body.category, workspace);
     const platform = cleanShort(body.platform, 80) || null;
     const appVersion = cleanShort(body.app_version || body.appVersion, 40) || null;
     const requestedCompanyId = cleanShort(body.company_id || body.companyId, 160) || null;

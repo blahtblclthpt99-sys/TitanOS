@@ -1,3 +1,5 @@
+import { logError } from "./safeLog.js";
+
 const MAX_DIAGNOSTIC_STRING = 1200;
 const MAX_FLAG_COUNT = 40;
 const SUPPORT_STAFF_ROLES = new Set([
@@ -252,6 +254,19 @@ export async function writeSupportAudit(admin, {
     metadata: safeMetadata,
   });
   if (error) throw error;
+}
+
+export async function writeSupportAuditBestEffort(admin, input, scope = "supportAudit") {
+  try {
+    await writeSupportAudit(admin, input);
+    return true;
+  } catch (error) {
+    logError(scope, error, {
+      caseId: input?.caseId || null,
+      action: input?.action || "unknown",
+    });
+    return false;
+  }
 }
 
 export function cleanSupportMessage(value, max = 10000) {

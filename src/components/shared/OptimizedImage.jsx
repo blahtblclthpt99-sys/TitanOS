@@ -6,7 +6,7 @@ import React, { memo, useMemo } from "react";
  */
 function unsplashSrcSet(src, widths = [80, 160, 240, 320, 480]) {
   try {
-    const u = new URL(src, typeof window !== "undefined" ? window.location.origin : "https://titanos-web.vercel.app");
+    const u = new URL(src, typeof window !== "undefined" ? window.location.origin : "https://titanfieldos.com");
     if (!u.hostname.includes("images.unsplash.com") && !u.hostname.includes("unsplash.com")) {
       return null;
     }

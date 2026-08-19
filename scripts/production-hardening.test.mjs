@@ -25,12 +25,14 @@ describe("Sentry wiring", () => {
     assert.match(src, /maskAllText/);
   });
 
-  it("API instrument initializes with traces and flush path", () => {
+  it("keeps Node instrumentation optional while the shared API capture path is edge-safe", () => {
     const instrument = read("api/instrument.mjs");
     const helper = read("api/_lib/sentry.js");
     assert.match(instrument, /tracesSampleRate/);
-    assert.match(helper, /Sentry\.flush/);
+    assert.match(helper, /application\/x-sentry-envelope/);
     assert.match(helper, /captureApiException/);
+    assert.match(helper, /async flush/);
+    assert.doesNotMatch(helper, /@sentry\/node|@sentry\/profiling-node|\.\.\/instrument\.mjs/);
   });
 });
 

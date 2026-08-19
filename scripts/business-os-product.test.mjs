@@ -12,16 +12,16 @@ const auto = readFileSync(new URL("../src/pages/Autopilot.jsx", import.meta.url)
 const discovery = readFileSync(new URL("../api/functions/leadDiscovery.js", import.meta.url), "utf8");
 const leadsApi = readFileSync(new URL("../src/lib/leadsApi.js", import.meta.url), "utf8");
 
-test("mobile navigation prioritizes daily business work", () => {
-  const mobileBlock = nav.match(/export const MOBILE_TAB_ITEMS = \[([\s\S]*?)\];/);
-  assert.ok(mobileBlock, "MOBILE_TAB_ITEMS must exist");
+test("business mobile navigation prioritizes daily business work", () => {
+  const mobileBlock = nav.match(/const BUSINESS_MOBILE = \[([\s\S]*?)\];/);
+  assert.ok(mobileBlock, "BUSINESS_MOBILE must exist");
   const block = mobileBlock[1];
   const paths = [...block.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(paths, ["/", "/jobs", "/customers", "/invoices", "/more"]);
   assert.doesNotMatch(block, /\/hire\/matches|\/second-me|\/autopilot|\/driver/);
 });
 
-test("primary navigation is a business OS before extensions", () => {
+test("primary navigation isolates Business, Independent Work, Job Seeker, and shared TitanAUTO", () => {
   const appBlock = nav.match(/export const APP_NAV_ITEMS = \[([\s\S]*?)\];/);
   assert.ok(appBlock, "APP_NAV_ITEMS must exist");
   const block = appBlock[1];
@@ -35,6 +35,7 @@ test("primary navigation is a business OS before extensions", () => {
     "Invoices",
     "Payments",
     "Employees",
+    "Talent",
     "Fleet",
     "Inventory",
     "Business Documents",
@@ -42,15 +43,41 @@ test("primary navigation is a business OS before extensions", () => {
     assert.match(block, new RegExp(`label: "${required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
 
-  for (const extension of ["Find Work", "Titan Auto + Leads", "2nd Self"]) {
-    assert.match(block, new RegExp(`label: "${extension.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
+  for (const required of ["Opportunities", "Service Profile", "Available Jobs", "Job Profile", "TitanAUTO"]) {
+    assert.match(block, new RegExp(`label: "${required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
 
-  const operationsAt = block.indexOf('label: "Jobs"');
-  const managementAt = block.indexOf('label: "Fleet"');
-  const extensionsAt = block.indexOf('label: "Find Work"');
-  assert.ok(operationsAt >= 0 && managementAt > operationsAt && extensionsAt > managementAt);
+  assert.match(block, /audience: "business"/);
+  assert.match(block, /audience: "self_employed"/);
+  assert.match(block, /audience: "job_seeker"/);
+  assert.match(block, /label: "TitanAUTO", path: "\/autopilot", group: "shared", audience: "shared"/);
+
+  const businessAt = block.indexOf('label: "Business Home"');
+  const independentAt = block.indexOf('label: "Home", path: "/independent"');
+  const seekerAt = block.indexOf('label: "Available Jobs"');
+  const sharedAt = block.indexOf('label: "TitanAUTO"');
+  assert.ok(businessAt >= 0 && independentAt > businessAt && seekerAt > independentAt && sharedAt > seekerAt);
+
+  // 2nd Self stays available as an internal intelligence workflow rather than a primary workspace tab.
+  assert.doesNotMatch(block, /label: "2nd Self"/);
+  assert.match(nav, /label: "2nd Self", path: "\/second-me"[\s\S]*hidden: true/);
   assert.doesNotMatch(block, /path: "\/(driver|comms|marketplace|reports|tax-center)"/);
+});
+
+test("workspace-specific mobile tabs exist for Independent Work and Job Seeker", () => {
+  const independent = nav.match(/const INDEPENDENT_MOBILE = \[([\s\S]*?)\];/);
+  const seeker = nav.match(/const SEEKER_MOBILE = \[([\s\S]*?)\];/);
+  assert.ok(independent, "INDEPENDENT_MOBILE must exist");
+  assert.ok(seeker, "SEEKER_MOBILE must exist");
+  assert.match(independent[1], /path: "\/independent"/);
+  assert.match(independent[1], /path: "\/work-opportunities"/);
+  assert.match(independent[1], /path: "\/autopilot"/);
+  assert.match(seeker[1], /path: "\/hire\/matches"/);
+  assert.match(seeker[1], /path: "\/job-profile"/);
+  assert.match(seeker[1], /path: "\/autopilot"/);
+  assert.match(nav, /mobileTabItemsForUser/);
+  assert.match(nav, /WORKSPACES\.BUSINESS/);
+  assert.match(nav, /WORKSPACES\.SELF_EMPLOYED/);
 });
 
 test("app boot does not restart retired driver or legacy background services", () => {
@@ -95,17 +122,18 @@ test("Driver Hub is reduced to a fleet-management subsystem", () => {
   assert.doesNotMatch(driver, /MissionControl|DriverExplorer|DoorDash|delivery search|live-shift/);
 });
 
-test("Business Home presents operations and management before extensions", () => {
+test("Business Home presents operations and management before shared TitanAUTO", () => {
   assert.match(dashboard, /Business Operating System/);
   assert.match(dashboard, /Daily business operations/);
-  assert.match(dashboard, /People, fleet, inventory, and records/);
-  assert.match(dashboard, /Business extensions/);
+  assert.match(dashboard, /People, talent, fleet, inventory, and records/);
+  assert.match(dashboard, /TitanAUTO/);
+  assert.match(dashboard, /Automate repetitive business work after approval/);
   assert.doesNotMatch(dashboard, /HomeAdClips|loadLocalWeather|ensureDemoInbox|TitanScoreBadge|BusinessTimeline/);
 
   const operationsAt = dashboard.indexOf("Daily business operations");
-  const managementAt = dashboard.indexOf("People, fleet, inventory, and records");
-  const extensionsAt = dashboard.indexOf("Business extensions");
-  assert.ok(operationsAt >= 0 && managementAt > operationsAt && extensionsAt > managementAt);
+  const managementAt = dashboard.indexOf("People, talent, fleet, inventory, and records");
+  const titanAutoAt = dashboard.indexOf("Automate repetitive business work after approval");
+  assert.ok(operationsAt >= 0 && managementAt > operationsAt && titanAutoAt > managementAt);
 });
 
 test("2nd Self remains an optional intelligence layer with confirmation language", () => {
@@ -114,10 +142,11 @@ test("2nd Self remains an optional intelligence layer with confirmation language
   assert.match(secondMe, /\/assistant\?q=/);
 });
 
-test("Titan Auto remains a business extension for leads and approved automation", () => {
+test("TitanAUTO remains a shared leads and approved-automation surface", () => {
+  assert.match(auto, /Titan Auto \+ Leads/);
   assert.match(auto, /Lead Finder/);
   assert.match(auto, /Find nearby businesses/);
-  assert.match(auto, /Approved automation/);
+  assert.match(auto, /approved automations|Approved automation/i);
   assert.match(auto, /discoverNearbyLeads/);
   assert.match(auto, /runAutopilotMembership/);
 });

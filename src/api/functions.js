@@ -1,6 +1,7 @@
 import { getFreshAccessToken } from "@/lib/sessionRecovery";
 
 const FUNCTION_TIMEOUT_MS = 15_000;
+const TITAN_API_ORIGIN = "https://titanfieldos.com";
 
 function apiError(message, status = 400, code = "") {
   const error = new Error(message);
@@ -168,19 +169,20 @@ function candidateUrls(path) {
 
   if (typeof window !== "undefined") {
     const { hostname, origin } = window.location;
-    // Same-origin /api on Vercel / custom domains
+    // Same-origin Pages API on local development, previews, and TitanfieldOS.
     if (
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com") ||
-      hostname === "titanos-web.vercel.app"
+      hostname.endsWith(".pages.dev") ||
+      hostname.endsWith("titanfieldos.com")
     ) {
       urls.push(`${origin}${path}`);
       urls.push(path);
     }
   }
 
+  // Native/static clients retain a canonical production API fallback.
+  urls.push(`${TITAN_API_ORIGIN}${path}`);
   return [...new Set(urls)];
 }
 

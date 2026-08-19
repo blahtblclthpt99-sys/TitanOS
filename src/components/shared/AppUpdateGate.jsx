@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 
 const DISMISS_KEY = "titanos_update_later_version";
+const TITAN_PUBLIC_ORIGIN = (import.meta.env.VITE_TITANOS_PUBLIC_ORIGIN || "https://titanfieldos.com").replace(/\/$/, "");
 
 function compareVersions(a, b) {
   const left = String(a || "0").split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -20,7 +21,7 @@ export default function AppUpdateGate() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return undefined;
     const controller = new AbortController();
-    fetch("https://titanos-web.vercel.app/api/functions/appVersion", { signal: controller.signal })
+    fetch(`${TITAN_PUBLIC_ORIGIN}/api/functions/appVersion`, { signal: controller.signal })
       .then((response) => (response.ok ? response.json() : null))
       .then((config) => {
         if (!config || compareVersions(config.latest, current) <= 0) return;

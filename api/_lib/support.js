@@ -57,10 +57,19 @@ const URI_CREDENTIAL_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^:\s/@]+:)[^@\s/]+@/gi;
 const BEARER_PATTERN = /bearer\s+[a-z0-9._~+\/-]+=*/gi;
 const JWT_PATTERN = /eyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}/g;
 const SK_PATTERN = /\b(?:sk|rk|pk)_(?:live|test|proj)_[a-zA-Z0-9_-]{8,}\b/g;
-const LONG_SECRET_PATTERN = /\b[a-zA-Z0-9_\-]{48,}\b/g;
+const LONG_TOKEN_PATTERN = /\b[a-zA-Z0-9_\-]{48,}\b/g;
 
 function text(value, max = MAX_DIAGNOSTIC_STRING) {
   return String(value ?? "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
+}
+
+function looksLikeOpaqueSecret(token) {
+  const uniqueCharacters = new Set(token).size;
+  if (uniqueCharacters < 12) return false;
+  const hasLetter = /[a-zA-Z]/.test(token);
+  const hasDigit = /\d/.test(token);
+  const hasTokenSymbol = /[_-]/.test(token);
+  return (hasLetter && hasDigit) || (hasTokenSymbol && (hasLetter || hasDigit));
 }
 
 export function redactSupportText(value, max = MAX_DIAGNOSTIC_STRING) {
@@ -70,7 +79,7 @@ export function redactSupportText(value, max = MAX_DIAGNOSTIC_STRING) {
     .replace(BEARER_PATTERN, "[REDACTED_BEARER]")
     .replace(JWT_PATTERN, "[REDACTED_JWT]")
     .replace(SK_PATTERN, "[REDACTED_KEY]")
-    .replace(LONG_SECRET_PATTERN, "[REDACTED_SECRET]")
+    .replace(LONG_TOKEN_PATTERN, (token) => looksLikeOpaqueSecret(token) ? "[REDACTED_SECRET]" : token)
     .replace(SECRET_ASSIGNMENT_PATTERN, "$1[REDACTED]");
 }
 

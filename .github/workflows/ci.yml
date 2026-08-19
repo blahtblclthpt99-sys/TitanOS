@@ -1,4 +1,4 @@
-# TitanOS CI — build gate for GitHub → Vercel continuous deployment
+# TitanOS CI — build gate for GitHub → production deployment
 name: CI
 
 on:
@@ -36,6 +36,9 @@ jobs:
 
       - name: Unit / integration / regression pack
         run: npm test
+
+      - name: Titan Support security and workspace boundary
+        run: node --test scripts/support-security.test.mjs
 
       - name: Business OS product boundary
         run: node --test scripts/business-os-product.test.mjs

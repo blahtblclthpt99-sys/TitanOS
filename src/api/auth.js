@@ -179,11 +179,16 @@ async function registerViaServer({ email, password, fullName, enabledWorkspaces,
   if (configured) bases.push(configured);
   if (typeof window !== "undefined") {
     const { hostname, origin } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".pages.dev") ||
+      hostname.endsWith("titanfieldos.com")
+    ) {
       bases.push(origin);
     }
-    // Always allow production API as last resort (Capacitor / IONOS)
-    bases.push("https://titanos-web.vercel.app");
+    // Canonical Pages API fallback for native/static hosts.
+    bases.push("https://titanfieldos.com");
   }
 
   let lastError;
@@ -307,7 +312,7 @@ export function createAuthModule() {
           const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
           if (configured) bases.push(configured);
           if (typeof window !== "undefined") bases.push(window.location.origin);
-          bases.push("https://titanos-web.vercel.app");
+          bases.push("https://titanfieldos.com");
           for (const base of [...new Set(bases)]) {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",

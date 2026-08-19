@@ -102,7 +102,6 @@ export function subscribeToSupportCase(caseId, onChange) {
   const channel = supabase
     .channel(`support-case-${caseId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "support_messages", filter: `case_id=eq.${caseId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "support_case_events", filter: `case_id=eq.${caseId}` }, onChange)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "support_cases", filter: `id=eq.${caseId}` }, onChange)
     .subscribe();
   return () => { supabase.removeChannel(channel); };

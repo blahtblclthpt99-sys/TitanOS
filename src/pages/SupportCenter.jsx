@@ -14,6 +14,7 @@ import {
   getSupportCase,
   listSupportCases,
   postSupportMessage,
+  reopenSupportCase,
   subscribeToSupportCase,
   submitSupportCsat,
   uploadSupportAttachment,
@@ -22,7 +23,7 @@ import { toast } from "@/components/ui/use-toast";
 
 const SHARED_HELP = [
   ["Account & Login", "account"], ["Billing & Subscription", "billing"],
-  ["TitanAUTO", "titan_auto"], ["Lead Finder", "leads"], ["Titan AI", "titan_ai"],
+  ["TitanAUTO", "titan_auto"], ["Titan AI", "titan_ai"],
   ["Invisible Interface / 2nd Self", "invisible_interface"], ["Notifications", "notifications"],
   ["Communications", "communications"], ["Files", "files"], ["Android App", "android"],
   ["Web / PWA", "pwa"], ["Security", "security"], ["Technical Problems", "technical"],
@@ -30,18 +31,19 @@ const SHARED_HELP = [
 
 const WORKSPACE_HELP = {
   [WORKSPACES.JOB_SEEKER]: [
-    ["Find Jobs & Opportunities", "opportunities"], ["Job Seeker Profile", "job_seeker"],
-    ["Applications & Responses", "applications"],
+    ["Find Jobs & Opportunities", "opportunities"], ["Job Seeker Profile", "profile"],
+    ["Applications, Interviews & Responses", "applications"],
   ],
   [WORKSPACES.SELF_EMPLOYED]: [
     ["Independent Opportunities", "opportunities"], ["Service Profile", "independent_work"],
-    ["Customers", "customers"], ["Estimates & Quotes", "estimates"], ["Invoices", "invoices"], ["Money", "money"],
+    ["Customers", "customers"], ["Scheduling", "scheduling"], ["Estimates & Quotes", "estimates"],
+    ["Invoices", "invoices"], ["Money", "money"],
   ],
   [WORKSPACES.BUSINESS]: [
     ["Business OS", "business_os"], ["Jobs", "jobs"], ["Customers", "customers"], ["Scheduling", "scheduling"],
     ["Estimates", "estimates"], ["Invoices", "invoices"], ["Money", "money"], ["Recruiting & Talent", "recruiting"],
     ["Employees", "employees"], ["Fleet & Driver Hub", "fleet"], ["Inventory", "inventory"],
-    ["Business Documents", "business_documents"],
+    ["Business Documents", "business_documents"], ["Lead Finder", "leads"],
   ],
 };
 
@@ -84,7 +86,8 @@ export default function SupportCenter() {
 
   const selectedCase = detail?.case || cases.find((item) => item.id === selectedCaseId) || null;
   const canEscalate = selectedCase && !["HUMAN_AGENT", "ENGINEERING", "RESOLVED", "CLOSED"].includes(selectedCase.status);
-  const canSend = selectedCase && selectedCase.status !== "CLOSED";
+  const canSend = selectedCase && !["RESOLVED", "CLOSED"].includes(selectedCase.status);
+  const canReopen = selectedCase && ["RESOLVED", "CLOSED"].includes(selectedCase.status);
   const showCsat = selectedCase && ["RESOLVED", "CLOSED"].includes(selectedCase.status) && !detail?.csat;
 
   const diagnostics = useMemo(() => buildSupportDiagnosticEnvelope({
@@ -93,6 +96,10 @@ export default function SupportCenter() {
     operation: "support_request",
     workspace,
   }), [category, workspace]);
+
+  useEffect(() => {
+    if (!quickHelp.some(([, value]) => value === category)) setCategory("technical");
+  }, [quickHelp, category]);
 
   const refreshCases = async ({ preserveSelection = true } = {}) => {
     setLoading(true);
@@ -172,15 +179,42 @@ export default function SupportCenter() {
         diagnostics: diagnosticConsent ? diagnostics : undefined,
       });
       const caseId = result.case.id;
-      for (const file of attachments) {
-        await uploadSupportAttachment({ caseId, userId: user.id, file });
-      }
+      const followUpIssues = [];
+
       setProblem("");
       setAttachments([]);
+      setDiagnosticConsent(false);
       setSelectedCaseId(caseId);
-      await askTitanSupport(caseId, text, { appendCustomerMessage: false });
-      await reloadDetail(caseId);
-      toast({ title: `Support case ${result.case.case_number}`, description: "Titan Support has started troubleshooting." });
+
+      if (attachments.length) {
+        const uploadResults = await Promise.allSettled(
+          attachments.map((file) => uploadSupportAttachment({ caseId, userId: user.id, file }))
+        );
+        const failedUploads = uploadResults.filter((item) => item.status === "rejected").length;
+        if (failedUploads) followUpIssues.push(`${failedUploads} attachment${failedUploads === 1 ? "" : "s"} could not be attached.`);
+      }
+
+      if (result.warnings?.includes("diagnostics_not_attached")) {
+        followUpIssues.push("Sanitized diagnostics could not be attached.");
+      }
+
+      try {
+        await askTitanSupport(caseId, text, { appendCustomerMessage: false });
+      } catch {
+        followUpIssues.push("Titan Support AI could not reply yet; the case remains open.");
+      }
+
+      try {
+        await reloadDetail(caseId);
+      } catch {
+        followUpIssues.push("The case was saved but could not be refreshed automatically.");
+      }
+
+      toast({
+        title: `Support case ${result.case.case_number}`,
+        description: followUpIssues.length ? "Case created. Some follow-up steps need attention." : "Titan Support has started troubleshooting.",
+      });
+      if (followUpIssues.length) setError(`Case ${result.case.case_number} was created. ${followUpIssues.join(" ")}`);
     } catch (err) {
       setError(err?.message || "Support case could not be created.");
     } finally {
@@ -195,25 +229,55 @@ export default function SupportCenter() {
     setError("");
     try {
       await postSupportMessage(selectedCaseId, text);
-      setMessage("");
-      await askTitanSupport(selectedCaseId, text, { appendCustomerMessage: false });
-      await reloadDetail();
     } catch (err) {
       setError(err?.message || "Message could not be sent.");
-    } finally {
       setBusy(false);
+      return;
     }
+
+    setMessage("");
+    let aiError = null;
+    try {
+      await askTitanSupport(selectedCaseId, text, { appendCustomerMessage: false });
+    } catch (err) {
+      aiError = err;
+    }
+
+    try {
+      await reloadDetail();
+    } catch (err) {
+      setError(aiError?.message || err?.message || "Your message was sent, but the conversation could not be refreshed automatically.");
+      setBusy(false);
+      return;
+    }
+
+    if (aiError) setError("Your message was sent. Titan Support AI could not reply yet, so the case remains available for human support.");
+    setBusy(false);
   };
 
   const handleEscalate = async () => {
     if (!selectedCaseId || busy) return;
     setBusy(true);
+    setError("");
     try {
       await escalateSupportCase(selectedCaseId);
       await reloadDetail();
       toast({ title: "Human support requested", description: "Your case history stays attached." });
     } catch (err) {
       setError(err?.message || "Human escalation could not be requested.");
+    } finally { setBusy(false); }
+  };
+
+  const handleReopen = async () => {
+    if (!selectedCaseId || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await reopenSupportCase(selectedCaseId);
+      await reloadDetail();
+      toast({ title: "Support case reopened", description: "You can continue the existing conversation." });
+    } catch (err) {
+      setError(err?.message || "Support case could not be reopened.");
     } finally { setBusy(false); }
   };
 
@@ -248,7 +312,7 @@ export default function SupportCenter() {
             <div><h2 className="font-semibold text-foreground">How can we help?</h2><p className="text-sm text-muted-foreground">Current workspace: <span className="font-medium text-foreground">{currentWorkspaceLabel}</span>. Describe the exact problem and Titan Support will keep the case tied to that context.</p></div>
           </div>
           <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="support-problem">Problem description</label>
-          <Textarea id="support-problem" value={problem} onChange={(e) => setProblem(e.target.value)} rows={5} placeholder={WORKSPACE_EXAMPLE[workspace] || "Describe the exact TitanOS problem you are seeing…"} className="min-h-[132px]" />
+          <Textarea id="support-problem" value={problem} onChange={(e) => setProblem(e.target.value)} rows={5} maxLength={10000} placeholder={WORKSPACE_EXAMPLE[workspace] || "Describe the exact TitanOS problem you are seeing…"} className="min-h-[132px]" />
 
           <div className="mt-4">
             <p className="mb-2 text-sm font-medium text-foreground">Issue area</p>
@@ -291,7 +355,10 @@ export default function SupportCenter() {
         <section className="mt-5 rounded-xl border border-border bg-card shadow-soft" aria-label="Support conversation">
           <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{selectedCase.case_number}</p><h2 className="text-lg font-semibold text-foreground">{selectedCase.title}</h2><div className="mt-2 flex flex-wrap items-center gap-2"><CaseStatus value={selectedCase.status} /><span className="text-xs text-muted-foreground">{workspaceLabel(selectedCase.workspace)} · Priority {selectedCase.priority}</span></div></div>
-            {canEscalate ? <Button type="button" variant="outline" className="min-h-[44px] gap-2" onClick={handleEscalate} disabled={busy}><UserRound className="h-4 w-4" aria-hidden="true" /> Talk to a Human</Button> : null}
+            <div className="flex flex-wrap gap-2">
+              {canEscalate ? <Button type="button" variant="outline" className="min-h-[44px] gap-2" onClick={handleEscalate} disabled={busy}><UserRound className="h-4 w-4" aria-hidden="true" /> Talk to a Human</Button> : null}
+              {canReopen ? <Button type="button" variant="outline" className="min-h-[44px] gap-2" onClick={handleReopen} disabled={busy}><RefreshCw className="h-4 w-4" aria-hidden="true" /> Reopen case</Button> : null}
+            </div>
           </div>
           <div className="max-h-[520px] space-y-3 overflow-y-auto p-5" aria-live="polite">
             {(detail?.messages || []).map((item) => {
@@ -299,8 +366,8 @@ export default function SupportCenter() {
               return <div key={item.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-xl px-4 py-3 text-sm leading-relaxed ${mine ? "bg-primary text-primary-foreground" : item.sender_kind === "system" ? "border border-border bg-muted text-muted-foreground" : "border border-border bg-background text-foreground"}`}><p className="mb-1 text-[10px] font-bold uppercase tracking-wide opacity-70">{mine ? "You" : item.sender_kind === "support_ai" ? "Titan Support AI" : item.sender_kind === "agent" ? "Titan Support Live" : item.sender_kind === "engineering" ? "Engineering" : "Titan Support"}</p><p className="whitespace-pre-wrap">{item.body}</p><p className="mt-2 text-[10px] opacity-60">{new Date(item.created_at).toLocaleString()}</p></div></div>;
             })}
           </div>
-          {canSend ? <div className="border-t border-border p-4"><div className="flex gap-2"><Textarea aria-label="Message Titan Support" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} placeholder="Reply to this support case…" className="min-h-[52px] resize-none" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} /><Button type="button" aria-label="Send message" className="min-h-[52px] min-w-[52px]" onClick={handleSend} disabled={busy || !message.trim()}><Send className="h-4 w-4" /></Button></div></div> : null}
-          {showCsat ? <div className="border-t border-border bg-muted/30 p-5"><h3 className="font-semibold text-foreground">Did we solve your problem?</h3><Textarea value={csatComment} onChange={(e) => setCsatComment(e.target.value)} rows={2} placeholder="Optional comment" className="mt-3 max-w-xl" /><div className="mt-3 flex gap-2"><Button type="button" onClick={() => handleCsat(true)} disabled={busy}>Yes</Button><Button type="button" variant="outline" onClick={() => handleCsat(false)} disabled={busy}>No</Button></div></div> : null}
+          {canSend ? <div className="border-t border-border p-4"><div className="flex gap-2"><Textarea aria-label="Message Titan Support" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={10000} placeholder="Reply to this support case…" className="min-h-[52px] resize-none" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} /><Button type="button" aria-label="Send message" className="min-h-[52px] min-w-[52px]" onClick={handleSend} disabled={busy || !message.trim()}><Send className="h-4 w-4" /></Button></div></div> : null}
+          {showCsat ? <div className="border-t border-border bg-muted/30 p-5"><h3 className="font-semibold text-foreground">Did we solve your problem?</h3><Textarea value={csatComment} onChange={(e) => setCsatComment(e.target.value)} rows={2} maxLength={2000} placeholder="Optional comment" className="mt-3 max-w-xl" /><div className="mt-3 flex gap-2"><Button type="button" onClick={() => handleCsat(true)} disabled={busy}>Yes</Button><Button type="button" variant="outline" onClick={() => handleCsat(false)} disabled={busy}>No</Button></div></div> : null}
         </section>
       ) : null}
     </PageShell>

@@ -2,7 +2,7 @@ name: Full System Certification
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main, master, product/titan-core-four]
   workflow_dispatch:
 
 concurrency:
@@ -35,8 +35,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://127.0.0.1:54321
           VITE_SUPABASE_ANON_KEY: e2e-placeholder-anon-key
-          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
-          VITE_API_BASE_URL: https://titanos-web.vercel.app
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanfieldos.com
+          VITE_API_BASE_URL: https://titanfieldos.com
 
   android-compile:
     name: Android native compile
@@ -73,8 +73,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
-          VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
-          VITE_API_BASE_URL: https://titanos-web.vercel.app
+          VITE_TITANOS_PUBLIC_ORIGIN: https://titanfieldos.com
+          VITE_API_BASE_URL: https://titanfieldos.com
 
       - name: Sync Capacitor Android
         run: npx cap sync android

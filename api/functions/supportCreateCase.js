@@ -90,8 +90,27 @@ export default async function handler(req, res) {
         .delete()
         .eq("id", supportCase.id)
         .eq("created_by_id", auth.user.id);
-      if (cleanupError) logError("supportCreateCase:rollback", cleanupError, { caseId: supportCase.id });
-      throw messageError;
+      if (!cleanupError) throw messageError;
+
+      // The case row is already committed and could not be rolled back. Returning
+      // a false 500 would encourage retries that create duplicate support cases.
+      // Preserve the case as the authoritative result and surface the degraded
+      // initial-message state explicitly so the client can recover in place.
+      logError("supportCreateCase:rollback", cleanupError, { caseId: supportCase.id });
+      logError("supportCreateCase:initialMessage", messageError, { caseId: supportCase.id });
+      await writeSupportAuditBestEffort(auth.admin, {
+        caseId: supportCase.id,
+        actorUserId: auth.user.id,
+        action: "support_case_created_degraded",
+        targetType: "support_case",
+        targetId: supportCase.id,
+        metadata: { reason: "initial_message_failed_and_case_rollback_failed", workspace },
+      }, "supportCreateCase:degradedAudit");
+      return res.status(201).json({
+        case: supportCase,
+        diagnostic_attached: false,
+        warnings: ["initial_message_not_created", "case_cleanup_failed"],
+      });
     }
 
     const warnings = [];

@@ -113,12 +113,12 @@ test("Driver Hub is reduced to a fleet-management subsystem", () => {
 test("Business Home presents operations and management before extensions", () => {
   assert.match(dashboard, /Business Operating System/);
   assert.match(dashboard, /Daily business operations/);
-  assert.match(dashboard, /People, fleet, inventory, and records/);
+  assert.match(dashboard, /People, talent, fleet, inventory, and records/);
   assert.match(dashboard, /Business extensions/);
   assert.doesNotMatch(dashboard, /HomeAdClips|loadLocalWeather|ensureDemoInbox|TitanScoreBadge|BusinessTimeline/);
 
   const operationsAt = dashboard.indexOf("Daily business operations");
-  const managementAt = dashboard.indexOf("People, fleet, inventory, and records");
+  const managementAt = dashboard.indexOf("People, talent, fleet, inventory, and records");
   const extensionsAt = dashboard.indexOf("Business extensions");
   assert.ok(operationsAt >= 0 && managementAt > operationsAt && extensionsAt > managementAt);
 });

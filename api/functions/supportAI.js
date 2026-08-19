@@ -165,6 +165,7 @@ export default async function handler(req, res) {
 
     if (body.diagnostic_consent === true && body.diagnostics) {
       const payload = sanitizeDiagnosticEnvelope(body.diagnostics);
+      payload.workspace = supportCase.workspace || "general";
       if (Object.keys(payload).length) {
         const { error: diagnosticInsertError } = await auth.admin.from("support_diagnostics").insert({
           case_id: supportCase.id,
@@ -186,6 +187,7 @@ export default async function handler(req, res) {
     if (historyError) throw historyError;
 
     const diagnostic = sanitizeDiagnosticEnvelope(diagnosticRows?.[0]?.payload || {});
+    diagnostic.workspace = supportCase.workspace || "general";
     const provider = providerConfig();
     let answer = localFallback(knowledge);
     let source = "support-knowledge";
@@ -235,7 +237,6 @@ export default async function handler(req, res) {
       }
     }
 
-    const now = new Date().toISOString();
     const { data: aiMessage, error: aiMessageError } = await auth.admin
       .from("support_messages")
       .insert({
@@ -248,13 +249,21 @@ export default async function handler(req, res) {
       .single();
     if (aiMessageError) throw aiMessageError;
 
+    if (supportCase.status === "NEW") {
+      const { error: statusError } = await auth.admin
+        .from("support_cases")
+        .update({ status: "AI_WORKING" })
+        .eq("id", supportCase.id)
+        .eq("created_by_id", auth.user.id)
+        .eq("status", "NEW");
+      if (statusError) throw statusError;
+    }
+
     const { error: updateError } = await auth.admin
       .from("support_cases")
       .update({
-        status: supportCase.status === "NEW" ? "AI_WORKING" : supportCase.status,
-        first_response_at: supportCase.first_response_at || now,
-        last_message_at: now,
-        updated_at: now,
+        last_message_at: aiMessage.created_at,
+        updated_at: aiMessage.created_at,
       })
       .eq("id", supportCase.id)
       .eq("created_by_id", auth.user.id);

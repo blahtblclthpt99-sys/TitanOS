@@ -3,7 +3,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { isSupportAdmin, isSupportStaff, supportRole, writeSupportAudit } from "../_lib/support.js";
+import { isSupportAdmin, isSupportStaff, supportRole, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -57,12 +57,12 @@ export default async function handler(req, res) {
       ai_working: cases.filter((item) => item.status === "AI_WORKING").length,
     };
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       actorUserId: auth.user.id,
       action: "support_inbox_viewed",
       targetType: "support_inbox",
       metadata: { role: supportRole(auth.user), result_count: cases.length },
-    });
+    }, "supportAgentInbox:audit");
 
     return res.status(200).json({ role: supportRole(auth.user), stats, cases });
   } catch (error) {

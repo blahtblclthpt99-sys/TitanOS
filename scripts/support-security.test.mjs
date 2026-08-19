@@ -8,6 +8,7 @@ import {
   isSupportAdmin,
   isSupportStaff,
   normalizeSupportCategory,
+  normalizeSupportCategoryForWorkspace,
   normalizeSupportWorkspace,
   redactSupportText,
   sanitizeDiagnosticEnvelope,
@@ -74,6 +75,28 @@ test("authoritative workspace selection comes from enabled profile state, not re
   assert.equal(supportWorkspaceFromProfile(null), "general");
 });
 
+test("workspace-aware category routing fails closed across product boundaries", () => {
+  assert.equal(normalizeSupportCategoryForWorkspace("applications", "job_seeker"), "applications");
+  assert.equal(normalizeSupportCategoryForWorkspace("profile", "job_seeker"), "profile");
+  assert.equal(normalizeSupportCategoryForWorkspace("fleet", "job_seeker"), "technical");
+  assert.equal(normalizeSupportCategoryForWorkspace("driver_hub", "job_seeker"), "technical");
+
+  assert.equal(normalizeSupportCategoryForWorkspace("scheduling", "self_employed"), "scheduling");
+  assert.equal(normalizeSupportCategoryForWorkspace("invoices", "self_employed"), "invoices");
+  assert.equal(normalizeSupportCategoryForWorkspace("fleet", "self_employed"), "technical");
+  assert.equal(normalizeSupportCategoryForWorkspace("employees", "self_employed"), "technical");
+
+  assert.equal(normalizeSupportCategoryForWorkspace("fleet", "business"), "fleet");
+  assert.equal(normalizeSupportCategoryForWorkspace("driver_hub", "business"), "driver_hub");
+  assert.equal(normalizeSupportCategoryForWorkspace("leads", "business"), "leads");
+
+  for (const workspace of ["job_seeker", "self_employed", "business", "general"]) {
+    assert.equal(normalizeSupportCategoryForWorkspace("titan_auto", workspace), "titan_auto");
+    assert.equal(normalizeSupportCategoryForWorkspace("titan_ai", workspace), "titan_ai");
+    assert.equal(normalizeSupportCategoryForWorkspace("invisible_interface", workspace), "invisible_interface");
+  }
+});
+
 test("support text redacts headers, query secrets, JSON secrets, provider keys, JWTs, and URI credentials", () => {
   const jwt = ["eyJabcdefghijk", "abcdefghijk", "abcdefghijk"].join(".");
   const input = [
@@ -114,9 +137,9 @@ test("support role authority comes only from app_metadata", () => {
   assert.equal(isSupportAdmin(adminRole), true);
 });
 
-test("support categories preserve legacy cases and allow focused workspace surfaces", () => {
+test("support categories preserve legacy cases and focused workspace surfaces", () => {
   for (const category of [
-    "gps","jobs","job_seeker","opportunities","applications","independent_work","business_os",
+    "gps","jobs","job_seeker","opportunities","applications","profile","independent_work","business_os",
     "recruiting","employees","fleet","driver_hub","titan_auto","titan_ai","invisible_interface",
   ]) {
     assert.equal(normalizeSupportCategory(category), category);
@@ -141,7 +164,7 @@ test("cleanSupportMessage strips credentials without truncating valid long messa
   assert.equal(sanitizeDiagnosticEnvelope({ error_description: "C".repeat(5000) }).error_description.length, 1200);
 });
 
-test("support writes are server-owned and company/workspace context is server-authoritative", () => {
+test("support writes are server-owned and company/workspace/category context is server-authoritative", () => {
   const migration = read("supabase/migrations/20260819013000_titan_support_workspaces.sql");
   const createCase = read("api/functions/supportCreateCase.js");
 
@@ -149,22 +172,38 @@ test("support writes are server-owned and company/workspace context is server-au
   assert.match(migration, /drop policy if exists support_cases_customer_insert/);
   assert.match(migration, /drop policy if exists support_messages_customer_insert/);
   assert.match(createCase, /resolveAuthoritativeSupportWorkspace\(auth\.admin, auth\.user\.id\)/);
+  assert.match(createCase, /normalizeSupportCategoryForWorkspace\(body\.category, workspace\)/);
   assert.match(createCase, /resolveAuthorizedSupportCompany\(auth\.admin, auth\.user\.id, requestedCompanyId\)/);
   assert.doesNotMatch(createCase, /workspace\s*=\s*normalizeSupportWorkspace\(body\.workspace/);
   assert.doesNotMatch(createCase, /companyId\s*=\s*cleanShort\(body\.company_id/);
 });
 
-test("first_response_at is database-owned and concurrency-safe", () => {
+test("message-driven case state is locked and concurrency-safe", () => {
   const migration = read("supabase/migrations/20260819013000_titan_support_workspaces.sql");
   const supportAI = read("api/functions/supportAI.js");
   const agentReply = read("api/functions/supportAgentReply.js");
+  const customerReply = read("api/functions/supportPostMessage.js");
+  const escalate = read("api/functions/supportEscalate.js");
+  const reopen = read("api/functions/supportReopenCase.js");
 
-  assert.match(migration, /support_messages_first_response/);
+  assert.match(migration, /for update;/i);
   assert.match(migration, /least\(first_response_at, new\.created_at\)/);
   assert.match(migration, /new\.sender_kind in \('support_ai','agent','engineering'\)/);
-  assert.doesNotMatch(supportAI, /first_response_at\s*:/);
-  assert.doesNotMatch(agentReply, /first_response_at\s*:/);
-  assert.match(supportAI, /\.eq\("status", "NEW"\)/);
+  assert.match(migration, /new\.sender_kind = 'customer' and status = 'NEEDS_USER' then 'AI_WORKING'/);
+  assert.match(migration, /new\.sender_kind = 'support_ai' and status = 'NEW' then 'AI_WORKING'/);
+  assert.match(migration, /requested_status/);
+  assert.match(migration, /human_escalation_requested/);
+  assert.match(migration, /case_reopened/);
+  assert.match(migration, /current_status in \('RESOLVED','CLOSED'\)/);
+  assert.match(migration, /current_status = 'CLOSED'/);
+
+  for (const source of [supportAI, agentReply, customerReply, escalate, reopen]) {
+    assert.doesNotMatch(source, /first_response_at\s*:/);
+  }
+  assert.match(agentReply, /requested_status: requestedStatus/);
+  assert.doesNotMatch(customerReply, /\.update\(\{[\s\S]{0,220}status:/);
+  assert.doesNotMatch(escalate, /\.update\(\{[\s\S]{0,220}status:/);
+  assert.doesNotMatch(reopen, /\.update\(\{[\s\S]{0,220}status:/);
 });
 
 test("realtime is published and both customer and staff UIs subscribe with cleanup", () => {
@@ -184,14 +223,50 @@ test("realtime is published and both customer and staff UIs subscribe with clean
 test("Fleet and Driver Hub support controls remain Business-only", () => {
   const supportCenter = read("src/pages/SupportCenter.jsx");
   const sharedBlock = supportCenter.match(/const SHARED_HELP = \[([\s\S]*?)\n\];/)?.[1] || "";
+  const seekerBlock = supportCenter.match(/\[WORKSPACES\.JOB_SEEKER\]: \[([\s\S]*?)\n  \],/)?.[1] || "";
+  const independentBlock = supportCenter.match(/\[WORKSPACES\.SELF_EMPLOYED\]: \[([\s\S]*?)\n  \],/)?.[1] || "";
   assert.doesNotMatch(sharedBlock, /Fleet|Driver Hub|driver_hub|\"fleet\"/);
+  assert.doesNotMatch(seekerBlock, /Fleet|Driver Hub|driver_hub|\"fleet\"/);
+  assert.doesNotMatch(independentBlock, /Fleet|Driver Hub|driver_hub|\"fleet\"/);
   assert.match(supportCenter, /\[WORKSPACES\.BUSINESS\][\s\S]*\["Fleet & Driver Hub", "fleet"\]/);
 });
 
-test("Titan Support AI explicitly rejects workspace-as-authority and privileged action claims", () => {
+test("customer Support UI has safe workspace switching and reopen/recovery behavior", () => {
+  const supportCenter = read("src/pages/SupportCenter.jsx");
+  assert.match(supportCenter, /if \(!quickHelp\.some\(\(\[, value\]\) => value === category\)\) setCategory\("technical"\)/);
+  assert.match(supportCenter, /reopenSupportCase\(selectedCaseId\)/);
+  assert.match(supportCenter, /Reopen case/);
+  assert.match(supportCenter, /!\["RESOLVED", "CLOSED"\]\.includes\(selectedCase\.status\)/);
+  assert.match(supportCenter, /Promise\.allSettled/);
+  assert.match(supportCenter, /Your message was sent\. Titan Support AI could not reply yet/);
+});
+
+test("Titan Support AI rejects workspace-as-authority, bounds provider calls, and degrades safely", () => {
   const supportAI = read("api/functions/supportAI.js");
   assert.match(supportAI, /Workspace metadata is troubleshooting context only/);
   assert.match(supportAI, /Fleet\/Driver Hub support is Business-only/);
   assert.match(supportAI, /Never execute SQL, arbitrary commands, refunds, subscription changes, destructive actions, or account changes/);
   assert.match(supportAI, /Never reveal passwords, access tokens, refresh tokens, authorization headers, API keys, service-role keys/);
+  assert.match(supportAI, /PROVIDER_TIMEOUT_MS\s*=\s*15_000/);
+  assert.match(supportAI, /AbortController/);
+  assert.match(supportAI, /signal: controller\.signal/);
+  assert.match(supportAI, /localFallback\(knowledge\)/);
+  assert.doesNotMatch(supportAI, /providerText\s*=\s*await response\.text/);
+});
+
+test("post-commit audit failures stay observable without falsely failing core support writes", () => {
+  const helper = read("api/_lib/support.js");
+  assert.match(helper, /writeSupportAuditBestEffort/);
+  assert.match(helper, /logError\(scope, error/);
+  for (const file of [
+    "api/functions/supportCreateCase.js",
+    "api/functions/supportPostMessage.js",
+    "api/functions/supportAgentReply.js",
+    "api/functions/supportEscalate.js",
+    "api/functions/supportReopenCase.js",
+    "api/functions/supportRegisterAttachment.js",
+    "api/functions/supportSubmitCsat.js",
+  ]) {
+    assert.match(read(file), /writeSupportAuditBestEffort/);
+  }
 });

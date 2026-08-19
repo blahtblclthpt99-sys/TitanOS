@@ -198,10 +198,24 @@ export default function SupportCenter() {
         followUpIssues.push("Sanitized diagnostics could not be attached.");
       }
 
-      try {
-        await askTitanSupport(caseId, text, { appendCustomerMessage: false });
-      } catch {
-        followUpIssues.push("Titan Support AI could not reply yet; the case remains open.");
+      const needsInitialMessageRepair = result.needs_message_retry === true
+        || result.warnings?.includes("initial_message_not_created");
+      let initialMessageReady = true;
+      if (needsInitialMessageRepair) {
+        try {
+          await postSupportMessage(caseId, text);
+        } catch {
+          initialMessageReady = false;
+          followUpIssues.push("Your case was created, but the first message could not be restored. Reply in the case to continue.");
+        }
+      }
+
+      if (initialMessageReady) {
+        try {
+          await askTitanSupport(caseId, text, { appendCustomerMessage: false });
+        } catch {
+          followUpIssues.push("Titan Support AI could not reply yet; the case remains open.");
+        }
       }
 
       try {

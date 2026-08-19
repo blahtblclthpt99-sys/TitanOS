@@ -206,18 +206,32 @@ test("message-driven case state is locked and concurrency-safe", () => {
   assert.doesNotMatch(reopen, /\.update\(\{[\s\S]{0,220}status:/);
 });
 
-test("realtime is published and both customer and staff UIs subscribe with cleanup", () => {
+test("realtime uses least-privilege rows and both customer and staff UIs subscribe with cleanup", () => {
   const realtimeMigration = read("supabase/migrations/20260818120500_titan_support_realtime.sql");
+  const hardeningMigration = read("supabase/migrations/20260819013000_titan_support_workspaces.sql");
   const supportApi = read("src/lib/supportApi.js");
   const customerUi = read("src/pages/SupportCenter.jsx");
   const staffUi = read("src/pages/SupportCommandCenter.jsx");
 
-  for (const table of ["support_messages", "support_cases", "support_case_events"]) {
-    assert.match(realtimeMigration, new RegExp(`tablename = '${table}'`));
-  }
+  assert.match(realtimeMigration, /tablename = 'support_messages'/);
+  assert.match(realtimeMigration, /tablename = 'support_cases'/);
+  assert.match(hardeningMigration, /revoke select on public\.support_case_events from authenticated/);
+  assert.match(hardeningMigration, /revoke select on public\.support_messages from authenticated/);
+  assert.match(hardeningMigration, /grant select \(id, case_id, created_at\) on public\.support_messages to authenticated/);
+  assert.match(supportApi, /select: \["id", "case_id", "created_at"\]/);
+  assert.doesNotMatch(supportApi, /table: "support_case_events"/);
   assert.match(supportApi, /removeChannel\(channel\)/);
   assert.match(customerUi, /subscribeToSupportCase\(selectedCaseId/);
   assert.match(staffUi, /subscribeToSupportCase\(selectedId/);
+});
+
+test("customer case API excludes internal events, diagnostics, assignments, and message metadata", () => {
+  const getCase = read("api/functions/supportGetCase.js");
+  assert.doesNotMatch(getCase, /from\("support_case_events"\)/);
+  assert.doesNotMatch(getCase, /from\("support_diagnostics"\)/);
+  assert.doesNotMatch(getCase, /from\("support_agent_assignments"\)/);
+  assert.match(getCase, /select\("id,sender_kind,body,created_at"\)/);
+  assert.doesNotMatch(getCase, /sender_kind,body,metadata,created_at/);
 });
 
 test("Fleet and Driver Hub support controls remain Business-only", () => {
@@ -254,6 +268,15 @@ test("Titan Support AI rejects workspace-as-authority, bounds provider calls, an
   assert.doesNotMatch(supportAI, /providerText\s*=\s*await response\.text/);
 });
 
+test("billing support reconciliation is bounded and does not lie after a successful sync", () => {
+  const refresh = read("api/functions/supportRefreshSubscription.js");
+  assert.match(refresh, /STRIPE_SUPPORT_TIMEOUT_MS\s*=\s*10_000/);
+  assert.match(refresh, /maxNetworkRetries:\s*1/);
+  assert.match(refresh, /telemetry:\s*false/);
+  assert.match(refresh, /writeSupportAuditBestEffort/);
+  assert.match(refresh, /supportRefreshSubscription:event/);
+});
+
 test("post-commit audit failures stay observable without falsely failing core support writes", () => {
   const helper = read("api/_lib/support.js");
   assert.match(helper, /writeSupportAuditBestEffort/);
@@ -266,6 +289,10 @@ test("post-commit audit failures stay observable without falsely failing core su
     "api/functions/supportReopenCase.js",
     "api/functions/supportRegisterAttachment.js",
     "api/functions/supportSubmitCsat.js",
+    "api/functions/supportRefreshSubscription.js",
+    "api/functions/supportAdminAssignCase.js",
+    "api/functions/supportIncidentAdmin.js",
+    "api/functions/supportAnalytics.js",
   ]) {
     assert.match(read(file), /writeSupportAuditBestEffort/);
   }

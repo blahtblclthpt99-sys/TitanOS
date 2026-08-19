@@ -12,7 +12,7 @@ import {
   resolveAuthorizedSupportCompany,
   sanitizeDiagnosticEnvelope,
   suggestedPriority,
-  writeSupportAudit,
+  writeSupportAuditBestEffort,
 } from "../_lib/support.js";
 
 const CUSTOMER_SOURCES = new Set(["support_center", "contextual_error", "feedback"]);
@@ -84,15 +84,28 @@ export default async function handler(req, res) {
       body: description,
       metadata: { source, workspace },
     });
-    if (messageError) throw messageError;
+    if (messageError) {
+      const { error: cleanupError } = await auth.admin
+        .from("support_cases")
+        .delete()
+        .eq("id", supportCase.id)
+        .eq("created_by_id", auth.user.id);
+      if (cleanupError) logError("supportCreateCase:rollback", cleanupError, { caseId: supportCase.id });
+      throw messageError;
+    }
 
-    await auth.admin.from("support_case_events").insert({
+    const warnings = [];
+    const { error: eventError } = await auth.admin.from("support_case_events").insert({
       case_id: supportCase.id,
       actor_user_id: auth.user.id,
       event_type: "case_created",
       to_status: "NEW",
       details: { category, priority, source, workspace },
     });
+    if (eventError) {
+      warnings.push("event_log_deferred");
+      logError("supportCreateCase:event", eventError, { caseId: supportCase.id });
+    }
 
     let diagnosticAttached = false;
     if (body.diagnostic_consent === true || body.diagnosticConsent === true) {
@@ -106,30 +119,37 @@ export default async function handler(req, res) {
           redaction_version: 1,
           consented_at: new Date().toISOString(),
         });
-        if (diagnosticError) throw diagnosticError;
-        diagnosticAttached = true;
-        await writeSupportAudit(auth.admin, {
-          caseId: supportCase.id,
-          actorUserId: auth.user.id,
-          action: "diagnostic_context_attached",
-          targetType: "support_diagnostic",
-          metadata: { redaction_version: 1, workspace },
-        });
+        if (diagnosticError) {
+          warnings.push("diagnostics_not_attached");
+          logError("supportCreateCase:diagnostic", diagnosticError, { caseId: supportCase.id });
+        } else {
+          diagnosticAttached = true;
+          const auditOk = await writeSupportAuditBestEffort(auth.admin, {
+            caseId: supportCase.id,
+            actorUserId: auth.user.id,
+            action: "diagnostic_context_attached",
+            targetType: "support_diagnostic",
+            metadata: { redaction_version: 1, workspace },
+          }, "supportCreateCase:diagnosticAudit");
+          if (!auditOk) warnings.push("diagnostic_audit_deferred");
+        }
       }
     }
 
-    await writeSupportAudit(auth.admin, {
+    const auditOk = await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_case_created",
       targetType: "support_case",
       targetId: supportCase.id,
       metadata: { category, priority, source, workspace, company_context: Boolean(companyId) },
-    });
+    }, "supportCreateCase:audit");
+    if (!auditOk) warnings.push("case_audit_deferred");
 
     return res.status(201).json({
       case: supportCase,
       diagnostic_attached: diagnosticAttached,
+      warnings,
     });
   } catch (error) {
     logError("supportCreateCase", error);

@@ -62,22 +62,67 @@ create policy support_storage_customer_insert on storage.objects
     )
   );
 
--- first_response_at is the earliest AI/human/engineering response timestamp.
--- LEAST makes the invariant concurrency-safe even when two responses race.
+-- One message insert owns all message-derived case state. This prevents stale API
+-- reads from overwriting newer human/AI state during concurrent replies.
 create or replace function public.titan_support_sync_first_response()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.sender_kind in ('support_ai','agent','engineering') then
-    update public.support_cases
-    set first_response_at = case
-      when first_response_at is null then new.created_at
-      else least(first_response_at, new.created_at)
+  update public.support_cases
+  set
+    first_response_at = case
+      when new.sender_kind in ('support_ai','agent','engineering') then
+        case
+          when first_response_at is null then new.created_at
+          else least(first_response_at, new.created_at)
+        end
+      else first_response_at
+    end,
+    last_message_at = greatest(coalesce(last_message_at, new.created_at), new.created_at),
+    updated_at = greatest(coalesce(updated_at, new.created_at), new.created_at),
+    status = case
+      when new.sender_kind = 'customer' and status = 'NEEDS_USER' then 'AI_WORKING'
+      when new.sender_kind = 'support_ai' and status = 'NEW' then 'AI_WORKING'
+      when new.sender_kind in ('agent','engineering')
+        and (new.metadata ->> 'requested_status') in ('NEEDS_USER','HUMAN_AGENT','ENGINEERING','RESOLVED')
+        then new.metadata ->> 'requested_status'
+      when new.sender_kind = 'system'
+        and (new.metadata ->> 'event') = 'human_escalation_requested'
+        and status not in ('RESOLVED','CLOSED') then 'HUMAN_AGENT'
+      when new.sender_kind = 'system'
+        and (new.metadata ->> 'event') = 'case_reopened'
+        and status in ('RESOLVED','CLOSED') then 'NEW'
+      else status
+    end,
+    escalated_at = case
+      when (
+        new.sender_kind in ('agent','engineering')
+        and (new.metadata ->> 'requested_status') = 'ENGINEERING'
+      ) or (
+        new.sender_kind = 'system'
+        and (new.metadata ->> 'event') = 'human_escalation_requested'
+      ) then coalesce(escalated_at, new.created_at)
+      else escalated_at
+    end,
+    resolved_at = case
+      when new.sender_kind in ('agent','engineering')
+        and (new.metadata ->> 'requested_status') = 'RESOLVED'
+        then coalesce(resolved_at, new.created_at)
+      when new.sender_kind = 'system'
+        and (new.metadata ->> 'event') = 'case_reopened'
+        then null
+      else resolved_at
+    end,
+    closed_at = case
+      when new.sender_kind = 'system'
+        and (new.metadata ->> 'event') = 'case_reopened'
+        then null
+      else closed_at
     end
-    where id = new.case_id;
-  end if;
+  where id = new.case_id;
+
   return new;
 end;
 $$;

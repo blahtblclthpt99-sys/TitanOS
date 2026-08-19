@@ -89,6 +89,23 @@ begin
       using errcode = '23514';
   end if;
 
+  if new.sender_kind = 'system' and (new.metadata ->> 'event') = 'human_escalation_requested' then
+    if current_status in ('RESOLVED','CLOSED') then
+      raise exception 'resolved/closed support case must be reopened before escalation'
+        using errcode = '23514';
+    end if;
+    if current_status in ('HUMAN_AGENT','ENGINEERING') then
+      raise exception 'support case is already escalated'
+        using errcode = '23505';
+    end if;
+  end if;
+
+  if new.sender_kind = 'system' and (new.metadata ->> 'event') = 'case_reopened'
+    and current_status not in ('RESOLVED','CLOSED') then
+    raise exception 'only resolved/closed support cases can be reopened'
+      using errcode = '23514';
+  end if;
+
   update public.support_cases
   set
     first_response_at = case
@@ -109,10 +126,10 @@ begin
         then new.metadata ->> 'requested_status'
       when new.sender_kind = 'system'
         and (new.metadata ->> 'event') = 'human_escalation_requested'
-        and status not in ('RESOLVED','CLOSED') then 'HUMAN_AGENT'
+        then 'HUMAN_AGENT'
       when new.sender_kind = 'system'
         and (new.metadata ->> 'event') = 'case_reopened'
-        and status in ('RESOLVED','CLOSED') then 'NEW'
+        then 'NEW'
       else status
     end,
     escalated_at = case

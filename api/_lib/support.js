@@ -53,11 +53,11 @@ export function redactSupportText(value) {
   return text(value)
     .replace(URI_CREDENTIAL_PATTERN, "$1[REDACTED]@")
     .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
-    .replace(SECRET_ASSIGNMENT_PATTERN, "$1[REDACTED]")
     .replace(BEARER_PATTERN, "[REDACTED_BEARER]")
     .replace(JWT_PATTERN, "[REDACTED_JWT]")
     .replace(SK_PATTERN, "[REDACTED_KEY]")
-    .replace(LONG_SECRET_PATTERN, "[REDACTED_SECRET]");
+    .replace(LONG_SECRET_PATTERN, "[REDACTED_SECRET]")
+    .replace(SECRET_ASSIGNMENT_PATTERN, "$1[REDACTED]");
 }
 
 function sanitizeFlags(value) {

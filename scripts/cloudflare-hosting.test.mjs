@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,8 +14,14 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
   const adapter = read("functions/_lib/vercelAdapter.js");
   const router = read("functions/api/functions/[name].js");
   const mppBoundary = read("functions/api/functions/mppPaid.js");
+  const authMeRoute = read("functions/api/functions/auth/me.js");
+  const authRegisterRoute = read("functions/api/functions/auth/register.js");
   const register = read("functions/api/register.js");
   const serverTelemetry = read("api/_lib/sentry.js");
+  const topLevelApiHandlers = readdirSync(join(root, "api/functions"), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => entry.name.replace(/\.js$/, ""))
+    .sort();
 
   it("builds Vite output as a node-compatible Cloudflare Pages project", () => {
     assert.match(wrangler, /"pages_build_output_dir"\s*:\s*"\.\/dist"/);
@@ -71,6 +77,27 @@ describe("TitanfieldOS Cloudflare hosting contract", () => {
     ]) {
       assert.match(router, new RegExp(`\\b${name}:`), `${name} must be routed on Cloudflare`);
     }
+  });
+
+  it("keeps every top-level production API represented on Cloudflare", () => {
+    for (const name of topLevelApiHandlers) {
+      if (name === "mppPaid") {
+        assert.match(mppBoundary, /mpp_worker_unavailable/);
+        continue;
+      }
+      if (name === "titanAI") {
+        assert.match(router, /titanAI:\s*\(\) => import\("\.\.\/\.\.\/\.\.\/api\/functions\/titanAILive\.js"\)/);
+        continue;
+      }
+      assert.match(router, new RegExp(`\\b${name}:`), `${name} must be routed on Cloudflare`);
+    }
+  });
+
+  it("preserves nested auth compatibility routes", () => {
+    assert.match(authMeRoute, /api\/functions\/auth\/me\.js/);
+    assert.match(authMeRoute, /runVercelHandler/);
+    assert.match(authRegisterRoute, /api\/functions\/auth\/register\.js/);
+    assert.match(authRegisterRoute, /runVercelHandler/);
   });
 
   it("quarantines only the experimental MPP route from the core Worker", () => {

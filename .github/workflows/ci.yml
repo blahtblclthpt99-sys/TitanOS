@@ -84,7 +84,14 @@ jobs:
       - name: Build Cloudflare Pages Functions
         run: |
           mkdir -p .cloudflare
-          npx --yes wrangler@4 pages functions build functions --outfile=.cloudflare/pages-worker.js --minify
+          set +e
+          npx --yes wrangler@4 pages functions build functions --outfile=.cloudflare/pages-worker.js --minify > .cloudflare/wrangler-build.log 2>&1
+          STATUS=$?
+          set -e
+          tail -n 100 .cloudflare/wrangler-build.log
+          if [ "$STATUS" -ne 0 ]; then
+            exit "$STATUS"
+          fi
           BYTES=$(gzip -c .cloudflare/pages-worker.js | wc -c)
           echo "Compressed Pages Worker: ${BYTES} bytes"
           test "$BYTES" -le 3145728

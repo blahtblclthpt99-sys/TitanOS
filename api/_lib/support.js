@@ -9,6 +9,7 @@ const SUPPORT_STAFF_ROLES = new Set([
   "admin",
 ]);
 const SUPPORT_ADMIN_ROLES = new Set(["support_admin", "admin"]);
+const SUPPORT_WORKSPACES = new Set(["general", "job_seeker", "self_employed", "business"]);
 
 const DIAGNOSTIC_KEYS = new Set([
   "timestamp",
@@ -16,6 +17,7 @@ const DIAGNOSTIC_KEYS = new Set([
   "page",
   "feature",
   "operation",
+  "workspace",
   "error_code",
   "error_description",
   "request_id",
@@ -82,6 +84,10 @@ export function sanitizeDiagnosticEnvelope(input) {
       if (Number.isFinite(n)) out.retry_count = Math.max(0, Math.min(100, Math.trunc(n)));
       continue;
     }
+    if (key === "workspace") {
+      out.workspace = normalizeSupportWorkspace(raw);
+      continue;
+    }
     const clean = redactSupportText(raw);
     if (clean) out[key] = clean;
   }
@@ -100,9 +106,16 @@ export function isSupportAdmin(user) {
   return SUPPORT_ADMIN_ROLES.has(supportRole(user));
 }
 
+export function normalizeSupportWorkspace(value) {
+  const workspace = String(value || "general").trim().toLowerCase();
+  return SUPPORT_WORKSPACES.has(workspace) ? workspace : "general";
+}
+
 export function normalizeSupportCategory(value) {
   const allowed = new Set([
-    "account","billing","jobs","customers","scheduling","estimates","invoices","money",
+    "account","billing","jobs","job_seeker","opportunities","applications","profile",
+    "customers","scheduling","estimates","invoices","money","independent_work","business_os",
+    "recruiting","employees","fleet","inventory","business_documents","titan_auto","leads",
     "driver_hub","gps","mileage","titan_ai","invisible_interface","android","pwa",
     "notifications","communications","files","import_export","technical","security","other",
   ]);
@@ -130,7 +143,7 @@ export async function loadOwnedSupportCase(admin, userId, caseId) {
   if (!caseId) return null;
   const { data, error } = await admin
     .from("support_cases")
-    .select("id,case_number,created_by_id,company_id,title,description,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at")
+    .select("id,case_number,created_by_id,company_id,workspace,title,description,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at")
     .eq("id", caseId)
     .eq("created_by_id", userId)
     .maybeSingle();

@@ -143,7 +143,7 @@ export async function loadOwnedSupportCase(admin, userId, caseId) {
   if (!caseId) return null;
   const { data, error } = await admin
     .from("support_cases")
-    .select("id,case_number,created_by_id,company_id,workspace,title,description,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at")
+    .select("id,case_number,created_by_id,company_id,workspace,title,description,category,status,priority,source,platform,app_version,first_response_at,created_at,updated_at,last_message_at")
     .eq("id", caseId)
     .eq("created_by_id", userId)
     .maybeSingle();

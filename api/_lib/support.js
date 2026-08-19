@@ -10,6 +10,7 @@ const SUPPORT_STAFF_ROLES = new Set([
 ]);
 const SUPPORT_ADMIN_ROLES = new Set(["support_admin", "admin"]);
 const SUPPORT_WORKSPACES = new Set(["general", "job_seeker", "self_employed", "business"]);
+const USER_WORKSPACES = new Set(["job_seeker", "self_employed", "business"]);
 
 const DIAGNOSTIC_KEYS = new Set([
   "timestamp",
@@ -115,6 +116,28 @@ export function isSupportAdmin(user) {
 export function normalizeSupportWorkspace(value) {
   const workspace = String(value || "general").trim().toLowerCase();
   return SUPPORT_WORKSPACES.has(workspace) ? workspace : "general";
+}
+
+export async function resolveAuthoritativeSupportWorkspace(admin, userId) {
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("active_workspace,enabled_workspaces,account_type")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!profile) return "general";
+
+  const enabled = Array.isArray(profile.enabled_workspaces)
+    ? profile.enabled_workspaces
+        .map((value) => normalizeSupportWorkspace(value))
+        .filter((value) => USER_WORKSPACES.has(value))
+    : [];
+  const active = normalizeSupportWorkspace(profile.active_workspace || profile.account_type);
+  if (USER_WORKSPACES.has(active) && (!enabled.length || enabled.includes(active))) return active;
+
+  const legacy = normalizeSupportWorkspace(profile.account_type);
+  if (USER_WORKSPACES.has(legacy) && (!enabled.length || enabled.includes(legacy))) return legacy;
+  return enabled[0] || "general";
 }
 
 export function normalizeSupportCategory(value) {

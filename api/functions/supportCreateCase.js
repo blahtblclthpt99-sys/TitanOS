@@ -8,11 +8,14 @@ import {
   cleanSupportMessage,
   normalizeSupportCategory,
   normalizeSupportSource,
-  normalizeSupportWorkspace,
+  resolveAuthoritativeSupportWorkspace,
+  resolveAuthorizedSupportCompany,
   sanitizeDiagnosticEnvelope,
   suggestedPriority,
   writeSupportAudit,
 } from "../_lib/support.js";
+
+const CUSTOMER_SOURCES = new Set(["support_center", "contextual_error", "feedback"]);
 
 function cleanShort(value, max) {
   return String(value ?? "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
@@ -37,11 +40,15 @@ export default async function handler(req, res) {
     const description = cleanSupportMessage(body.description || body.message || "");
     const title = cleanShort(body.title || description.slice(0, 90) || "TitanOS support request", 180);
     const category = normalizeSupportCategory(body.category);
-    const source = normalizeSupportSource(body.source);
-    const workspace = normalizeSupportWorkspace(body.workspace);
+    const requestedSource = normalizeSupportSource(body.source);
+    const source = CUSTOMER_SOURCES.has(requestedSource) ? requestedSource : "support_center";
+    const workspace = await resolveAuthoritativeSupportWorkspace(auth.admin, auth.user.id);
     const platform = cleanShort(body.platform, 80) || null;
     const appVersion = cleanShort(body.app_version || body.appVersion, 40) || null;
-    const companyId = cleanShort(body.company_id || body.companyId, 160) || null;
+    const requestedCompanyId = cleanShort(body.company_id || body.companyId, 160) || null;
+    const companyId = workspace === "business"
+      ? await resolveAuthorizedSupportCompany(auth.admin, auth.user.id, requestedCompanyId)
+      : null;
 
     if (description.length < 3) {
       return res.status(400).json({ error: "Describe the problem in at least 3 characters." });
@@ -90,6 +97,7 @@ export default async function handler(req, res) {
     let diagnosticAttached = false;
     if (body.diagnostic_consent === true || body.diagnosticConsent === true) {
       const payload = sanitizeDiagnosticEnvelope(body.diagnostics || body.diagnostic || {});
+      payload.workspace = workspace;
       if (Object.keys(payload).length) {
         const { error: diagnosticError } = await auth.admin.from("support_diagnostics").insert({
           case_id: supportCase.id,
@@ -116,7 +124,7 @@ export default async function handler(req, res) {
       action: "support_case_created",
       targetType: "support_case",
       targetId: supportCase.id,
-      metadata: { category, priority, source, workspace },
+      metadata: { category, priority, source, workspace, company_context: Boolean(companyId) },
     });
 
     return res.status(201).json({

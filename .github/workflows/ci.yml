@@ -3,9 +3,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, product/titan-core-four]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, product/titan-core-four]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

@@ -9,6 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const createCaseSource = readFileSync(join(root, "api/functions/supportCreateCase.js"), "utf8");
 const agentReplySource = readFileSync(join(root, "api/functions/supportAgentReply.js"), "utf8");
 const supportApiSource = readFileSync(join(root, "src/lib/supportApi.js"), "utf8");
+const supportCenterSource = readFileSync(join(root, "src/pages/SupportCenter.jsx"), "utf8");
 
 test("case creation does not return false failure when initial-message rollback also fails", () => {
   assert.match(createCaseSource, /if \(messageError\)/);
@@ -22,6 +23,16 @@ test("case creation does not return false failure when initial-message rollback 
 test("successful rollback still reports the original initial-message failure", () => {
   assert.match(createCaseSource, /\.delete\(\)[\s\S]*\.eq\("id", supportCase\.id\)[\s\S]*\.eq\("created_by_id", auth\.user\.id\)/);
   assert.match(createCaseSource, /if \(!cleanupError\) throw messageError/);
+});
+
+test("customer UI repairs a degraded case before asking Titan Support AI", () => {
+  assert.match(supportCenterSource, /result\.needs_message_retry === true/);
+  assert.match(supportCenterSource, /result\.warnings\?\.includes\("initial_message_not_created"\)/);
+  const repairAt = supportCenterSource.indexOf("await postSupportMessage(caseId, text)");
+  const aiAt = supportCenterSource.indexOf("await askTitanSupport(caseId, text, { appendCustomerMessage: false })");
+  assert.ok(repairAt >= 0 && aiAt > repairAt, "degraded initial message must be repaired before AI runs");
+  assert.match(supportCenterSource, /if \(initialMessageReady\) \{[\s\S]*await askTitanSupport\(caseId, text, \{ appendCustomerMessage: false \}\)/);
+  assert.match(supportCenterSource, /first message could not be restored\. Reply in the case to continue\./);
 });
 
 test("support message sender identity comes from authenticated role, not requested workflow status", () => {

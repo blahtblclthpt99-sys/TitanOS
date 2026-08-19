@@ -9,13 +9,14 @@ import {
   loadOwnedSupportCase,
   redactSupportText,
   sanitizeDiagnosticEnvelope,
-  writeSupportAudit,
+  writeSupportAuditBestEffort,
 } from "../_lib/support.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.6-sol";
 const MAX_HISTORY = 8;
 const MAX_CONTEXT = 12000;
+const PROVIDER_TIMEOUT_MS = 15_000;
 
 function providerConfig() {
   const openAiKey = process.env.OPENAI_API_KEY;
@@ -60,13 +61,19 @@ async function loadKnowledge(admin, category, workspace) {
     .in("category", categories)
     .order("last_reviewed_at", { ascending: false, nullsFirst: false })
     .limit(8);
-  if (articleError) throw articleError;
+  if (articleError) {
+    logError("supportAI:knowledgeArticles", articleError);
+    return [];
+  }
   if (!articles?.length) return [];
   const { data: versions, error: versionError } = await admin
     .from("support_article_versions")
     .select("article_id,version,content,created_at")
     .in("article_id", articles.map((article) => article.id));
-  if (versionError) throw versionError;
+  if (versionError) {
+    logError("supportAI:knowledgeVersions", versionError);
+    return [];
+  }
   const versionMap = new Map((versions || []).map((v) => [`${v.article_id}:${v.version}`, v]));
   return articles
     .map((article) => ({
@@ -160,6 +167,7 @@ export default async function handler(req, res) {
         body: message,
         metadata: {},
       });
+      if (customerMessageError?.code === "23514") return res.status(409).json({ error: "This case changed state. Reopen or refresh it before continuing." });
       if (customerMessageError) throw customerMessageError;
     }
 
@@ -174,34 +182,35 @@ export default async function handler(req, res) {
           redaction_version: 1,
           consented_at: new Date().toISOString(),
         });
-        if (diagnosticInsertError) throw diagnosticInsertError;
+        if (diagnosticInsertError) logError("supportAI:diagnostic", diagnosticInsertError, { caseId: supportCase.id });
       }
     }
 
-    const [{ data: diagnosticRows, error: diagnosticError }, { data: historyRows, error: historyError }, knowledge] = await Promise.all([
+    const [diagnosticResult, historyResult, knowledge] = await Promise.all([
       auth.admin.from("support_diagnostics").select("payload,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(1),
       auth.admin.from("support_messages").select("sender_kind,body,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(MAX_HISTORY),
       loadKnowledge(auth.admin, supportCase.category, supportCase.workspace),
     ]);
-    if (diagnosticError) throw diagnosticError;
-    if (historyError) throw historyError;
+    if (diagnosticResult.error) logError("supportAI:diagnosticRead", diagnosticResult.error, { caseId: supportCase.id });
+    if (historyResult.error) logError("supportAI:historyRead", historyResult.error, { caseId: supportCase.id });
 
-    const diagnostic = sanitizeDiagnosticEnvelope(diagnosticRows?.[0]?.payload || {});
+    const diagnostic = sanitizeDiagnosticEnvelope(diagnosticResult.data?.[0]?.payload || {});
     diagnostic.workspace = supportCase.workspace || "general";
+    const historyRows = historyResult.data || [];
     const provider = providerConfig();
     let answer = localFallback(knowledge);
     let source = "support-knowledge";
     let model = null;
 
     if (provider) {
-      const recent = (historyRows || [])
+      const recent = historyRows
         .slice()
         .reverse()
         .filter((row) => ["customer", "support_ai", "agent", "engineering"].includes(row.sender_kind))
         .map((row) => ({
           type: "message",
           role: row.sender_kind === "customer" ? "user" : "assistant",
-          content: redactSupportText(row.body).slice(0, 2000),
+          content: redactSupportText(row.body, 2000),
         }));
       if (!recent.length || recent[recent.length - 1]?.role !== "user") {
         recent.push({ type: "message", role: "user", content: message.slice(0, 2000) });
@@ -218,22 +227,30 @@ export default async function handler(req, res) {
         requestBody.providerOptions = { gateway: { disallowPromptTraining: true } };
       }
 
-      const response = await fetch(provider.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${provider.credential}`, "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-      if (response.ok) {
-        const completion = await response.json();
-        const liveText = extractOutputText(completion);
-        if (liveText) {
-          answer = cleanSupportMessage(liveText);
-          source = provider.source;
-          model = provider.model;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+      try {
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${provider.credential}`, "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const completion = await response.json();
+          const liveText = extractOutputText(completion);
+          if (liveText) {
+            answer = cleanSupportMessage(liveText);
+            source = provider.source;
+            model = provider.model;
+          }
+        } else {
+          logError("supportAI:provider", new Error(`AI provider returned HTTP ${response.status}`));
         }
-      } else {
-        const providerText = await response.text().catch(() => "");
-        logError("supportAI:provider", providerText.slice(0, 500));
+      } catch (providerError) {
+        logError("supportAI:provider", providerError);
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
@@ -247,36 +264,17 @@ export default async function handler(req, res) {
       })
       .select("id,sender_kind,body,metadata,created_at")
       .single();
+    if (aiMessageError?.code === "23514") return res.status(409).json({ error: "This case changed state before Titan Support AI replied. Refresh the case." });
     if (aiMessageError) throw aiMessageError;
 
-    if (supportCase.status === "NEW") {
-      const { error: statusError } = await auth.admin
-        .from("support_cases")
-        .update({ status: "AI_WORKING" })
-        .eq("id", supportCase.id)
-        .eq("created_by_id", auth.user.id)
-        .eq("status", "NEW");
-      if (statusError) throw statusError;
-    }
-
-    const { error: updateError } = await auth.admin
-      .from("support_cases")
-      .update({
-        last_message_at: aiMessage.created_at,
-        updated_at: aiMessage.created_at,
-      })
-      .eq("id", supportCase.id)
-      .eq("created_by_id", auth.user.id);
-    if (updateError) throw updateError;
-
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_ai_response_generated",
       targetType: "support_message",
       targetId: aiMessage.id,
       metadata: { source, model: model || "none", workspace: supportCase.workspace || "general" },
-    });
+    }, "supportAI:audit");
 
     return res.status(200).json({
       data: {

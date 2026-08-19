@@ -12,16 +12,24 @@ const auto = readFileSync(new URL("../src/pages/Autopilot.jsx", import.meta.url)
 const discovery = readFileSync(new URL("../api/functions/leadDiscovery.js", import.meta.url), "utf8");
 const leadsApi = readFileSync(new URL("../src/lib/leadsApi.js", import.meta.url), "utf8");
 
-test("mobile navigation prioritizes daily business work", () => {
-  const mobileBlock = nav.match(/export const MOBILE_TAB_ITEMS = \[([\s\S]*?)\];/);
-  assert.ok(mobileBlock, "MOBILE_TAB_ITEMS must exist");
-  const block = mobileBlock[1];
-  const paths = [...block.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
-  assert.deepEqual(paths, ["/", "/jobs", "/customers", "/invoices", "/more"]);
-  assert.doesNotMatch(block, /\/hire\/matches|\/second-me|\/autopilot|\/driver/);
+test("mobile navigation is explicitly scoped per workspace", () => {
+  const businessBlock = nav.match(/const BUSINESS_MOBILE = \[([\s\S]*?)\];/);
+  const independentBlock = nav.match(/const INDEPENDENT_MOBILE = \[([\s\S]*?)\];/);
+  const seekerBlock = nav.match(/const SEEKER_MOBILE = \[([\s\S]*?)\];/);
+  assert.ok(businessBlock && independentBlock && seekerBlock, "all workspace mobile nav blocks must exist");
+
+  const paths = (block) => [...block.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(paths(businessBlock[1]), ["/", "/jobs", "/customers", "/invoices", "/more"]);
+  assert.deepEqual(paths(independentBlock[1]), ["/independent", "/work-opportunities", "/jobs", "/invoices", "/autopilot"]);
+  assert.deepEqual(paths(seekerBlock[1]), ["/hire/matches", "/job-profile", "/autopilot"]);
+
+  assert.doesNotMatch(seekerBlock[1], /\/fleet|\/driver|\/employees|\/talent/);
+  assert.doesNotMatch(independentBlock[1], /\/fleet|\/driver|\/employees|\/talent/);
+  assert.match(nav, /export const MOBILE_TAB_ITEMS = BUSINESS_MOBILE/);
+  assert.match(nav, /mobileTabItemsForUser/);
 });
 
-test("primary navigation is a business OS before extensions", () => {
+test("primary navigation preserves Business OS while isolating Independent and Job Seeker surfaces", () => {
   const appBlock = nav.match(/export const APP_NAV_ITEMS = \[([\s\S]*?)\];/);
   assert.ok(appBlock, "APP_NAV_ITEMS must exist");
   const block = appBlock[1];
@@ -35,6 +43,7 @@ test("primary navigation is a business OS before extensions", () => {
     "Invoices",
     "Payments",
     "Employees",
+    "Talent",
     "Fleet",
     "Inventory",
     "Business Documents",
@@ -42,14 +51,20 @@ test("primary navigation is a business OS before extensions", () => {
     assert.match(block, new RegExp(`label: "${required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
 
-  for (const extension of ["Find Work", "Titan Auto + Leads", "2nd Self"]) {
-    assert.match(block, new RegExp(`label: "${extension.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
-  }
+  assert.match(block, /label: "Home", path: "\/independent"[^\n]*audience: "self_employed"/);
+  assert.match(block, /label: "Opportunities", path: "\/work-opportunities"[^\n]*audience: "self_employed"/);
+  assert.match(block, /label: "Available Jobs", path: "\/hire\/matches"[^\n]*audience: "job_seeker"/);
+  assert.match(block, /label: "Job Profile", path: "\/job-profile"[^\n]*audience: "job_seeker"/);
+  assert.match(block, /label: "TitanAUTO", path: "\/autopilot"[^\n]*audience: "shared"/);
 
   const operationsAt = block.indexOf('label: "Jobs"');
   const managementAt = block.indexOf('label: "Fleet"');
-  const extensionsAt = block.indexOf('label: "Find Work"');
-  assert.ok(operationsAt >= 0 && managementAt > operationsAt && extensionsAt > managementAt);
+  const independentAt = block.indexOf('path: "/independent"');
+  const seekerAt = block.indexOf('path: "/hire/matches"');
+  const sharedAt = block.indexOf('label: "TitanAUTO"');
+  assert.ok(
+    operationsAt >= 0 && managementAt > operationsAt && independentAt > managementAt && seekerAt > independentAt && sharedAt > seekerAt
+  );
   assert.doesNotMatch(block, /path: "\/(driver|comms|marketplace|reports|tax-center)"/);
 });
 
@@ -112,9 +127,11 @@ test("2nd Self remains an optional intelligence layer with confirmation language
   assert.match(secondMe, /Invisible Interface/);
   assert.match(secondMe, /Understand → Propose → Confirm → Act/);
   assert.match(secondMe, /\/assistant\?q=/);
+  assert.match(nav, /label: "2nd Self", path: "\/second-me"[^\n]*hidden: true/);
 });
 
-test("Titan Auto remains a business extension for leads and approved automation", () => {
+test("TitanAUTO remains shared while lead actions stay bounded", () => {
+  assert.match(nav, /label: "TitanAUTO", path: "\/autopilot"[^\n]*audience: "shared"/);
   assert.match(auto, /Lead Finder/);
   assert.match(auto, /Find nearby businesses/);
   assert.match(auto, /Approved automation/);

@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { cleanSupportMessage, loadAssignedSupportCase, supportRole, writeSupportAudit } from "../_lib/support.js";
+import { cleanSupportMessage, loadAssignedSupportCase, supportRole, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 const ALLOWED_NEXT_STATUS = new Set(["NEEDS_USER", "HUMAN_AGENT", "ENGINEERING", "RESOLVED"]);
 
@@ -33,24 +33,19 @@ export default async function handler(req, res) {
 
     const { data: supportMessage, error: messageError } = await auth.admin
       .from("support_messages")
-      .insert({ case_id: supportCase.id, sender_user_id: auth.user.id, sender_kind: senderKind, body: message, metadata: { role } })
+      .insert({
+        case_id: supportCase.id,
+        sender_user_id: auth.user.id,
+        sender_kind: senderKind,
+        body: message,
+        metadata: { role, requested_status: requestedStatus },
+      })
       .select("id,sender_kind,body,metadata,created_at")
       .single();
+    if (messageError?.code === "23514") return res.status(409).json({ error: "This case changed state before the reply was saved. Refresh and try again." });
     if (messageError) throw messageError;
 
-    const responseAt = supportMessage.created_at || new Date().toISOString();
-    const patch = {
-      status: requestedStatus,
-      last_message_at: responseAt,
-      updated_at: responseAt,
-    };
-    if (requestedStatus === "ENGINEERING" && !supportCase.escalated_at) patch.escalated_at = responseAt;
-    if (requestedStatus === "RESOLVED") patch.resolved_at = responseAt;
-
-    const { error: updateError } = await auth.admin.from("support_cases").update(patch).eq("id", supportCase.id);
-    if (updateError) throw updateError;
-
-    await auth.admin.from("support_case_events").insert({
+    const { error: eventError } = await auth.admin.from("support_case_events").insert({
       case_id: supportCase.id,
       actor_user_id: auth.user.id,
       event_type: requestedStatus === "RESOLVED" ? "case_resolved" : "staff_replied",
@@ -58,15 +53,16 @@ export default async function handler(req, res) {
       to_status: requestedStatus,
       details: { role },
     });
+    if (eventError) logError("supportAgentReply:event", eventError, { caseId: supportCase.id });
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: requestedStatus === "RESOLVED" ? "support_case_resolved" : "support_staff_reply_posted",
       targetType: "support_message",
       targetId: supportMessage.id,
       metadata: { from_status: supportCase.status, to_status: requestedStatus, role },
-    });
+    }, "supportAgentReply:audit");
 
     return res.status(201).json({ message: supportMessage, status: requestedStatus });
   } catch (error) {

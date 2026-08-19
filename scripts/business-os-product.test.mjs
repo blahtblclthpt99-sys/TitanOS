@@ -110,17 +110,18 @@ test("Driver Hub is reduced to a fleet-management subsystem", () => {
   assert.doesNotMatch(driver, /MissionControl|DriverExplorer|DoorDash|delivery search|live-shift/);
 });
 
-test("Business Home presents operations and management before extensions", () => {
+test("Business Home presents operations and management before TitanAUTO", () => {
   assert.match(dashboard, /Business Operating System/);
   assert.match(dashboard, /Daily business operations/);
   assert.match(dashboard, /People, talent, fleet, inventory, and records/);
-  assert.match(dashboard, /Business extensions/);
+  assert.match(dashboard, /aria-label="TitanAUTO"/);
+  assert.match(dashboard, /Automate repetitive business work after approval/);
   assert.doesNotMatch(dashboard, /HomeAdClips|loadLocalWeather|ensureDemoInbox|TitanScoreBadge|BusinessTimeline/);
 
   const operationsAt = dashboard.indexOf("Daily business operations");
   const managementAt = dashboard.indexOf("People, talent, fleet, inventory, and records");
-  const extensionsAt = dashboard.indexOf("Business extensions");
-  assert.ok(operationsAt >= 0 && managementAt > operationsAt && extensionsAt > managementAt);
+  const titanAutoAt = dashboard.indexOf('aria-label="TitanAUTO"');
+  assert.ok(operationsAt >= 0 && managementAt > operationsAt && titanAutoAt > managementAt);
 });
 
 test("2nd Self remains an optional intelligence layer with confirmation language", () => {

@@ -26,7 +26,7 @@ function randomId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-export function buildSupportDiagnosticEnvelope({ error, route, page, feature, operation, requestId, correlationId } = {}) {
+export function buildSupportDiagnosticEnvelope({ error, route, page, feature, operation, workspace, requestId, correlationId } = {}) {
   const nav = typeof navigator !== "undefined" ? navigator : null;
   const win = typeof window !== "undefined" ? window : null;
   return {
@@ -35,6 +35,7 @@ export function buildSupportDiagnosticEnvelope({ error, route, page, feature, op
     page: cleanText(page || "", 160),
     feature: cleanText(feature || "", 160),
     operation: cleanText(operation || "", 160),
+    workspace: cleanText(workspace || "general", 40),
     error_code: cleanText(error?.code || error?.name || "", 160),
     error_description: cleanText(error?.message || "", 1000),
     request_id: cleanText(requestId || error?.requestId || "", 160),

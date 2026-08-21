@@ -64,6 +64,9 @@ jobs:
       - name: Find Jobs session recovery
         run: node --test scripts/job-match-session-recovery.test.mjs
 
+      - name: Android native auth routing
+        run: node --test scripts/android-auth-routing.test.mjs
+
       - name: Google Play billing policy boundary
         run: node --test scripts/play-billing-policy.test.mjs
 

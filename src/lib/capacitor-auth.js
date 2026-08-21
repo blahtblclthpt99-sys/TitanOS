@@ -2,12 +2,32 @@ import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 
+function authRouteFromPath(pathname) {
+  if (pathname.startsWith("/callback")) return "/auth/callback";
+  if (pathname.startsWith("/reset-password")) return "/reset-password";
+  return "";
+}
+
+function authParamsFromDeepLink(parsed) {
+  const params = new URLSearchParams(parsed.search || "");
+  const fragment = (parsed.hash || "").replace(/^#/, "");
+  if (fragment && fragment.includes("=")) {
+    const fragmentParams = new URLSearchParams(fragment);
+    for (const [key, value] of fragmentParams.entries()) {
+      if (!params.has(key)) params.set(key, value);
+    }
+  }
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
 /**
- * When Google OAuth returns to com.titanos.myapp://auth/callback?...
- * close the system browser and route into the SPA hash router.
+ * Handle native auth returns such as:
+ * - com.titanos.myapp://auth/callback?code=...
+ * - com.titanos.myapp://auth/reset-password?code=...
  *
- * Prefer hash navigation (no full reload) so in-memory auth client + PKCE
- * storage stay intact when the process was not killed.
+ * Prefer hash navigation (no full reload) so native auth storage and PKCE
+ * verifier state remain available while the recovery/login code is exchanged.
  */
 export function installNativeAuthDeepLinks() {
   if (!Capacitor.isNativePlatform()) return () => {};
@@ -15,20 +35,20 @@ export function installNativeAuthDeepLinks() {
   const handleAuthUrl = async (url) => {
     try {
       const parsed = new URL(url);
-      if (parsed.host === "auth" && parsed.pathname.startsWith("/callback")) {
-        try {
-          await Browser.close();
-        } catch {
-          // Browser may already be closed
-        }
+      if (parsed.host !== "auth") return;
+      const route = authRouteFromPath(parsed.pathname);
+      if (!route) return;
 
-        const query = parsed.search || "";
-        const hashTarget = `#/auth/callback${query}`;
+      try {
+        await Browser.close();
+      } catch {
+        // Browser may already be closed
+      }
 
-        // Soft navigate when possible (preserves Preferences + JS heap)
-        if (window.location.hash !== hashTarget) {
-          window.location.hash = `/auth/callback${query}`;
-        }
+      const query = authParamsFromDeepLink(parsed);
+      const hashTarget = `#${route}${query}`;
+      if (window.location.hash !== hashTarget) {
+        window.location.hash = `${route}${query}`;
       }
     } catch {
       // ignore malformed deep links

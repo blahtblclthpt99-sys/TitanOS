@@ -1,4 +1,4 @@
-# TitanOS CI — build gate for GitHub → production deployment
+# TitanOS CI — application and Android build gate
 name: CI
 
 on:
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,6 +86,25 @@ jobs:
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
           VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
           VITE_API_BASE_URL: https://titanos-web.vercel.app
+
+      - name: Setup Java for Android
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Compile Android debug app
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify Android debug artifact
+        run: test -f android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

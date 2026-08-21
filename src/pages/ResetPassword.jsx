@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
+import { completeOAuthFromUrl, hasPendingOAuthParams } from "@/lib/oauthBootstrap";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2 } from "lucide-react";
@@ -17,21 +18,52 @@ export default function ResetPassword() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) setReady(true);
-      setChecking(false);
+    let cancelled = false;
+
+    const prepareRecoverySession = async () => {
+      try {
+        if (hasPendingOAuthParams()) {
+          const result = await completeOAuthFromUrl();
+          if (!result.ok) {
+            if (!cancelled) {
+              setError(result.error || "This password reset link is invalid or expired.");
+              setChecking(false);
+            }
+            return;
+          }
+          if (result.session && !cancelled) {
+            setReady(true);
+            setChecking(false);
+            return;
+          }
+        }
+
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!cancelled) {
+          if (data.session) setReady(true);
+          setChecking(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err?.message || "This password reset link could not be verified.");
+          setChecking(false);
+        }
+      }
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+      if (!cancelled && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN")) {
         setReady(true);
         setChecking(false);
       }
     });
 
-    checkSession();
-    return () => subscription.subscription.unsubscribe();
+    prepareRecoverySession();
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e) => {
@@ -69,6 +101,7 @@ export default function ResetPassword() {
   if (!ready) {
     return (
       <AuthLayout title="Invalid reset link" subtitle="This link is missing or expired">
+        {error ? <p className="mb-4 text-center text-sm text-red-600" role="alert">{error}</p> : null}
         <p className="text-sm text-slate-600 text-center mb-4">
           Open the reset link from your email, or request a new password reset.
         </p>

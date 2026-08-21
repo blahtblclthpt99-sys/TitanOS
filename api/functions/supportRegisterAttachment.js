@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 const ALLOWED_MIME = new Set([
   "image/jpeg","image/png","image/webp","application/pdf","text/plain","text/csv",
@@ -74,14 +74,14 @@ export default async function handler(req, res) {
     if (error?.code === "23505") return res.status(409).json({ error: "This attachment is already registered." });
     if (error) throw error;
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_attachment_registered",
       targetType: "support_attachment",
       targetId: data.id,
       metadata: { mime_type: mimeType, size_bytes: sizeBytes },
-    });
+    }, "supportRegisterAttachment:audit");
 
     return res.status(201).json({ attachment: data });
   } catch (error) {

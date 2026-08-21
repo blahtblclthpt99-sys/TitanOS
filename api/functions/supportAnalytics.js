@@ -3,7 +3,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { isSupportAdmin, writeSupportAudit } from "../_lib/support.js";
+import { isSupportAdmin, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 function average(values, precision = 1) {
   const numbers = values.filter((n) => Number.isFinite(n) && n >= 0);
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   try {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const [casesResult, csatResult, incidentsResult] = await Promise.all([
-      auth.admin.from("support_cases").select("id,category,status,priority,platform,app_version,created_at,first_response_at,escalated_at,resolved_at,closed_at").gte("created_at", since).limit(5000),
+      auth.admin.from("support_cases").select("id,workspace,category,status,priority,platform,app_version,created_at,first_response_at,escalated_at,resolved_at,closed_at").gte("created_at", since).limit(5000),
       auth.admin.from("support_csat").select("case_id,solved,rating,created_at").gte("created_at", since).limit(5000),
       auth.admin.from("support_incidents").select("id,status,severity,created_at,resolved_at").gte("created_at", since).limit(1000),
     ]);
@@ -56,6 +56,7 @@ export default async function handler(req, res) {
       resolved_percentage: cases.length ? Math.round((resolved.length / cases.length) * 1000) / 10 : 0,
       solved_csat_percentage: csat.length ? Math.round((csat.filter((row) => row.solved).length / csat.length) * 1000) / 10 : null,
       average_csat_rating: average(ratings, 2),
+      by_workspace: countBy("workspace"),
       by_category: countBy("category"),
       by_platform: countBy("platform"),
       by_version: countBy("app_version"),
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
       },
     };
 
-    await writeSupportAudit(auth.admin, { actorUserId: auth.user.id, action: "support_analytics_viewed", targetType: "support_analytics", metadata: { window_days: 30 } });
+    await writeSupportAuditBestEffort(auth.admin, { actorUserId: auth.user.id, action: "support_analytics_viewed", targetType: "support_analytics", metadata: { window_days: 30 } }, "supportAnalytics:audit");
     return res.status(200).json({ analytics });
   } catch (error) {
     logError("supportAnalytics", error);

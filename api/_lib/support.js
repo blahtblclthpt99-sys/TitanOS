@@ -1,3 +1,5 @@
+import { logError } from "./safeLog.js";
+
 const MAX_DIAGNOSTIC_STRING = 1200;
 const MAX_FLAG_COUNT = 40;
 const SUPPORT_STAFF_ROLES = new Set([
@@ -9,6 +11,20 @@ const SUPPORT_STAFF_ROLES = new Set([
   "admin",
 ]);
 const SUPPORT_ADMIN_ROLES = new Set(["support_admin", "admin"]);
+const SUPPORT_WORKSPACES = new Set(["general", "job_seeker", "self_employed", "business"]);
+const USER_WORKSPACES = new Set(["job_seeker", "self_employed", "business"]);
+const SUPPORT_SHARED_CATEGORIES = new Set([
+  "account","billing","titan_auto","titan_ai","invisible_interface","android","pwa",
+  "notifications","communications","files","import_export","technical","security","other",
+]);
+const SUPPORT_WORKSPACE_CATEGORIES = Object.freeze({
+  job_seeker: new Set(["jobs","job_seeker","opportunities","applications","profile"]),
+  self_employed: new Set(["opportunities","independent_work","profile","customers","jobs","scheduling","estimates","invoices","money"]),
+  business: new Set([
+    "business_os","jobs","customers","scheduling","estimates","invoices","money","recruiting",
+    "employees","fleet","driver_hub","gps","mileage","inventory","business_documents","leads",
+  ]),
+});
 
 const DIAGNOSTIC_KEYS = new Set([
   "timestamp",
@@ -16,6 +32,7 @@ const DIAGNOSTIC_KEYS = new Set([
   "page",
   "feature",
   "operation",
+  "workspace",
   "error_code",
   "error_description",
   "request_id",
@@ -34,21 +51,36 @@ const DIAGNOSTIC_KEYS = new Set([
 ]);
 
 const SECRET_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)/i;
+const SECRET_ASSIGNMENT_PATTERN = /(["']?(?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi;
+const QUERY_SECRET_PATTERN = /([?&](?:password|passwd|secret|token|authorization|cookie|service[_-]?role|api[_-]?key|private[_-]?key|refresh[_-]?token|access[_-]?token|stripe[_-]?secret|webhook[_-]?secret)=)[^&#\s]*/gi;
+const URI_CREDENTIAL_PATTERN = /([a-z][a-z0-9+.-]*:\/\/[^:\s/@]+:)[^@\s/]+@/gi;
 const BEARER_PATTERN = /bearer\s+[a-z0-9._~+\/-]+=*/gi;
 const JWT_PATTERN = /eyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}/g;
 const SK_PATTERN = /\b(?:sk|rk|pk)_(?:live|test|proj)_[a-zA-Z0-9_-]{8,}\b/g;
-const LONG_SECRET_PATTERN = /\b[a-zA-Z0-9_\-]{48,}\b/g;
+const LONG_TOKEN_PATTERN = /\b[a-zA-Z0-9_\-]{48,}\b/g;
 
 function text(value, max = MAX_DIAGNOSTIC_STRING) {
   return String(value ?? "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
 }
 
-export function redactSupportText(value) {
-  return text(value)
+function looksLikeOpaqueSecret(token) {
+  const uniqueCharacters = new Set(token).size;
+  if (uniqueCharacters < 12) return false;
+  const hasLetter = /[a-zA-Z]/.test(token);
+  const hasDigit = /\d/.test(token);
+  const hasTokenSymbol = /[_-]/.test(token);
+  return (hasLetter && hasDigit) || (hasTokenSymbol && (hasLetter || hasDigit));
+}
+
+export function redactSupportText(value, max = MAX_DIAGNOSTIC_STRING) {
+  return text(value, max)
+    .replace(URI_CREDENTIAL_PATTERN, "$1[REDACTED]@")
+    .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
     .replace(BEARER_PATTERN, "[REDACTED_BEARER]")
     .replace(JWT_PATTERN, "[REDACTED_JWT]")
     .replace(SK_PATTERN, "[REDACTED_KEY]")
-    .replace(LONG_SECRET_PATTERN, "[REDACTED_SECRET]");
+    .replace(LONG_TOKEN_PATTERN, (token) => looksLikeOpaqueSecret(token) ? "[REDACTED_SECRET]" : token)
+    .replace(SECRET_ASSIGNMENT_PATTERN, "$1[REDACTED]");
 }
 
 function sanitizeFlags(value) {
@@ -82,6 +114,10 @@ export function sanitizeDiagnosticEnvelope(input) {
       if (Number.isFinite(n)) out.retry_count = Math.max(0, Math.min(100, Math.trunc(n)));
       continue;
     }
+    if (key === "workspace") {
+      out.workspace = normalizeSupportWorkspace(raw);
+      continue;
+    }
     const clean = redactSupportText(raw);
     if (clean) out[key] = clean;
   }
@@ -100,14 +136,53 @@ export function isSupportAdmin(user) {
   return SUPPORT_ADMIN_ROLES.has(supportRole(user));
 }
 
+export function normalizeSupportWorkspace(value) {
+  const workspace = String(value || "general").trim().toLowerCase();
+  return SUPPORT_WORKSPACES.has(workspace) ? workspace : "general";
+}
+
+export function supportWorkspaceFromProfile(profile) {
+  if (!profile || typeof profile !== "object") return "general";
+  const enabled = Array.isArray(profile.enabled_workspaces)
+    ? profile.enabled_workspaces
+        .map((value) => normalizeSupportWorkspace(value))
+        .filter((value) => USER_WORKSPACES.has(value))
+    : [];
+  const active = normalizeSupportWorkspace(profile.active_workspace || profile.account_type);
+  if (USER_WORKSPACES.has(active) && (!enabled.length || enabled.includes(active))) return active;
+
+  const legacy = normalizeSupportWorkspace(profile.account_type);
+  if (USER_WORKSPACES.has(legacy) && (!enabled.length || enabled.includes(legacy))) return legacy;
+  return enabled[0] || "general";
+}
+
+export async function resolveAuthoritativeSupportWorkspace(admin, userId) {
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("active_workspace,enabled_workspaces,account_type")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return supportWorkspaceFromProfile(profile);
+}
+
 export function normalizeSupportCategory(value) {
   const allowed = new Set([
-    "account","billing","jobs","customers","scheduling","estimates","invoices","money",
+    "account","billing","jobs","job_seeker","opportunities","applications","profile",
+    "customers","scheduling","estimates","invoices","money","independent_work","business_os",
+    "recruiting","employees","fleet","inventory","business_documents","titan_auto","leads",
     "driver_hub","gps","mileage","titan_ai","invisible_interface","android","pwa",
     "notifications","communications","files","import_export","technical","security","other",
   ]);
   const category = String(value || "technical").trim().toLowerCase();
   return allowed.has(category) ? category : "technical";
+}
+
+export function normalizeSupportCategoryForWorkspace(value, workspace) {
+  const category = normalizeSupportCategory(value);
+  const normalizedWorkspace = normalizeSupportWorkspace(workspace);
+  if (SUPPORT_SHARED_CATEGORIES.has(category)) return category;
+  return SUPPORT_WORKSPACE_CATEGORIES[normalizedWorkspace]?.has(category) ? category : "technical";
 }
 
 export function normalizeSupportSource(value) {
@@ -126,11 +201,35 @@ export function suggestedPriority({ category, message }) {
   return "P3";
 }
 
+export async function resolveAuthorizedSupportCompany(admin, userId, requestedCompanyId = null) {
+  let candidate = text(requestedCompanyId, 160) || null;
+  if (!candidate) {
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("active_company_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    candidate = text(profile?.active_company_id, 160) || null;
+  }
+  if (!candidate) return null;
+
+  const { data: memberships, error } = await admin
+    .from("company_members")
+    .select("company_id")
+    .eq("company_id", candidate)
+    .eq("user_id", String(userId))
+    .eq("status", "active")
+    .limit(1);
+  if (error) throw error;
+  return memberships?.length ? candidate : null;
+}
+
 export async function loadOwnedSupportCase(admin, userId, caseId) {
   if (!caseId) return null;
   const { data, error } = await admin
     .from("support_cases")
-    .select("id,case_number,created_by_id,company_id,title,description,category,status,priority,source,platform,app_version,created_at,updated_at,last_message_at")
+    .select("id,case_number,created_by_id,company_id,workspace,title,description,category,status,priority,source,platform,app_version,first_response_at,created_at,updated_at,last_message_at")
     .eq("id", caseId)
     .eq("created_by_id", userId)
     .maybeSingle();
@@ -185,6 +284,19 @@ export async function writeSupportAudit(admin, {
   if (error) throw error;
 }
 
+export async function writeSupportAuditBestEffort(admin, input, scope = "supportAudit") {
+  try {
+    await writeSupportAudit(admin, input);
+    return true;
+  } catch (error) {
+    logError(scope, error, {
+      caseId: input?.caseId || null,
+      action: input?.action || "unknown",
+    });
+    return false;
+  }
+}
+
 export function cleanSupportMessage(value, max = 10000) {
-  return redactSupportText(value).slice(0, max);
+  return redactSupportText(value, max).slice(0, max);
 }

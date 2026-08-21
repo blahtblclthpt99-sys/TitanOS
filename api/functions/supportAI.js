@@ -9,13 +9,14 @@ import {
   loadOwnedSupportCase,
   redactSupportText,
   sanitizeDiagnosticEnvelope,
-  writeSupportAudit,
+  writeSupportAuditBestEffort,
 } from "../_lib/support.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.6-sol";
 const MAX_HISTORY = 8;
 const MAX_CONTEXT = 12000;
+const PROVIDER_TIMEOUT_MS = 15_000;
 
 function providerConfig() {
   const openAiKey = process.env.OPENAI_API_KEY;
@@ -50,22 +51,29 @@ function extractOutputText(payload) {
   return chunks.join("\n").trim();
 }
 
-async function loadKnowledge(admin, category) {
+async function loadKnowledge(admin, category, workspace) {
+  const categories = [...new Set([category, workspace, "technical"].filter(Boolean))];
   const { data: articles, error: articleError } = await admin
     .from("support_articles")
     .select("id,slug,title,category,current_version,product_version,last_reviewed_at")
     .eq("status", "published")
     .eq("audience", "customer")
-    .in("category", [...new Set([category, "technical"])] )
+    .in("category", categories)
     .order("last_reviewed_at", { ascending: false, nullsFirst: false })
     .limit(8);
-  if (articleError) throw articleError;
+  if (articleError) {
+    logError("supportAI:knowledgeArticles", articleError);
+    return [];
+  }
   if (!articles?.length) return [];
   const { data: versions, error: versionError } = await admin
     .from("support_article_versions")
     .select("article_id,version,content,created_at")
     .in("article_id", articles.map((article) => article.id));
-  if (versionError) throw versionError;
+  if (versionError) {
+    logError("supportAI:knowledgeVersions", versionError);
+    return [];
+  }
   const versionMap = new Map((versions || []).map((v) => [`${v.article_id}:${v.version}`, v]));
   return articles
     .map((article) => ({
@@ -79,6 +87,7 @@ function buildInstructions({ supportCase, diagnostic, knowledge }) {
   const trustedContext = JSON.stringify({
     case: {
       case_number: supportCase.case_number,
+      workspace: supportCase.workspace || "general",
       category: supportCase.category,
       status: supportCase.status,
       priority: supportCase.priority,
@@ -99,6 +108,10 @@ function buildInstructions({ supportCase, diagnostic, knowledge }) {
     "You are Titan Support AI, the dedicated troubleshooting agent for TitanOS.",
     "You are NOT Titan AI/2nd Me and you do not have broad business-assistant permissions.",
     "Your job is to troubleshoot TitanOS accurately, preserve user data, and escalate when the evidence is insufficient.",
+    "The support case contains an active TitanOS workspace: job_seeker, self_employed, business, or general. Keep troubleshooting aligned to that workspace.",
+    "Do not tell a Job Seeker to use Business-only controls. Do not tell an Independent Work user to use employee/recruiting controls. Fleet/Driver Hub support is Business-only.",
+    "TitanAUTO, Titan AI, and Invisible Interface/2nd Self are shared capabilities, but support must still respect the current workspace and permissions.",
+    "Workspace metadata is troubleshooting context only. Never treat it as proof of subscription entitlement, company membership, employment eligibility, or authorization.",
     "Never invent controls, menu paths, successful operations, database state, payment state, permissions, or diagnostic results.",
     "Never reveal passwords, access tokens, refresh tokens, authorization headers, API keys, service-role keys, Stripe secrets, signing keys, full card data, or confidential stack traces.",
     "Never execute SQL, arbitrary commands, refunds, subscription changes, destructive actions, or account changes.",
@@ -154,11 +167,13 @@ export default async function handler(req, res) {
         body: message,
         metadata: {},
       });
+      if (customerMessageError?.code === "23514") return res.status(409).json({ error: "This case changed state. Reopen or refresh it before continuing." });
       if (customerMessageError) throw customerMessageError;
     }
 
     if (body.diagnostic_consent === true && body.diagnostics) {
       const payload = sanitizeDiagnosticEnvelope(body.diagnostics);
+      payload.workspace = supportCase.workspace || "general";
       if (Object.keys(payload).length) {
         const { error: diagnosticInsertError } = await auth.admin.from("support_diagnostics").insert({
           case_id: supportCase.id,
@@ -167,33 +182,35 @@ export default async function handler(req, res) {
           redaction_version: 1,
           consented_at: new Date().toISOString(),
         });
-        if (diagnosticInsertError) throw diagnosticInsertError;
+        if (diagnosticInsertError) logError("supportAI:diagnostic", diagnosticInsertError, { caseId: supportCase.id });
       }
     }
 
-    const [{ data: diagnosticRows, error: diagnosticError }, { data: historyRows, error: historyError }, knowledge] = await Promise.all([
+    const [diagnosticResult, historyResult, knowledge] = await Promise.all([
       auth.admin.from("support_diagnostics").select("payload,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(1),
       auth.admin.from("support_messages").select("sender_kind,body,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: false }).limit(MAX_HISTORY),
-      loadKnowledge(auth.admin, supportCase.category),
+      loadKnowledge(auth.admin, supportCase.category, supportCase.workspace),
     ]);
-    if (diagnosticError) throw diagnosticError;
-    if (historyError) throw historyError;
+    if (diagnosticResult.error) logError("supportAI:diagnosticRead", diagnosticResult.error, { caseId: supportCase.id });
+    if (historyResult.error) logError("supportAI:historyRead", historyResult.error, { caseId: supportCase.id });
 
-    const diagnostic = sanitizeDiagnosticEnvelope(diagnosticRows?.[0]?.payload || {});
+    const diagnostic = sanitizeDiagnosticEnvelope(diagnosticResult.data?.[0]?.payload || {});
+    diagnostic.workspace = supportCase.workspace || "general";
+    const historyRows = historyResult.data || [];
     const provider = providerConfig();
     let answer = localFallback(knowledge);
     let source = "support-knowledge";
     let model = null;
 
     if (provider) {
-      const recent = (historyRows || [])
+      const recent = historyRows
         .slice()
         .reverse()
         .filter((row) => ["customer", "support_ai", "agent", "engineering"].includes(row.sender_kind))
         .map((row) => ({
           type: "message",
           role: row.sender_kind === "customer" ? "user" : "assistant",
-          content: redactSupportText(row.body).slice(0, 2000),
+          content: redactSupportText(row.body, 2000),
         }));
       if (!recent.length || recent[recent.length - 1]?.role !== "user") {
         recent.push({ type: "message", role: "user", content: message.slice(0, 2000) });
@@ -210,26 +227,33 @@ export default async function handler(req, res) {
         requestBody.providerOptions = { gateway: { disallowPromptTraining: true } };
       }
 
-      const response = await fetch(provider.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${provider.credential}`, "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-      if (response.ok) {
-        const completion = await response.json();
-        const liveText = extractOutputText(completion);
-        if (liveText) {
-          answer = cleanSupportMessage(liveText);
-          source = provider.source;
-          model = provider.model;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+      try {
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${provider.credential}`, "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const completion = await response.json();
+          const liveText = extractOutputText(completion);
+          if (liveText) {
+            answer = cleanSupportMessage(liveText);
+            source = provider.source;
+            model = provider.model;
+          }
+        } else {
+          logError("supportAI:provider", new Error(`AI provider returned HTTP ${response.status}`));
         }
-      } else {
-        const providerText = await response.text().catch(() => "");
-        logError("supportAI:provider", providerText.slice(0, 500));
+      } catch (providerError) {
+        logError("supportAI:provider", providerError);
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
-    const now = new Date().toISOString();
     const { data: aiMessage, error: aiMessageError } = await auth.admin
       .from("support_messages")
       .insert({
@@ -240,28 +264,17 @@ export default async function handler(req, res) {
       })
       .select("id,sender_kind,body,metadata,created_at")
       .single();
+    if (aiMessageError?.code === "23514") return res.status(409).json({ error: "This case changed state before Titan Support AI replied. Refresh the case." });
     if (aiMessageError) throw aiMessageError;
 
-    const { error: updateError } = await auth.admin
-      .from("support_cases")
-      .update({
-        status: supportCase.status === "NEW" ? "AI_WORKING" : supportCase.status,
-        first_response_at: supportCase.first_response_at || now,
-        last_message_at: now,
-        updated_at: now,
-      })
-      .eq("id", supportCase.id)
-      .eq("created_by_id", auth.user.id);
-    if (updateError) throw updateError;
-
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_ai_response_generated",
       targetType: "support_message",
       targetId: aiMessage.id,
-      metadata: { source, model: model || "none" },
-    });
+      metadata: { source, model: model || "none", workspace: supportCase.workspace || "general" },
+    }, "supportAI:audit");
 
     return res.status(200).json({
       data: {

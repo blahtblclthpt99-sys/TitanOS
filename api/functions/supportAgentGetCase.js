@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { loadAssignedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { loadAssignedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -30,14 +30,14 @@ export default async function handler(req, res) {
     ]);
     for (const result of [messages, diagnostics, events, attachments, assignments, incidents]) if (result.error) throw result.error;
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId,
       actorUserId: auth.user.id,
       action: "support_case_detail_viewed",
       targetType: "support_case",
       targetId: caseId,
       metadata: { diagnostics_viewed: (diagnostics.data || []).length > 0 },
-    });
+    }, "supportAgentGetCase:audit");
 
     return res.status(200).json({
       case: supportCase,

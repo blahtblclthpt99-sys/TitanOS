@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { isSupportAdmin, isSupportStaff, supportRole, writeSupportAudit } from "../_lib/support.js";
+import { isSupportAdmin, isSupportStaff, supportRole, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 const ASSIGNMENT_ROLES = new Set(["support_agent", "senior_support", "support_engineering", "billing_support"]);
 
@@ -36,10 +36,12 @@ export default async function handler(req, res) {
     if (!isSupportStaff(targetUser)) return res.status(400).json({ error: "Target user does not have a support staff role." });
 
     const targetRole = supportRole(targetUser);
-    const assignmentRole = ASSIGNMENT_ROLES.has(String(body.assignment_role || targetRole))
-      ? String(body.assignment_role || targetRole)
+    const requestedAssignmentRole = String(body.assignment_role || targetRole);
+    const assignmentRole = ASSIGNMENT_ROLES.has(requestedAssignmentRole)
+      ? requestedAssignmentRole
       : targetRole === "admin" || targetRole === "support_admin" ? "senior_support" : "support_agent";
 
+    let changed = false;
     if (active) {
       const { data: existing, error: existingError } = await auth.admin
         .from("support_agent_assignments")
@@ -57,34 +59,41 @@ export default async function handler(req, res) {
           assigned_by_id: auth.user.id,
           active: true,
         });
-        if (error) throw error;
+        if (error?.code !== "23505" && error) throw error;
+        changed = !error;
       }
     } else {
-      const { error } = await auth.admin
+      const { data, error } = await auth.admin
         .from("support_agent_assignments")
         .update({ active: false, ended_at: new Date().toISOString() })
         .eq("case_id", caseId)
         .eq("agent_user_id", agentUserId)
-        .eq("active", true);
+        .eq("active", true)
+        .select("id");
       if (error) throw error;
+      changed = Boolean(data?.length);
     }
 
-    await auth.admin.from("support_case_events").insert({
-      case_id: caseId,
-      actor_user_id: auth.user.id,
-      event_type: active ? "agent_assigned" : "agent_unassigned",
-      details: { agent_user_id: agentUserId, assignment_role: assignmentRole },
-    });
-    await writeSupportAudit(auth.admin, {
+    if (changed) {
+      const { error: eventError } = await auth.admin.from("support_case_events").insert({
+        case_id: caseId,
+        actor_user_id: auth.user.id,
+        event_type: active ? "agent_assigned" : "agent_unassigned",
+        details: { agent_user_id: agentUserId, assignment_role: assignmentRole },
+      });
+      if (eventError) logError("supportAdminAssignCase:event", eventError, { caseId });
+    }
+
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId,
       actorUserId: auth.user.id,
       action: active ? "support_agent_assigned" : "support_agent_unassigned",
       targetType: "support_agent",
       targetId: agentUserId,
-      metadata: { assignment_role: assignmentRole },
-    });
+      metadata: { assignment_role: assignmentRole, changed },
+    }, "supportAdminAssignCase:audit");
 
-    return res.status(200).json({ success: true, active, agent_user_id: agentUserId, assignment_role: assignmentRole });
+    return res.status(200).json({ success: true, active, changed, agent_user_id: agentUserId, assignment_role: assignmentRole });
   } catch (error) {
     logError("supportAdminAssignCase", error);
     captureApiException(error, { tags: { route: "supportAdminAssignCase" } });

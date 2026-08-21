@@ -1,5 +1,5 @@
 /**
- * FINAL QA structural gates — Core Four nav↔routes, exports, migrations, GPS, escrow honesty.
+ * FINAL QA structural gates — workspace nav↔routes, exports, migrations, GPS, escrow honesty.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -21,8 +21,8 @@ function extractQuotedPaths(src, marker) {
   return [...new Set(paths)];
 }
 
-describe("final-qa: Core Four nav ↔ app routing closure", () => {
-  it("every user-facing APP_NAV_ITEMS path is owned by TabStack or the authenticated shell", () => {
+describe("final-qa: workspace navigation ↔ app routing closure", () => {
+  it("primary navigation matches the approved Business / Independent / Job Seeker / shared surfaces", () => {
     const navSrc = read("src/lib/nav-items.js");
     const tabSrc = read("src/components/layout/TabStack.jsx");
     const layoutSrc = read("src/components/layout/AppLayout.jsx");
@@ -31,29 +31,42 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       navSrc.indexOf("export const APP_NAV_ITEMS"),
       navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
     );
-    const navPaths = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]*)["']/g)].map((m) => m[1]);
-    const expectedCorePaths = [
-      "/",
-      "/jobs",
-      "/schedule",
-      "/customers",
-      "/estimates",
-      "/invoices",
-      "/payments",
-      "/hire/matches",
-      "/second-me",
-      "/autopilot",
+    const navEntries = [...navBlock.matchAll(/path:\s*["'](\/[^"'?]*)["'][^\n]*audience:\s*["']([^"']+)["']/g)]
+      .map((match) => `${match[2]}:${match[1]}`);
+
+    const expectedEntries = [
+      "business:/",
+      "business:/jobs",
+      "business:/schedule",
+      "business:/customers",
+      "business:/estimates",
+      "business:/invoices",
+      "business:/payments",
+      "business:/employees",
+      "business:/talent",
+      "business:/fleet",
+      "business:/inventory",
+      "business:/business-documents",
+      "self_employed:/independent",
+      "self_employed:/work-opportunities",
+      "self_employed:/customers",
+      "self_employed:/jobs",
+      "self_employed:/estimates",
+      "self_employed:/invoices",
+      "self_employed:/payments",
+      "self_employed:/service-profile",
+      "job_seeker:/hire/matches",
+      "job_seeker:/job-profile",
+      "shared:/autopilot",
     ];
 
-    // Business Home + six business workflows + one root each for Find Work,
-    // 2nd Self, and Titan Auto. Compare the exact set so feature creep or
-    // accidental removal fails this release gate.
     assert.deepEqual(
-      [...navPaths].sort(),
-      [...expectedCorePaths].sort(),
-      "Core Four primary navigation must match the approved product surface exactly"
+      [...navEntries].sort(),
+      [...expectedEntries].sort(),
+      "Primary navigation must match the approved workspace product surfaces exactly"
     );
 
+    const navPaths = [...new Set(navEntries.map((entry) => entry.slice(entry.indexOf(":" ) + 1)))];
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
     const nonTabPaths = extractQuotedPaths(tabSrc, "NON_TAB_ROUTES");
 
@@ -80,7 +93,7 @@ describe("final-qa: Core Four nav ↔ app routing closure", () => {
       return true;
     });
 
-    assert.deepEqual(missing, [], `unrouted Core Four nav paths: ${missing.join(", ")}`);
+    assert.deepEqual(missing, [], `unrouted workspace nav paths: ${missing.join(", ")}`);
   });
 });
 
@@ -176,7 +189,7 @@ describe("final-qa: docs + rule", () => {
     assert.match(read("docs/FINAL_QA.md"), /controlled beta/i);
   });
 
-  it("ships FINAL OBJECTIVE rule and guiding principle", () => {
+  it("ships FINAL OBJECTIVE rule and keeps More organized as an OS surface", () => {
     assert.ok(existsSync(join(root, ".cursor/rules/final-objective.mdc")));
     assert.ok(existsSync(join(root, "docs/FINAL_OBJECTIVE.md")));
     const obj = read("docs/FINAL_OBJECTIVE.md");
@@ -184,6 +197,8 @@ describe("final-qa: docs + rule", () => {
     assert.match(obj, /No feature ships until/i);
     assert.match(read("docs/TITANIUM_MASTER_PROMPT.md"), /FINAL OBJECTIVE/);
     assert.match(read("AGENTS.md"), /FINAL OBJECTIVE/);
-    assert.match(read("src/pages/MoreMenu.jsx"), /not a feature list/i);
+    const more = read("src/pages/MoreMenu.jsx");
+    assert.match(more, /organized around running a real business/i);
+    assert.match(more, /Configuration and help, kept separate from the business product surface/i);
   });
 });

@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -23,15 +23,20 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Only resolved or closed support cases can be reopened." });
     }
 
-    const now = new Date().toISOString();
-    const { error: updateError } = await auth.admin
-      .from("support_cases")
-      .update({ status: "NEW", resolved_at: null, closed_at: null, updated_at: now, last_message_at: now })
-      .eq("id", supportCase.id)
-      .eq("created_by_id", auth.user.id);
-    if (updateError) throw updateError;
+    const { data: systemMessage, error: messageError } = await auth.admin
+      .from("support_messages")
+      .insert({
+        case_id: supportCase.id,
+        sender_kind: "system",
+        body: "This support case was reopened. Previous messages, attachments, diagnostics, and audit history remain attached.",
+        metadata: { event: "case_reopened" },
+      })
+      .select("id,created_at")
+      .single();
+    if (messageError?.code === "23514") return res.status(409).json({ error: "This case changed state before it could be reopened. Refresh and try again." });
+    if (messageError) throw messageError;
 
-    await auth.admin.from("support_case_events").insert({
+    const { error: eventError } = await auth.admin.from("support_case_events").insert({
       case_id: supportCase.id,
       actor_user_id: auth.user.id,
       event_type: "case_reopened",
@@ -39,20 +44,16 @@ export default async function handler(req, res) {
       to_status: "NEW",
       details: { reopened_by: "customer" },
     });
-    await auth.admin.from("support_messages").insert({
-      case_id: supportCase.id,
-      sender_kind: "system",
-      body: "This support case was reopened. Previous messages, attachments, diagnostics, and audit history remain attached.",
-      metadata: { event: "case_reopened" },
-    });
-    await writeSupportAudit(auth.admin, {
+    if (eventError) logError("supportReopenCase:event", eventError, { caseId: supportCase.id });
+
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_case_reopened",
-      targetType: "support_case",
-      targetId: supportCase.id,
+      targetType: "support_message",
+      targetId: systemMessage.id,
       metadata: { from_status: supportCase.status, to_status: "NEW" },
-    });
+    }, "supportReopenCase:audit");
 
     return res.status(200).json({ success: true, status: "NEW" });
   } catch (error) {

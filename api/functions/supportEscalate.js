@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -31,15 +31,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, status: supportCase.status, already_escalated: true });
     }
 
-    const now = new Date().toISOString();
-    const { error: updateError } = await auth.admin
-      .from("support_cases")
-      .update({ status: "HUMAN_AGENT", escalated_at: now, updated_at: now })
-      .eq("id", supportCase.id)
-      .eq("created_by_id", auth.user.id);
-    if (updateError) throw updateError;
+    const { data: systemMessage, error: messageError } = await auth.admin
+      .from("support_messages")
+      .insert({
+        case_id: supportCase.id,
+        sender_kind: "system",
+        body: "Human support requested. Your existing conversation and authorized diagnostics stay attached to this case so you do not need to start over.",
+        metadata: { event: "human_escalation_requested" },
+      })
+      .select("id,created_at")
+      .single();
 
-    await auth.admin.from("support_case_events").insert({
+    if (messageError?.code === "23505") {
+      const { data: refreshed } = await auth.admin.from("support_cases").select("status").eq("id", supportCase.id).maybeSingle();
+      return res.status(200).json({ success: true, status: refreshed?.status || "HUMAN_AGENT", already_escalated: true });
+    }
+    if (messageError?.code === "23514") return res.status(409).json({ error: "This case changed state. Refresh it before requesting human support." });
+    if (messageError) throw messageError;
+
+    const { error: eventError } = await auth.admin.from("support_case_events").insert({
       case_id: supportCase.id,
       actor_user_id: auth.user.id,
       event_type: "human_escalation_requested",
@@ -47,22 +57,16 @@ export default async function handler(req, res) {
       to_status: "HUMAN_AGENT",
       details: { requested_by: "customer" },
     });
+    if (eventError) logError("supportEscalate:event", eventError, { caseId: supportCase.id });
 
-    await auth.admin.from("support_messages").insert({
-      case_id: supportCase.id,
-      sender_kind: "system",
-      body: "Human support requested. Your existing conversation and authorized diagnostics stay attached to this case so you do not need to start over.",
-      metadata: { event: "human_escalation_requested" },
-    });
-
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "human_escalation_requested",
-      targetType: "support_case",
-      targetId: supportCase.id,
+      targetType: "support_message",
+      targetId: systemMessage.id,
       metadata: { from_status: supportCase.status, to_status: "HUMAN_AGENT" },
-    });
+    }, "supportEscalate:audit");
 
     return res.status(200).json({ success: true, status: "HUMAN_AGENT" });
   } catch (error) {

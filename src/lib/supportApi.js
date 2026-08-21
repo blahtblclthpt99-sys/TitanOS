@@ -1,5 +1,6 @@
 import { api } from "@/api/apiClient";
 import { supabase } from "@/api/supabaseClient";
+import { captureException } from "@/lib/sentry";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -26,7 +27,7 @@ function randomId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-export function buildSupportDiagnosticEnvelope({ error, route, page, feature, operation, requestId, correlationId } = {}) {
+export function buildSupportDiagnosticEnvelope({ error, route, page, feature, operation, workspace, requestId, correlationId } = {}) {
   const nav = typeof navigator !== "undefined" ? navigator : null;
   const win = typeof window !== "undefined" ? window : null;
   return {
@@ -35,6 +36,7 @@ export function buildSupportDiagnosticEnvelope({ error, route, page, feature, op
     page: cleanText(page || "", 160),
     feature: cleanText(feature || "", 160),
     operation: cleanText(operation || "", 160),
+    workspace: cleanText(workspace || "general", 40),
     error_code: cleanText(error?.code || error?.name || "", 160),
     error_description: cleanText(error?.message || "", 1000),
     request_id: cleanText(requestId || error?.requestId || "", 160),
@@ -100,8 +102,13 @@ export function subscribeToSupportCase(caseId, onChange) {
   if (!caseId || typeof onChange !== "function") return () => {};
   const channel = supabase
     .channel(`support-case-${caseId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "support_messages", filter: `case_id=eq.${caseId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "support_case_events", filter: `case_id=eq.${caseId}` }, onChange)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "support_messages",
+      filter: `case_id=eq.${caseId}`,
+      select: ["id", "case_id", "created_at"],
+    }, onChange)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "support_cases", filter: `id=eq.${caseId}` }, onChange)
     .subscribe();
   return () => { supabase.removeChannel(channel); };
@@ -130,7 +137,20 @@ export async function uploadSupportAttachment({ caseId, userId, file }) {
     });
     return result.attachment;
   } catch (error) {
-    await supabase.storage.from("support-attachments").remove([path]).catch(() => {});
+    try {
+      const { error: cleanupError } = await supabase.storage.from("support-attachments").remove([path]);
+      if (cleanupError) {
+        captureException(cleanupError, {
+          tags: { feature: "titan_support", operation: "attachment_cleanup" },
+          extra: { caseId: String(caseId) },
+        });
+      }
+    } catch (cleanupError) {
+      captureException(cleanupError, {
+        tags: { feature: "titan_support", operation: "attachment_cleanup" },
+        extra: { caseId: String(caseId) },
+      });
+    }
     throw error;
   }
 }

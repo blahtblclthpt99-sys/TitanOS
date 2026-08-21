@@ -63,6 +63,47 @@ function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
+async function claimReceipt(auth, row) {
+  // purchase_token is the primary key. An INSERT is the atomic ownership claim:
+  // two users racing the same fresh token cannot both become its owner.
+  const { error: insertError } = await auth.admin
+    .from("google_play_subscriptions")
+    .insert(row);
+  if (!insertError) return { claimed: true };
+  if (insertError.code !== "23505") throw insertError;
+
+  // The token already exists. Re-read after the unique-key conflict rather than
+  // trusting the preflight lookup, which can race with another verifier.
+  const { data: existing, error: existingError } = await auth.admin
+    .from("google_play_subscriptions")
+    .select("user_id")
+    .eq("purchase_token", row.purchase_token)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (!existing) throw insertError;
+  if (existing.user_id !== auth.user.id) return { claimed: false };
+
+  // Same owner: refresh only receipt state. Never update user_id during a
+  // duplicate-token path, and scope the update by both token and owner.
+  const refresh = {
+    product_id: row.product_id,
+    base_plan_id: row.base_plan_id,
+    subscription_state: row.subscription_state,
+    expires_at: row.expires_at,
+    auto_renewing: row.auto_renewing,
+    acknowledged: row.acknowledged,
+    linked_purchase_token: row.linked_purchase_token,
+    last_verified_at: row.last_verified_at,
+  };
+  const { error: refreshError } = await auth.admin
+    .from("google_play_subscriptions")
+    .update(refresh)
+    .eq("purchase_token", row.purchase_token)
+    .eq("user_id", auth.user.id);
+  if (refreshError) throw refreshError;
+  return { claimed: true };
+}
+
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
@@ -80,8 +121,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid Google Play purchase" });
     }
 
-    const { data: claimed } = await auth.admin.from("google_play_subscriptions")
+    const { data: claimed, error: claimedError } = await auth.admin.from("google_play_subscriptions")
       .select("user_id").eq("purchase_token", purchaseToken).maybeSingle();
+    if (claimedError) throw claimedError;
     if (claimed && claimed.user_id !== auth.user.id) return res.status(409).json({ error: "Purchase is linked to another account" });
 
     const token = await accessToken();
@@ -123,8 +165,8 @@ export default async function handler(req, res) {
       linked_purchase_token: purchase.linkedPurchaseToken || null,
       last_verified_at: new Date().toISOString(),
     };
-    const { error: receiptError } = await auth.admin.from("google_play_subscriptions").upsert(row, { onConflict: "purchase_token" });
-    if (receiptError) throw receiptError;
+    const receiptClaim = await claimReceipt(auth, row);
+    if (!receiptClaim.claimed) return res.status(409).json({ error: "Purchase is linked to another account" });
 
     const planTier = PRODUCT_PLANS[productId];
     const { data: profile, error: profileError } = await auth.admin.from("profiles")

@@ -5,6 +5,9 @@ import { resolveStoredUploadUrl } from "./integrations";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
 import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 
+const SERVER_REGISTER_TIMEOUT_MS = 10_000;
+const SERVER_UNAVAILABLE_STATUSES = new Set([402, 404, 408, 502, 503, 504]);
+
 function apiError(message, status = 400) {
   const error = new Error(message);
   error.status = status;
@@ -36,6 +39,36 @@ function normalizeWorkspaceInput(enabledWorkspaces, activeWorkspace, accountType
   const activeCandidate = String(activeWorkspace || accountType || enabled[0]).trim().toLowerCase();
   const active = enabled.includes(activeCandidate) ? activeCandidate : enabled[0];
   return { enabled, active };
+}
+
+function serverApiBases() {
+  const bases = [];
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (configured) bases.push(configured);
+
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
+      bases.push(origin);
+    }
+  }
+
+  return [...new Set(bases.filter(Boolean))];
+}
+
+async function fetchRegistration(url, options) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), SERVER_REGISTER_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw apiError("Registration service timed out", 408);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 async function fetchProfile(userId) {
@@ -174,22 +207,15 @@ async function assertOAuthProviderEnabled(provider) {
 
 async function registerViaServer({ email, password, fullName, enabledWorkspaces, activeWorkspace, accountType }) {
   const workspaces = normalizeWorkspaceInput(enabledWorkspaces, activeWorkspace, accountType);
-  const bases = [];
-  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) bases.push(configured);
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
-      bases.push(origin);
-    }
-    // Always allow production API as last resort (Capacitor / IONOS)
-    bases.push("https://titanos-web.vercel.app");
+  const bases = serverApiBases();
+  if (!bases.length) {
+    throw apiError("Registration service unavailable", 503);
   }
 
   let lastError;
-  for (const base of [...new Set(bases)]) {
+  for (const base of bases) {
     try {
-      const response = await fetch(`${base}/api/register`, {
+      const response = await fetchRegistration(`${base}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -221,8 +247,9 @@ async function registerViaServer({ email, password, fullName, enabledWorkspaces,
       };
     } catch (err) {
       lastError = err;
-      // Only fall through on network / unavailable host
-      if (err?.status && err.status !== 404 && err.status !== 502 && err.status !== 503) {
+      // Network failures and deployment-unavailable responses may fall through
+      // to direct Supabase signup. Real validation/auth/rate-limit decisions do not.
+      if (err?.status && !SERVER_UNAVAILABLE_STATUSES.has(Number(err.status))) {
         throw err;
       }
     }
@@ -301,14 +328,9 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
-        // Best-effort: log email when client falls back to direct Supabase signup
+        // Best-effort email logging must never make Android signup depend on a web host.
         try {
-          const bases = [];
-          const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-          if (configured) bases.push(configured);
-          if (typeof window !== "undefined") bases.push(window.location.origin);
-          bases.push("https://titanos-web.vercel.app");
-          for (const base of [...new Set(bases)]) {
+          for (const base of serverApiBases()) {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

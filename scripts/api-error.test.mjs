@@ -56,10 +56,14 @@ describe("apiError helpers", () => {
     assert.doesNotMatch(res.body.error, /duplicate key/i);
   });
 
-  it("packages Android with the live Titan API and allows Capacitor's secure localhost origin", () => {
+  it("packages Android only with an explicit secure Titan API and allows Capacitor's secure localhost origin", () => {
     const workflow = readFileSync(new URL("../.github/workflows/android-release.yml", import.meta.url), "utf8");
     const cors = readFileSync(new URL("../api/_lib/cors.js", import.meta.url), "utf8");
-    assert.match(workflow, /VITE_API_BASE_URL:\s*https:\/\/titanos-web\.vercel\.app/);
+
+    assert.match(workflow, /VITE_API_BASE_URL:\s*\$\{\{ vars\.TITANOS_API_BASE_URL \}\}/);
+    assert.match(workflow, /TITANOS_API_BASE_URL repository variable is required/);
+    assert.match(workflow, /TITANOS_API_BASE_URL must use HTTPS/);
+    assert.match(workflow, /Refusing to build Android against the disabled legacy TitanOS web deployment/);
     assert.match(cors, /"https:\/\/localhost"/);
   });
 });

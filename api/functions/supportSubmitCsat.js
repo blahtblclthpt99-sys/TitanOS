@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { cleanSupportMessage, loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { cleanSupportMessage, loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -43,14 +43,14 @@ export default async function handler(req, res) {
     if (error?.code === "23505") return res.status(409).json({ error: "Feedback was already submitted for this case." });
     if (error) throw error;
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "support_csat_submitted",
       targetType: "support_csat",
       targetId: data.id,
       metadata: { solved: body.solved, rating: rating ?? 0 },
-    });
+    }, "supportSubmitCsat:audit");
 
     return res.status(201).json({ csat: data });
   } catch (error) {

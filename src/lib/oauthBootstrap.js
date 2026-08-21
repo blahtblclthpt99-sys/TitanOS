@@ -1,7 +1,7 @@
 /**
  * Single-flight OAuth/PKCE bootstrap.
- * Handles ?code= on any path (including Site URL `/`).
- * Keep this out of main.jsx — import only from AuthCallback / auth routes.
+ * Handles ?code= on any auth path, including native HashRouter routes.
+ * Keep this out of main.jsx — import only from auth routes.
  */
 import { supabase } from "@/api/supabaseClient";
 import { hasPendingOAuthParams } from "@/lib/oauthParams";
@@ -10,6 +10,18 @@ export { hasPendingOAuthParams };
 
 let inflight = null;
 let lastCode = "";
+
+const AUTH_PARAM_KEYS = [
+  "code",
+  "state",
+  "error",
+  "error_description",
+  "error_code",
+  "access_token",
+  "refresh_token",
+  "token_type",
+  "expires_in",
+];
 
 function readAuthParams() {
   if (typeof window === "undefined") return {};
@@ -27,18 +39,36 @@ function readAuthParams() {
   };
 }
 
+function deleteAuthParams(params) {
+  AUTH_PARAM_KEYS.forEach((key) => params.delete(key));
+}
+
 function cleanAuthParamsFromUrl() {
   if (typeof window === "undefined" || !window.history?.replaceState) return;
   const url = new URL(window.location.href);
-  ["code", "state", "error", "error_description", "error_code", "access_token", "refresh_token", "token_type", "expires_in"].forEach(
-    (k) => url.searchParams.delete(k)
-  );
+  deleteAuthParams(url.searchParams);
+
+  const rawHash = (url.hash || "").replace(/^#/, "");
+  if (rawHash.includes("?")) {
+    const queryIndex = rawHash.indexOf("?");
+    const route = rawHash.slice(0, queryIndex);
+    const hashParams = new URLSearchParams(rawHash.slice(queryIndex + 1));
+    deleteAuthParams(hashParams);
+    const remaining = hashParams.toString();
+    url.hash = `#${route}${remaining ? `?${remaining}` : ""}`;
+  } else if (rawHash.includes("=") && !rawHash.startsWith("/")) {
+    const hashParams = new URLSearchParams(rawHash);
+    deleteAuthParams(hashParams);
+    const remaining = hashParams.toString();
+    url.hash = remaining ? `#${remaining}` : "";
+  }
+
   const path = url.pathname === "/auth/callback" ? "/" : url.pathname;
   window.history.replaceState({}, document.title, `${path}${url.search}${url.hash}`);
 }
 
 /**
- * @returns {Promise<{ ok: boolean, error?: string, session?: object | null }>}
+ * @returns {Promise<{ ok: boolean, error?: string | null, session?: object | null }>}
  */
 export async function completeOAuthFromUrl() {
   const params = readAuthParams();

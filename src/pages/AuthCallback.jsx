@@ -8,6 +8,7 @@ import { supabase } from "@/api/supabaseClient";
 import { api } from "@/api/apiClient";
 import { accountHomePath } from "@/lib/accountExperience";
 import { consumeReturnTo } from "@/lib/returnTo";
+import { shouldUseHashRouter } from "@/lib/routing";
 
 const OAUTH_EXCHANGE_TIMEOUT_MS = 15000;
 const PROFILE_BOOT_TIMEOUT_MS = 12000;
@@ -68,6 +69,19 @@ function clearPendingWorkspaces() {
   }
 }
 
+function clearCallbackLocation() {
+  if (typeof window === "undefined" || !window.history?.replaceState) return;
+
+  if (shouldUseHashRouter()) {
+    const pathname = window.location.pathname || "/";
+    const search = window.location.search || "";
+    window.history.replaceState({}, document.title, `${pathname}${search}#/auth/callback`);
+    return;
+  }
+
+  window.history.replaceState({}, document.title, "/auth/callback");
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { checkUserAuth } = useAuth();
@@ -94,9 +108,7 @@ export default function AuthCallback() {
           if (!data.session) throw new Error("No session returned. Try again or use email login.");
         }
 
-        if (typeof window !== "undefined" && window.history?.replaceState) {
-          window.history.replaceState({}, document.title, "/auth/callback");
-        }
+        clearCallbackLocation();
 
         const pendingWorkspaces = readPendingWorkspaces();
         if (pendingWorkspaces) {

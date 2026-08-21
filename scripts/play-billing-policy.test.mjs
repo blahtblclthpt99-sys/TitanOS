@@ -16,6 +16,8 @@ function functionBlock(source, name) {
 describe("Google Play billing policy boundary", () => {
   const pricing = read("src/pages/Pricing.jsx");
   const stripe = read("src/lib/stripeSubscriptions.js");
+  const verifier = read("api/functions/googlePlayVerifySubscription.js");
+  const receiptsMigration = read("supabase/migrations/041_google_play_subscriptions.sql");
 
   it("uses Google Play subscriptions for paid plans in Android Play builds", () => {
     assert.match(pricing, /const androidPlay = isAndroidPlayBuild\(\)/);
@@ -36,5 +38,29 @@ describe("Google Play billing policy boundary", () => {
     assert.match(block, /if \(isAndroidPlayBuild\(\)\)/);
     assert.match(block, /https:\/\/play\.google\.com\/store\/account\/subscriptions/);
     assert.ok(block.indexOf("play.google.com/store/account/subscriptions") < block.indexOf("stripeCustomerPortal"));
+  });
+
+  it("claims each Play purchase token atomically before granting entitlement", () => {
+    assert.match(receiptsMigration, /purchase_token text PRIMARY KEY/);
+    assert.match(verifier, /\.from\("google_play_subscriptions"\)[\s\S]*?\.insert\(row\)/);
+    assert.match(verifier, /insertError\.code !== "23505"/);
+    assert.match(verifier, /existing\.user_id !== auth\.user\.id/);
+    assert.match(
+      verifier,
+      /\.update\(refresh\)[\s\S]*?\.eq\("purchase_token", row\.purchase_token\)[\s\S]*?\.eq\("user_id", auth\.user\.id\)/
+    );
+    assert.doesNotMatch(verifier, /\.upsert\(row,\s*\{\s*onConflict:\s*"purchase_token"/);
+
+    const claimIndex = verifier.indexOf("const receiptClaim = await claimReceipt(auth, row)");
+    const entitlementIndex = verifier.indexOf(".update({ plan_tier: planTier, is_pro: true, paying_subscriber: true })");
+    assert.ok(claimIndex >= 0 && entitlementIndex > claimIndex, "receipt ownership must be established before paid entitlement");
+  });
+
+  it("keeps Play entitlements server-authoritative and account-bound when Google supplies the binding", () => {
+    assert.match(verifier, /const PACKAGE_NAME = "com\.titanos\.myapp"/);
+    assert.match(verifier, /const accountId = purchase\.externalAccountIdentifiers\?\.obfuscatedExternalAccountId/);
+    assert.match(verifier, /accountId && accountId !== sha256\(auth\.user\.id\)/);
+    assert.match(verifier, /SUBSCRIPTION_STATE_ACTIVE/);
+    assert.match(verifier, /expiresAt\.getTime\(\) > Date\.now\(\)/);
   });
 });

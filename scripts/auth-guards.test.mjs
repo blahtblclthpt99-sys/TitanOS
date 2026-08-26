@@ -109,6 +109,16 @@ describe("server admin authorization boundary", () => {
   });
 });
 
+describe("registration abuse boundary", () => {
+  const registerSource = readFileSync(new URL("../api/register.js", import.meta.url), "utf8");
+
+  it("requires the durable fail-closed rate limiter", () => {
+    assert.match(registerSource, /assertRateLimitAsync/);
+    assert.match(registerSource, /requireDurable\s*:\s*true/);
+    assert.doesNotMatch(registerSource, /\bassertRateLimit\s*\(/);
+  });
+});
+
 describe("entity adapter money guards", () => {
   it("blocks payment succeeded/refunded/paid", () => {
     assert.equal(entityAdapterBlocksPaymentStatus("succeeded"), true);

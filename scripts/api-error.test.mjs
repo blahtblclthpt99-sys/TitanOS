@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { AppError, sendApiError, sendDbClientError } from "../api/_lib/apiError.js";
-import { deleteEntityWithLocalFallback } from "../src/lib/localStore.js";
+import { deleteEntityWithLocalFallback, updateEntityWithLocalFallback } from "../src/lib/localStore.js";
 
 function mockRes() {
   return {
@@ -125,5 +125,57 @@ describe("local fallback delete integrity", () => {
     });
 
     assert.deepEqual(result, { source: "remote", degraded: false });
+  });
+});
+
+describe("local fallback update integrity", () => {
+  it("uses the remote result as authoritative and refreshes a matching fallback copy", async () => {
+    let rows = [{ id: "target", status: "old" }, { id: "keep", status: "same" }];
+
+    const result = await updateEntityWithLocalFallback({
+      id: "target",
+      values: { status: "requested" },
+      remoteUpdate: async () => ({ id: "target", status: "server", version: 2 }),
+      readLocalRows: () => rows,
+      writeLocalRows: (next) => { rows = next; },
+    });
+
+    assert.deepEqual(result, { id: "target", status: "server", version: 2 });
+    assert.deepEqual(rows, [
+      { id: "target", status: "server", version: 2 },
+      { id: "keep", status: "same" },
+    ]);
+  });
+
+  it("permits updates to a known local-only record while the backend is unavailable", async () => {
+    let rows = [{ id: "local-target", status: "old", name: "Truck" }];
+
+    const result = await updateEntityWithLocalFallback({
+      id: "local-target",
+      values: { status: "inactive" },
+      remoteUpdate: async () => { throw new Error("offline"); },
+      readLocalRows: () => rows,
+      writeLocalRows: (next) => { rows = next; },
+    });
+
+    assert.deepEqual(result, { id: "local-target", status: "inactive", name: "Truck" });
+    assert.deepEqual(rows, [{ id: "local-target", status: "inactive", name: "Truck" }]);
+  });
+
+  it("propagates a failed authoritative update when the record is not local-only", async () => {
+    let writes = 0;
+
+    await assert.rejects(
+      () => updateEntityWithLocalFallback({
+        id: "remote-target",
+        values: { status: "inactive" },
+        remoteUpdate: async () => { throw new Error("write denied"); },
+        readLocalRows: () => [{ id: "other" }],
+        writeLocalRows: () => { writes += 1; },
+      }),
+      /write denied/
+    );
+
+    assert.equal(writes, 0);
   });
 });

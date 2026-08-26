@@ -1,5 +1,5 @@
 import { api } from "@/api/apiClient";
-import { deleteEntityWithLocalFallback, readLocal, uid, writeLocal } from "@/lib/localStore";
+import { deleteEntityWithLocalFallback, readLocal, uid, updateEntityWithLocalFallback, writeLocal } from "@/lib/localStore";
 
 const PREFIX = "titanos_equipment";
 const local = (userId) => readLocal(PREFIX, userId, "all", []);
@@ -52,8 +52,13 @@ export async function createEquipment(user, values) {
   }
 }
 export async function updateEquipment(userId, id, values) {
-  try { return await api.entities.Equipment.update(id, values); }
-  catch { const item = { ...local(userId).find((row) => row.id === id), ...values }; save(userId, local(userId).map((row) => row.id === id ? item : row)); return item; }
+  return updateEntityWithLocalFallback({
+    id,
+    values,
+    remoteUpdate: () => api.entities.Equipment.update(id, values),
+    readLocalRows: () => local(userId),
+    writeLocalRows: (rows) => save(userId, rows),
+  });
 }
 export async function deleteEquipment(userId, id) {
   return deleteEntityWithLocalFallback({

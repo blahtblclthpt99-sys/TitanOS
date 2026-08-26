@@ -65,3 +65,40 @@ export async function deleteEntityWithLocalFallback({
     return { source: "local", degraded: true };
   }
 }
+
+/**
+ * Update with the same authoritative-state rule as deletes.
+ *
+ * A remote-backed record must surface remote update failures. Only a record
+ * already known to the local fallback store may be updated locally while the
+ * backend is unavailable.
+ */
+export async function updateEntityWithLocalFallback({
+  id,
+  values,
+  remoteUpdate,
+  readLocalRows,
+  writeLocalRows,
+}) {
+  const rows = readLocalRows();
+  const localRows = Array.isArray(rows) ? rows : [];
+  const localRecord = localRows.find((row) => row?.id === id);
+
+  try {
+    const updated = await remoteUpdate();
+    if (localRecord) {
+      const cached = { ...localRecord, ...values, ...(updated || {}) };
+      try {
+        writeLocalRows(localRows.map((row) => row?.id === id ? cached : row));
+      } catch {
+        // Remote state is authoritative; fallback-cache refresh is best effort.
+      }
+    }
+    return updated;
+  } catch (error) {
+    if (!localRecord) throw error;
+    const updated = { ...localRecord, ...values };
+    writeLocalRows(localRows.map((row) => row?.id === id ? updated : row));
+    return updated;
+  }
+}

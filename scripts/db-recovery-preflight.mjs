@@ -18,6 +18,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
+/**
+ * Tables required before TitanOS may run the mutation-based live DB security
+ * verifier. This intentionally includes both representative application tables
+ * and every server/security table that verifier reads or mutates.
+ */
 export const REQUIRED_CORE_TABLES = Object.freeze([
   "profiles",
   "customers",
@@ -33,6 +38,14 @@ export const REQUIRED_CORE_TABLES = Object.freeze([
   "referrals",
   "equipment",
   "credentials",
+  "insurance_docs",
+  "stripe_webhook_events",
+  "fee_rules",
+  "fee_categories",
+  "hire_applications",
+  "escrow_holds",
+  "titan_comms_channels",
+  "titan_comms_channel_secrets",
 ]);
 
 export const SUPPORT_TABLES = Object.freeze([

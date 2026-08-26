@@ -8,6 +8,14 @@ import { getSupabaseAdmin } from "./supabase.js";
  */
 const buckets = new Map();
 const MAX_KEYS = 20_000;
+const UPSTASH_FIXED_WINDOW_SCRIPT = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("EXPIRE", KEYS[1], ARGV[1])
+end
+local ttl = redis.call("TTL", KEYS[1])
+return {count, ttl}
+`;
 
 function clientIp(req) {
   const forwarded = req.headers?.["x-forwarded-for"];
@@ -47,17 +55,24 @@ async function upstashAllow(bucketKey, limit, windowMs) {
   const key = `rl:${bucketKey}`;
   const ttlSec = Math.max(1, Math.ceil(windowMs / 1000));
   try {
-    const res = await fetch(`${base}/pipeline`, {
+    // A pipeline that runs INCR + EXPIRE on every request continually extends the
+    // window under traffic. EVAL keeps first-increment expiry + count atomic.
+    const res = await fetch(base, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify([["INCR", key], ["EXPIRE", key, ttlSec]]),
+      body: JSON.stringify(["EVAL", UPSTASH_FIXED_WINDOW_SCRIPT, "1", key, String(ttlSec)]),
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const count = Number(data?.[0]?.result ?? data?.[0]);
+    const result = data?.result;
+    const count = Number(Array.isArray(result) ? result[0] : NaN);
+    const remainingTtl = Number(Array.isArray(result) ? result[1] : NaN);
     if (!Number.isFinite(count)) return null;
-    return count > limit ? { ok: false, retryAfterSec: ttlSec } : { ok: true };
-  } catch { return null; }
+    const retryAfterSec = Number.isFinite(remainingTtl) && remainingTtl > 0 ? remainingTtl : ttlSec;
+    return count > limit ? { ok: false, retryAfterSec } : { ok: true, retryAfterSec: 0 };
+  } catch {
+    return null;
+  }
 }
 
 async function supabaseAllow(bucketKey, limit, windowMs) {
@@ -72,7 +87,9 @@ async function supabaseAllow(bucketKey, limit, windowMs) {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row || typeof row.allowed !== "boolean") return null;
     return { ok: row.allowed, retryAfterSec: Number(row.retry_after_seconds || 1) };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function deny(res, retryAfterSec) {

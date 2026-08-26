@@ -18,30 +18,19 @@ const DEFAULT_ALLOWED = [
   "http://localhost",
 ];
 
-function isTrustedDynamicOrigin(origin) {
-  if (!origin) return false;
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== "https:") return false;
-    return url.hostname === "app.base44.com" || url.hostname.endsWith(".base44.app");
-  } catch {
-    return false;
-  }
-}
-
 export function allowedOrigins() {
   const extra = String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ""))
     .filter(Boolean);
   return [...new Set([...DEFAULT_ALLOWED, ...extra])];
 }
 
 /** Resolve a safe app origin for redirects (never trust raw Origin alone). */
 export function resolveAppOrigin(req) {
-  const origin = req?.headers?.origin || "";
+  const origin = String(req?.headers?.origin || "").replace(/\/$/, "");
   const allowed = allowedOrigins();
-  if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
+  if (origin && allowed.includes(origin)) {
     return origin;
   }
   const configured =
@@ -49,21 +38,22 @@ export function resolveAppOrigin(req) {
     process.env.VITE_APP_URL ||
     process.env.PUBLIC_APP_URL ||
     "";
-  if (configured && allowed.includes(configured.replace(/\/$/, ""))) {
-    return configured.replace(/\/$/, "");
+  const normalizedConfigured = configured.replace(/\/$/, "");
+  if (normalizedConfigured && allowed.includes(normalizedConfigured)) {
+    return normalizedConfigured;
   }
   // Do not accept arbitrary configured HTTPS URLs outside the allowlist.
   return "https://titanos-web.vercel.app";
 }
 
 export function applyCors(res, req) {
-  const origin = req?.headers?.origin || "";
+  const origin = String(req?.headers?.origin || "").replace(/\/$/, "");
   const allowed = allowedOrigins();
-  if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
+  if (origin && allowed.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   } else if (!origin) {
-    // Non-browser / same-origin / server-to-server
+    // Non-browser / same-origin / server-to-server.
     res.setHeader("Access-Control-Allow-Origin", allowed[0]);
   }
   // Unknown browser origins: omit ACAO (browser blocks). Do not echo Origin.

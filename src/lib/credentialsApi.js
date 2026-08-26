@@ -1,5 +1,5 @@
 import { api } from "@/api/apiClient";
-import { readLocal, uid, writeLocal } from "@/lib/localStore";
+import { deleteEntityWithLocalFallback, readLocal, uid, writeLocal } from "@/lib/localStore";
 
 const PREFIX = "titanos_credentials";
 const local = (userId) => readLocal(PREFIX, userId, "all", []);
@@ -51,5 +51,10 @@ export async function renewCredential(user, credential, values) {
   });
 }
 export async function deleteCredential(userId, id) {
-  try { await api.entities.Credential.delete(id); } catch { save(userId, local(userId).filter((row) => row.id !== id)); }
+  return deleteEntityWithLocalFallback({
+    id,
+    remoteDelete: () => api.entities.Credential.delete(id),
+    readLocalRows: () => local(userId),
+    writeLocalRows: (rows) => save(userId, rows),
+  });
 }

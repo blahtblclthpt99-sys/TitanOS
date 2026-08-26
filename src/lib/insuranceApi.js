@@ -1,5 +1,5 @@
 import { api } from "@/api/apiClient";
-import { readLocal, uid, writeLocal } from "@/lib/localStore";
+import { deleteEntityWithLocalFallback, readLocal, uid, writeLocal } from "@/lib/localStore";
 
 const PREFIX = "titanos_insurance";
 const local = (userId) => readLocal(PREFIX, userId, "docs", []);
@@ -58,9 +58,10 @@ export async function createInsuranceDoc(user, values) {
 }
 
 export async function deleteInsuranceDoc(userId, id) {
-  try {
-    await api.entities.InsuranceDoc.delete(id);
-  } catch {
-    save(userId, local(userId).filter((d) => d.id !== id));
-  }
+  return deleteEntityWithLocalFallback({
+    id,
+    remoteDelete: () => api.entities.InsuranceDoc.delete(id),
+    readLocalRows: () => local(userId),
+    writeLocalRows: (rows) => save(userId, rows),
+  });
 }

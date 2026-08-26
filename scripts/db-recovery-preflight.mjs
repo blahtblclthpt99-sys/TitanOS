@@ -14,6 +14,8 @@
  *   node scripts/db-recovery-preflight.mjs
  */
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 export const REQUIRED_CORE_TABLES = Object.freeze([
@@ -167,7 +169,10 @@ async function main() {
   process.exit(report.classification.safeForMutationProbes ? 0 : 3);
 }
 
-const isDirectRun = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+const isDirectRun = Boolean(
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+);
+
 if (isDirectRun) {
   main().catch((error) => {
     console.log(JSON.stringify({ ok: false, readOnly: true, error: String(error?.message || error) }, null, 2));

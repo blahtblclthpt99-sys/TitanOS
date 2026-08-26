@@ -99,6 +99,9 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
+      - name: Normalize Gradle wrapper permissions
+        run: chmod +x android/gradlew
+
       - name: Compile Android debug app
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon

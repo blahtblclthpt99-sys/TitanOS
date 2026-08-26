@@ -99,6 +99,9 @@ jobs:
       - name: Build web app and sync Capacitor
         run: npm run cap:sync
 
+      - name: Normalize Gradle wrapper permissions
+        run: chmod +x android/gradlew
+
       - name: Build installable test APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon

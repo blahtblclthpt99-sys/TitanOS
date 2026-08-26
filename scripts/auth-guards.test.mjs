@@ -5,6 +5,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sanitizeReturnPath } from "../src/lib/returnTo.js";
 
 const PROFILE_ALLOWED = new Set([
   "full_name",
@@ -116,6 +117,26 @@ describe("registration abuse boundary", () => {
     assert.match(registerSource, /assertRateLimitAsync/);
     assert.match(registerSource, /requireDurable\s*:\s*true/);
     assert.doesNotMatch(registerSource, /\bassertRateLimit\s*\(/);
+  });
+});
+
+describe("auth return-target boundary", () => {
+  it("preserves normal in-app destinations", () => {
+    assert.equal(sanitizeReturnPath("/jobs?tab=matched#top"), "/jobs?tab=matched#top");
+    assert.equal(sanitizeReturnPath("driver"), "/driver");
+  });
+
+  it("rejects protocol-relative, URI-scheme, control-character, and oversized targets", () => {
+    assert.equal(sanitizeReturnPath("//evil.example/path"), null);
+    assert.equal(sanitizeReturnPath("\\\\evil.example\\share"), null);
+    assert.equal(sanitizeReturnPath("javascript:alert(1)"), null);
+    assert.equal(sanitizeReturnPath("/jobs\u0000admin"), null);
+    assert.equal(sanitizeReturnPath(`/${"a".repeat(600)}`), null);
+  });
+
+  it("does not return auth routes as post-auth destinations", () => {
+    assert.equal(sanitizeReturnPath("/login"), "/");
+    assert.equal(sanitizeReturnPath("/auth/callback?code=secret"), "/");
   });
 });
 

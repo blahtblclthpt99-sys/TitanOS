@@ -4,7 +4,7 @@ import { requireUser } from "../_lib/auth.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
-import { cleanSupportMessage, loadOwnedSupportCase, writeSupportAudit } from "../_lib/support.js";
+import { cleanSupportMessage, loadOwnedSupportCase, writeSupportAuditBestEffort } from "../_lib/support.js";
 
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -44,37 +44,35 @@ export default async function handler(req, res) {
       .single();
     if (error) throw error;
 
-    const nextStatus = supportCase.status === "NEEDS_USER" ? "AI_WORKING" : supportCase.status;
-    const { error: updateError } = await auth.admin
-      .from("support_cases")
-      .update({
-        status: nextStatus,
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", supportCase.id)
-      .eq("created_by_id", auth.user.id);
-    if (updateError) throw updateError;
-
-    if (nextStatus !== supportCase.status) {
-      await auth.admin.from("support_case_events").insert({
+    const expectedStatus = supportCase.status === "NEEDS_USER" ? "AI_WORKING" : supportCase.status;
+    if (supportCase.status === "NEEDS_USER") {
+      const { error: eventError } = await auth.admin.from("support_case_events").insert({
         case_id: supportCase.id,
         actor_user_id: auth.user.id,
         event_type: "customer_replied",
-        from_status: supportCase.status,
-        to_status: nextStatus,
+        from_status: "NEEDS_USER",
+        to_status: "AI_WORKING",
       });
+      if (eventError) logError("supportPostMessage:event", eventError, { caseId: supportCase.id });
     }
 
-    await writeSupportAudit(auth.admin, {
+    await writeSupportAuditBestEffort(auth.admin, {
       caseId: supportCase.id,
       actorUserId: auth.user.id,
       action: "customer_support_message_posted",
       targetType: "support_message",
       targetId: data.id,
-    });
+    }, "supportPostMessage:audit");
 
-    return res.status(201).json({ message: data, status: nextStatus });
+    const { data: refreshed, error: refreshError } = await auth.admin
+      .from("support_cases")
+      .select("status")
+      .eq("id", supportCase.id)
+      .eq("created_by_id", auth.user.id)
+      .maybeSingle();
+    if (refreshError) logError("supportPostMessage:statusRefresh", refreshError, { caseId: supportCase.id });
+
+    return res.status(201).json({ message: data, status: refreshed?.status || expectedStatus });
   } catch (error) {
     logError("supportPostMessage", error);
     captureApiException(error, { tags: { route: "supportPostMessage" } });

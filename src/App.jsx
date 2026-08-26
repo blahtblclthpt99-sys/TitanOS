@@ -99,6 +99,14 @@ function PublicRoutes() {
   );
 }
 
+function LoginRedirect({ location }) {
+  useEffect(() => {
+    rememberReturnTo(location);
+  }, [location]);
+
+  return <Navigate to="/login" replace state={{ from: location }} />;
+}
+
 /**
  * One AppLayout instance for every authenticated app route (including `/`).
  * Public/marketing routes paint immediately without waiting on auth.
@@ -138,11 +146,8 @@ function AppShellGate() {
     return () => clearTimeout(t);
   }, [cachedSession, isAuthenticated, isLoadingAuth, authChecked, publicPath, checkUserAuth]);
 
-  // Authenticated shell for app routes (and home when signed in / session present)
-  const wantsAppShell =
-    (isAuthenticated && !publicPath) ||
-    (isAuthenticated && isHome) ||
-    (cachedSession && (isHome || !publicPath));
+  // Authenticated shell for non-public routes (including home) while a real or cached session exists.
+  const wantsAppShell = !publicPath && (isAuthenticated || cachedSession);
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {
@@ -166,7 +171,7 @@ function AppShellGate() {
     return <PublicRoutes />;
   }
 
-  // Protected deep-link while auth resolves
+  // Protected deep-link while auth resolves.
   if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
     return <Spinner fullScreen label="Loading TitanOS" />;
   }
@@ -176,8 +181,7 @@ function AppShellGate() {
   }
 
   if (!isAuthenticated) {
-    rememberReturnTo(location);
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <LoginRedirect location={location} />;
   }
 
   return (

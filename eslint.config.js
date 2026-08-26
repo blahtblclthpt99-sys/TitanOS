@@ -27,6 +27,15 @@ const reactRules = {
   "react-hooks/rules-of-hooks": "error",
 };
 
+const runtimeSafetyRules = {
+  "no-debugger": "error",
+  "no-eval": "error",
+  "no-implied-eval": "error",
+  "no-new-func": "error",
+  "no-unreachable": "error",
+  "no-with": "error",
+};
+
 export default [
   {
     ignores: [
@@ -35,9 +44,7 @@ export default [
       "**/release/**",
       "**/android/**",
       "**/.tools/**",
-      // API is Node/serverless — lint separately when Node globals block is ready
-      "**/api/**",
-      // Generated / vendor-style shadcn primitives (adopt or prune intentionally)
+      // Generated / vendor-style shadcn primitives are source-inventoried by code-quality.test.mjs.
       "src/components/ui/**",
     ],
   },
@@ -67,7 +74,10 @@ export default [
       "react-hooks": pluginReactHooks,
       "unused-imports": pluginUnusedImports,
     },
-    rules: reactRules,
+    rules: {
+      ...reactRules,
+      ...runtimeSafetyRules,
+    },
   },
   {
     // Temporary, file-scoped exception while the 2nd Me integration is release-gated.
@@ -78,7 +88,7 @@ export default [
     },
   },
   {
-    // Pure libs — catch dead imports without React JSX rules noise
+    // Pure libs — catch dead imports without React JSX rules noise.
     files: ["src/lib/**/*.{js,mjs,cjs}"],
     ...pluginJs.configs.recommended,
     languageOptions: {
@@ -107,6 +117,23 @@ export default [
         },
       ],
       "no-empty": ["error", { allowEmptyCatch: true }],
+      ...runtimeSafetyRules,
     },
+  },
+  {
+    // Serverless and shared runtime code used to be excluded from ESLint entirely.
+    // Keep this block intentionally low-noise: syntax + high-confidence runtime hazards.
+    files: ["api/**/*.{js,mjs,cjs}", "shared/**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+      },
+    },
+    rules: runtimeSafetyRules,
   },
 ];

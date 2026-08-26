@@ -1,4 +1,4 @@
-name: TitanOS Android Release Bundle
+name: TitanOS Android App Build
 
 on:
   push:
@@ -23,9 +23,14 @@ permissions:
 jobs:
   bundle:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     env:
-      VITE_API_BASE_URL: https://titanos-web.vercel.app
-      VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
+      # Mobile runtime configuration must be explicit. Never silently compile a
+      # release against a disabled/stale website deployment.
+      VITE_SUPABASE_URL: ${{ secrets.TITANOS_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.TITANOS_SUPABASE_ANON_KEY }}
+      VITE_API_BASE_URL: ${{ vars.TITANOS_API_BASE_URL }}
+      VITE_TITANOS_PUBLIC_ORIGIN: ${{ vars.TITANOS_PUBLIC_ORIGIN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,21 +42,38 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14.3'
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify mobile runtime configuration
+        run: |
+          set -eu
+          test -n "$VITE_SUPABASE_URL" || { echo "TITANOS_SUPABASE_URL secret is required"; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "TITANOS_SUPABASE_ANON_KEY secret is required"; exit 1; }
+          test -n "$VITE_API_BASE_URL" || { echo "TITANOS_API_BASE_URL repository variable is required"; exit 1; }
+          case "$VITE_SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *) echo "TITANOS_SUPABASE_URL must be an https://*.supabase.co URL"; exit 1 ;;
+          esac
+          case "$VITE_API_BASE_URL" in
+            https://*) ;;
+            *) echo "TITANOS_API_BASE_URL must use HTTPS"; exit 1 ;;
+          esac
+          if [ "$VITE_API_BASE_URL" = "https://titanos-web.vercel.app" ]; then
+            echo "Refusing to build Android against the disabled legacy TitanOS web deployment"
+            exit 1
+          fi
 
       - name: Verify release metadata
         run: |
           grep -q 'versionCode 37' android/app/build.gradle
           grep -q 'versionName "2.0.4"' android/app/build.gradle
           grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
-          test "$VITE_API_BASE_URL" = "https://titanos-web.vercel.app"
+          grep -q '"appId": "com.titanos.myapp"' capacitor.config.json
 
       - name: Restore existing Play upload key when configured
         env:
@@ -71,39 +93,53 @@ jobs:
             echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
           else
             echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
-            echo "Existing Play upload-key secrets are not configured; bundle will be unsigned."
+            echo "Existing Play upload-key secrets are not configured; AAB will be unsigned."
           fi
 
-      - name: Build and sync Capacitor
+      - name: Build web app and sync Capacitor
         run: npm run cap:sync
+
+      - name: Normalize Gradle wrapper permissions
+        run: chmod +x android/gradlew
+
+      - name: Build installable test APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Build release AAB
         working-directory: android
-        run: gradle bundleRelease --no-daemon
+        run: ./gradlew bundleRelease --no-daemon
 
-      - name: Verify bundle and signing state
+      - name: Verify artifacts and signing state
         run: |
+          set -eu
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
           AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -f "$APK"
           test -f "$AAB"
+          sha256sum "$APK" | tee apk-sha256.txt
           sha256sum "$AAB" | tee aab-sha256.txt
           if jarsigner -verify "$AAB" >/dev/null 2>&1; then
-            echo "AAB_SIGNED=true" | tee -a aab-build-info.txt
+            echo "AAB_SIGNED=true" | tee -a android-build-info.txt
           else
-            echo "AAB_SIGNED=false" | tee -a aab-build-info.txt
+            echo "AAB_SIGNED=false" | tee -a android-build-info.txt
           fi
-          echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED" | tee -a aab-build-info.txt
-          echo "VERSION_NAME=2.0.4" | tee -a aab-build-info.txt
-          echo "VERSION_CODE=37" | tee -a aab-build-info.txt
-          echo "APPLICATION_ID=com.titanos.myapp" | tee -a aab-build-info.txt
-          echo "API_BASE_URL=$VITE_API_BASE_URL" | tee -a aab-build-info.txt
+          echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED" | tee -a android-build-info.txt
+          echo "VERSION_NAME=2.0.4" | tee -a android-build-info.txt
+          echo "VERSION_CODE=37" | tee -a android-build-info.txt
+          echo "APPLICATION_ID=com.titanos.myapp" | tee -a android-build-info.txt
+          echo "SOURCE_SHA=$GITHUB_SHA" | tee -a android-build-info.txt
+          echo "API_BASE_URL=$VITE_API_BASE_URL" | tee -a android-build-info.txt
 
-      - name: Upload AAB artifact
+      - name: Upload Android app artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TitanOS-2.0.4-code37-AAB
+          name: TitanOS-2.0.4-code37-Android
           path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/bundle/release/app-release.aab
+            apk-sha256.txt
             aab-sha256.txt
-            aab-build-info.txt
+            android-build-info.txt
           if-no-files-found: error
           retention-days: 30

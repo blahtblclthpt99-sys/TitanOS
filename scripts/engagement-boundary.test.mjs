@@ -29,7 +29,7 @@ test("employment recruiting is separated from Driver/Fleet data", async () => {
   assertNotContains(jobEndpoint, [/from\("driver_profiles"\)/], "jobMatchesV2");
   assert.match(jobEndpoint, /from\("employment_profiles"\)/);
   assert.match(jobEndpoint, /eq\("relationship_type", "employment"\)/);
-  assertNotContains(talentProfile, [/driverProfilesApi/, /rating/i, /completedJobs/], "TalentProfile");
+  assertNotContains(talentProfile, [/driverProfilesApi/, /\.rating\b/i, /\brating\s*[:=]/i, /ratingScore/i, /reviewCount/, /review_count/i, /completedJobs/], "TalentProfile");
 });
 
 test("qualification matchers cannot use ratings engagement or identity labels", async () => {

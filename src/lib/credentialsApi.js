@@ -1,5 +1,5 @@
 import { api } from "@/api/apiClient";
-import { readLocal, uid, writeLocal } from "@/lib/localStore";
+import { deleteEntityWithLocalFallback, readLocal, uid, updateEntityWithLocalFallback, writeLocal } from "@/lib/localStore";
 
 const PREFIX = "titanos_credentials";
 const local = (userId) => readLocal(PREFIX, userId, "all", []);
@@ -25,8 +25,13 @@ export async function createCredential(user, values) {
   catch { const item = { id: uid(), created_at: new Date().toISOString(), ...row }; save(user.id, [item, ...local(user.id)]); return item; }
 }
 export async function updateCredential(userId, id, values) {
-  try { return await api.entities.Credential.update(id, values); }
-  catch { const item = { ...local(userId).find((row) => row.id === id), ...values }; save(userId, local(userId).map((row) => row.id === id ? item : row)); return item; }
+  return updateEntityWithLocalFallback({
+    id,
+    values,
+    remoteUpdate: () => api.entities.Credential.update(id, values),
+    readLocalRows: () => local(userId),
+    writeLocalRows: (rows) => save(userId, rows),
+  });
 }
 export async function renewCredential(user, credential, values) {
   const archived = {
@@ -51,5 +56,10 @@ export async function renewCredential(user, credential, values) {
   });
 }
 export async function deleteCredential(userId, id) {
-  try { await api.entities.Credential.delete(id); } catch { save(userId, local(userId).filter((row) => row.id !== id)); }
+  return deleteEntityWithLocalFallback({
+    id,
+    remoteDelete: () => api.entities.Credential.delete(id),
+    readLocalRows: () => local(userId),
+    writeLocalRows: (rows) => save(userId, rows),
+  });
 }

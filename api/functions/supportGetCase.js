@@ -20,22 +20,22 @@ export default async function handler(req, res) {
     const supportCase = await loadOwnedSupportCase(auth.admin, auth.user.id, caseId);
     if (!supportCase) return res.status(404).json({ error: "Support case not found." });
 
-    const [messagesResult, eventsResult, attachmentsResult, csatResult, incidentLinksResult] = await Promise.all([
-      auth.admin.from("support_messages").select("id,sender_kind,body,metadata,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: true }).limit(500),
-      auth.admin.from("support_case_events").select("id,event_type,from_status,to_status,details,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: true }).limit(300),
+    // Customer detail responses intentionally exclude internal support events,
+    // assignments, model/provider metadata, and diagnostics. Those stay staff-only.
+    const [messagesResult, attachmentsResult, csatResult, incidentLinksResult] = await Promise.all([
+      auth.admin.from("support_messages").select("id,sender_kind,body,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: true }).limit(500),
       auth.admin.from("support_attachments").select("id,file_name,mime_type,size_bytes,storage_path,created_at").eq("case_id", supportCase.id).order("created_at", { ascending: true }).limit(100),
       auth.admin.from("support_csat").select("id,solved,rating,comment,created_at").eq("case_id", supportCase.id).maybeSingle(),
       auth.admin.from("support_incident_cases").select("incident_id,support_incidents(id,title,status,severity,public_summary,updated_at,resolved_at)").eq("case_id", supportCase.id).limit(20),
     ]);
 
-    for (const result of [messagesResult, eventsResult, attachmentsResult, csatResult, incidentLinksResult]) {
+    for (const result of [messagesResult, attachmentsResult, csatResult, incidentLinksResult]) {
       if (result.error) throw result.error;
     }
 
     return res.status(200).json({
       case: supportCase,
       messages: messagesResult.data || [],
-      events: eventsResult.data || [],
       attachments: attachmentsResult.data || [],
       csat: csatResult.data || null,
       incidents: (incidentLinksResult.data || []).map((row) => row.support_incidents).filter(Boolean),

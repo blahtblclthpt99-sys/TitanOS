@@ -17,9 +17,13 @@ describe("existing Hire post worker matching", () => {
     assert.match(stack, /"\/hire\/candidates": WorkerMatches/);
   });
 
-  it("keeps candidate authorization at the existing job-owner boundary", () => {
-    assert.match(employerApi, /Only the job owner can view ranked worker matches/);
-    assert.match(employerApi, /listPublishedDrivers/);
+  it("keeps candidate authorization and profile pools at the opportunity-owner boundary", () => {
+    assert.match(employerApi, /Only the opportunity owner can view ranked matches/);
+    assert.match(employerApi, /listPublishedEmploymentProfiles/);
+    assert.match(employerApi, /listPublishedServiceProfiles/);
+    assert.match(employerApi, /relationship === "employment"/);
+    assert.match(employerApi, /relationship === "contract" \|\| relationship === "customer_request"/);
+    assert.doesNotMatch(employerApi, /listPublishedDrivers|driverProfilesApi|engagementApi/);
     assert.doesNotMatch(employerApi, /job_match_preferences|privacy_prefs|search_lat|search_lng/);
   });
 });

@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await auth.admin
       .from("support_cases")
-      .select("id,case_number,title,category,status,priority,source,platform,app_version,last_message_at,first_response_at,escalated_at,resolved_at,closed_at,created_at,updated_at")
+      .select("id,case_number,workspace,title,category,status,priority,source,platform,app_version,last_message_at,first_response_at,escalated_at,resolved_at,closed_at,created_at,updated_at")
       .eq("created_by_id", auth.user.id)
       .order("updated_at", { ascending: false })
       .limit(100);

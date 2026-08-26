@@ -5,6 +5,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sanitizeReturnPath } from "../src/lib/returnTo.js";
+import { assertRateLimitAsync } from "../api/_lib/rateLimit.js";
 
 const PROFILE_ALLOWED = new Set([
   "full_name",
@@ -48,6 +50,25 @@ function filterUpdateMe(updates) {
     if (updates[key] !== undefined) payload[key] = updates[key];
   }
   return payload;
+}
+
+function createResponseProbe() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: null,
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(value) {
+      this.body = value;
+      return this;
+    },
+  };
 }
 
 const WEBHOOK_ONLY_PAYMENT = new Set(["succeeded", "refunded", "paid"]);
@@ -106,6 +127,78 @@ describe("server admin authorization boundary", () => {
     ]) {
       assert.equal(new RegExp(`\\b${forbidden}\\b`, "i").test(grant), false, `${forbidden} must remain server-owned`);
     }
+  });
+});
+
+describe("registration abuse boundary", () => {
+  const registerSource = readFileSync(new URL("../api/register.js", import.meta.url), "utf8");
+
+  it("requires the durable fail-closed rate limiter", () => {
+    assert.match(registerSource, /assertRateLimitAsync/);
+    assert.match(registerSource, /requireDurable\s*:\s*true/);
+    assert.doesNotMatch(registerSource, /\bassertRateLimit\s*\(/);
+  });
+
+  it("uses one atomic Upstash EVAL and returns the remaining TTL when denied", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const originalToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+
+    let command;
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, "https://redis.invalid");
+      command = JSON.parse(init.body);
+      return {
+        ok: true,
+        async json() {
+          return { result: [9, 42] };
+        },
+      };
+    };
+
+    try {
+      const res = createResponseProbe();
+      const allowed = await assertRateLimitAsync(
+        { headers: { "x-forwarded-for": "203.0.113.10" }, url: "/register" },
+        res,
+        { limit: 8, windowMs: 60_000, key: "register", requireDurable: true },
+      );
+      assert.equal(allowed, false);
+      assert.equal(res.statusCode, 429);
+      assert.equal(res.headers["Retry-After"], "42");
+      assert.equal(command[0], "EVAL");
+      assert.equal(command[2], "1");
+      assert.match(command[1], /count == 1/);
+      assert.match(command[1], /EXPIRE/);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+      else process.env.UPSTASH_REDIS_REST_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+      else process.env.UPSTASH_REDIS_REST_TOKEN = originalToken;
+    }
+  });
+});
+
+describe("auth return-target boundary", () => {
+  it("preserves normal in-app destinations", () => {
+    assert.equal(sanitizeReturnPath("/jobs?tab=matched#top"), "/jobs?tab=matched#top");
+    assert.equal(sanitizeReturnPath("driver"), "/driver");
+  });
+
+  it("rejects protocol-relative, URI-scheme, control-character, and oversized targets", () => {
+    assert.equal(sanitizeReturnPath("//evil.example/path"), null);
+    assert.equal(sanitizeReturnPath("\\\\evil.example\\share"), null);
+    assert.equal(sanitizeReturnPath("javascript:alert(1)"), null);
+    assert.equal(sanitizeReturnPath("/jobs\u0000admin"), null);
+    assert.equal(sanitizeReturnPath(`/${"a".repeat(600)}`), null);
+  });
+
+  it("does not return auth routes as post-auth destinations", () => {
+    assert.equal(sanitizeReturnPath("/login"), "/");
+    assert.equal(sanitizeReturnPath("/auth/callback?code=secret"), "/");
   });
 });
 

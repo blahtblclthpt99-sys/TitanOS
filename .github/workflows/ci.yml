@@ -1,11 +1,11 @@
-# TitanOS CI — build gate for GitHub → Vercel continuous deployment
+# TitanOS CI — application and Android build gate
 name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, product/titan-core-four]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, product/titan-core-four]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +37,15 @@ jobs:
       - name: Unit / integration / regression pack
         run: npm test
 
+      - name: Titan Support security and workspace boundary
+        run: node --test scripts/support-security.test.mjs
+
+      - name: Titan Support case-creation recovery
+        run: node --test scripts/support-create-case-recovery.test.mjs
+
+      - name: Database recovery preflight classification
+        run: node --test scripts/db-recovery-preflight.test.mjs
+
       - name: Business OS product boundary
         run: node --test scripts/business-os-product.test.mjs
 
@@ -58,6 +67,9 @@ jobs:
       - name: Find Jobs session recovery
         run: node --test scripts/job-match-session-recovery.test.mjs
 
+      - name: Android native auth routing
+        run: node --test scripts/android-auth-routing.test.mjs
+
       - name: Google Play billing policy boundary
         run: node --test scripts/play-billing-policy.test.mjs
 
@@ -77,6 +89,28 @@ jobs:
           VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
           VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
           VITE_API_BASE_URL: https://titanos-web.vercel.app
+
+      - name: Setup Java for Android
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Normalize Gradle wrapper permissions
+        run: chmod +x android/gradlew
+
+      - name: Compile Android debug app
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify Android debug artifact
+        run: test -f android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

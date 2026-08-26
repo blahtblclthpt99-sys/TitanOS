@@ -1,6 +1,7 @@
 import { normalizeAppPath } from "@/lib/routing";
 
 const STORAGE_KEY = "titanos_auth_return_to";
+const MAX_RETURN_PATH_LENGTH = 500;
 
 const AUTH_PATHS = new Set([
   "/login",
@@ -10,6 +11,16 @@ const AUTH_PATHS = new Set([
   "/auth/callback",
 ]);
 
+function unsafeRelativePath(path) {
+  return (
+    !path ||
+    path.length > MAX_RETURN_PATH_LENGTH ||
+    path.startsWith("//") ||
+    path.startsWith("\\\\") ||
+    /[\u0000-\u001F\u007F]/.test(path)
+  );
+}
+
 /**
  * Resolve a safe in-app path from a Location-like value, absolute URL, or path string.
  */
@@ -18,15 +29,20 @@ export function sanitizeReturnPath(raw) {
 
   let path = "";
   if (typeof raw === "string") {
+    const value = raw.trim();
+    if (!value || unsafeRelativePath(value)) return null;
+
     try {
-      if (/^https?:\/\//i.test(raw)) {
-        const url = new URL(raw);
-        if (typeof window !== "undefined" && url.origin !== window.location.origin) {
+      if (/^https?:\/\//i.test(value)) {
+        const url = new URL(value);
+        if (typeof window === "undefined" || !window.location?.origin || url.origin !== window.location.origin) {
           return null;
         }
         path = `${url.pathname || "/"}${url.search || ""}${url.hash || ""}`;
       } else {
-        path = raw.startsWith("/") ? raw : `/${raw}`;
+        // Explicitly reject URI schemes instead of turning them into misleading app paths.
+        if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(value)) return null;
+        path = value.startsWith("/") ? value : `/${value}`;
       }
     } catch {
       return null;
@@ -35,11 +51,13 @@ export function sanitizeReturnPath(raw) {
     path = `${raw.pathname || ""}${raw.search || ""}${raw.hash || ""}`;
   }
 
+  if (unsafeRelativePath(path)) return null;
   path = normalizeAppPath(path) || "/";
-  // Strip hash-router noise like /#/jobs → handled by router; keep path only
+  // Strip hash-router noise like /#/jobs → handled by router; keep path only.
   if (path.startsWith("/#")) {
     path = path.slice(2) || "/";
   }
+  if (unsafeRelativePath(path)) return null;
 
   const pathnameOnly = path.split("?")[0].split("#")[0] || "/";
   if (AUTH_PATHS.has(pathnameOnly) || pathnameOnly.startsWith("/auth/")) {

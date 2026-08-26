@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.js";
 import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
-import { assertRateLimit } from "./_lib/rateLimit.js";
+import { assertRateLimitAsync } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
@@ -33,7 +33,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!assertRateLimit(req, res, { limit: 8, windowMs: 60 * 60 * 1000, key: "register" })) {
+  if (!await assertRateLimitAsync(req, res, {
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+    key: "register",
+    requireDurable: true,
+  })) {
     return;
   }
 

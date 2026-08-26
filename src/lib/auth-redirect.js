@@ -3,7 +3,7 @@ import { shouldUseHashRouter } from "@/lib/routing";
 
 /**
  * Canonical public HTTPS origins that must be allow-listed in Supabase Auth.
- * Keep in sync with Vercel / custom domains.
+ * Keep in sync with deployed public hosts.
  */
 export const AUTH_PUBLIC_ORIGINS = [
   "https://titanos-web.vercel.app",
@@ -12,6 +12,7 @@ export const AUTH_PUBLIC_ORIGINS = [
 ];
 
 export const NATIVE_AUTH_CALLBACK = "com.titanos.myapp://auth/callback";
+export const NATIVE_PASSWORD_RESET = "com.titanos.myapp://auth/reset-password";
 
 function withPath(origin, path) {
   const base = origin.replace(/\/$/, "");
@@ -22,20 +23,25 @@ function withPath(origin, path) {
   return `${base}${normalized}`;
 }
 
+function nativeRedirectFor(path) {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return normalized === "/reset-password" ? NATIVE_PASSWORD_RESET : NATIVE_AUTH_CALLBACK;
+}
+
 /**
  * OAuth / email redirect URL.
- * - Native app → custom scheme deep link (handled by capacitor-auth.js)
- * - Web → current browser origin (so Vercel / IONOS / custom domains all work)
+ * - Native login/signup → custom callback deep link
+ * - Native recovery → dedicated reset-password deep link
+ * - Web → current browser origin
  * - Fallback → configured VITE_TITANOS_PUBLIC_ORIGIN
  */
 export function getAuthRedirectTo(path = "/auth/callback") {
   if (Capacitor.isNativePlatform()) {
-    return NATIVE_AUTH_CALLBACK;
+    return nativeRedirectFor(path);
   }
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin;
-    // Prefer the live host the user is actually on
     if (origin.startsWith("http://") || origin.startsWith("https://")) {
       return withPath(origin, path);
     }
@@ -51,11 +57,9 @@ export function getAuthRedirectTo(path = "/auth/callback") {
 
 /** Redirect URLs to paste into Supabase → Authentication → URL Configuration */
 export function getSupabaseRedirectAllowList() {
-  // Include site roots: some providers / Site URL configs return ?code= on `/`
-  // (PathNormalizer forwards those to /auth/callback).
   const paths = ["/", "/auth/callback", "/reset-password"];
   const https = AUTH_PUBLIC_ORIGINS.flatMap((origin) =>
     paths.map((p) => `${origin.replace(/\/$/, "")}${p === "/" ? "" : p}`)
   );
-  return [...https, NATIVE_AUTH_CALLBACK];
+  return [...https, NATIVE_AUTH_CALLBACK, NATIVE_PASSWORD_RESET];
 }

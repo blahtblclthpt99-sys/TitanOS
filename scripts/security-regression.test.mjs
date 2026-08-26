@@ -115,4 +115,12 @@ describe("security regression", () => {
     assert.match(read("api/_lib/entitlements.js"), /loadEntitlementProfile/);
     assert.match(read("src/lib/marketplaceApi.js"), /installMarketplaceModule/);
   });
+
+  it("CORS trusts only exact defaults or explicitly configured origins", () => {
+    const cors = read("api/_lib/cors.js");
+    assert.match(cors, /CORS_ALLOWED_ORIGINS/);
+    assert.match(cors, /allowed\.includes\(origin\)/);
+    assert.doesNotMatch(cors, /endsWith\(["']\.base44\.app["']\)/);
+    assert.doesNotMatch(cors, /isTrustedDynamicOrigin/);
+  });
 });

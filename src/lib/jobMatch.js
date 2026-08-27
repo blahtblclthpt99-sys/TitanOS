@@ -14,6 +14,17 @@ function clean(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function boundedText(value, maxLength) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function boundedNullableNumber(value, { min = 0, max = 10_000_000 } = {}) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.min(max, Math.max(min, number));
+}
+
 function uniqueStrings(values = []) {
   return [...new Set((values || []).map(clean).filter(Boolean))];
 }
@@ -171,37 +182,44 @@ export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumS
   return (jobs || [])
     .filter((job) => job && (job.status || "open") === "open")
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    // Requirements are advisory to the job seeker. TitanOS may rank them but must
-    // not silently disqualify a person from seeing a legitimate open opportunity.
     .filter((job) => job.match.score >= minimumScore)
     .sort((a, b) => b.match.score - a.match.score || Number(Boolean(b.is_urgent)) - Number(Boolean(a.is_urgent)) || String(b.created_at || "").localeCompare(String(a.created_at || "")));
 }
 
 export function normalizeExternalJob(raw = {}, provider = {}) {
-  const sourceName = String(provider.name || raw.source_name || "External provider").trim();
-  const sourceUrl = String(raw.source_url || raw.url || "").trim();
-  if (!/^https:\/\//i.test(sourceUrl)) throw new Error("External job source_url must use HTTPS.");
-  const externalId = String(raw.external_id || raw.id || "").trim();
+  const sourceName = boundedText(provider.name || raw.source_name || "External provider", 120) || "External provider";
+  const sourceUrlRaw = boundedText(raw.source_url || raw.url || "", 2048);
+  let sourceUrl;
+  try {
+    const parsed = new URL(sourceUrlRaw);
+    if (parsed.protocol !== "https:") throw new Error("protocol");
+    sourceUrl = parsed.toString();
+  } catch {
+    throw new Error("External job source_url must use a valid HTTPS URL.");
+  }
+
+  const externalId = boundedText(raw.external_id || raw.id || "", 300);
   if (!externalId) throw new Error("External job requires an external_id.");
+
   return {
     id: `external:${clean(sourceName)}:${externalId}`,
     external_id: externalId,
-    title: String(raw.title || "").trim(),
-    description: String(raw.description || "").trim(),
-    category: String(raw.category || "General").trim(),
-    city: String(raw.city || "").trim(),
-    state: String(raw.state || "").trim(),
-    budget_min: raw.budget_min == null ? null : Number(raw.budget_min),
-    budget_max: raw.budget_max == null ? null : Number(raw.budget_max),
-    required_skills: uniqueStrings(raw.required_skills),
-    required_certifications: uniqueStrings(raw.required_certifications),
-    minimum_years_experience: Math.max(0, Number(raw.minimum_years_experience || 0) || 0),
-    employment_type: clean(raw.employment_type),
-    pay_type: clean(raw.pay_type),
-    schedule_tags: uniqueStrings(raw.schedule_tags),
-    work_mode: clean(raw.work_mode),
-    posted_at: raw.posted_at || null,
-    expires_at: raw.expires_at || null,
+    title: boundedText(raw.title, 300),
+    description: boundedText(raw.description, 12000),
+    category: boundedText(raw.category || "General", 120) || "General",
+    city: boundedText(raw.city, 120),
+    state: boundedText(raw.state, 120),
+    budget_min: boundedNullableNumber(raw.budget_min),
+    budget_max: boundedNullableNumber(raw.budget_max),
+    required_skills: uniqueStrings(raw.required_skills).slice(0, 100),
+    required_certifications: uniqueStrings(raw.required_certifications).slice(0, 100),
+    minimum_years_experience: Math.min(80, Math.max(0, Number(raw.minimum_years_experience || 0) || 0)),
+    employment_type: boundedText(clean(raw.employment_type), 80),
+    pay_type: boundedText(clean(raw.pay_type), 80),
+    schedule_tags: uniqueStrings(raw.schedule_tags).slice(0, 50),
+    work_mode: boundedText(clean(raw.work_mode), 80),
+    posted_at: boundedText(raw.posted_at, 80) || null,
+    expires_at: boundedText(raw.expires_at, 80) || null,
     status: "open",
     source: "external",
     source_name: sourceName,
@@ -219,10 +237,15 @@ function vacancyFingerprint(job = {}) {
 }
 
 function isStale(job, now = Date.now()) {
-  if (job.expires_at && Date.parse(job.expires_at) < now) return true;
+  if (job.expires_at) {
+    const expires = Date.parse(job.expires_at);
+    if (!Number.isFinite(expires) || expires < now) return true;
+  }
   if (job.posted_at) {
     const posted = Date.parse(job.posted_at);
-    if (Number.isFinite(posted) && now - posted > 1000 * 60 * 60 * 24 * 45) return true;
+    if (!Number.isFinite(posted)) return true;
+    if (posted > now + 1000 * 60 * 60 * 24) return true;
+    if (now - posted > 1000 * 60 * 60 * 24 * 45) return true;
   }
   return false;
 }
@@ -236,8 +259,6 @@ export function mergeRankedJobMatches({ internal = [], external = [], driverProf
   const rankedExternal = external
     .filter((job) => !isStale(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    // Keep listing requirements visible as advisory information; do not turn the
-    // matching layer into an employment eligibility or automated rejection gate.
     .filter((job) => job.match.score >= 25)
     .filter((job) => {
       const urlKey = urlDedupeKey(job);

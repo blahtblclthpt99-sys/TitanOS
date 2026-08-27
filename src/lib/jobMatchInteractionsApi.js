@@ -1,13 +1,13 @@
 import { supabase } from "@/api/supabaseClient";
 import { normalizeCareerPipelineDetails } from "./careerPipelineDetails.js";
 import { assertCareerStateTransition, isTrackableCareerState } from "./careerPipelineState.js";
-import { jobInteractionIdentity } from "./jobMatchIdentity.js";
+import { jobInteractionIdentity, jobOpportunitySnapshot } from "./jobMatchIdentity.js";
 
 export async function listMyJobMatchInteractions(userId) {
   if (!userId) return [];
   const { data, error } = await supabase
     .from("job_match_interactions")
-    .select("id,user_id,source,source_name,source_job_id,state,source_url,interview_at,follow_up_at,private_notes,created_at,updated_at")
+    .select("id,user_id,source,source_name,source_job_id,state,source_url,job_title,company_name,job_city,job_state,interview_at,follow_up_at,private_notes,created_at,updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   if (error) throw error;
@@ -41,6 +41,7 @@ export async function setMyJobMatchInteraction(userId, job, state) {
     source_job_id: sourceJobId,
     state,
     source_url: sourceUrl,
+    ...jobOpportunitySnapshot(job),
     updated_at: new Date().toISOString(),
   };
 

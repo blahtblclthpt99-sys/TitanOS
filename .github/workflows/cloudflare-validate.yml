@@ -5,9 +5,12 @@ on:
     branches: [main]
     paths:
       - "cloudflare/**"
+      - "src/api/**"
       - "public/_headers"
       - "wrangler.jsonc"
+      - ".env.production.example"
       - ".github/workflows/cloudflare-validate.yml"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
       - "package.json"
       - "package-lock.json"
   push:
@@ -15,9 +18,12 @@ on:
       - "infra/cloudflare-workers-migration"
     paths:
       - "cloudflare/**"
+      - "src/api/**"
       - "public/_headers"
       - "wrangler.jsonc"
+      - ".env.production.example"
       - ".github/workflows/cloudflare-validate.yml"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
       - "package.json"
       - "package-lock.json"
 

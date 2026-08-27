@@ -4,6 +4,7 @@ import {
   buildApplicationPackage,
   buildCoverLetter,
   buildMasterResume,
+  buildTailoredResume,
   matchingEvidence,
 } from "../src/lib/resumeBuilder.js";
 
@@ -25,6 +26,14 @@ test("master resume only uses supplied profile evidence", () => {
   assert.doesNotMatch(resume, /CDL Class A/i);
 });
 
+test("matching evidence includes structured work history instead of stringifying objects", () => {
+  const evidence = matchingEvidence(profile, "Courier needed for time-sensitive packages and route work");
+  assert.ok(evidence.includes("courier"));
+  assert.ok(evidence.includes("time-sensitive"));
+  assert.ok(evidence.includes("packages"));
+  assert.ok(!evidence.includes("route"));
+});
+
 test("matching evidence is limited to terms present in both job and profile", () => {
   const evidence = matchingEvidence(profile, "Seeking box truck delivery driver with forklift and hazmat certification");
   assert.ok(evidence.includes("box"));
@@ -32,6 +41,14 @@ test("matching evidence is limited to terms present in both job and profile", ()
   assert.ok(evidence.includes("delivery"));
   assert.ok(!evidence.includes("forklift"));
   assert.ok(!evidence.includes("hazmat"));
+});
+
+test("tailored resume promotes complete factual profile evidence instead of raw keyword claims", () => {
+  const resume = buildTailoredResume(profile, "Courier role handling packages and box truck delivery");
+  assert.match(resume, /TARGETED HIGHLIGHTS/);
+  assert.match(resume, /Skill: Box truck/);
+  assert.match(resume, /Experience: Courier \| Example Logistics/);
+  assert.doesNotMatch(resume, /forklift|hazmat/i);
 });
 
 test("cover letter does not invent missing credentials", () => {

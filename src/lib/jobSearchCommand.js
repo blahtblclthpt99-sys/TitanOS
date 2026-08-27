@@ -101,14 +101,33 @@ export function normalizeSavedSearchFilters(filters = {}) {
   };
 }
 
-function savedSearchFingerprint(filters) {
+function canonicalSearchText(value) {
+  return lower(value).replace(/\s+/g, " ");
+}
+
+export function savedSearchFingerprint(filters) {
   const normalized = normalizeSavedSearchFilters(filters);
-  return JSON.stringify(normalized);
+  return JSON.stringify({
+    ...normalized,
+    query: canonicalSearchText(normalized.query),
+    company: canonicalSearchText(normalized.company),
+    location: canonicalSearchText(normalized.location),
+  });
+}
+
+function createSavedSearchId() {
+  try {
+    if (globalThis.crypto?.randomUUID) return `search_${globalThis.crypto.randomUUID()}`;
+  } catch {
+    // Fall through to a collision-resistant local fallback.
+  }
+  return `search_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function normalizeSavedSearches(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
+  const seenIds = new Set();
   const normalized = [];
 
   for (const raw of value) {
@@ -116,9 +135,12 @@ export function normalizeSavedSearches(value) {
     const filters = normalizeSavedSearchFilters(raw.filters);
     const fingerprint = savedSearchFingerprint(filters);
     if (seen.has(fingerprint)) continue;
-    seen.add(fingerprint);
 
-    const id = text(raw.id) || `search_${normalized.length + 1}`;
+    let id = text(raw.id);
+    if (!id || seenIds.has(id)) id = createSavedSearchId();
+    seen.add(fingerprint);
+    seenIds.add(id);
+
     const createdAt = Number.isFinite(Date.parse(raw.createdAt)) ? new Date(raw.createdAt).toISOString() : null;
     normalized.push({
       id,
@@ -144,20 +166,23 @@ export function saveSearch(userId, filters, name = "") {
   const normalizedFilters = normalizeSavedSearchFilters(filters);
   const fingerprint = savedSearchFingerprint(normalizedFilters);
   const item = {
-    id: `search_${Date.now()}`,
+    id: createSavedSearchId(),
     name: text(name).slice(0, 120) || normalizedFilters.query || normalizedFilters.location || "Saved search",
     filters: normalizedFilters,
     createdAt: new Date().toISOString(),
   };
   const next = [item, ...current.filter((entry) => savedSearchFingerprint(entry.filters) !== fingerprint)].slice(0, 20);
-  writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
+  if (!writeCareerPreference(userId, SAVED_SEARCH_NAME, next)) {
+    throw new Error("Saved search could not be stored on this device.");
+  }
   return next;
 }
 
 export function removeSavedSearch(userId, id) {
   if (!userId) return [];
+  const current = loadSavedSearches(userId);
   const targetId = text(id);
-  const next = loadSavedSearches(userId).filter((item) => item.id !== targetId);
-  writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
-  return next;
+  const next = current.filter((item) => item.id !== targetId);
+  if (next.length === current.length) return current;
+  return writeCareerPreference(userId, SAVED_SEARCH_NAME, next) ? next : current;
 }

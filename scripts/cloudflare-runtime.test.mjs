@@ -9,8 +9,7 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 describe("Cloudflare production runtime", () => {
   it("serves the Vite SPA through Workers static assets and sends APIs to the Worker first", () => {
-    const raw = read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "");
-    const config = JSON.parse(raw);
+    const config = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, ""));
     assert.equal(config.name, "titanos");
     assert.equal(config.main, "./worker/index.js");
     assert.equal(config.assets.directory, "./dist");
@@ -21,13 +20,15 @@ describe("Cloudflare production runtime", () => {
     assert.equal(config.observability.enabled, true);
   });
 
-  it("provides a bounded legacy API bridge including raw webhook bodies", () => {
+  it("provides a bounded API bridge including root routes, nested routes, and raw webhook bodies", () => {
     const worker = read("worker/index.js");
     assert.match(worker, /const ROUTES = new Map/);
-    assert.match(worker, /\["stripeWebhook", stripeWebhook\]/);
-    assert.match(worker, /\["jobMatchesV2", jobMatchesV2\]/);
-    assert.match(worker, /\["auth\/me", authMe\]/);
-    assert.match(worker, /\["titanAI", titanAILive\]/);
+    assert.match(worker, /\["register", rootRegister\]/);
+    assert.match(worker, /\["signup-emails", signupEmails\]/);
+    assert.match(worker, /\["functions\/stripeWebhook", stripeWebhook\]/);
+    assert.match(worker, /\["functions\/jobMatchesV2", jobMatchesV2\]/);
+    assert.match(worker, /\["functions\/auth\/me", authMe\]/);
+    assert.match(worker, /\["functions\/titanAI", titanAILive\]/);
     assert.match(worker, /rawBody/);
     assert.match(worker, /Symbol\.asyncIterator/);
     assert.match(worker, /API route not found/);
@@ -47,5 +48,12 @@ describe("Cloudflare production runtime", () => {
     const cors = read("api/_lib/cors.js");
     assert.doesNotMatch(cors, /titanos-web\.vercel\.app/);
     assert.match(cors, /https:\/\/titanos\.app/);
+  });
+
+  it("does not depend on Vercel runtime metadata in the Worker server instrument", () => {
+    const instrument = read("api/instrument.mjs");
+    assert.doesNotMatch(instrument, /VERCEL_/);
+    assert.doesNotMatch(instrument, /@sentry\/profiling-node/);
+    assert.match(instrument, /CLOUDFLARE_ENV/);
   });
 });

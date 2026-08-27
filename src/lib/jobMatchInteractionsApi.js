@@ -1,4 +1,5 @@
 import { supabase } from "@/api/supabaseClient";
+import { normalizeCareerPipelineDetails } from "./careerPipelineDetails.js";
 import { jobInteractionIdentity } from "./jobMatchIdentity.js";
 
 const ALLOWED_STATES = new Set([
@@ -53,9 +54,7 @@ export async function setMyJobMatchInteraction(userId, job, state) {
 export async function saveMyCareerPipelineDetails(userId, interactionId, details = {}) {
   if (!userId || !interactionId) throw new Error("Application reference is missing.");
   const payload = {
-    interview_at: details.interviewAt ? new Date(details.interviewAt).toISOString() : null,
-    follow_up_at: details.followUpAt ? new Date(details.followUpAt).toISOString() : null,
-    private_notes: String(details.notes || "").slice(0, 5000) || null,
+    ...normalizeCareerPipelineDetails(details),
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase

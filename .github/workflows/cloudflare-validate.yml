@@ -1,0 +1,42 @@
+name: TitanOS Cloudflare Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - "public/_headers"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-validate.yml"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - "infra/cloudflare-workers-migration"
+    paths:
+      - "cloudflare/**"
+      - "public/_headers"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-validate.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build production assets
+        run: npm run build
+      - name: Validate Cloudflare bundle without deploying
+        run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-dry-run

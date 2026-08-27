@@ -2,6 +2,10 @@ function text(value) {
   return String(value || "").trim();
 }
 
+function boundedText(value, maxLength) {
+  return text(value).slice(0, maxLength);
+}
+
 export function jobSource(job) {
   return String(job?.match?.source || job?.source || "titan").toLowerCase() === "external" ? "external" : "titan";
 }
@@ -38,6 +42,20 @@ export function jobInteractionIdentity(job) {
     sourceJobId: jobSourceId(job),
     sourceUrl: safeExternalJobUrl(job),
   };
+}
+
+export function jobOpportunitySnapshot(job) {
+  const snapshot = {};
+  const title = boundedText(job?.job_title || job?.title, 300);
+  const company = boundedText(job?.company_name || job?.company || job?.employer_name, 200);
+  const city = boundedText(job?.job_city || job?.city, 120);
+  const state = boundedText(job?.job_state || job?.state, 120);
+
+  if (title) snapshot.job_title = title;
+  if (company) snapshot.company_name = company;
+  if (city) snapshot.job_city = city;
+  if (state) snapshot.job_state = state;
+  return snapshot;
 }
 
 export function jobInteractionKey(job) {

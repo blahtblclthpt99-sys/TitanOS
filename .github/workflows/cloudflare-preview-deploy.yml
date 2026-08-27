@@ -1,0 +1,38 @@
+name: TitanOS Cloudflare Preview Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy-preview:
+    if: github.ref == 'refs/heads/infra/cloudflare-workers-migration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Deploy isolated Cloudflare preview worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.102.0'
+          command: deploy --name titanos-preview

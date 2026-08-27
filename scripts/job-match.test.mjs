@@ -89,8 +89,31 @@ describe("external fallback safety", () => {
     posted_at: "2026-08-16T12:00:00Z",
   }, { name: "Example Jobs" });
 
-  it("requires HTTPS provenance for external jobs", () => {
+  it("requires a parseable HTTPS provenance URL for external jobs", () => {
     assert.throws(() => normalizeExternalJob({ id: "x", title: "Bad", url: "http://jobs.example.test/x" }, { name: "Example" }), /HTTPS/);
+    assert.throws(() => normalizeExternalJob({ id: "x", title: "Bad", url: "https://" }, { name: "Example" }), /HTTPS/);
+    assert.throws(() => normalizeExternalJob({ id: "x", title: "Bad", url: "javascript:alert(1)" }, { name: "Example" }), /HTTPS/);
+  });
+
+  it("bounds untrusted provider payload fields and numeric compensation", () => {
+    const row = normalizeExternalJob({
+      id: "x".repeat(500),
+      title: "T".repeat(500),
+      description: "D".repeat(15000),
+      url: "https://jobs.example.test/x",
+      budget_min: "not-a-number",
+      budget_max: 99_999_999,
+      minimum_years_experience: 999,
+      required_skills: Array.from({ length: 150 }, (_, index) => `skill-${index}`),
+    }, { name: "P".repeat(200) });
+    assert.equal(row.external_id.length, 300);
+    assert.equal(row.title.length, 300);
+    assert.equal(row.description.length, 12000);
+    assert.equal(row.source_name.length, 120);
+    assert.equal(row.budget_min, null);
+    assert.equal(row.budget_max, 10_000_000);
+    assert.equal(row.minimum_years_experience, 80);
+    assert.equal(row.required_skills.length, 100);
   });
 
   it("does not include external jobs without explicit user consent", () => {
@@ -117,6 +140,19 @@ describe("external fallback safety", () => {
     const rows = mergeRankedJobMatches({
       internal: [],
       external: [stale],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 0);
+  });
+
+  it("filters malformed and implausibly future provider dates", () => {
+    const malformed = { ...external, id: "external:example:bad-date", posted_at: "not-a-date" };
+    const future = { ...external, id: "external:example:future", posted_at: "2026-08-20T00:00:00Z" };
+    const malformedExpiry = { ...external, id: "external:example:bad-expiry", expires_at: "not-a-date" };
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [malformed, future, malformedExpiry],
       driverProfile: { ...worker, external_job_search_consent: true },
       now: Date.parse("2026-08-17T00:00:00Z"),
     });

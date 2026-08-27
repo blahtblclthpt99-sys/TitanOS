@@ -1,8 +1,13 @@
 const RISK_PATTERNS = [
-  { pattern: /\b(pay|send|wire|transfer)\b.{0,30}\b(fee|deposit|money|crypto|bitcoin|gift card)\b/i, label: "Requests payment or transfer from applicant", weight: 35 },
+  {
+    pattern: /\b(pay|send|wire|transfer)\b.{0,30}\b(fee|deposit|money|crypto|bitcoin|gift card)\b/i,
+    label: "Requests payment or transfer from applicant",
+    weight: 55,
+    critical: true,
+  },
   { pattern: /\btelegram\b|\bwhatsapp\b/i, label: "Moves recruiting to an informal messaging channel", weight: 12 },
   { pattern: /\bno interview\b|\bhired immediately\b|\bguaranteed job\b/i, label: "Promises employment without a normal hiring process", weight: 22 },
-  { pattern: /\bcheck\b.{0,35}\b(equipment|supplies|deposit)\b/i, label: "Mentions a check/equipment purchasing arrangement", weight: 30 },
+  { pattern: /\bcheck\b.{0,35}\b(equipment|supplies|deposit)\b/i, label: "Mentions a check/equipment purchasing arrangement", weight: 30, critical: true },
   { pattern: /\bssn\b|social security number|bank account/i, label: "Requests highly sensitive information in the listing", weight: 25 },
 ];
 
@@ -26,7 +31,8 @@ export function assessOpportunityRisk(job = {}) {
   if (!text(job.description)) signals.push({ label: "Listing has limited job detail", weight: 8 });
 
   const score = Math.min(100, signals.reduce((sum, item) => sum + item.weight, 0));
-  const level = score >= 50 ? "high" : score >= 20 ? "review" : "low";
+  const hasCriticalSignal = signals.some((item) => item.critical === true);
+  const level = hasCriticalSignal || score >= 50 ? "high" : score >= 20 ? "review" : "low";
   return {
     score,
     level,

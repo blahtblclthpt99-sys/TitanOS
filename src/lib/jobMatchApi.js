@@ -1,5 +1,3 @@
-import { api } from "@/api/apiClient";
-
 const DEFAULT_MAX_AGE_DAYS = 45;
 
 function normalizedText(value) {
@@ -60,6 +58,9 @@ export function normalizeJobMatches(matches, { maxAgeDays = DEFAULT_MAX_AGE_DAYS
 }
 
 export async function getJobMatches({ includeExternal = true } = {}) {
+  // Keep pure normalization helpers importable by the plain Node test runner.
+  // The runtime API is loaded only when a live match request is actually made.
+  const { api } = await import("../api/apiClient.js");
   const response = await api.functions.invoke("jobMatchesV2", { includeExternal });
   const data = response?.data || {
     matches: [],

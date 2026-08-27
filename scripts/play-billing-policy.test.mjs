@@ -13,15 +13,25 @@ function functionBlock(source, name) {
   return source.slice(start, next === -1 ? source.length : next);
 }
 
+function componentBlock(source, startToken, endToken) {
+  const start = source.indexOf(startToken);
+  assert.notEqual(start, -1, `${startToken} must exist`);
+  const end = source.indexOf(endToken, start + startToken.length);
+  assert.notEqual(end, -1, `${endToken} must exist after ${startToken}`);
+  return source.slice(start, end);
+}
+
 describe("Google Play billing policy boundary", () => {
   const pricing = read("src/pages/Pricing.jsx");
   const stripe = read("src/lib/stripeSubscriptions.js");
 
-  it("uses Google Play subscriptions for paid plans in Android Play builds", () => {
+  it("uses Google Play subscriptions for configured paid plans in Android Play builds", () => {
+    const planCard = componentBlock(pricing, "function PlanCard(", "\nexport default function Pricing");
     assert.match(pricing, /const androidPlay = isAndroidPlayBuild\(\)/);
-    assert.match(pricing, /const isPaidPlayPlan = androidPlay/);
-    assert.match(pricing, /startPlaySubscription/);
-    assert.match(pricing, /const checkoutHref = androidPlay \? null/);
+    assert.match(planCard, /const playEnabled = androidPlay && paid && Boolean\(PLAY_SUBSCRIPTIONS\[definition\.planId\]\)/);
+    assert.match(planCard, /if \(playEnabled\) return onPlayPurchase\(definition\.planId\)/);
+    assert.match(pricing, /startPlaySubscription\(planId, user\.id\)/);
+    assert.match(pricing, /Android subscription via Google Play/);
   });
 
   it("blocks Stripe subscription checkout inside the Android Play build", () => {
@@ -29,6 +39,13 @@ describe("Google Play billing policy boundary", () => {
     assert.match(block, /if \(isAndroidPlayBuild\(\)\)/);
     assert.match(block, /handled securely by Google Play/);
     assert.ok(block.indexOf("isAndroidPlayBuild()") < block.indexOf("createSubscriptionCheckout"));
+  });
+
+  it("keeps the Android guard in front of every Pricing Stripe fallback", () => {
+    const planCard = componentBlock(pricing, "function PlanCard(", "\nexport default function Pricing");
+    assert.match(planCard, /return onStripePurchase\(definition\.planId\)/);
+    const stripeBlock = functionBlock(stripe, "startStripeSubscription");
+    assert.ok(stripeBlock.indexOf("isAndroidPlayBuild()") < stripeBlock.indexOf("createSubscriptionCheckout"));
   });
 
   it("routes billing management to Google Play rather than Stripe on Android", () => {

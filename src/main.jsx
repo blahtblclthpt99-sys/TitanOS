@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import { installAttentionUxRuntime } from "./lib/attentionUxRuntime.js";
 import "./index.css";
 import "./styles/attention-polish.css";
 import "./styles/attention-refine.css";
@@ -32,6 +33,7 @@ async function purgeLegacyClientState() {
 }
 
 purgeLegacyClientState();
+installAttentionUxRuntime();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

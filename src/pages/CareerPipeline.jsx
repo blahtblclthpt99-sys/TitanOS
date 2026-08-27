@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
+import { safeExternalJobUrl } from "@/lib/jobSearchCommand";
 import { listMyJobMatchInteractions, saveMyCareerPipelineDetails, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
 
 const STAGES = ["saved", "applied", "screening", "interview", "offer", "hired", "closed"];
@@ -55,8 +56,8 @@ export default function CareerPipeline() {
       const data = (await listMyJobMatchInteractions(user.id)).filter((row) => row.state !== "ignored");
       setRows(data);
       setDrafts(Object.fromEntries(data.map((row) => [row.id, draftFromRow(row)])));
-    } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't load career pipeline", description: error.message || "Please try again." });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't load career pipeline", description: "Please try again." });
     } finally {
       setLoading(false);
     }
@@ -81,8 +82,8 @@ export default function CareerPipeline() {
       }, state);
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, ...updated, state } : item));
       toast({ title: `Moved to ${stageLabel(state)}` });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't update application stage", description: error.message || "Please try again." });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't update application stage", description: "Please try again." });
     } finally {
       setBusyId(null);
     }
@@ -98,7 +99,10 @@ export default function CareerPipeline() {
       setDrafts((current) => ({ ...current, [row.id]: draftFromRow(updated) }));
       toast({ title: "Application details saved" });
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't save application details", description: error.message || "Please try again." });
+      const message = /valid date and time/i.test(String(error?.message || ""))
+        ? error.message
+        : "Please review the dates and try again.";
+      toast({ variant: "destructive", title: "Couldn't save application details", description: message });
     } finally {
       setBusyId(null);
     }
@@ -116,20 +120,21 @@ export default function CareerPipeline() {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild><Link to="/hire/matches">Find matches</Link></Button>
+        <Button asChild><Link to="/jobs">Find jobs</Link></Button>
         <Button asChild variant="outline"><Link to="/assistant?mode=interview"><Sparkles className="mr-2 h-4 w-4" />Interview prep</Link></Button>
         <Button type="button" variant="outline" onClick={load} disabled={loading}>Refresh</Button>
       </div>
 
       {loading ? (
-        <div className="titan-surface p-6 text-sm text-muted-foreground">Loading your applications…</div>
+        <div className="titan-surface p-6 text-sm text-muted-foreground" role="status">Loading your applications…</div>
       ) : rows.length === 0 ? (
-        <EmptyState icon={BriefcaseBusiness} title="No applications tracked yet" description="Save a job or mark one applied from Job Matches and it will appear here." actionLabel="Browse matches" onAction={() => window.location.assign("/hire/matches")} />
+        <EmptyState icon={BriefcaseBusiness} title="No applications tracked yet" description="Save a job or track an application from Jobs and it will appear here." actionLabel="Browse jobs" onAction={() => window.location.assign("/jobs")} />
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
           {rows.map((row) => {
             const next = nextStage(row.state);
             const draft = drafts[row.id] || draftFromRow(row);
+            const originalListingUrl = row.source === "external" ? safeExternalJobUrl(row) : null;
             return (
               <article key={row.id} className="titan-surface p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
@@ -141,7 +146,7 @@ export default function CareerPipeline() {
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 </div>
 
-                {row.source_url ? <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">Open original listing</a> : null}
+                {originalListingUrl ? <a href={originalListingUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">Open original listing</a> : row.source === "external" ? <p className="text-xs text-muted-foreground">Original listing link unavailable. Verify the employer before continuing.</p> : null}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="space-y-1.5"><span className="flex items-center gap-1 text-xs font-semibold"><CalendarClock className="h-3.5 w-3.5" />Interview</span><Input type="datetime-local" value={draft.interviewAt} onChange={(e) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, interviewAt: e.target.value } }))} /></label>

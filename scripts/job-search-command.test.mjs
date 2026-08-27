@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { annualizePay, buildResumeLink, filterJobSearch, safeExternalJobUrl, sortJobSearch, sourceTrust } from "../src/lib/jobSearchCommand.js";
-import { jobInteractionIdentity, jobSource } from "../src/lib/jobMatchIdentity.js";
+import {
+  annualizePay,
+  buildResumeLink,
+  filterJobSearch,
+  normalizeSavedSearchFilters,
+  normalizeSavedSearches,
+  safeExternalJobUrl,
+  sortJobSearch,
+  sourceTrust,
+} from "../src/lib/jobSearchCommand.js";
+import { jobInteractionIdentity, jobInteractionKey, jobSource } from "../src/lib/jobMatchIdentity.js";
 
 const native = {
   id: "n1", title: "Box Truck Driver", company_name: "Acme Logistics", city: "Oklahoma City", state: "OK",
@@ -67,6 +76,17 @@ test("nested match provenance remains external throughout tracking identity", ()
     sourceJobId: "provider-42",
     sourceUrl: "https://jobs.example.test/provider-42",
   });
+  assert.equal(jobInteractionKey(nestedExternal), "external:verified jobs feed:provider-42");
+});
+
+test("canonical interaction key works without a local row id", () => {
+  const providerOnly = {
+    external_id: "provider-77",
+    source: "external",
+    source_name: "Partner Feed",
+  };
+  assert.equal(jobInteractionKey(providerOnly), "external:partner feed:provider-77");
+  assert.equal(jobInteractionKey({ source: "external", source_name: "Partner Feed" }), "");
 });
 
 test("tracking identity refuses unsafe external source URLs", () => {
@@ -78,6 +98,41 @@ test("tracking identity refuses unsafe external source URLs", () => {
   });
   assert.equal(identity.source, "external");
   assert.equal(identity.sourceUrl, null);
+});
+
+test("saved search filters are bounded and allowlisted", () => {
+  assert.deepEqual(normalizeSavedSearchFilters({
+    query: "  driver  ",
+    company: " Acme ",
+    location: " OKC ",
+    source: "untrusted",
+    minMatch: 900,
+    minAnnual: -10,
+    sort: "random",
+  }), {
+    query: "driver",
+    company: "Acme",
+    location: "OKC",
+    source: "all",
+    minMatch: 100,
+    minAnnual: 0,
+    sort: "match",
+  });
+});
+
+test("saved searches discard malformed rows and exact duplicates", () => {
+  const normalized = normalizeSavedSearches([
+    null,
+    { id: "a", name: "Drivers", filters: { query: "driver", source: "all", sort: "match" }, createdAt: "2026-08-27T00:00:00Z" },
+    { id: "b", name: "Duplicate", filters: { query: "driver", source: "all", sort: "match" }, createdAt: "bad-date" },
+    { id: "c", name: "External", filters: { query: "driver", source: "external", sort: "newest" } },
+    { id: "broken", name: "Missing filters" },
+  ]);
+  assert.equal(normalized.length, 2);
+  assert.equal(normalized[0].id, "a");
+  assert.equal(normalized[0].createdAt, "2026-08-27T00:00:00.000Z");
+  assert.equal(normalized[1].id, "c");
+  assert.equal(normalized[1].filters.source, "external");
 });
 
 test("resume handoff carries only listing-provided role company and description", () => {

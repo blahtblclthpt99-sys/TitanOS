@@ -39,7 +39,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {isAuthenticated ? (
-              <Link className={primary} to="/jobs">Open TitanOS</Link>
+              <Link className={primary} to="/career/search">Find jobs</Link>
             ) : (
               <>
                 <Link className="hidden text-sm font-semibold text-muted-foreground hover:text-foreground sm:inline-flex" to="/login">Sign in</Link>
@@ -65,7 +65,7 @@ export default function Landing() {
                 TitanOS brings job discovery, career matching, applications, interview preparation, scheduling, career profiles, and practical work tools into one focused system.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link className={primary} to={isAuthenticated ? "/jobs" : "/register"}>
+                <Link className={primary} to={isAuthenticated ? "/career/search" : "/register"}>
                   Find opportunities
                 </Link>
                 <Link className={secondary} to={isAuthenticated ? "/profile" : "/login"}>

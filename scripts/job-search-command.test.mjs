@@ -7,6 +7,7 @@ import {
   normalizeSavedSearchFilters,
   normalizeSavedSearches,
   safeExternalJobUrl,
+  savedSearchFingerprint,
   sortJobSearch,
   sourceTrust,
 } from "../src/lib/jobSearchCommand.js";
@@ -120,11 +121,17 @@ test("saved search filters are bounded and allowlisted", () => {
   });
 });
 
-test("saved searches discard malformed rows and exact duplicates", () => {
+test("saved search identity is case and whitespace insensitive", () => {
+  const first = savedSearchFingerprint({ query: " Box   Truck ", company: " ACME Logistics ", location: " Oklahoma  City ", source: "all" });
+  const second = savedSearchFingerprint({ query: "box truck", company: "acme logistics", location: "oklahoma city", source: "all" });
+  assert.equal(first, second);
+});
+
+test("saved searches discard malformed rows and semantic duplicates", () => {
   const normalized = normalizeSavedSearches([
     null,
-    { id: "a", name: "Drivers", filters: { query: "driver", source: "all", sort: "match" }, createdAt: "2026-08-27T00:00:00Z" },
-    { id: "b", name: "Duplicate", filters: { query: "driver", source: "all", sort: "match" }, createdAt: "bad-date" },
+    { id: "a", name: "Drivers", filters: { query: "Driver", company: "Acme  Logistics", source: "all", sort: "match" }, createdAt: "2026-08-27T00:00:00Z" },
+    { id: "b", name: "Duplicate", filters: { query: " driver ", company: "acme logistics", source: "all", sort: "match" }, createdAt: "bad-date" },
     { id: "c", name: "External", filters: { query: "driver", source: "external", sort: "newest" } },
     { id: "broken", name: "Missing filters" },
   ]);
@@ -133,6 +140,15 @@ test("saved searches discard malformed rows and exact duplicates", () => {
   assert.equal(normalized[0].createdAt, "2026-08-27T00:00:00.000Z");
   assert.equal(normalized[1].id, "c");
   assert.equal(normalized[1].filters.source, "external");
+});
+
+test("saved searches repair duplicate ids without dropping distinct searches", () => {
+  const normalized = normalizeSavedSearches([
+    { id: "same", filters: { query: "driver" } },
+    { id: "same", filters: { query: "warehouse" } },
+  ]);
+  assert.equal(normalized.length, 2);
+  assert.notEqual(normalized[0].id, normalized[1].id);
 });
 
 test("resume handoff carries only listing-provided role company and description", () => {

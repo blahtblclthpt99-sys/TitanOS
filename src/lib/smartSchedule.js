@@ -8,7 +8,7 @@ export function buildSmartScheduleTips(jobs = [], weather = null) {
     tips.push({
       type: "empty",
       text: "No jobs today — create a job or send an estimate to fill the day.",
-      path: "/jobs?new=1",
+      path: "/work/jobs?new=1",
     });
   } else {
     const byArea = {};
@@ -52,7 +52,7 @@ export function buildSmartScheduleTips(jobs = [], weather = null) {
     tips.push({
       type: "ok",
       text: "Schedule looks balanced. Keep confirming tomorrow’s jobs tonight.",
-      path: "/jobs",
+      path: "/work/jobs",
     });
   }
   return tips.slice(0, 4);

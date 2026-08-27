@@ -1,4 +1,5 @@
 import { readCareerPreference, writeCareerPreference } from "./careerPreferenceStorage.js";
+import { jobSource, safeExternalJobUrl } from "./jobMatchIdentity.js";
 
 const SAVED_SEARCH_NAME = "saved-searches";
 
@@ -23,19 +24,10 @@ export function annualizePay(job) {
   return null;
 }
 
-export function safeExternalJobUrl(job) {
-  const raw = text(job?.source_url || job?.match?.source_url);
-  if (!raw) return null;
-  try {
-    const parsed = new URL(raw);
-    return parsed.protocol === "https:" ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
-}
+export { safeExternalJobUrl };
 
 export function sourceTrust(job) {
-  const external = (job?.match?.source || job?.source) === "external";
+  const external = jobSource(job) === "external";
   if (!external) return { level: "native", label: "TitanOS native", detail: "Posted inside TitanOS" };
   if (safeExternalJobUrl(job)) return { level: "external", label: "External source", detail: "Original HTTPS listing available" };
   return { level: "limited", label: "Source limited", detail: "Verify the employer and listing before applying" };
@@ -57,7 +49,7 @@ export function filterJobSearch(rows, filters = {}) {
     if (company && !employer.includes(company)) return false;
     const place = lower([job.city, job.state, job.location].filter(Boolean).join(" "));
     if (location && !place.includes(location)) return false;
-    const external = (job?.match?.source || job?.source) === "external";
+    const external = jobSource(job) === "external";
     if (source === "native" && external) return false;
     if (source === "external" && !external) return false;
     if (Number(job?.match?.score || 0) < minMatch) return false;

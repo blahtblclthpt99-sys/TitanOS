@@ -67,6 +67,34 @@ describe("native Titan job scoring", () => {
     assert.ok(rows[0].match.blockers.length > 0);
   });
 
+  it("keeps legitimate low-score native jobs visible by default", () => {
+    const lowFit = {
+      id: "low-fit",
+      title: "Marine biologist",
+      category: "Science",
+      city: "Miami",
+      state: "FL",
+      budget_min: 10,
+      budget_max: 12,
+      pay_type: "hourly",
+      required_skills: ["marine biology", "research"],
+      required_certifications: ["scuba"],
+      minimum_years_experience: 20,
+      schedule_tags: ["overnight"],
+      status: "open",
+    };
+    assert.ok(scoreJobMatch(worker, lowFit).score < 25);
+    assert.deepEqual(rankInternalJobMatches([lowFit], worker).map((row) => row.id), ["low-fit"]);
+  });
+
+  it("allows an explicit caller threshold while keeping the default advisory", () => {
+    const lowFit = { id: "weak", title: "Painter", category: "Painting", city: "Tulsa", state: "OK", status: "open" };
+    const threshold = Math.min(100, scoreJobMatch(worker, lowFit).score + 1);
+    const rows = rankInternalJobMatches([strongJob, lowFit], worker, { minimumScore: threshold });
+    assert.equal(rows.some((row) => row.id === "weak"), false);
+    assert.equal(rows.some((row) => row.id === "j1"), true);
+  });
+
   it("ranks native open jobs and excludes closed jobs", () => {
     const rows = rankInternalJobMatches([
       { ...strongJob, id: "best" },
@@ -152,6 +180,29 @@ describe("external fallback safety", () => {
     assert.equal(rows[1].source_name, "Example Jobs");
     assert.equal(rows[1].company_name, "Route Logistics");
     assert.match(rows[1].source_url, /^https:\/\//);
+  });
+
+  it("keeps legitimate low-score external jobs visible when consent is granted", () => {
+    const lowFitExternal = normalizeExternalJob({
+      id: "ext-low-fit",
+      title: "Marine biologist",
+      city: "Miami",
+      state: "FL",
+      url: "https://jobs.example.test/marine-biologist",
+      required_skills: ["marine biology", "research"],
+      required_certifications: ["scuba"],
+      minimum_years_experience: 20,
+      posted_at: "2026-08-16T12:00:00Z",
+    }, { name: "Example Jobs" });
+    assert.ok(scoreJobMatch(worker, lowFitExternal).score < 25);
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [lowFitExternal],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].external_id, "ext-low-fit");
   });
 
   it("preserves same-role vacancies from different employers", () => {

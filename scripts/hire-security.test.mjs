@@ -88,8 +88,11 @@ describe("skills-driven job matching safety", () => {
     assert.ok(match.score >= 90);
     assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
   });
-  it("treats missing required credentials as a hard eligibility filter", () => {
-    assert.equal(rankInternalJobMatches([native], { ...worker, certifications: [] }).length, 0);
+  it("keeps a job visible when a credential is missing and marks the requirement advisory", () => {
+    const rows = rankInternalJobMatches([native], { ...worker, certifications: [] });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].match.requirements_advisory, true);
+    assert.ok(rows[0].match.blockers.some((item) => item.includes("dot medical card")));
   });
   it("does not compare incompatible pay periods as raw numbers", () => {
     const match = scoreJobMatch(worker, { ...native, pay_type: "salary", budget_min: 40000, budget_max: 50000 });
@@ -146,8 +149,11 @@ describe("employer-side published worker matching", () => {
     assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
     assert.ok(match.reasons.includes("Meets experience requirement"));
   });
-  it("hard-filters candidates missing a required credential", () => {
-    assert.equal(rankPublishedWorkerMatches(job, [{ ...strong, certifications: [] }]).length, 0);
+  it("keeps a published worker visible when a credential is missing and marks the requirement advisory", () => {
+    const rows = rankPublishedWorkerMatches(job, [{ ...strong, certifications: [] }]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].match.requirements_advisory, true);
+    assert.ok(rows[0].match.blockers.some((item) => item.includes("dot medical card")));
   });
   it("never includes unpublished profiles or the job owner's own profile", () => {
     const rows = rankPublishedWorkerMatches(
@@ -252,13 +258,14 @@ describe("career-core job discovery wiring", () => {
   const stack = fs.readFileSync(new URL("../src/components/layout/TabStack.jsx", import.meta.url), "utf8");
   const post = fs.readFileSync(new URL("../src/pages/MatchReadyJobPost.jsx", import.meta.url), "utf8");
 
-  it("surfaces seeker matches as Opportunities and keeps employer posting internal", () => {
-    assert.match(nav, /label: "Opportunities", path: "\/hire\/matches", group: "career"/);
+  it("surfaces seeker matches as Opportunity Matches and keeps employer posting internal", () => {
+    assert.match(nav, /label: "Opportunity Matches", path: "\/hire\/matches", group: "career"/);
     assert.match(nav, /label: "Match-ready job", path: "\/hire\/post-match-ready", group: "live", hidden: true/);
     assert.match(nav, /paths: \[[^\]]*"\/hire\/matches"[^\]]*\]/);
   });
-  it("groups nested Hire pages under the seeker-facing Opportunities parent", () => {
-    assert.match(nav, /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Opportunities", path: "\/hire\/matches" \}/);
+  it("keeps match pages under Opportunity Matches and other Hire workflows under Opportunity Board", () => {
+    assert.match(nav, /if \(path\.startsWith\("\/hire\/matches"\)\) return \{ label: "Opportunity Matches", path: "\/hire\/matches" \}/);
+    assert.match(nav, /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Opportunity Board", path: "\/hire" \}/);
   });
   it("provides all, saved, and applied opportunity inbox views", () => {
     assert.match(page, /const \[view, setView\] = useState\("all"\)/);

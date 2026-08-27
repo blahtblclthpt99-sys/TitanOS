@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   buildApplicationPackage,
   buildCoverLetter,
@@ -7,6 +8,8 @@ import {
   buildTailoredResume,
   matchingEvidence,
 } from "../src/lib/resumeBuilder.js";
+
+const page = fs.readFileSync(new URL("../src/pages/ResumeBuilder.jsx", import.meta.url), "utf8");
 
 const profile = {
   display_name: "Test Applicant",
@@ -64,4 +67,15 @@ test("application package declares truthful tailoring policy", () => {
   assert.ok(pkg.tailoredResume.length > 0);
   assert.ok(pkg.coverLetter.length > 0);
   assert.ok(pkg.interviewBrief.length > 0);
+});
+
+test("resume workspace hands interview prep to the query parameter TitanAI reads", () => {
+  assert.match(page, /\/assistant\?mode=interview&q=/);
+  assert.doesNotMatch(page, /\/assistant\?mode=interview&prompt=/);
+});
+
+test("print export isolates the generated document from surrounding app chrome", () => {
+  assert.match(page, /id="career-print-document"/);
+  assert.match(page, /@media print/);
+  assert.match(page, /#career-print-document, #career-print-document \*/);
 });

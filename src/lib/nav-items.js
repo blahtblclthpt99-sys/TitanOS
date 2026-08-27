@@ -12,6 +12,7 @@ export const APP_NAV_ITEMS = [
   { icon: Search, label: "Opportunities", path: "/hire/matches", group: "career" },
   { icon: ClipboardList, label: "Applications", path: "/career/pipeline", group: "career" },
   { icon: Target, label: "Career Readiness", path: "/career/readiness", group: "career" },
+  { icon: FileText, label: "Resume Builder", path: "/career/resume", group: "career" },
   { icon: User, label: "Career Profile", path: "/profile", group: "career" },
   { icon: Building2, label: "Companies", path: "/companies", group: "career" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "career" },
@@ -83,7 +84,7 @@ export const MOBILE_TAB_ITEMS = [
 export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/hire/matches", "/career/pipeline", "/more"];
 
 export const MORE_MENU_GROUPS = [
-  { title: "Jobs & Career", description: "Find work, evaluate opportunities, track applications, and strengthen your career profile", paths: ["/", "/jobs", "/hire/matches", "/career/pipeline", "/career/readiness", "/profile", "/companies", "/schedule", "/notifications"] },
+  { title: "Jobs & Career", description: "Find work, evaluate opportunities, track applications, and strengthen your career profile", paths: ["/", "/jobs", "/hire/matches", "/career/pipeline", "/career/readiness", "/career/resume", "/profile", "/companies", "/schedule", "/notifications"] },
   { title: "Career Tools", description: "Get user-controlled AI help with career planning and work organization", paths: ["/assistant", "/second-me", "/autopilot"] },
   { title: "Work Tools", description: "Manage clients, estimates, invoices, payments, and completed work", paths: ["/booking", "/customers", "/leads", "/follow-ups", "/comms", "/reputation", "/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"] },
   { title: "Specialized Operations", description: "Optional tools for driving, routing, teams, fleets, inventory, and business records", paths: ["/driver", "/routes", "/employees", "/fleet", "/inventory", "/business-documents", "/analytics"] },
@@ -95,7 +96,7 @@ export const QUICK_CREATE_ACTIONS = [
   { label: "Find Jobs", path: "/jobs", icon: Briefcase },
   { label: "View Matches", path: "/hire/matches", icon: Search },
   { label: "Track Applications", path: "/career/pipeline", icon: ClipboardList },
-  { label: "Check Career Readiness", path: "/career/readiness", icon: Target },
+  { label: "Build Resume", path: "/career/resume", icon: FileText },
 ];
 
 export function resolveNavDomain(pathname = "/") {
@@ -113,6 +114,7 @@ export function resolvePageTitle(pathname = "/") {
   if (path === "/more") return "More";
   if (path === "/career/pipeline") return "Applications";
   if (path === "/career/readiness") return "Career Readiness";
+  if (path === "/career/resume") return "Resume Builder";
   if (path.startsWith("/driver/trip")) return "Trip detail";
   if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
   if (path.startsWith("/customers/") && path !== "/customers") return "Customer";
@@ -141,6 +143,7 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
   if (path.startsWith("/career/pipeline")) return { label: "Applications", path: "/career/pipeline" };
   if (path.startsWith("/career/readiness")) return { label: "Career Readiness", path: "/career/readiness" };
+  if (path.startsWith("/career/resume")) return { label: "Resume Builder", path: "/career/resume" };
   if (path.startsWith("/hire")) return { label: "Opportunities", path: "/hire/matches" };
   if (path.startsWith("/profile")) return { label: "Career Profile", path: "/profile" };
   if (path.startsWith("/companies")) return { label: "Companies", path: "/companies" };

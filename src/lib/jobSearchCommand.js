@@ -23,16 +23,26 @@ export function annualizePay(job) {
   return null;
 }
 
+export function safeExternalJobUrl(job) {
+  const raw = text(job?.source_url || job?.match?.source_url);
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function sourceTrust(job) {
   const external = (job?.match?.source || job?.source) === "external";
-  const sourceUrl = text(job?.source_url || job?.match?.source_url);
   if (!external) return { level: "native", label: "TitanOS native", detail: "Posted inside TitanOS" };
-  if (/^https:\/\//i.test(sourceUrl)) return { level: "external", label: "External source", detail: "Original HTTPS listing available" };
+  if (safeExternalJobUrl(job)) return { level: "external", label: "External source", detail: "Original HTTPS listing available" };
   return { level: "limited", label: "Source limited", detail: "Verify the employer and listing before applying" };
 }
 
 export function filterJobSearch(rows, filters = {}) {
-  const query = lower(filters.query);
+  const queryTokens = lower(filters.query).split(/\s+/).filter(Boolean);
   const company = lower(filters.company);
   const location = lower(filters.location);
   const source = lower(filters.source || "all");
@@ -42,7 +52,7 @@ export function filterJobSearch(rows, filters = {}) {
   return (rows || []).filter((job) => {
     const haystack = [job.title, job.description, job.company_name, job.company, job.employer_name, job.city, job.state]
       .map(lower).join(" ");
-    if (query && !haystack.includes(query)) return false;
+    if (queryTokens.length && !queryTokens.every((token) => haystack.includes(token))) return false;
     const employer = lower(job.company_name || job.company || job.employer_name);
     if (company && !employer.includes(company)) return false;
     const place = lower([job.city, job.state, job.location].filter(Boolean).join(" "));
@@ -52,7 +62,7 @@ export function filterJobSearch(rows, filters = {}) {
     if (source === "external" && !external) return false;
     if (Number(job?.match?.score || 0) < minMatch) return false;
     const annual = annualizePay(job);
-    if (minAnnual && annual != null && annual < minAnnual) return false;
+    if (minAnnual && (annual == null || annual < minAnnual)) return false;
     return true;
   });
 }

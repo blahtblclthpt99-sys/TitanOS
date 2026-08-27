@@ -42,6 +42,7 @@ jobs:
           node --test
           scripts/career-attention.test.mjs
           scripts/career-pipeline.test.mjs
+          scripts/career-preference-storage.test.mjs
           scripts/career-readiness.test.mjs
           scripts/employer-intelligence.test.mjs
           scripts/job-match-career-core.test.mjs

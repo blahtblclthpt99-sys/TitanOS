@@ -8,10 +8,6 @@ import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
 import MobileGlobalSearch from "@/components/layout/MobileGlobalSearch";
 
-/**
- * Map nested routes to a sensible parent when browser history is empty
- * or the entry was a cold deep link (location.key === "default").
- */
 function getTabRoot(pathname) {
   if (pathname.startsWith("/driver")) return "/driver";
   if (pathname.startsWith("/customers")) return "/customers";
@@ -62,13 +58,13 @@ export default function MobileHeader() {
   return (
     <>
       <header
-        className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border flex items-center px-4"
+        className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border flex items-center px-4"
         style={{
           paddingTop: "env(safe-area-inset-top)",
           height: "calc(env(safe-area-inset-top) + 3.5rem)",
         }}
       >
-        <div className="flex items-center h-14 w-full gap-2">
+        <div className="flex items-center h-14 w-full gap-2 min-w-0">
           {isRoot ? (
             <TitanBrandLogo to="/" className="flex-1 min-w-0" markClassName="h-8 w-8" />
           ) : (
@@ -87,7 +83,7 @@ export default function MobileHeader() {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground focus-ring"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground focus-ring shrink-0"
             aria-label="Search TitanOS"
           >
             <Search className="w-5 h-5" aria-hidden />

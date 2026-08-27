@@ -9,26 +9,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/lib/AuthContext";
 import { getJobMatches } from "@/lib/jobMatchApi";
 import { assessOpportunityRisk, buildEmployerSummary, evaluateAlerts, employerKey } from "@/lib/employerIntelligence";
-
-const SAVED_KEY = "titanos_saved_employers_v1";
-const ALERT_KEY = "titanos_job_alerts_v1";
-
-function readJson(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || "") || fallback; } catch { return fallback; }
-}
-function writeJson(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+import { readCareerPreference, writeCareerPreference } from "@/lib/careerPreferenceStorage";
 
 export default function EmployerIntelligence() {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [saved, setSaved] = useState(() => readJson(SAVED_KEY, []));
-  const [alerts, setAlerts] = useState(() => readJson(ALERT_KEY, []));
+  const [saved, setSaved] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [alertForm, setAlertForm] = useState({ query: "", location: "", minMatch: 0, source: "all" });
 
   useEffect(() => {
+    if (!user?.id) {
+      setSaved([]);
+      setAlerts([]);
+      return;
+    }
+    setSaved(readCareerPreference(user.id, "saved-employers", []));
+    setAlerts(readCareerPreference(user.id, "job-alerts", []));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
     let alive = true;
     (async () => {
       setLoading(true);
@@ -40,23 +46,30 @@ export default function EmployerIntelligence() {
       } finally { if (alive) setLoading(false); }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [user?.id]);
 
-  const employers = useMemo(() => buildEmployerSummary(jobs).filter((company) => !query || `${company.name} ${company.city} ${company.state}`.toLowerCase().includes(query.toLowerCase())), [jobs, query]);
+  const employers = useMemo(
+    () => buildEmployerSummary(jobs).filter((company) => !query || `${company.name} ${company.city} ${company.state}`.toLowerCase().includes(query.toLowerCase())),
+    [jobs, query]
+  );
   const alertResults = useMemo(() => evaluateAlerts(jobs, alerts), [jobs, alerts]);
 
   const toggleSaved = (company) => {
+    if (!user?.id) return;
     const next = saved.includes(company.key) ? saved.filter((key) => key !== company.key) : [...saved, company.key];
-    setSaved(next); writeJson(SAVED_KEY, next);
+    setSaved(next);
+    writeCareerPreference(user.id, "saved-employers", next);
   };
 
   const addAlert = (event) => {
     event.preventDefault();
+    if (!user?.id) return;
     const rule = { id: `alert_${Date.now()}`, ...alertForm, minMatch: Number(alertForm.minMatch || 0) };
     const next = [rule, ...alerts].slice(0, 20);
-    setAlerts(next); writeJson(ALERT_KEY, next);
+    setAlerts(next);
+    writeCareerPreference(user.id, "job-alerts", next);
     setAlertForm({ query: "", location: "", minMatch: 0, source: "all" });
-    toast({ title: "Job alert saved", description: "TitanOS will evaluate this rule whenever the job feed refreshes." });
+    toast({ title: "Job alert saved", description: "TitanOS will evaluate this rule whenever your job feed refreshes." });
   };
 
   if (loading) return <PageLoader variant="list" label="Checking employers and job alerts" />;
@@ -93,12 +106,12 @@ export default function EmployerIntelligence() {
             <Input type="number" min="0" max="100" value={alertForm.minMatch} onChange={(e) => setAlertForm((f) => ({ ...f, minMatch: e.target.value }))} placeholder="Minimum match %" />
             <NativeSelect value={alertForm.source} onChange={(e) => setAlertForm((f) => ({ ...f, source: e.target.value }))}><option value="all">All sources</option><option value="titan">TitanOS only</option><option value="external">External sources only</option></NativeSelect>
             <Button type="submit" className="w-full">Save alert</Button>
-            <p className="text-[11px] text-muted-foreground">Alert rules are user-defined filters. They do not guarantee job availability or employer legitimacy.</p>
+            <p className="text-[11px] text-muted-foreground">Alert rules are private to this account on this device. They are user-defined filters and do not guarantee job availability or employer legitimacy.</p>
           </form>
 
           <section className="titan-surface p-5 space-y-3">
             <h2 className="font-semibold">Saved alerts</h2>
-            {alertResults.length === 0 ? <p className="text-sm text-muted-foreground">No alerts yet.</p> : alertResults.map((alert) => <div key={alert.id} className="rounded-md border border-border p-3"><p className="text-sm font-medium">{alert.query || "Any role"}{alert.location ? ` · ${alert.location}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{alert.matches.length} current match{alert.matches.length === 1 ? "" : "es"} · minimum {alert.minMatch || 0}%</p><Button type="button" size="sm" variant="ghost" className="mt-2" onClick={() => { const next = alerts.filter((item) => item.id !== alert.id); setAlerts(next); writeJson(ALERT_KEY, next); }}>Delete alert</Button></div>)}
+            {alertResults.length === 0 ? <p className="text-sm text-muted-foreground">No alerts yet.</p> : alertResults.map((alert) => <div key={alert.id} className="rounded-md border border-border p-3"><p className="text-sm font-medium">{alert.query || "Any role"}{alert.location ? ` · ${alert.location}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{alert.matches.length} current match{alert.matches.length === 1 ? "" : "es"} · minimum {alert.minMatch || 0}%</p><Button type="button" size="sm" variant="ghost" className="mt-2" onClick={() => { const next = alerts.filter((item) => item.id !== alert.id); setAlerts(next); writeCareerPreference(user.id, "job-alerts", next); }}>Delete alert</Button></div>)}
           </section>
 
           <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 text-xs text-muted-foreground"><AlertTriangle className="mb-2 h-4 w-4 text-warning" />TitanOS risk indicators are screening aids, not factual accusations about an employer. Verify company identity, recruiter identity, application domains, and requests for money or sensitive data independently.</div>

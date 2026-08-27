@@ -151,8 +151,8 @@ export function scoreJobMatch(driverProfile, job = {}) {
   if (minimumYears && experienceRatio >= 1) reasons.push("Meets experience requirement");
 
   const blockers = [];
-  if (certifications.missing.length) blockers.push(`Missing required credential: ${certifications.missing.join(", ")}`);
-  if (minimumYears && experienceRatio < 1) blockers.push(`Requires ${minimumYears}+ years experience`);
+  if (certifications.missing.length) blockers.push(`Listing asks for credential: ${certifications.missing.join(", ")}`);
+  if (minimumYears && experienceRatio < 1) blockers.push(`Listing asks for ${minimumYears}+ years experience`);
 
   return {
     score,
@@ -160,21 +160,19 @@ export function scoreJobMatch(driverProfile, job = {}) {
     blockers,
     matched_skills: skills.matched,
     missing_certifications: certifications.missing,
+    requirements_advisory: blockers.length > 0,
     source: job.source || "titan",
     source_name: job.source_name || "TitanOS",
     source_url: job.source_url || null,
   };
 }
 
-function isEligibleMatch(job) {
-  return !job.match.missing_certifications.length;
-}
-
 export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumScore = 25 } = {}) {
   return (jobs || [])
     .filter((job) => job && (job.status || "open") === "open")
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    .filter(isEligibleMatch)
+    // Requirements are advisory to the job seeker. TitanOS may rank them but must
+    // not silently disqualify a person from seeing a legitimate open opportunity.
     .filter((job) => job.match.score >= minimumScore)
     .sort((a, b) => b.match.score - a.match.score || Number(Boolean(b.is_urgent)) - Number(Boolean(a.is_urgent)) || String(b.created_at || "").localeCompare(String(a.created_at || "")));
 }
@@ -238,7 +236,8 @@ export function mergeRankedJobMatches({ internal = [], external = [], driverProf
   const rankedExternal = external
     .filter((job) => !isStale(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    .filter(isEligibleMatch)
+    // Keep listing requirements visible as advisory information; do not turn the
+    // matching layer into an employment eligibility or automated rejection gate.
     .filter((job) => job.match.score >= 25)
     .filter((job) => {
       const urlKey = urlDedupeKey(job);

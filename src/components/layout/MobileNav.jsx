@@ -11,7 +11,6 @@ const TAB_ROOTS = new Set(MOBILE_TAB_ITEMS.map((item) => item.path));
 const MORE_PATHS = MORE_MENU_GROUPS.flatMap((g) => g.paths).filter(
   (p) => p !== "/more" && !TAB_ROOTS.has(p)
 );
-
 const TABS = [...MOBILE_TAB_ITEMS, { path: "/more", label: "More", icon: LayoutGrid }];
 
 export default function MobileNav() {
@@ -20,17 +19,11 @@ export default function MobileNav() {
   const badges = useNavBadges();
   const pathname = normalizeAppPath(location.pathname);
   const touchStart = useRef(null);
-
   const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
-
-  const activeIndex = TABS.findIndex((item) => {
-    if (item.path === "/more") return moreActive;
-    return isRouteActive(pathname, item.path);
-  });
+  const activeIndex = TABS.findIndex((item) => item.path === "/more" ? moreActive : isRouteActive(pathname, item.path));
 
   const handleTab = (path) => {
-    if (pathname === path) return;
-    navigate(path);
+    if (pathname !== path) navigate(path);
   };
 
   const onTouchStart = (e) => {
@@ -45,16 +38,14 @@ export default function MobileNav() {
     const t = e.changedTouches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-    if (Date.now() - start.t > 600) return;
+    if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.4 || Date.now() - start.t > 600) return;
     const next = dx < 0 ? activeIndex + 1 : activeIndex - 1;
-    if (next < 0 || next >= TABS.length) return;
-    handleTab(TABS[next].path);
+    if (next >= 0 && next < TABS.length) handleTab(TABS[next].path);
   };
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 shadow-soft backdrop-blur-xl"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 shadow-soft backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Main navigation"
       onTouchStart={onTouchStart}
@@ -70,38 +61,25 @@ export default function MobileNav() {
               onClick={() => handleTab(item.path)}
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-colors duration-fast select-none active:scale-[0.97] focus-ring ${
-                isActive ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-colors duration-fast select-none active:scale-[0.97] focus-ring ${isActive ? "text-primary" : "text-muted-foreground"}`}
             >
               <item.icon className={`h-6 w-6 ${isActive ? "scale-105" : ""}`} aria-hidden="true" strokeWidth={isActive ? 2.25 : 2} />
               <NavBadge count={badges[item.path]} className="absolute right-1 top-1" />
-              <span className="text-[10px] font-semibold leading-none" aria-hidden="true">
-                {item.label}
-              </span>
-              {isActive && (
-                <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" aria-hidden="true" />
-              )}
+              <span className="text-[10px] font-semibold leading-none" aria-hidden="true">{item.label}</span>
+              {isActive && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" aria-hidden="true" />}
             </button>
           );
         })}
-
         <button
           type="button"
           onClick={() => handleTab("/more")}
           aria-label="More features"
           aria-current={moreActive ? "page" : undefined}
-          className={`relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-colors duration-fast select-none active:scale-[0.97] focus-ring ${
-            moreActive ? "text-primary" : "text-muted-foreground"
-          }`}
+          className={`relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 transition-colors duration-fast select-none active:scale-[0.97] focus-ring ${moreActive ? "text-primary" : "text-muted-foreground"}`}
         >
           <LayoutGrid className="h-6 w-6" aria-hidden="true" strokeWidth={moreActive ? 2.25 : 2} />
-          <span className="text-[10px] font-semibold leading-none" aria-hidden="true">
-            More
-          </span>
-          {moreActive && (
-            <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" aria-hidden="true" />
-          )}
+          <span className="text-[10px] font-semibold leading-none" aria-hidden="true">More</span>
+          {moreActive && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" aria-hidden="true" />}
         </button>
       </div>
     </nav>

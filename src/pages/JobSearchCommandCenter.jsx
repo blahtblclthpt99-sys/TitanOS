@@ -32,9 +32,13 @@ export default function JobSearchCommandCenter() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [savedSearches, setSavedSearches] = useState(loadSavedSearches);
+  const [savedSearches, setSavedSearches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    setSavedSearches(user?.id ? loadSavedSearches(user.id) : []);
+  }, [user?.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,8 +75,9 @@ export default function JobSearchCommandCenter() {
   };
 
   const rememberSearch = () => {
-    setSavedSearches(saveSearch(filters));
-    toast({ title: "Search saved on this device" });
+    if (!user?.id) return;
+    setSavedSearches(saveSearch(user.id, filters));
+    toast({ title: "Search saved for this account on this device" });
   };
 
   return (
@@ -100,7 +105,7 @@ export default function JobSearchCommandCenter() {
         </div>
       </section>
 
-      {savedSearches.length ? <section className="titan-surface p-4 space-y-2"><h2 className="text-sm font-semibold">Saved searches</h2><div className="flex flex-wrap gap-2">{savedSearches.map((item) => <div key={item.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-1"><button className="px-2 py-1 text-xs font-medium" onClick={() => setFilters({ ...DEFAULT_FILTERS, ...item.filters })}>{item.name}</button><button aria-label={`Delete ${item.name}`} className="p-1 text-muted-foreground hover:text-destructive" onClick={() => setSavedSearches(removeSavedSearch(item.id))}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div></section> : null}
+      {savedSearches.length ? <section className="titan-surface p-4 space-y-2"><h2 className="text-sm font-semibold">Saved searches</h2><div className="flex flex-wrap gap-2">{savedSearches.map((item) => <div key={item.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-1"><button className="px-2 py-1 text-xs font-medium" onClick={() => setFilters({ ...DEFAULT_FILTERS, ...item.filters })}>{item.name}</button><button aria-label={`Delete ${item.name}`} className="p-1 text-muted-foreground hover:text-destructive" onClick={() => setSavedSearches(removeSavedSearch(user?.id, item.id))}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div></section> : null}
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground"><Filter className="h-4 w-4" />{visible.length} result{visible.length === 1 ? "" : "s"}</div>
 
@@ -119,7 +124,7 @@ export default function JobSearchCommandCenter() {
         </article>;
       })}</section>}
 
-      <p className="text-xs text-muted-foreground">Search ranking and pay normalization are career-assistance tools for the seeker. They are not employer hiring decisions, guarantees of eligibility, or guarantees that an external listing remains open.</p>
+      <p className="text-xs text-muted-foreground">Saved searches are private to this signed-in account on this device. Search ranking and pay normalization are career-assistance tools for the seeker, not employer hiring decisions, eligibility guarantees, or guarantees that an external listing remains open.</p>
     </PageShell>
   );
 }

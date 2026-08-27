@@ -2,6 +2,8 @@ import { readCareerPreference, writeCareerPreference } from "./careerPreferenceS
 import { jobSource, safeExternalJobUrl } from "./jobMatchIdentity.js";
 
 const SAVED_SEARCH_NAME = "saved-searches";
+const ALLOWED_SOURCES = new Set(["all", "native", "external"]);
+const ALLOWED_SORTS = new Set(["match", "newest", "pay"]);
 
 function text(value) {
   return String(value || "").trim();
@@ -9,6 +11,12 @@ function text(value) {
 
 function lower(value) {
   return text(value).toLowerCase();
+}
+
+function boundedNumber(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return min;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export function annualizePay(job) {
@@ -79,37 +87,77 @@ export function buildResumeLink(job) {
   return `/career/resume?${params.toString()}`;
 }
 
+export function normalizeSavedSearchFilters(filters = {}) {
+  const source = lower(filters.source || "all");
+  const sort = lower(filters.sort || "match");
+  return {
+    query: text(filters.query).slice(0, 200),
+    company: text(filters.company).slice(0, 160),
+    location: text(filters.location).slice(0, 160),
+    source: ALLOWED_SOURCES.has(source) ? source : "all",
+    minMatch: boundedNumber(filters.minMatch, 0, 100),
+    minAnnual: boundedNumber(filters.minAnnual, 0, 1000000),
+    sort: ALLOWED_SORTS.has(sort) ? sort : "match",
+  };
+}
+
+function savedSearchFingerprint(filters) {
+  const normalized = normalizeSavedSearchFilters(filters);
+  return JSON.stringify(normalized);
+}
+
+export function normalizeSavedSearches(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const normalized = [];
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object" || !raw.filters || typeof raw.filters !== "object") continue;
+    const filters = normalizeSavedSearchFilters(raw.filters);
+    const fingerprint = savedSearchFingerprint(filters);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+
+    const id = text(raw.id) || `search_${normalized.length + 1}`;
+    const createdAt = Number.isFinite(Date.parse(raw.createdAt)) ? new Date(raw.createdAt).toISOString() : null;
+    normalized.push({
+      id,
+      name: text(raw.name).slice(0, 120) || filters.query || filters.location || "Saved search",
+      filters,
+      createdAt,
+    });
+    if (normalized.length >= 20) break;
+  }
+
+  return normalized;
+}
+
 export function loadSavedSearches(userId) {
   if (!userId) return [];
   const parsed = readCareerPreference(userId, SAVED_SEARCH_NAME, []);
-  return Array.isArray(parsed) ? parsed.slice(0, 20) : [];
+  return normalizeSavedSearches(parsed);
 }
 
 export function saveSearch(userId, filters, name = "") {
   if (!userId) return [];
   const current = loadSavedSearches(userId);
+  const normalizedFilters = normalizeSavedSearchFilters(filters);
+  const fingerprint = savedSearchFingerprint(normalizedFilters);
   const item = {
     id: `search_${Date.now()}`,
-    name: text(name) || text(filters.query) || text(filters.location) || "Saved search",
-    filters: {
-      query: text(filters.query),
-      company: text(filters.company),
-      location: text(filters.location),
-      source: text(filters.source || "all"),
-      minMatch: Number(filters.minMatch || 0),
-      minAnnual: Number(filters.minAnnual || 0),
-      sort: text(filters.sort || "match"),
-    },
+    name: text(name).slice(0, 120) || normalizedFilters.query || normalizedFilters.location || "Saved search",
+    filters: normalizedFilters,
     createdAt: new Date().toISOString(),
   };
-  const next = [item, ...current].slice(0, 20);
+  const next = [item, ...current.filter((entry) => savedSearchFingerprint(entry.filters) !== fingerprint)].slice(0, 20);
   writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
   return next;
 }
 
 export function removeSavedSearch(userId, id) {
   if (!userId) return [];
-  const next = loadSavedSearches(userId).filter((item) => item.id !== id);
+  const targetId = text(id);
+  const next = loadSavedSearches(userId).filter((item) => item.id !== targetId);
   writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
   return next;
 }

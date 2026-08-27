@@ -50,6 +50,7 @@ const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const CareerPipeline = lazy(() => import("@/pages/CareerPipeline"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
@@ -80,11 +81,6 @@ const ShareReport = lazy(() => import("@/pages/ShareReport"));
 const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
 const SecondMe = lazy(() => import("@/pages/SecondMe"));
 
-/**
- * Compatibility map: preserve old bookmarks without keeping duplicate product concepts.
- * Removed/postponed high-liability features return to Home; their code remains in source
- * until separately archived after dependency/runtime verification.
- */
 const LEGACY_REDIRECTS = {
   "/messages": "/comms",
   "/titan-score": "/analytics?titanScore=1",
@@ -116,6 +112,7 @@ const NON_TAB_ROUTES = {
   "/referral": Referral,
   "/hire": Hire,
   "/hire/matches": JobMatches,
+  "/career/pipeline": CareerPipeline,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,
@@ -147,61 +144,19 @@ const NON_TAB_ROUTES = {
 function NonTabPage() {
   const { pathname: rawPath } = useLocation();
   const pathname = normalizeAppPath(rawPath);
-
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
 
-  if (pathname.startsWith("/share/report/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <ShareReport />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/customers/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <CustomerDetail />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/invoices/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <InvoiceDetail />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/driver/trip/")) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverTripDetail />
-      </Suspense>
-    );
-  }
-  if (pathname.startsWith("/driver/") && pathname !== "/driver/") {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <DriverProfile />
-      </Suspense>
-    );
-  }
+  if (pathname.startsWith("/share/report/")) return <Suspense fallback={<Spinner />}><ShareReport /></Suspense>;
+  if (pathname.startsWith("/customers/")) return <Suspense fallback={<Spinner />}><CustomerDetail /></Suspense>;
+  if (pathname.startsWith("/invoices/")) return <Suspense fallback={<Spinner />}><InvoiceDetail /></Suspense>;
+  if (pathname.startsWith("/driver/trip/")) return <Suspense fallback={<Spinner />}><DriverTripDetail /></Suspense>;
+  if (pathname.startsWith("/driver/") && pathname !== "/driver/") return <Suspense fallback={<Spinner />}><DriverProfile /></Suspense>;
 
   const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
   const Page = NON_TAB_ROUTES[routeKey];
-  if (!Page) {
-    return (
-      <Suspense fallback={<Spinner />}>
-        <PageNotFound />
-      </Suspense>
-    );
-  }
-
-  return (
-    <Suspense fallback={<Spinner />}>
-      <Page />
-    </Suspense>
-  );
+  if (!Page) return <Suspense fallback={<Spinner />}><PageNotFound /></Suspense>;
+  return <Suspense fallback={<Spinner />}><Page /></Suspense>;
 }
 
 export default function TabStack() {
@@ -209,13 +164,10 @@ export default function TabStack() {
   const recentTabs = useRef(["/"]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
-
   const isTab = TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
 
-  if (activeTab) {
-    recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
-  }
+  if (activeTab) recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
 
@@ -225,20 +177,11 @@ export default function TabStack() {
         const Page = TAB_COMPONENTS[path];
         const isMounted = mountedTabs.has(path);
         const isActive = activeTab === path;
-
         if (!isMounted) return null;
-
         return (
-          <div
-            key={path}
-            style={{ display: isActive ? "block" : "none" }}
-            aria-hidden={!isActive}
-            className={isActive && !reduceMotion ? "page-enter" : undefined}
-          >
+          <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive} className={isActive && !reduceMotion ? "page-enter" : undefined}>
             <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
-              <Suspense fallback={<Spinner label="Loading" />}>
-                <Page isActive={isActive} />
-              </Suspense>
+              <Suspense fallback={<Spinner label="Loading" />}><Page isActive={isActive} /></Suspense>
             </ErrorBoundary>
           </div>
         );
@@ -246,17 +189,8 @@ export default function TabStack() {
 
       {!isTab && (
         <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={reduceMotion ? false : { opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }}
-            transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
-            className="relative w-full"
-          >
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home.">
-              <NonTabPage />
-            </ErrorBoundary>
+          <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }} transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }} className="relative w-full">
+            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home."><NonTabPage /></ErrorBoundary>
           </motion.div>
         </AnimatePresence>
       )}

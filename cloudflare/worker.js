@@ -1,5 +1,15 @@
 const API_PREFIX = "/api/";
 
+const SECURITY_HEADERS = {
+  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'none'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; upgrade-insecure-requests",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
 function normalizeOrigin(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -10,6 +20,29 @@ function normalizeOrigin(value) {
   } catch {
     return null;
   }
+}
+
+function withSecurityHeaders(response, pathname) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) headers.set(key, value);
+
+  if (pathname.startsWith("/assets/")) {
+    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  } else if (pathname === "/sw.js") {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+    headers.set("Service-Worker-Allowed", "/");
+  } else if (pathname === "/manifest.webmanifest") {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+    headers.set("Content-Type", "application/manifest+json");
+  } else if (pathname === "/" || pathname.endsWith(".html")) {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function proxyLegacyApi(request, env) {
@@ -25,7 +58,6 @@ async function proxyLegacyApi(request, env) {
   const target = new URL(incoming.pathname + incoming.search, origin);
   const headers = new Headers(request.headers);
 
-  // Preserve the public host/protocol explicitly for existing origin-aware handlers.
   headers.set("x-forwarded-host", incoming.host);
   headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
   headers.set("x-titanos-edge", "cloudflare");
@@ -61,6 +93,7 @@ export default {
       return proxyLegacyApi(request, env);
     }
 
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    return withSecurityHeaders(assetResponse, url.pathname);
   },
 };

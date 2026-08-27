@@ -1,0 +1,293 @@
+/* Active Titan Attention second-pass UX refinement.
+   This intentionally targets only the current App.jsx surface. */
+
+:root {
+  --surface-raised: rgba(16, 25, 43, .9);
+  --surface-soft: rgba(255, 255, 255, .025);
+  --text-soft: #a8b5ca;
+  --text-faint: #7f8da5;
+  --success-soft: rgba(99, 245, 183, .08);
+  --warning-soft: rgba(255, 210, 118, .08);
+}
+
+/* Preserve comfortable line lengths and make sections easier to scan. */
+.section-copy > p,
+.policy > p,
+.dash-head p,
+.campaign p,
+.campaign-list article p,
+.watch-modal > p {
+  max-width: 68ch;
+}
+
+/* Public navigation: keep the primary choices visually distinct without noise. */
+.topbar nav .btn { white-space: nowrap; }
+.topbar nav .primary { box-shadow: 0 8px 26px rgba(51, 134, 255, .18); }
+
+.hero-copy .eyebrow,
+.section-copy .eyebrow,
+.policy .eyebrow,
+.dash-head .eyebrow,
+.create-card .eyebrow,
+.watch-title .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+}
+.hero-copy .eyebrow::before,
+.dash-head .eyebrow::before,
+.create-card .eyebrow::before {
+  content: "";
+  width: 1.25rem;
+  height: 1px;
+  background: currentColor;
+  opacity: .7;
+}
+
+/* Hero example should read as a product preview, not a decorative block. */
+.hero-card { padding: 1.25rem; }
+.card-head { min-height: 30px; }
+.card-head b {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .28rem .5rem;
+  border: 1px solid rgba(99,245,183,.22);
+  border-radius: 999px;
+  background: var(--success-soft);
+}
+.card-head b::before { content: "●"; font-size: .55rem; }
+.reward-grid strong { letter-spacing: -.02em; }
+
+/* Dashboard chrome: account identity should not compete with work content. */
+.account-chip { box-shadow: inset 0 1px rgba(255,255,255,.025); }
+.account-chip b { font-family: "Space Grotesk", Inter, sans-serif; letter-spacing: -.02em; }
+.side-note { background: rgba(99,245,183,.025); }
+
+/* Metric cards: labels, values and supporting text become an explicit hierarchy. */
+.stats small {
+  min-height: 1.1rem;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.stats strong { margin: .15rem 0 .65rem; }
+.stats article > span { line-height: 1.45; }
+.stats .btn { align-self: stretch; text-align: center; }
+
+/* Campaign cards: reward/status first, description second, action last. */
+.campaign,
+.campaign-list article {
+  position: relative;
+  isolation: isolate;
+}
+.campaign::before,
+.campaign-list article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--cyan), transparent 72%);
+  opacity: .35;
+  pointer-events: none;
+}
+.campaign-top { min-height: 27px; }
+.campaign-top > b {
+  font-family: "Space Grotesk", Inter, sans-serif;
+  font-size: .96rem;
+  font-weight: 700;
+}
+.campaign h3,
+.campaign-list article h3 { margin-top: 1rem; }
+.campaign-meta { row-gap: .5rem; }
+.campaign-meta span {
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+/* Status chips: readable at a glance, including non-color cues. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: .3rem .55rem;
+  background: rgba(255,255,255,.025);
+}
+.status.active { background: var(--success-soft); }
+.status.funding { background: var(--warning-soft); }
+.status.draft { background: rgba(148,186,255,.07); }
+
+/* Advertiser workspace: make the creation form feel like a guided control surface. */
+.advertiser-layout { gap: 1.25rem; }
+.create-card {
+  position: sticky;
+  top: 1.25rem;
+  padding: 1.25rem;
+  box-shadow: 0 12px 38px rgba(0,0,0,.14);
+}
+.create-card form, .create-card { gap: 1rem; }
+.create-card label { font-size: .8rem; }
+.create-card input,
+.create-card textarea {
+  margin-top: .08rem;
+  background: rgba(5,10,18,.84);
+}
+.create-card .fine {
+  margin: .1rem 0 .2rem;
+  padding: .75rem .8rem;
+  border-left: 2px solid rgba(75,226,255,.32);
+  background: rgba(75,226,255,.035);
+  border-radius: 0 .55rem .55rem 0;
+}
+.campaign-list { padding: 1.2rem; }
+.campaign-list > h2 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: .15rem 0 .75rem;
+  background: linear-gradient(180deg, rgba(11,18,31,.98) 70%, transparent);
+}
+
+/* Empty states: make them calm and purposeful rather than looking unfinished. */
+.empty {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 0%, rgba(57,169,255,.07), transparent 14rem), rgba(255,255,255,.012);
+}
+.empty::before {
+  content: "T";
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: .8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(75,226,255,.2);
+  border-radius: .8rem;
+  color: var(--cyan);
+  background: rgba(75,226,255,.045);
+  font: 800 1.1rem "Space Grotesk", sans-serif;
+}
+.empty h3 { font-family: "Space Grotesk", Inter, sans-serif; }
+
+/* Notices should be obvious but never dominate the work surface. */
+.notice {
+  position: relative;
+  padding-left: 1rem;
+  box-shadow: inset 3px 0 rgba(57,169,255,.45);
+}
+.notice.success { box-shadow: inset 3px 0 rgba(99,245,183,.5); }
+
+/* Watch experience: put verified progress and reward in the visual foreground. */
+.watch-modal { padding: 1.5rem; }
+.watch-title { align-items: flex-start; }
+.watch-stats > div { min-height: 76px; }
+.watch-stats strong {
+  font-family: "Space Grotesk", Inter, sans-serif;
+  font-size: 1.12rem;
+}
+.watch-modal .progress { height: 9px; }
+.watch-modal .fine {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+}
+.watch-modal .fine::before { content: "●"; color: var(--green); font-size: .65rem; margin-top: .12rem; }
+.sponsor-link {
+  padding: 0 .15rem;
+  text-decoration: underline;
+  text-decoration-color: rgba(75,226,255,.35);
+  text-underline-offset: .23rem;
+}
+
+/* Forms: better autofill/readability and less accidental mobile zoom risk. */
+input,
+textarea { color-scheme: dark; }
+input::placeholder,
+textarea::placeholder { color: #65738a; }
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px #08101c inset;
+  caret-color: var(--text);
+}
+
+/* Give destructive/session-ending actions less visual weight than the primary task. */
+.dashboard aside > .btn.ghost { color: #aebbd0; }
+.dashboard aside > .btn.ghost:hover { color: #fff; }
+
+@media (max-width: 1180px) {
+  .campaign-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 980px) {
+  .create-card { position: relative; top: auto; }
+  .campaign-list > h2 { position: static; background: transparent; }
+  .advertiser-layout { gap: .9rem; }
+}
+
+@media (max-width: 640px) {
+  /* Keep essential auth controls while preventing the header from feeling crowded. */
+  .topbar .brand { gap: .5rem; }
+  .topbar nav .btn { font-size: .8rem; }
+
+  .hero-copy .eyebrow { line-height: 1.45; }
+  .hero-card { padding: 1rem; }
+  .card-head { gap: .55rem; }
+
+  .dash-main { padding-bottom: max(4rem, env(safe-area-inset-bottom)); }
+  .dash-head { padding-bottom: .9rem; }
+  .dash-head p { font-size: .9rem; }
+
+  .stats article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .25rem .75rem;
+    padding: .9rem 1rem;
+  }
+  .stats article small,
+  .stats article > span,
+  .stats article > .btn { grid-column: 1 / -1; }
+  .stats article strong { margin: .05rem 0; }
+  .stats article > span { margin-top: .2rem; }
+  .stats article > .btn { margin-top: .55rem; }
+
+  .campaign-grid { grid-template-columns: 1fr; }
+  .campaign,
+  .campaign-list article { padding: 1rem; }
+  .campaign-top { align-items: flex-start; }
+  .campaign-meta span { font-size: .69rem; }
+
+  .create-card,
+  .campaign-list { padding: 1rem; }
+  .create-card .fine { font-size: .75rem; }
+
+  /* Mobile modals behave like deliberate bottom sheets and respect safe areas. */
+  .modal-backdrop { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }
+  .auth-modal,
+  .watch-modal {
+    border-bottom-left-radius: max(1rem, env(safe-area-inset-bottom));
+    border-bottom-right-radius: max(1rem, env(safe-area-inset-bottom));
+  }
+  .watch-modal { padding: 1rem; }
+  .watch-title h2 { font-size: 1.45rem; }
+  .watch-stats > div { min-height: 68px; }
+}
+
+@media (max-width: 420px) {
+  .topbar .brand-copy b { font-size: .86rem; }
+  .topbar nav .btn { padding-left: .58rem; padding-right: .58rem; }
+  .topbar nav .primary { max-width: 8.2rem; }
+  .stats strong { font-size: 1.85rem; }
+}
+
+@media (hover: none) {
+  .hero-card:hover,
+  .campaign:hover,
+  .campaign-list article:hover,
+  .three-grid article:hover,
+  .role-picker button:hover { transform: none; }
+}

@@ -168,7 +168,7 @@ export default async function handler(req, res) {
       needsProfile: false,
       needsSkills: false,
       internalCount: internal.length,
-      radiusMode: worker.lat != null && worker.lng != null ? "precise" : "city_state_fallback",
+      radiusMode: worker.lat != null && worker.lng != null ? "device_location" : "city_state_fallback",
       external: externalState,
     } });
   } catch (error) {

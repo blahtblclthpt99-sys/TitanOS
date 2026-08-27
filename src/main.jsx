@@ -12,8 +12,8 @@ import '@/index.css'
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
+const SW_PURGE_KEY = "titanos-sw-v9-purge";
 
-// Observability — crash/perf (Sentry), flags, first-party analytics
 initSentry();
 hydrateFeatureFlags();
 hydrateLaunchStatus();
@@ -22,7 +22,6 @@ runWhenIdle(() => {
   refreshFeatureFlagsFromServer().catch(() => {});
 });
 
-/** Log uncaught async/sync failures without crashing the shell (ErrorBoundary covers React tree). */
 function installGlobalErrorLogging() {
   if (typeof window === "undefined") return;
   window.addEventListener("unhandledrejection", (event) => {
@@ -40,16 +39,9 @@ function installGlobalErrorLogging() {
 }
 
 installGlobalErrorLogging();
-
-// Prefer stored preference (system / light / dark). Default is system when unset.
 applyTheme(getStoredTheme());
 watchSystemContrast();
 
-/**
- * One-shot chunk recovery after deploy.
- * Do NOT clear the flag at module load (that caused infinite reloads).
- * Clear only after the app has stayed healthy for a few seconds.
- */
 function markChunkReloadAttempt() {
   try {
     sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
@@ -61,8 +53,7 @@ function markChunkReloadAttempt() {
 
 function canAttemptChunkReload() {
   try {
-    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return false;
-    return true;
+    return sessionStorage.getItem(CHUNK_RELOAD_KEY) !== "1";
   } catch {
     return true;
   }
@@ -70,7 +61,6 @@ function canAttemptChunkReload() {
 
 function clearChunkReloadFlagWhenHealthy() {
   try {
-    // Only clear if we reloaded recently (within 30s) and stayed up
     const at = Number(sessionStorage.getItem(CHUNK_RELOAD_TS) || 0);
     if (!at) {
       sessionStorage.removeItem(CHUNK_RELOAD_KEY);
@@ -93,13 +83,11 @@ if (typeof window !== "undefined") {
     window.location.reload();
   });
 
-  // After a successful paint + idle, clear the one-shot flag
   window.addEventListener("load", () => {
     window.setTimeout(clearChunkReloadFlagWhenHealthy, 5000);
   });
 }
 
-// Native-only deep links — keep Capacitor plugins out of the web entry chunk
 if (typeof window !== "undefined") {
   import("@/lib/capacitor-auth")
     .then((m) => m.installNativeAuthDeepLinks())
@@ -114,7 +102,6 @@ function BootProbe({ children }) {
   return children;
 }
 
-// Paint immediately — never block first render on auth/network.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary message="The app failed to load." fullScreen showHome>
     <BootProbe>
@@ -123,26 +110,25 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </ErrorBoundary>
 )
 
-// Progressive Web App — register service worker after load + idle (keep LCP clean)
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   const isNative = window.Capacitor?.isNativePlatform?.() === true;
   if (!isNative) {
     window.addEventListener('load', () => {
       runWhenIdle(async () => {
         try {
-          if (!localStorage.getItem('titanos-sw-v8-purge')) {
+          if (!localStorage.getItem(SW_PURGE_KEY)) {
             const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map((r) => r.unregister()));
+            await Promise.all(regs.map((registration) => registration.unregister()));
             if (window.caches?.keys) {
               const keys = await caches.keys();
-              await Promise.all(keys.filter((k) => k.startsWith('titanos-shell')).map((k) => caches.delete(k)));
+              await Promise.all(keys.filter((key) => key.startsWith('titanos-shell')).map((key) => caches.delete(key)));
             }
-            localStorage.setItem('titanos-sw-v8-purge', '1');
+            localStorage.setItem(SW_PURGE_KEY, '1');
           }
         } catch {
-          /* ignore */
+          /* cache recovery must never block app boot */
         }
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
         prefetchHotRoutes();
       }, 2500);
     });

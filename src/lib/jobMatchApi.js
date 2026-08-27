@@ -34,8 +34,16 @@ function freshnessState(job, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now()
 }
 
 function dedupeKey(job) {
-  const sourceId = job?.external_id || job?.source_job_id || job?.id;
-  if (sourceId) return `${normalizedText(job?.source_name || job?.source || job?.match?.source_name || job?.match?.source)}:${String(sourceId)}`;
+  // Only explicit provider/source identifiers are authoritative identities.
+  // A generic local `id` is unique to a row and must not prevent semantic
+  // duplicate collapse across separate copies of the same vacancy.
+  const sourceId = job?.external_id || job?.source_job_id || job?.match?.source_job_id;
+  if (sourceId) {
+    const source = normalizedText(
+      job?.source_name || job?.source || job?.match?.source_name || job?.match?.source
+    );
+    return `source:${source}:${String(sourceId)}`;
+  }
 
   const parts = [
     normalizedText(job?.title),
@@ -43,7 +51,7 @@ function dedupeKey(job) {
     normalizedText(job?.city || job?.location),
     normalizedText(job?.state),
   ];
-  return parts.some(Boolean) ? parts.join("|") : null;
+  return parts.some(Boolean) ? `semantic:${parts.join("|")}` : null;
 }
 
 export function normalizeJobMatches(matches, { maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {

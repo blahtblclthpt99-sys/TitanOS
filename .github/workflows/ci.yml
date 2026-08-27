@@ -46,6 +46,9 @@ jobs:
       - name: Career pipeline regression
         run: node --test scripts/career-pipeline.test.mjs
 
+      - name: Career pipeline detail validation regression
+        run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/career-pipeline-details.test.mjs
+
       - name: Career preference isolation regression
         run: node --test scripts/career-preference-storage.test.mjs
 
@@ -58,8 +61,11 @@ jobs:
       - name: Job match career-core regression
         run: node --test scripts/job-match-career-core.test.mjs
 
+      - name: Job provider freshness and provenance regression
+        run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/job-match.test.mjs
+
       - name: Job search command regression
-        run: node --test scripts/job-search-command.test.mjs
+        run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/job-search-command.test.mjs
 
       - name: Resume builder regression
         run: node --test scripts/resume-builder.test.mjs

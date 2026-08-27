@@ -73,21 +73,21 @@ export default function RoutePlanner() {
           title="No scheduled stops today"
           description="Schedule jobs to build a route for this date."
           actionLabel="Create a job"
-          onAction={() => navigate("/jobs?new=1")}
+          onAction={() => navigate("/work/jobs?new=1")}
           icon={Route}
         />
       ) : (
         <div className="grid lg:grid-cols-2 gap-6">
           <section className="titan-surface p-5 border border-border">
             <h2 className="font-semibold text-foreground mb-4">Original order</h2>
-            <div className="space-y-3">{jobs.map((job, index) => <Stop key={job.id} index={index + 1} job={job} onOpen={() => navigate(`/jobs?id=${job.id}`)} />)}</div>
+            <div className="space-y-3">{jobs.map((job, index) => <Stop key={job.id} index={index + 1} job={job} onOpen={() => navigate(`/work/jobs?id=${job.id}`)} />)}</div>
           </section>
           <section className="titan-surface p-5 border border-titan-cyan/15">
             <h2 className="font-semibold text-foreground mb-4">Optimized order</h2>
             <div className="space-y-3">
               {route.ordered.map((job, index) => (
                 <div key={job.id}>
-                  <Stop index={index + 1} job={job} onOpen={() => navigate(`/jobs?id=${job.id}`)} />
+                  <Stop index={index + 1} job={job} onOpen={() => navigate(`/work/jobs?id=${job.id}`)} />
                   <p className="text-xs text-titan-cyan/75 ml-10 mt-1">
                     {route.legs[index] ? `${route.legs[index].miles ?? "—"} mi to next stop` : "Final stop"}
                   </p>

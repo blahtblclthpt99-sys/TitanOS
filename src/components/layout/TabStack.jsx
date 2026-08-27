@@ -16,11 +16,12 @@ const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
 const TAB_LRU_SIZE = 3;
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Jobs = lazy(() => import("@/pages/Jobs"));
+const JobSearchCommandCenter = lazy(() => import("@/pages/JobSearchCommandCenter"));
+const WorkOrders = lazy(() => import("@/pages/Jobs"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
-const TAB_COMPONENTS = { "/": Dashboard, "/driver": DriverHubTab, "/comms": TitanCommsTab, "/jobs": Jobs, "/more": MoreMenu };
+const TAB_COMPONENTS = { "/": Dashboard, "/driver": DriverHubTab, "/comms": TitanCommsTab, "/jobs": JobSearchCommandCenter, "/more": MoreMenu };
 
 const Customers = lazy(() => import("@/pages/Customers"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
@@ -29,7 +30,6 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const CareerAttentionCenter = lazy(() => import("@/pages/CareerAttentionCenter"));
 const CareerReadiness = lazy(() => import("@/pages/CareerReadiness"));
 const ResumeBuilder = lazy(() => import("@/pages/ResumeBuilder"));
-const JobSearchCommandCenter = lazy(() => import("@/pages/JobSearchCommandCenter"));
 const EmployerIntelligence = lazy(() => import("@/pages/EmployerIntelligence"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
@@ -79,6 +79,7 @@ const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
 const SecondMe = lazy(() => import("@/pages/SecondMe"));
 
 const LEGACY_REDIRECTS = {
+  "/career/search": "/jobs",
   "/messages": "/comms", "/titan-score": "/analytics?titanScore=1", "/growth-coach": "/assistant?mode=growth",
   "/marketing": "/assistant?mode=marketing", "/phone": "/assistant?mode=phone-script", "/community": "/",
   "/emergency": "/", "/deals": "/", "/escrow": "/",
@@ -89,7 +90,7 @@ const NON_TAB_ROUTES = {
   "/receipts": ReceiptScanner, "/fleet": Fleet, "/tax-center": TaxCenter, "/reports": Reports, "/analytics": Analytics,
   "/customers": Customers, "/invoices": Invoices, "/assistant": AIAssistant, "/second-me": SecondMe,
   "/business-documents": BusinessDocuments, "/insurance": Insurance, "/referral": Referral, "/hire": Hire,
-  "/hire/matches": JobMatches, "/career/search": JobSearchCommandCenter, "/career/employers": EmployerIntelligence,
+  "/work/jobs": WorkOrders, "/hire/matches": JobMatches, "/career/employers": EmployerIntelligence,
   "/career/attention": CareerAttentionCenter, "/career/pipeline": CareerPipeline, "/career/readiness": CareerReadiness,
   "/career/resume": ResumeBuilder, "/hire/post-match-ready": MatchReadyJobPost, "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches, "/notifications": Notifications, "/admin/moderation": AdminModeration,

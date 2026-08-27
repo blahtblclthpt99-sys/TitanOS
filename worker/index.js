@@ -1,3 +1,5 @@
+import rootRegister from "../api/register.js";
+import signupEmails from "../api/signup-emails.js";
 import accountDeletionRequest from "../api/functions/accountDeletionRequest.js";
 import adminControl from "../api/functions/adminControl.js";
 import adminFees from "../api/functions/adminFees.js";
@@ -57,73 +59,74 @@ import supportRefreshSubscription from "../api/functions/supportRefreshSubscript
 import supportRegisterAttachment from "../api/functions/supportRegisterAttachment.js";
 import supportReopenCase from "../api/functions/supportReopenCase.js";
 import supportSubmitCsat from "../api/functions/supportSubmitCsat.js";
-import titanAI from "../api/functions/titanAI.js";
 import titanAICapabilities from "../api/functions/titanAICapabilities.js";
 import titanAILive from "../api/functions/titanAILive.js";
 
 const ROUTES = new Map([
-  ["accountDeletionRequest", accountDeletionRequest],
-  ["adminControl", adminControl],
-  ["adminFees", adminFees],
-  ["aiExecuteAction", aiExecuteAction],
-  ["analyticsIngest", analyticsIngest],
-  ["appVersion", appVersion],
-  ["attachReferral", attachReferral],
-  ["auth/me", authMe],
-  ["auth/register", authRegister],
-  ["calculateFee", calculateFee],
-  ["contractShareToken", contractShareToken],
-  ["createAutopilotOrder", createAutopilotOrder],
-  ["createNotification", createNotification],
-  ["createPaymentLink", createPaymentLink],
-  ["createSubscriptionCheckout", createSubscriptionCheckout],
-  ["directionsOptimize", directionsOptimize],
-  ["featureFlags", featureFlags],
-  ["googlePlayVerifySubscription", googlePlayVerifySubscription],
-  ["health", health],
-  ["installMarketplaceModule", installMarketplaceModule],
-  ["jobMatches", jobMatches],
-  ["jobMatchesV2", jobMatchesV2],
-  ["markReferralPaying", markReferralPaying],
-  ["mppPaid", mppPaid],
-  ["paypalWebhook", paypalWebhook],
-  ["portalAcceptEstimate", portalAcceptEstimate],
-  ["portalGetData", portalGetData],
-  ["portalLeaveReview", portalLeaveReview],
-  ["portalPayInvoice", portalPayInvoice],
-  ["portalRequestOtp", portalRequestOtp],
-  ["portalVerifyOtp", portalVerifyOtp],
-  ["publicContract", publicContract],
-  ["receiptVisionOcr", receiptVisionOcr],
-  ["runAutopilotMembership", runAutopilotMembership],
-  ["runAutopilotOrder", runAutopilotOrder],
-  ["seedMarketplace", seedMarketplace],
-  ["sendEmail", sendEmail],
-  ["sendFollowUp", sendFollowUp],
-  ["sentryDebug", sentryDebug],
-  ["stripeCustomerPortal", stripeCustomerPortal],
-  ["stripeWebhook", stripeWebhook],
-  ["submitFeedback", submitFeedback],
-  ["subscriptionStatus", subscriptionStatus],
-  ["supportAI", supportAI],
-  ["supportAdminAssignCase", supportAdminAssignCase],
-  ["supportAgentGetCase", supportAgentGetCase],
-  ["supportAgentInbox", supportAgentInbox],
-  ["supportAgentReply", supportAgentReply],
-  ["supportAnalytics", supportAnalytics],
-  ["supportCreateCase", supportCreateCase],
-  ["supportEscalate", supportEscalate],
-  ["supportGetCase", supportGetCase],
-  ["supportIncidentAdmin", supportIncidentAdmin],
-  ["supportListCases", supportListCases],
-  ["supportPostMessage", supportPostMessage],
-  ["supportRefreshSubscription", supportRefreshSubscription],
-  ["supportRegisterAttachment", supportRegisterAttachment],
-  ["supportReopenCase", supportReopenCase],
-  ["supportSubmitCsat", supportSubmitCsat],
-  ["titanAI", titanAILive],
-  ["titanAICapabilities", titanAICapabilities],
-  ["titanAILive", titanAILive],
+  ["register", rootRegister],
+  ["signup-emails", signupEmails],
+  ["functions/accountDeletionRequest", accountDeletionRequest],
+  ["functions/adminControl", adminControl],
+  ["functions/adminFees", adminFees],
+  ["functions/aiExecuteAction", aiExecuteAction],
+  ["functions/analyticsIngest", analyticsIngest],
+  ["functions/appVersion", appVersion],
+  ["functions/attachReferral", attachReferral],
+  ["functions/auth/me", authMe],
+  ["functions/auth/register", authRegister],
+  ["functions/calculateFee", calculateFee],
+  ["functions/contractShareToken", contractShareToken],
+  ["functions/createAutopilotOrder", createAutopilotOrder],
+  ["functions/createNotification", createNotification],
+  ["functions/createPaymentLink", createPaymentLink],
+  ["functions/createSubscriptionCheckout", createSubscriptionCheckout],
+  ["functions/directionsOptimize", directionsOptimize],
+  ["functions/featureFlags", featureFlags],
+  ["functions/googlePlayVerifySubscription", googlePlayVerifySubscription],
+  ["functions/health", health],
+  ["functions/installMarketplaceModule", installMarketplaceModule],
+  ["functions/jobMatches", jobMatches],
+  ["functions/jobMatchesV2", jobMatchesV2],
+  ["functions/markReferralPaying", markReferralPaying],
+  ["functions/mppPaid", mppPaid],
+  ["functions/paypalWebhook", paypalWebhook],
+  ["functions/portalAcceptEstimate", portalAcceptEstimate],
+  ["functions/portalGetData", portalGetData],
+  ["functions/portalLeaveReview", portalLeaveReview],
+  ["functions/portalPayInvoice", portalPayInvoice],
+  ["functions/portalRequestOtp", portalRequestOtp],
+  ["functions/portalVerifyOtp", portalVerifyOtp],
+  ["functions/publicContract", publicContract],
+  ["functions/receiptVisionOcr", receiptVisionOcr],
+  ["functions/runAutopilotMembership", runAutopilotMembership],
+  ["functions/runAutopilotOrder", runAutopilotOrder],
+  ["functions/seedMarketplace", seedMarketplace],
+  ["functions/sendEmail", sendEmail],
+  ["functions/sendFollowUp", sendFollowUp],
+  ["functions/sentryDebug", sentryDebug],
+  ["functions/stripeCustomerPortal", stripeCustomerPortal],
+  ["functions/stripeWebhook", stripeWebhook],
+  ["functions/submitFeedback", submitFeedback],
+  ["functions/subscriptionStatus", subscriptionStatus],
+  ["functions/supportAI", supportAI],
+  ["functions/supportAdminAssignCase", supportAdminAssignCase],
+  ["functions/supportAgentGetCase", supportAgentGetCase],
+  ["functions/supportAgentInbox", supportAgentInbox],
+  ["functions/supportAgentReply", supportAgentReply],
+  ["functions/supportAnalytics", supportAnalytics],
+  ["functions/supportCreateCase", supportCreateCase],
+  ["functions/supportEscalate", supportEscalate],
+  ["functions/supportGetCase", supportGetCase],
+  ["functions/supportIncidentAdmin", supportIncidentAdmin],
+  ["functions/supportListCases", supportListCases],
+  ["functions/supportPostMessage", supportPostMessage],
+  ["functions/supportRefreshSubscription", supportRefreshSubscription],
+  ["functions/supportRegisterAttachment", supportRegisterAttachment],
+  ["functions/supportReopenCase", supportReopenCase],
+  ["functions/supportSubmitCsat", supportSubmitCsat],
+  ["functions/titanAI", titanAILive],
+  ["functions/titanAICapabilities", titanAICapabilities],
+  ["functions/titanAILive", titanAILive],
 ]);
 
 function headersObject(headers) {
@@ -207,7 +210,6 @@ function legacyResponse() {
       statusCode = Number(code) || 500;
       return response;
     },
-    statusCode,
     setHeader(name, value) {
       if (Array.isArray(value)) {
         headers.delete(name);
@@ -257,7 +259,9 @@ function legacyResponse() {
       return ended;
     },
     toResponse() {
-      const body = chunks.length ? chunks.map((chunk) => typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8")).join("") : null;
+      const body = chunks.length
+        ? chunks.map((chunk) => typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8")).join("")
+        : null;
       return new Response(body, { status: statusCode, headers });
     },
   };
@@ -268,9 +272,9 @@ function legacyResponse() {
   return response;
 }
 
-export async function dispatchLegacyFunction(request) {
+export async function dispatchLegacyApi(request) {
   const url = new URL(request.url);
-  const prefix = "/api/functions/";
+  const prefix = "/api/";
   if (!url.pathname.startsWith(prefix)) {
     return new Response("Not found", { status: 404 });
   }
@@ -284,9 +288,7 @@ export async function dispatchLegacyFunction(request) {
   const res = legacyResponse();
   try {
     await handler(req, res);
-    if (!res.writableEnded && res.statusCode === 200) {
-      res.status(204).end();
-    }
+    if (!res.writableEnded && res.statusCode === 200) res.status(204).end();
     return res.toResponse();
   } catch (error) {
     console.error("Cloudflare API adapter error", {
@@ -294,9 +296,7 @@ export async function dispatchLegacyFunction(request) {
       name: error?.name || "Error",
       message: error?.message || "Unhandled API error",
     });
-    if (!res.writableEnded) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    if (!res.writableEnded) res.status(500).json({ error: "Internal server error" });
     return res.toResponse();
   }
 }
@@ -304,9 +304,7 @@ export async function dispatchLegacyFunction(request) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/functions/")) {
-      return dispatchLegacyFunction(request);
-    }
+    if (url.pathname.startsWith("/api/")) return dispatchLegacyApi(request);
     return env.ASSETS.fetch(request);
   },
 };

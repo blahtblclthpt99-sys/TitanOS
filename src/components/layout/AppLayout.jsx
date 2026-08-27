@@ -38,7 +38,7 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div className="titan-app-shell min-h-screen bg-background text-foreground">
+    <div className="titan-app-shell min-h-screen overflow-x-hidden bg-background text-foreground">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -50,7 +50,7 @@ export default function AppLayout() {
         <Sidebar />
         <DesktopTopBar />
         <MobileHeader />
-        <nav aria-label="Mobile primary" className="md:hidden contents">
+        <nav aria-label="Mobile primary" className="lg:hidden contents">
           <MobileNav />
         </nav>
       </div>
@@ -59,21 +59,21 @@ export default function AppLayout() {
         id="main-content"
         tabIndex={-1}
         aria-label="Main content"
-        className="titan-main-stage md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
+        className="titan-main-stage min-w-0 overflow-x-hidden lg:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] lg:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] lg:pb-8"
         style={{
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",
           minHeight: "100svh",
         }}
       >
-        <div className="page-enter">
+        <div className="page-enter min-w-0">
           {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
         </div>
       </main>
 
       <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />
       <TitanSupportButton />
-      <div className="hidden md:contents">
+      <div className="hidden lg:contents">
         <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
       </div>
       <FeedbackButton ref={feedbackRef} />

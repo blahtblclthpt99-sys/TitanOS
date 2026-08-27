@@ -43,6 +43,7 @@ export default function JobSearchCommandCenter() {
   const [jobs, setJobs] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [savedSearches, setSavedSearches] = useState([]);
+  const [externalState, setExternalState] = useState({ requested: false, enabled: false, reason: "unavailable" });
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
 
@@ -55,7 +56,9 @@ export default function JobSearchCommandCenter() {
     try {
       const result = await getJobMatches({ includeExternal: true });
       setJobs(result.matches || []);
+      setExternalState(result.external || { requested: false, enabled: false, reason: "unavailable" });
     } catch {
+      setExternalState({ requested: false, enabled: false, reason: "unavailable" });
       toast({ variant: "destructive", title: "Couldn't load job search", description: "The opportunity feed is unavailable right now. Please try again." });
     } finally {
       setLoading(false);
@@ -67,6 +70,7 @@ export default function JobSearchCommandCenter() {
   const visible = useMemo(() => sortJobSearch(filterJobSearch(jobs, filters), filters.sort), [jobs, filters]);
   const nativeCount = jobs.filter((job) => !isExternalJobMatch(job)).length;
   const externalCount = jobs.length - nativeCount;
+  const externalConsentRequired = externalState.reason === "consent_required";
 
   const patch = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
 
@@ -91,8 +95,19 @@ export default function JobSearchCommandCenter() {
 
   const rememberSearch = () => {
     if (!user?.id) return;
-    setSavedSearches(saveSearch(user.id, filters));
-    toast({ title: "Search saved for this account on this device" });
+    try {
+      setSavedSearches(saveSearch(user.id, filters));
+      toast({ title: "Search saved for this account on this device" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't save search", description: "This device could not store the search. Check browser storage settings and try again." });
+    }
+  };
+
+  const applySavedSearch = (item) => {
+    setFilters({ ...DEFAULT_FILTERS, ...item.filters });
+    if (item.filters?.source === "external" && externalConsentRequired) {
+      toast({ title: "External search is off", description: "This saved filter is preserved, but external listings require your explicit search consent before provider jobs can load." });
+    }
   };
 
   return (
@@ -121,7 +136,9 @@ export default function JobSearchCommandCenter() {
         </div>
       </section>
 
-      {savedSearches.length ? <section className="titan-surface p-4 space-y-2"><h2 className="text-sm font-semibold">Saved searches</h2><div className="flex flex-wrap gap-2">{savedSearches.map((item) => <div key={item.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-1"><button className="px-2 py-1 text-xs font-medium" onClick={() => setFilters({ ...DEFAULT_FILTERS, ...item.filters })}>{item.name}</button><button aria-label={`Delete ${item.name}`} className="p-1 text-muted-foreground hover:text-destructive" onClick={() => setSavedSearches(removeSavedSearch(user?.id, item.id))}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div></section> : null}
+      {externalConsentRequired ? <div className="titan-surface border-amber-500/30 p-4 text-sm text-muted-foreground" role="status">External provider search is disabled until you explicitly enable external job search in your career preferences. TitanOS native jobs remain available.</div> : null}
+
+      {savedSearches.length ? <section className="titan-surface p-4 space-y-2"><h2 className="text-sm font-semibold">Saved searches</h2><div className="flex flex-wrap gap-2">{savedSearches.map((item) => <div key={item.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-1"><button className="px-2 py-1 text-xs font-medium" onClick={() => applySavedSearch(item)}>{item.name}</button><button aria-label={`Delete ${item.name}`} className="p-1 text-muted-foreground hover:text-destructive" onClick={() => setSavedSearches(removeSavedSearch(user?.id, item.id))}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div></section> : null}
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite"><Filter className="h-4 w-4" />{visible.length} result{visible.length === 1 ? "" : "s"}</div>
 

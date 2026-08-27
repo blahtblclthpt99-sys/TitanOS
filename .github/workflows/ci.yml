@@ -34,20 +34,35 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Career-core checks are intentionally split into named steps. A failure
+      # must identify the subsystem immediately instead of hiding inside one
+      # aggregate shell command.
+      - name: Career attention regression
+        run: node --test scripts/career-attention.test.mjs
+
+      - name: Career pipeline regression
+        run: node --test scripts/career-pipeline.test.mjs
+
+      - name: Career preference isolation regression
+        run: node --test scripts/career-preference-storage.test.mjs
+
+      - name: Career readiness regression
+        run: node --test scripts/career-readiness.test.mjs
+
+      - name: Employer intelligence regression
+        run: node --test scripts/employer-intelligence.test.mjs
+
+      - name: Job match career-core regression
+        run: node --test scripts/job-match-career-core.test.mjs
+
+      - name: Job search command regression
+        run: node --test scripts/job-search-command.test.mjs
+
+      - name: Resume builder regression
+        run: node --test scripts/resume-builder.test.mjs
+
       - name: Unit / integration / regression pack
         run: npm test
-
-      - name: Career core regression pack
-        run: >-
-          node --test
-          scripts/career-attention.test.mjs
-          scripts/career-pipeline.test.mjs
-          scripts/career-preference-storage.test.mjs
-          scripts/career-readiness.test.mjs
-          scripts/employer-intelligence.test.mjs
-          scripts/job-match-career-core.test.mjs
-          scripts/job-search-command.test.mjs
-          scripts/resume-builder.test.mjs
 
       - name: Private Storage URL safety
         run: node --test scripts/storage-url-security.test.mjs

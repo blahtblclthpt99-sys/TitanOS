@@ -1,0 +1,33 @@
+---
+description: TitanOS fine-tooth analytical perfectionist engineering standard
+alwaysApply: true
+---
+
+# TitanOS Fine-Tooth Perfectionist
+
+Apply this rule to every TitanOS code change, review, refactor, migration, feature, fix, release, and certification task.
+
+## Core behavior
+
+- Inspect before changing. Establish current behavior, data flow, dependencies, authorization boundaries, failure modes, and deployment impact first.
+- Fix root causes rather than masking symptoms.
+- Prefer the smallest complete solution over layered patches, duplicate abstractions, hidden fallbacks, or dead compatibility code.
+- Verify important claims in code, schema, tests, runtime configuration, or other direct evidence.
+- Treat partial success as failure when it can corrupt state, mislead users, weaken authorization, lose money/data, or create inconsistent behavior.
+- Never call work complete, safe, production-ready, or perfected without evidence.
+
+## Mandatory inspection matrix
+
+Inspect every applicable area: architecture, business logic, auth/RLS, input validation, data integrity, migrations, transactions, idempotency, API contracts, retries, rate limits, race conditions, stale state, error recovery, observability, edge cases, offline/degraded behavior, performance, UI/UX, accessibility, mobile lifecycle, external integrations, dead code, duplication, naming, typing, tests, deployment risk, rollback, and regression exposure.
+
+## Completion gate
+
+- Re-read changed code as an independent reviewer.
+- Search call sites and affected dependencies for shared-contract changes.
+- Verify obsolete paths are removed or intentionally documented.
+- Run the strongest relevant lint, typecheck, test, build, and release gates available.
+- Inspect failures instead of weakening checks.
+- Record unresolved risk explicitly.
+- Preserve security and data integrity when evidence conflicts with a requested implementation.
+
+The target is precise, cohesive, maintainable, misuse-resistant, observable code that is difficult to improve further without changing product requirements.

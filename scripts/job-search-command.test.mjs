@@ -11,7 +11,7 @@ import {
   sortJobSearch,
   sourceTrust,
 } from "../src/lib/jobSearchCommand.js";
-import { jobInteractionIdentity, jobInteractionKey, jobSource } from "../src/lib/jobMatchIdentity.js";
+import { jobInteractionIdentity, jobInteractionKey, jobOpportunitySnapshot, jobSource } from "../src/lib/jobMatchIdentity.js";
 
 const native = {
   id: "n1", title: "Box Truck Driver", company_name: "Acme Logistics", city: "Oklahoma City", state: "OK",
@@ -99,6 +99,34 @@ test("tracking identity refuses unsafe external source URLs", () => {
   });
   assert.equal(identity.source, "external");
   assert.equal(identity.sourceUrl, null);
+});
+
+test("opportunity snapshots preserve listing metadata without treating provider as employer", () => {
+  assert.deepEqual(jobOpportunitySnapshot({
+    title: " Route Driver ",
+    source: "external",
+    source_name: "Jobs Provider",
+    city: "Norman",
+    state: "OK",
+  }), {
+    job_title: "Route Driver",
+    job_city: "Norman",
+    job_state: "OK",
+  });
+});
+
+test("opportunity snapshots bound fields and omit blanks to prevent destructive overwrites", () => {
+  const snapshot = jobOpportunitySnapshot({
+    job_title: "T".repeat(400),
+    company_name: "C".repeat(300),
+    job_city: " ",
+    job_state: "S".repeat(200),
+  });
+  assert.equal(snapshot.job_title.length, 300);
+  assert.equal(snapshot.company_name.length, 200);
+  assert.equal(snapshot.job_state.length, 120);
+  assert.equal(Object.hasOwn(snapshot, "job_city"), false);
+  assert.deepEqual(jobOpportunitySnapshot({}), {});
 });
 
 test("saved search filters are bounded and allowlisted", () => {

@@ -39,3 +39,9 @@ export function jobInteractionIdentity(job) {
     sourceUrl: safeExternalJobUrl(job),
   };
 }
+
+export function jobInteractionKey(job) {
+  const { source, sourceName, sourceJobId } = jobInteractionIdentity(job);
+  if (!sourceJobId) return "";
+  return `${source}:${sourceName.toLowerCase()}:${sourceJobId}`;
+}

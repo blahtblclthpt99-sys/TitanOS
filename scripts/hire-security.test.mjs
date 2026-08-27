@@ -1,6 +1,7 @@
 /**
  * Hiring security unit tests — client filter + defense-in-depth assumptions.
- * Run: node --test scripts/hire-security.test.mjs
+ * These tests protect privacy/security behavior while allowing product labels
+ * and information architecture to evolve intentionally.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -44,7 +45,7 @@ describe("hire message visibility", () => {
   });
 });
 
-describe("hire application ACL (mirrors migration 016 intent)", () => {
+describe("hire application ACL", () => {
   const job = { id: "j1", customer_id: "owner", created_by_id: "owner" };
   const app = { id: "a1", worker_id: "worker", created_by_id: "worker", hire_job_id: "j1" };
   it("applicant can read", () => assert.equal(canReadApplication(app, { id: "worker" }, job), true));
@@ -96,35 +97,24 @@ describe("skills-driven job matching safety", () => {
   });
   it("does not return external jobs without explicit consent", () => {
     const external = normalizeExternalJob({
-      id: "ext-1",
-      title: "Route driver",
-      city: "Oklahoma City",
-      state: "OK",
-      url: "https://jobs.example.test/route-driver",
-      required_skills: ["delivery"],
+      id: "ext-1", title: "Route driver", city: "Oklahoma City", state: "OK",
+      url: "https://jobs.example.test/route-driver", required_skills: ["delivery"],
       posted_at: "2026-08-16T12:00:00Z",
     }, { name: "Example Jobs" });
     const rows = mergeRankedJobMatches({
-      internal: [native],
-      external: [external],
+      internal: [native], external: [external],
       driverProfile: { ...worker, external_job_search_consent: false },
       now: Date.parse("2026-08-17T00:00:00Z"),
     });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].id, "native-1");
+    assert.deepEqual(rows.map((row) => row.id), ["native-1"]);
   });
   it("deduplicates an outside copy of an existing native vacancy", () => {
     const external = normalizeExternalJob({
-      id: "duplicate",
-      title: native.title,
-      city: native.city,
-      state: native.state,
-      url: "https://jobs.example.test/duplicate",
-      posted_at: "2026-08-16T12:00:00Z",
+      id: "duplicate", title: native.title, city: native.city, state: native.state,
+      url: "https://jobs.example.test/duplicate", posted_at: "2026-08-16T12:00:00Z",
     }, { name: "Example Jobs" });
     const rows = mergeRankedJobMatches({
-      internal: [native],
-      external: [external],
+      internal: [native], external: [external],
       driverProfile: { ...worker, external_job_search_consent: true },
       now: Date.parse("2026-08-17T00:00:00Z"),
     });
@@ -140,25 +130,14 @@ describe("skills-driven job matching safety", () => {
 
 describe("employer-side published worker matching", () => {
   const job = {
-    title: "Box truck delivery driver",
-    category: "Delivery",
-    city: "Oklahoma City",
-    state: "OK",
-    required_skills: ["delivery", "box truck"],
-    required_certifications: ["dot medical card"],
+    title: "Box truck delivery driver", category: "Delivery", city: "Oklahoma City", state: "OK",
+    required_skills: ["delivery", "box truck"], required_certifications: ["dot medical card"],
     minimum_years_experience: 3,
   };
   const strong = {
-    id: "strong",
-    userId: "worker-strong",
-    published: true,
-    name: "Strong Worker",
-    city: "Oklahoma City, OK",
-    skills: ["delivery", "box truck", "forklift"],
-    certifications: ["dot medical card"],
-    yearsExperience: 5,
-    availability: "available",
-    rating: 4.9,
+    id: "strong", userId: "worker-strong", published: true, name: "Strong Worker",
+    city: "Oklahoma City, OK", skills: ["delivery", "box truck", "forklift"],
+    certifications: ["dot medical card"], yearsExperience: 5, availability: "available", rating: 4.9,
   };
 
   it("ranks a strong published candidate with explainable reasons", () => {
@@ -167,12 +146,9 @@ describe("employer-side published worker matching", () => {
     assert.ok(match.reasons.some((reason) => reason.startsWith("Skills:")));
     assert.ok(match.reasons.includes("Meets experience requirement"));
   });
-
   it("hard-filters candidates missing a required credential", () => {
-    const rows = rankPublishedWorkerMatches(job, [{ ...strong, id: "missing", certifications: [] }]);
-    assert.equal(rows.length, 0);
+    assert.equal(rankPublishedWorkerMatches(job, [{ ...strong, certifications: [] }]).length, 0);
   });
-
   it("never includes unpublished profiles or the job owner's own profile", () => {
     const rows = rankPublishedWorkerMatches(
       job,
@@ -181,14 +157,12 @@ describe("employer-side published worker matching", () => {
     );
     assert.deepEqual(rows.map((row) => row.id), ["strong"]);
   });
-
-  it("keeps lower experience visible as an explainable ranking factor instead of a hidden hard filter", () => {
+  it("keeps lower experience visible as an explainable ranking factor", () => {
     const rows = rankPublishedWorkerMatches(job, [{ ...strong, id: "junior", yearsExperience: 1 }]);
     assert.equal(rows.length, 1);
     assert.ok(rows[0].match.blockers.some((reason) => /3\+ years/.test(reason)));
   });
-
-  it("employer API reads published profiles and does not query private worker preferences", () => {
+  it("employer API reads published profiles and not private worker preferences", () => {
     const source = fs.readFileSync(new URL("../src/lib/employerWorkerMatchApi.js", import.meta.url), "utf8");
     assert.match(source, /listPublishedDrivers/);
     assert.match(source, /Only the job owner can view ranked worker matches/);
@@ -202,7 +176,7 @@ describe("job match radius enforcement", () => {
     const miles = haversineMiles(35.4676, -97.5164, 35.2226, -97.4395);
     assert.ok(miles > 15 && miles < 25);
   });
-  it("excludes precise-coordinate jobs beyond the worker radius", () => {
+  it("excludes precise-coordinate jobs beyond worker radius", () => {
     const rows = filterByRadius([
       { id: "near", lat: 35.2226, lng: -97.4395 },
       { id: "far", lat: 36.154, lng: -95.9928 },
@@ -211,7 +185,7 @@ describe("job match radius enforcement", () => {
     assert.equal(rows[0].within_radius, true);
     assert.ok(rows[0].distance_mi > 0);
   });
-  it("does not fabricate a distance when coordinates are unavailable", () => {
+  it("does not fabricate distance without coordinates", () => {
     const rows = filterByRadius([{ id: "unknown", city: "Oklahoma City", state: "OK" }], okc);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].distance_mi, null);
@@ -226,7 +200,7 @@ describe("job match server trust boundaries", () => {
   const phase2Migration = fs.readFileSync(new URL("../supabase/migrations/20260817083000_job_match_radius_and_interactions.sql", import.meta.url), "utf8");
   const originMigration = fs.readFileSync(new URL("../supabase/migrations/20260817084000_private_job_match_origin.sql", import.meta.url), "utf8");
 
-  it("derives worker identity from the verified auth user and scopes both profile sources to it", () => {
+  it("derives worker identity from verified auth and scopes profile sources", () => {
     assert.match(endpoint, /const userId = userData\.user\.id/);
     assert.match(endpoint, /driver_profiles[\s\S]*?\.eq\("user_id", userId\)/);
     assert.match(endpoint, /job_match_preferences[\s\S]*?\.eq\("user_id", userId\)/);
@@ -234,7 +208,7 @@ describe("job match server trust boundaries", () => {
   it("filters jobs posted by the same authenticated account", () => {
     assert.match(endpointV2, /\.neq\("created_by_id", userId\)/);
   });
-  it("uses a fixed HTTPS external-provider host rather than a caller supplied URL", () => {
+  it("uses a fixed HTTPS external-provider host", () => {
     assert.match(endpointV2, /https:\/\/api\.adzuna\.com\/v1\/api\/jobs\/us\/search\/1/);
     assert.doesNotMatch(endpointV2, /fetch\(body\.(url|endpoint|provider)/);
   });
@@ -248,7 +222,7 @@ describe("job match server trust boundaries", () => {
     assert.match(privacyMigration, /revoke all on public\.job_match_preferences from anon/i);
     assert.match(privacyMigration, /using \(user_id = auth\.uid\(\) and created_by_id = auth\.uid\(\)\)/i);
   });
-  it("keeps precise search origin in owner-only preferences, not the public driver profile", () => {
+  it("keeps precise search origin in owner-only preferences", () => {
     assert.match(originMigration, /alter table public\.job_match_preferences/i);
     assert.match(originMigration, /search_lat double precision/i);
     assert.match(originMigration, /search_lng double precision/i);
@@ -257,14 +231,14 @@ describe("job match server trust boundaries", () => {
     assert.match(endpointV2, /worker\.lng = privatePrefs\.search_lng/);
     assert.doesNotMatch(endpointV2, /driver_profiles[^\n]*search_lat/);
   });
-  it("keeps match interactions owner-only and does not persist external listing bodies", () => {
+  it("keeps match interactions owner-only and external bodies unpersisted", () => {
     assert.match(phase2Migration, /alter table public\.job_match_interactions enable row level security/i);
     assert.match(phase2Migration, /revoke all on public\.job_match_interactions from anon/i);
     assert.match(phase2Migration, /using \(user_id = auth\.uid\(\) and created_by_id = auth\.uid\(\)\)/i);
     assert.doesNotMatch(phase2Migration, /description\s+text/i);
     assert.doesNotMatch(phase2Migration, /payload\s+jsonb/i);
   });
-  it("merges existing native saves and applications instead of replacing them", () => {
+  it("merges existing native saves and applications", () => {
     assert.match(endpointV2, /from\("hire_saves"\)/);
     assert.match(endpointV2, /from\("hire_applications"\)/);
     assert.match(endpointV2, /nativeAppliedIds/);
@@ -272,22 +246,20 @@ describe("job match server trust boundaries", () => {
   });
 });
 
-describe("job match discovery wiring", () => {
+describe("career-core job discovery wiring", () => {
   const nav = fs.readFileSync(new URL("../src/lib/nav-items.js", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../src/pages/JobMatches.jsx", import.meta.url), "utf8");
   const stack = fs.readFileSync(new URL("../src/components/layout/TabStack.jsx", import.meta.url), "utf8");
   const post = fs.readFileSync(new URL("../src/pages/MatchReadyJobPost.jsx", import.meta.url), "utf8");
 
-  it("surfaces Job Matches as a live destination and match-ready posting as quick create", () => {
-    assert.match(nav, /label: "Job Matches", path: "\/hire\/matches", group: "live"/);
-    assert.match(nav, /label: "Match-ready job", path: "\/hire\/post-match-ready"/);
+  it("surfaces seeker matches as Opportunities and keeps employer posting internal", () => {
+    assert.match(nav, /label: "Opportunities", path: "\/hire\/matches", group: "career"/);
+    assert.match(nav, /label: "Match-ready job", path: "\/hire\/post-match-ready", group: "live", hidden: true/);
     assert.match(nav, /paths: \[[^\]]*"\/hire\/matches"[^\]]*\]/);
   });
-
-  it("keeps nested Hire pages grouped under Hire Workers", () => {
-    assert.match(nav, /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Hire Workers", path: "\/hire" \}/);
+  it("groups nested Hire pages under the seeker-facing Opportunities parent", () => {
+    assert.match(nav, /if \(path\.startsWith\("\/hire"\)\) return \{ label: "Opportunities", path: "\/hire\/matches" \}/);
   });
-
   it("provides all, saved, and applied opportunity inbox views", () => {
     assert.match(page, /const \[view, setView\] = useState\("all"\)/);
     assert.match(page, /saved: matches\.filter\(\(job\) => job\.interaction_state === "saved"\)/);
@@ -295,8 +267,7 @@ describe("job match discovery wiring", () => {
     assert.match(page, /Opportunity inbox/);
     assert.match(page, /Ignored matches stay hidden/);
   });
-
-  it("routes match-ready employers directly into owner-scoped candidate ranking", () => {
+  it("routes match-ready employers into owner-scoped candidate ranking", () => {
     assert.match(stack, /"\/hire\/candidates": WorkerMatches/);
     assert.match(post, /navigate\(`\/hire\/candidates\?job=\$\{encodeURIComponent\(job\.id\)\}`\)/);
   });

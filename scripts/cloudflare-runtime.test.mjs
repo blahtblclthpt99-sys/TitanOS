@@ -12,6 +12,7 @@ describe("Cloudflare production runtime", () => {
     const config = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, ""));
     assert.equal(config.name, "titanos");
     assert.equal(config.main, "./worker/index.js");
+    assert.equal(config.vars.APP_ENV, "production");
     assert.equal(config.assets.directory, "./dist");
     assert.equal(config.assets.binding, "ASSETS");
     assert.equal(config.assets.not_found_handling, "single-page-application");
@@ -55,5 +56,13 @@ describe("Cloudflare production runtime", () => {
     assert.doesNotMatch(instrument, /VERCEL_/);
     assert.doesNotMatch(instrument, /@sentry\/profiling-node/);
     assert.match(instrument, /CLOUDFLARE_ENV/);
+  });
+
+  it("requires verification by default in production without relying on provider-specific metadata", () => {
+    const register = read("api/register.js");
+    assert.match(register, /process\.env\.APP_ENV/);
+    assert.match(register, /shouldRequireEmailConfirmation/);
+    assert.match(register, /runtime === "production" \|\| runtime === "prod"/);
+    assert.match(register, /email_confirm:\s*!requireConfirm/);
   });
 });

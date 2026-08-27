@@ -1,6 +1,6 @@
 /**
- * Professional profile — bio, ratings, portfolio, verification, social,
- * skills, work history, achievements, reviews, badges.
+ * Professional profile — career bio, portfolio, social links, skills, work
+ * history and achievements. Platform trust fields are never user-authored.
  * Local-first with optional profiles.professional_profile sync.
  */
 import { api } from "@/api/apiClient";
@@ -11,30 +11,41 @@ const PREFIX = "titanos_pro_profile";
 const INDEX_KEY = "by_slug";
 
 export const SKILL_SUGGESTIONS = [
+  "Customer service",
+  "Project management",
+  "Scheduling",
+  "Sales",
+  "Data entry",
+  "Microsoft Office",
+  "Warehouse operations",
+  "Forklift",
+  "Delivery",
+  "CDL Class A",
+  "CDL Class B",
+  "Safety compliance",
+  "Fleet operations",
   "HVAC",
   "Plumbing",
   "Electrical",
-  "Roofing",
-  "Landscaping",
-  "CDL Class A",
-  "CDL Class B",
-  "Project management",
-  "Customer service",
-  "Estimating",
-  "Safety compliance",
-  "Fleet operations",
 ];
 
+// Kept as metadata for rendering server-authoritative badges only. These are
+// not user-selectable and are stripped from user-authored profile payloads.
 export const BADGE_CATALOG = [
-  { id: "verified", label: "Verified pro", description: "Identity and credentials reviewed" },
-  { id: "top_rated", label: "Top rated", description: "Consistently high customer ratings" },
-  { id: "reliable", label: "Reliable", description: "On-time and dependable" },
-  { id: "fast_response", label: "Fast response", description: "Quick to reply and schedule" },
-  { id: "community", label: "Community contributor", description: "Active in Titan Community" },
-  { id: "milestone_10", label: "10 jobs", description: "Completed 10+ jobs on TitanOS" },
-  { id: "milestone_50", label: "50 jobs", description: "Completed 50+ jobs on TitanOS" },
-  { id: "rising_star", label: "Rising star", description: "Strong early reputation" },
+  { id: "verified", label: "Verified pro", description: "Identity or credentials reviewed by TitanOS" },
 ];
+
+const TRUST_PROFILE_KEYS = new Set([
+  "verified",
+  "verification_notes",
+  "badges",
+  "jobs_completed",
+  "years_experience",
+  "rating",
+  "review_count",
+  "reliability_rate",
+  "titan_score",
+]);
 
 function slugify(value) {
   return String(value || "")
@@ -43,6 +54,44 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
+}
+
+function cleanString(value, max = 5000) {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function cleanSocial(raw = {}) {
+  return {
+    website: cleanString(raw.website, 2048),
+    linkedin: cleanString(raw.linkedin, 2048),
+    instagram: cleanString(raw.instagram, 2048),
+    facebook: cleanString(raw.facebook, 2048),
+    youtube: cleanString(raw.youtube, 2048),
+    x: cleanString(raw.x, 2048),
+  };
+}
+
+function cleanList(raw, maxItems, mapper) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, maxItems).map(mapper).filter(Boolean);
+}
+
+function trustedProfileState(user = {}) {
+  const verified = user.verified_worker === true;
+  return {
+    verified,
+    verification_notes: verified ? cleanString(user.verification_notes, 1000) : "",
+    badges: verified ? ["verified"] : [],
+  };
+}
+
+/**
+ * Remove any platform-owned trust/reputation fields from a user-authored patch.
+ * This is defense in depth; the database trigger enforces the same boundary.
+ */
+export function stripUserTrustClaims(raw = {}) {
+  if (!raw || typeof raw !== "object") return {};
+  return Object.fromEntries(Object.entries(raw).filter(([key]) => !TRUST_PROFILE_KEYS.has(key)));
 }
 
 export function emptyProfessionalProfile(user = {}) {
@@ -57,21 +106,12 @@ export function emptyProfessionalProfile(user = {}) {
     city: user.city || "",
     state: user.state || "",
     company_name: user.company_name || "",
-    verified: Boolean(user.verified_worker),
-    verification_notes: user.verification_notes || "",
-    social: {
-      website: "",
-      linkedin: "",
-      instagram: "",
-      facebook: "",
-      youtube: "",
-      x: "",
-    },
+    ...trustedProfileState(user),
+    social: cleanSocial(),
     skills: [],
     portfolio: [],
     work_history: [],
     achievements: [],
-    badges: user.verified_worker ? ["verified"] : [],
     public: true,
     updated_at: new Date().toISOString(),
   };
@@ -80,15 +120,54 @@ export function emptyProfessionalProfile(user = {}) {
 export function normalizeProfile(raw, user = {}) {
   const base = emptyProfessionalProfile(user);
   if (!raw || typeof raw !== "object") return base;
+  const editable = stripUserTrustClaims(raw);
+
   return {
     ...base,
-    ...raw,
-    social: { ...base.social, ...(raw.social || {}) },
-    skills: Array.isArray(raw.skills) ? raw.skills : [],
-    portfolio: Array.isArray(raw.portfolio) ? raw.portfolio : [],
-    work_history: Array.isArray(raw.work_history) ? raw.work_history : [],
-    achievements: Array.isArray(raw.achievements) ? raw.achievements : [],
-    badges: Array.isArray(raw.badges) ? raw.badges : base.badges,
+    user_id: user.id || cleanString(editable.user_id, 128) || base.user_id,
+    slug: slugify(editable.slug || base.slug) || base.slug,
+    display_name: cleanString(editable.display_name || base.display_name, 120) || base.display_name,
+    headline: cleanString(editable.headline, 180),
+    bio: cleanString(editable.bio, 5000),
+    avatar_url: cleanString(editable.avatar_url, 2048),
+    city: cleanString(editable.city, 120),
+    state: cleanString(editable.state, 120),
+    company_name: cleanString(editable.company_name, 180),
+    social: cleanSocial(editable.social),
+    skills: cleanList(editable.skills, 24, (skill) => cleanString(skill, 120)).filter(Boolean),
+    portfolio: cleanList(editable.portfolio, 24, (item) => {
+      if (!item || typeof item !== "object") return null;
+      return {
+        id: cleanString(item.id, 128),
+        title: cleanString(item.title, 180),
+        description: cleanString(item.description, 3000),
+        image_url: cleanString(item.image_url, 2048),
+        year: cleanString(item.year, 20),
+      };
+    }),
+    work_history: cleanList(editable.work_history, 40, (item) => {
+      if (!item || typeof item !== "object") return null;
+      return {
+        id: cleanString(item.id, 128),
+        role: cleanString(item.role, 180),
+        company: cleanString(item.company, 180),
+        start: cleanString(item.start, 40),
+        end: cleanString(item.end, 40),
+        summary: cleanString(item.summary, 4000),
+      };
+    }),
+    achievements: cleanList(editable.achievements, 24, (item) => {
+      if (!item || typeof item !== "object") return null;
+      return {
+        id: cleanString(item.id, 128),
+        title: cleanString(item.title, 180),
+        year: cleanString(item.year, 20),
+        description: cleanString(item.description, 3000),
+      };
+    }),
+    public: editable.public !== false,
+    updated_at: cleanString(editable.updated_at, 64) || new Date().toISOString(),
+    ...trustedProfileState(user),
   };
 }
 
@@ -113,9 +192,10 @@ function writeOwned(userId, profile) {
     delete index[profile.slug];
   }
   writeIndex(index);
-  // Public mirror for slug lookup
+  // Public mirror is display content only. Trust claims are stripped again on
+  // public read unless supplied by an authoritative server identity.
   if (profile.public) {
-    writeLocal(PREFIX, "public", profile.slug, profile);
+    writeLocal(PREFIX, "public", profile.slug, stripUserTrustClaims(profile));
   }
 }
 
@@ -132,15 +212,7 @@ function seedDemoIfNeeded(user) {
       portfolio: [],
       work_history: [],
       achievements: [],
-      badges: [],
-      social: {
-        website: "",
-        linkedin: "",
-        instagram: "",
-        facebook: "",
-        youtube: "",
-        x: "",
-      },
+      social: cleanSocial(),
       public: false,
     },
     user
@@ -155,7 +227,13 @@ export async function getMyProfessionalProfile(user) {
   try {
     const me = await api.auth.me();
     if (me?.professional_profile) {
-      local = normalizeProfile({ ...local, ...me.professional_profile }, user);
+      // Top-level verification fields returned by auth are authoritative; the
+      // nested professional_profile object is still treated as user-authored.
+      local = normalizeProfile({ ...local, ...me.professional_profile }, {
+        ...user,
+        verified_worker: me.verified_worker === true,
+        verification_notes: me.verification_notes || "",
+      });
     }
   } catch {
     /* local */
@@ -166,16 +244,17 @@ export async function getMyProfessionalProfile(user) {
 export async function saveProfessionalProfile(user, patch) {
   if (!user?.id) throw new Error("Sign in to save your profile");
   const current = await getMyProfessionalProfile(user);
+  const editablePatch = stripUserTrustClaims(patch);
   let next = normalizeProfile(
     {
       ...current,
-      ...patch,
+      ...editablePatch,
       user_id: user.id,
       updated_at: new Date().toISOString(),
     },
     user
   );
-  next.slug = slugify(patch?.slug || next.slug || user.username || user.full_name) || next.slug;
+  next.slug = slugify(editablePatch?.slug || next.slug || user.username || user.full_name) || next.slug;
 
   // Ensure unique slug locally
   const index = readIndex();
@@ -186,11 +265,13 @@ export async function saveProfessionalProfile(user, patch) {
   writeOwned(user.id, next);
 
   try {
+    // Never forward top-level or nested verification/reputation authority from
+    // profile editing. updateMe also excludes privileged top-level columns.
+    const serverProfile = stripUserTrustClaims(next);
     await api.auth.updateMe({
-      professional_profile: next,
+      professional_profile: serverProfile,
       bio: next.bio,
       username: next.slug,
-      verified_worker: next.verified,
     });
   } catch {
     /* local-first */
@@ -205,14 +286,15 @@ export async function getPublicProfileBySlug(slug) {
 
   const mirrored = readLocal(PREFIX, "public", key, null);
   if (mirrored?.public !== false) {
-    return normalizeProfile(mirrored);
+    // A browser-local mirror can never establish verification or reputation.
+    return normalizeProfile(stripUserTrustClaims(mirrored));
   }
 
   const index = readIndex();
   const hit = index[key];
   if (hit?.user_id) {
     const owned = readOwned(hit.user_id);
-    if (owned?.public !== false) return normalizeProfile(owned);
+    if (owned?.public !== false) return normalizeProfile(stripUserTrustClaims(owned));
   }
 
   return null;

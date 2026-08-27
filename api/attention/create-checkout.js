@@ -6,6 +6,24 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
+function isMissingStripeResource(error) {
+  return error?.type === "StripeInvalidRequestError" && error?.code === "resource_missing";
+}
+
+function appOrigin() {
+  const configuredOrigin = String(process.env.APP_ORIGIN || "https://titanfieldos.com").trim();
+  let parsed;
+  try {
+    parsed = new URL(configuredOrigin);
+  } catch {
+    throw new Error("APP_ORIGIN is invalid");
+  }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("APP_ORIGIN must be a clean HTTPS origin");
+  }
+  return parsed.origin;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
 
@@ -13,11 +31,11 @@ export default async function handler(req, res) {
   if (!stripeKey) return json(res, 503, { error: "Stripe is not configured for this deployment" });
 
   const authorization = String(req.headers.authorization || "");
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return json(res, 401, { error: "Authentication required" });
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const campaignId = String(body.campaign_id || "");
+  const campaignId = String(body.campaign_id || "").trim();
   if (!campaignId) return json(res, 400, { error: "campaign_id is required" });
 
   try {
@@ -26,11 +44,12 @@ export default async function handler(req, res) {
     const user = authData?.user;
     if (authError || !user) return json(res, 401, { error: "Invalid session" });
 
-    const { data: profile } = await admin
+    const { data: profile, error: profileError } = await admin
       .from("attention_profiles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
+    if (profileError) throw profileError;
     if (!profile || !["advertiser", "admin"].includes(profile.role)) {
       return json(res, 403, { error: "Advertiser account required" });
     }
@@ -41,7 +60,8 @@ export default async function handler(req, res) {
       .eq("id", campaignId)
       .eq("advertiser_id", user.id)
       .maybeSingle();
-    if (campaignError || !campaign) return json(res, 404, { error: "Campaign not found" });
+    if (campaignError) throw campaignError;
+    if (!campaign) return json(res, 404, { error: "Campaign not found" });
     if (campaign.status === "active" && Number(campaign.funded_cents) >= Number(campaign.total_budget_cents)) {
       return json(res, 409, { error: "Campaign is already funded" });
     }
@@ -59,12 +79,17 @@ export default async function handler(req, res) {
         const existing = await stripe.checkout.sessions.retrieve(campaign.stripe_checkout_session_id);
         if (existing.status === "open" && existing.url) return json(res, 200, { url: existing.url, reused: true });
         if (existing.payment_status === "paid") return json(res, 409, { error: "Funding payment already completed" });
-      } catch {
-        // A missing/expired prior session is replaced below.
+        // Closed/expired and unpaid is authoritative evidence that a replacement is safe.
+      } catch (error) {
+        if (!isMissingStripeResource(error)) {
+          // Never create a second checkout merely because Stripe retrieval was
+          // temporarily unavailable or unauthorized.
+          throw error;
+        }
       }
     }
 
-    const origin = String(process.env.APP_ORIGIN || "https://titanfieldos.com").replace(/\/$/, "");
+    const origin = appOrigin();
     const campaignVersion = Number.isFinite(Date.parse(campaign.updated_at)) ? Date.parse(campaign.updated_at) : 0;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -101,14 +126,20 @@ export default async function handler(req, res) {
       },
     }, { idempotencyKey: `attention-fund-${campaign.id}-${amount}-${campaignVersion}` });
 
-    const { error: updateError } = await admin
+    if (!session?.id || !session?.url) throw new Error("Stripe checkout session was incomplete");
+
+    const { data: updatedCampaign, error: updateError } = await admin
       .from("attention_campaigns")
       .update({ stripe_checkout_session_id: session.id, status: "funding", updated_at: new Date().toISOString() })
       .eq("id", campaign.id)
-      .eq("advertiser_id", user.id);
-    if (updateError) {
+      .eq("advertiser_id", user.id)
+      .eq("funded_cents", Number(campaign.funded_cents || 0))
+      .select("id")
+      .maybeSingle();
+    if (updateError || !updatedCampaign) {
       try { await stripe.checkout.sessions.expire(session.id); } catch { /* best effort */ }
-      throw updateError;
+      if (updateError) throw updateError;
+      throw new Error("Campaign changed while checkout was being created");
     }
 
     return json(res, 200, { url: session.url });

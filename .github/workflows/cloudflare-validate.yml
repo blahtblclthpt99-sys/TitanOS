@@ -5,8 +5,10 @@ on:
     branches: [main]
     paths:
       - "cloudflare/**"
-      - "src/api/**"
-      - "public/_headers"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.js"
       - "wrangler.jsonc"
       - ".env.production.example"
       - ".github/workflows/cloudflare-validate.yml"
@@ -18,8 +20,10 @@ on:
       - "infra/cloudflare-workers-migration"
     paths:
       - "cloudflare/**"
-      - "src/api/**"
-      - "public/_headers"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.js"
       - "wrangler.jsonc"
       - ".env.production.example"
       - ".github/workflows/cloudflare-validate.yml"

@@ -1,17 +1,7 @@
 import { supabase } from "@/api/supabaseClient";
 import { normalizeCareerPipelineDetails } from "./careerPipelineDetails.js";
+import { assertCareerStateTransition, isTrackableCareerState } from "./careerPipelineState.js";
 import { jobInteractionIdentity } from "./jobMatchIdentity.js";
-
-const ALLOWED_STATES = new Set([
-  "saved",
-  "ignored",
-  "applied",
-  "screening",
-  "interview",
-  "offer",
-  "hired",
-  "closed",
-]);
 
 export async function listMyJobMatchInteractions(userId) {
   if (!userId) return [];
@@ -26,10 +16,22 @@ export async function listMyJobMatchInteractions(userId) {
 
 export async function setMyJobMatchInteraction(userId, job, state) {
   if (!userId) throw new Error("Sign in to update job match state.");
-  if (!ALLOWED_STATES.has(state)) throw new Error("Invalid job match state.");
+  if (!isTrackableCareerState(state)) throw new Error("Invalid job match state.");
 
   const { source, sourceName, sourceJobId, sourceUrl } = jobInteractionIdentity(job);
   if (!sourceJobId) throw new Error("Job reference is missing.");
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("job_match_interactions")
+    .select("id,state")
+    .eq("user_id", userId)
+    .eq("source", source)
+    .eq("source_name", sourceName)
+    .eq("source_job_id", sourceJobId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+
+  assertCareerStateTransition(existing?.state || null, state);
 
   const row = {
     user_id: userId,

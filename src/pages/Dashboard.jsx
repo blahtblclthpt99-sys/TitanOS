@@ -18,7 +18,7 @@ const primaryActions = [
   {
     title: "Job search",
     description: "Search, filter, compare, and verify current work opportunities.",
-    path: "/career/search",
+    path: "/jobs",
     icon: BriefcaseBusiness,
   },
   {
@@ -48,7 +48,7 @@ const progressActions = [
 ];
 
 const workTools = [
-  { title: "Work Orders", path: "/jobs" },
+  { title: "Work Orders", path: "/work/jobs" },
   { title: "Driver Hub", path: "/driver" },
   { title: "Route Planner", path: "/routes" },
   { title: "Customers", path: "/customers" },
@@ -99,7 +99,7 @@ export default function Dashboard() {
               TitanOS keeps the highest-value career actions in front of you: find opportunities, understand your matches, prepare stronger applications, and keep progress organized.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button type="button" onClick={() => navigate("/career/search")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button type="button" onClick={() => navigate("/jobs")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" /> Search opportunities
               </button>
               <button type="button" onClick={() => navigate("/career/attention")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

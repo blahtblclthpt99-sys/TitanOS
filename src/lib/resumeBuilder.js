@@ -1,25 +1,60 @@
 const WORD_RE = /[a-z0-9+#.-]{2,}/gi;
+const STOP_WORDS = new Set([
+  "and", "are", "for", "from", "has", "have", "into", "its", "job", "our", "that", "the", "their", "this", "with", "you", "your",
+]);
 
 function clean(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
-function list(value) {
+function stringList(value) {
   return Array.isArray(value) ? value.map(clean).filter(Boolean) : [];
 }
 
+function objectList(value) {
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+}
+
 function tokens(value) {
-  return new Set((String(value || "").toLowerCase().match(WORD_RE) || []).filter((word) => word.length >= 3));
+  return new Set(
+    (String(value || "").toLowerCase().match(WORD_RE) || [])
+      .filter((word) => word.length >= 3 && !STOP_WORDS.has(word))
+  );
+}
+
+function intersects(left, right) {
+  for (const term of left) if (right.has(term)) return true;
+  return false;
+}
+
+function workHistoryText(item) {
+  return [item?.role, item?.company, item?.summary].map(clean).filter(Boolean).join(" ");
+}
+
+function achievementText(item) {
+  return [item?.title, item?.description].map(clean).filter(Boolean).join(" ");
+}
+
+function alignedProfileEvidence(profile = {}, jobDescription = "") {
+  const jobTerms = tokens(jobDescription);
+  if (!jobTerms.size) return { skills: [], history: [], achievements: [] };
+
+  return {
+    skills: stringList(profile.skills).filter((skill) => intersects(tokens(skill), jobTerms)).slice(0, 12),
+    history: objectList(profile.work_history).filter((item) => intersects(tokens(workHistoryText(item)), jobTerms)).slice(0, 6),
+    achievements: objectList(profile.achievements).filter((item) => intersects(tokens(achievementText(item)), jobTerms)).slice(0, 6),
+  };
 }
 
 export function evidenceTerms(profile = {}) {
-  const history = list(profile.work_history).flatMap((item) => [item?.role, item?.company, item?.summary]);
+  const history = objectList(profile.work_history).flatMap((item) => [item?.role, item?.company, item?.summary]);
+  const achievements = objectList(profile.achievements).flatMap((item) => [item?.title, item?.description]);
   return tokens([
     profile.headline,
     profile.bio,
-    ...list(profile.skills),
+    ...stringList(profile.skills),
     ...history,
-    ...list(profile.achievements).map((item) => `${item?.title || ""} ${item?.description || ""}`),
+    ...achievements,
   ].join(" "));
 }
 
@@ -32,9 +67,9 @@ export function matchingEvidence(profile = {}, jobDescription = "") {
 export function buildMasterResume(profile = {}) {
   const name = clean(profile.display_name) || "Professional";
   const location = [clean(profile.city), clean(profile.state)].filter(Boolean).join(", ");
-  const skills = list(profile.skills);
-  const history = Array.isArray(profile.work_history) ? profile.work_history : [];
-  const achievements = Array.isArray(profile.achievements) ? profile.achievements : [];
+  const skills = stringList(profile.skills);
+  const history = objectList(profile.work_history);
+  const achievements = objectList(profile.achievements);
 
   const lines = [name];
   if (clean(profile.headline)) lines.push(clean(profile.headline));
@@ -47,7 +82,8 @@ export function buildMasterResume(profile = {}) {
       const role = clean(item?.role);
       const company = clean(item?.company);
       const dates = [clean(item?.start), clean(item?.end)].filter(Boolean).join(" – ");
-      lines.push([role, company].filter(Boolean).join(" | "));
+      const heading = [role, company].filter(Boolean).join(" | ");
+      if (heading) lines.push(heading);
       if (dates) lines.push(dates);
       if (clean(item?.summary)) lines.push(clean(item.summary));
     });
@@ -65,26 +101,44 @@ export function buildMasterResume(profile = {}) {
 
 export function buildTailoredResume(profile = {}, jobDescription = "") {
   const master = buildMasterResume(profile);
-  const matches = matchingEvidence(profile, jobDescription);
-  if (!matches.length) return master;
-  return `${master}\n\nJOB-ALIGNED EVIDENCE\n${matches.join(" • ")}`;
+  const aligned = alignedProfileEvidence(profile, jobDescription);
+  const highlights = [];
+
+  aligned.skills.forEach((skill) => highlights.push(`• Skill: ${skill}`));
+  aligned.history.forEach((item) => {
+    const heading = [clean(item?.role), clean(item?.company)].filter(Boolean).join(" | ");
+    const summary = clean(item?.summary);
+    if (heading || summary) highlights.push(`• Experience: ${[heading, summary].filter(Boolean).join(" — ")}`);
+  });
+  aligned.achievements.forEach((item) => {
+    const evidence = [clean(item?.title), clean(item?.description)].filter(Boolean).join(": ");
+    if (evidence) highlights.push(`• Achievement: ${evidence}`);
+  });
+
+  if (!highlights.length) return master;
+  return `${master}\n\nTARGETED HIGHLIGHTS\n${highlights.join("\n")}`;
 }
 
 export function buildCoverLetter(profile = {}, jobDescription = "", options = {}) {
   const name = clean(profile.display_name) || "Applicant";
   const role = clean(options.role) || "the role";
   const company = clean(options.company) || "your organization";
-  const matched = matchingEvidence(profile, jobDescription).slice(0, 8);
-  const evidence = matched.length
-    ? `My background includes experience and skills aligned with this opportunity, including ${matched.join(", ")}.`
+  const aligned = alignedProfileEvidence(profile, jobDescription);
+  const labels = [
+    ...aligned.skills,
+    ...aligned.history.map((item) => [clean(item?.role), clean(item?.company)].filter(Boolean).join(" at ")),
+    ...aligned.achievements.map((item) => clean(item?.title)),
+  ].filter(Boolean).slice(0, 6);
+  const evidence = labels.length
+    ? `My profile includes relevant evidence such as ${labels.join(", ")}.`
     : "My background and work history are outlined in the attached resume, and I would welcome the opportunity to discuss how they align with this role.";
   return `Dear Hiring Team,\n\nI am applying for ${role} with ${company}. ${evidence}\n\nI am interested in learning more about the position and discussing the experience I can truthfully bring to the work. Thank you for your consideration.\n\nSincerely,\n${name}`;
 }
 
 export function buildInterviewBrief(profile = {}, jobDescription = "", options = {}) {
   const matched = matchingEvidence(profile, jobDescription).slice(0, 12);
-  const skills = list(profile.skills).slice(0, 12);
-  const history = Array.isArray(profile.work_history) ? profile.work_history : [];
+  const skills = stringList(profile.skills).slice(0, 12);
+  const history = objectList(profile.work_history);
   const lines = [
     `INTERVIEW BRIEF${clean(options.role) ? ` — ${clean(options.role)}` : ""}`,
     "",

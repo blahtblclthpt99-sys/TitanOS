@@ -34,6 +34,7 @@ const Customers = lazy(() => import("@/pages/Customers"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
 const Marketplace = lazy(() => import("@/pages/Marketplace"));
 const Profile = lazy(() => import("@/pages/Profile"));
+const CareerReadiness = lazy(() => import("@/pages/CareerReadiness"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
@@ -113,6 +114,7 @@ const NON_TAB_ROUTES = {
   "/hire": Hire,
   "/hire/matches": JobMatches,
   "/career/pipeline": CareerPipeline,
+  "/career/readiness": CareerReadiness,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,

@@ -1,5 +1,5 @@
-import { evaluateAlerts } from "@/lib/employerIntelligence";
-import { profileCompleteness } from "@/lib/careerReadiness";
+import { evaluateAlerts } from "./employerIntelligence.js";
+import { profileCompleteness } from "./careerReadiness.js";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;

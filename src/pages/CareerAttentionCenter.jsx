@@ -12,16 +12,7 @@ import { getJobMatches } from "@/lib/jobMatchApi";
 import { listMyJobMatchInteractions } from "@/lib/jobMatchInteractionsApi";
 import { getMyProfessionalProfile } from "@/lib/professionalProfileApi";
 import { attentionCounts, buildCareerAttention } from "@/lib/careerAttention";
-
-const ALERT_KEY = "titanos_job_alerts_v1";
-const REVIEWED_PREFIX = "titanos_career_alert_seen_v1";
-
-function readJson(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || "") || fallback; } catch { return fallback; }
-}
-function writeJson(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
-}
+import { readCareerPreference, writeCareerPreference } from "@/lib/careerPreferenceStorage";
 
 const KIND_META = {
   interview: { icon: CalendarClock, label: "Interview" },
@@ -37,12 +28,15 @@ export default function CareerAttentionCenter() {
   const [interactions, setInteractions] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [profile, setProfile] = useState(null);
-  const reviewedKey = user?.id ? `${REVIEWED_PREFIX}:${user.id}` : REVIEWED_PREFIX;
-  const [reviewedAlerts, setReviewedAlerts] = useState(() => readJson(reviewedKey, []));
+  const [reviewedAlerts, setReviewedAlerts] = useState([]);
 
   useEffect(() => {
-    setReviewedAlerts(readJson(reviewedKey, []));
-  }, [reviewedKey]);
+    if (!user?.id) {
+      setReviewedAlerts([]);
+      return;
+    }
+    setReviewedAlerts(readCareerPreference(user.id, "reviewed-alert-matches", []));
+  }, [user?.id]);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
@@ -65,15 +59,21 @@ export default function CareerAttentionCenter() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const alerts = useMemo(() => readJson(ALERT_KEY, []), [jobs]);
-  const items = useMemo(() => buildCareerAttention({ interactions, jobs, alerts, profile: profile || {}, seenAlertKeys: reviewedAlerts }), [interactions, jobs, alerts, profile, reviewedAlerts]);
+  const alerts = useMemo(
+    () => user?.id ? readCareerPreference(user.id, "job-alerts", []) : [],
+    [user?.id, jobs]
+  );
+  const items = useMemo(
+    () => buildCareerAttention({ interactions, jobs, alerts, profile: profile || {}, seenAlertKeys: reviewedAlerts }),
+    [interactions, jobs, alerts, profile, reviewedAlerts]
+  );
   const counts = useMemo(() => attentionCounts(items), [items]);
 
   const markAlertReviewed = (item) => {
-    if (!item.alert_key) return;
+    if (!item.alert_key || !user?.id) return;
     const next = [...new Set([item.alert_key, ...reviewedAlerts])].slice(0, 500);
     setReviewedAlerts(next);
-    writeJson(reviewedKey, next);
+    writeCareerPreference(user.id, "reviewed-alert-matches", next);
   };
 
   if (loading && !profile) return <PageLoader variant="list" label="Checking career priorities" />;
@@ -125,7 +125,7 @@ export default function CareerAttentionCenter() {
         </section>
       )}
 
-      <p className="text-xs text-muted-foreground">Career reminders never submit applications, contact employers, change application stages or share data automatically. They surface information for you to review and act on.</p>
+      <p className="text-xs text-muted-foreground">Career reminders and reviewed-alert state are private to this account on this device. Reminders never submit applications, contact employers, change application stages, or share data automatically.</p>
     </PageShell>
   );
 }

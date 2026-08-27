@@ -110,8 +110,8 @@ export function scoreWorkerMatch(job = {}, driver = {}) {
   if (location.ratio >= 0.7) reasons.push(location.reason);
   if (available) reasons.push("Available now");
 
-  const blockers = certifications.missing.map((name) => `Missing required credential: ${name}`);
-  if (minimumYears && experienceRatio < 1) blockers.push(`Below ${minimumYears}+ years requested`);
+  const blockers = certifications.missing.map((name) => `Listing asks for credential: ${name}`);
+  if (minimumYears && experienceRatio < 1) blockers.push(`Listing asks for ${minimumYears}+ years experience`);
 
   return {
     score: Math.max(0, Math.min(100, Math.round(raw))),
@@ -119,6 +119,7 @@ export function scoreWorkerMatch(job = {}, driver = {}) {
     blockers,
     matched_skills: skills.matched,
     missing_certifications: certifications.missing,
+    requirements_advisory: blockers.length > 0,
   };
 }
 
@@ -127,11 +128,12 @@ export function rankPublishedWorkerMatches(job = {}, drivers = [], { minimumScor
     .filter((driver) => driver && driver.published === true)
     .filter((driver) => !ownerUserId || driver.userId !== ownerUserId)
     .map((driver) => ({ ...driver, match: scoreWorkerMatch(job, driver) }))
-    .filter((driver) => driver.match.missing_certifications.length === 0)
+    // Requirements are surfaced as advisory evidence. TitanOS may rank published
+    // profiles, but it must not silently remove a worker from employer visibility.
     .filter((driver) => driver.match.score >= minimumScore)
     .sort((a, b) =>
       b.match.score - a.match.score ||
       Number(b.availability === "available") - Number(a.availability === "available") ||
-      Number(b.rating || 0) - Number(a.rating || 0)
+      String(a.name || a.id || "").localeCompare(String(b.name || b.id || ""))
     );
 }

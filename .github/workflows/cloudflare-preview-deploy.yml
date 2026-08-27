@@ -2,6 +2,11 @@ name: TitanOS Cloudflare Preview Deploy
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-workers-migration"
+    paths:
+      - "cloudflare/preview-trigger.txt"
 
 permissions:
   contents: read

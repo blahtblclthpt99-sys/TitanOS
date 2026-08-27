@@ -4,6 +4,7 @@ import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { buildWorkerMatchProfile, mergeRankedJobMatches, normalizeExternalJob, rankInternalJobMatches } from "../../src/lib/jobMatch.js";
+import { normalizeJobCoordinates } from "../../src/lib/jobCoordinates.js";
 import { jobInteractionIdentity } from "../../src/lib/jobMatchIdentity.js";
 import { filterByRadius } from "../../src/lib/jobMatchRadius.js";
 
@@ -30,7 +31,7 @@ function normalizeAdzunaResult(row = {}) {
   const areas = Array.isArray(row.location?.area) ? row.location.area.filter(Boolean) : [];
   const state = areas.length >= 2 ? areas[areas.length - 2] : "";
   const city = areas.length ? areas[areas.length - 1] : row.location?.display_name || "";
-  return normalizeExternalJob({
+  const normalized = normalizeExternalJob({
     external_id: row.id,
     title: row.title,
     company_name: row.company?.display_name,
@@ -38,8 +39,6 @@ function normalizeAdzunaResult(row = {}) {
     category: row.category?.label || "General",
     city,
     state,
-    lat: row.latitude,
-    lng: row.longitude,
     budget_min: row.salary_min,
     budget_max: row.salary_max,
     source_url: row.redirect_url,
@@ -47,6 +46,10 @@ function normalizeAdzunaResult(row = {}) {
     employment_type: row.contract_time === "full_time" ? "full_time" : row.contract_time === "part_time" ? "part_time" : "",
     pay_type: row.salary_min || row.salary_max ? "salary" : "",
   }, { name: "Adzuna" });
+  return {
+    ...normalized,
+    ...normalizeJobCoordinates({ lat: row.latitude, lng: row.longitude }),
+  };
 }
 
 async function fetchAdzuna(profile) {

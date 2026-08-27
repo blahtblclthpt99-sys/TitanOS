@@ -1,0 +1,3 @@
+TitanOS Cloudflare preview deployment trigger.
+Purpose: controlled one-purpose workflow trigger for the isolated titanos-preview Worker.
+Production DNS and production Worker routing are intentionally unaffected.

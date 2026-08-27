@@ -4,7 +4,6 @@ import { queryClientInstance } from "@/lib/query-client";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
 import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
-import DoorDashKeepAlive from "@/components/driver/activity/DoorDashKeepAlive";
 import { useAuth } from "@/lib/AuthContext";
 import { warmSearchIndex } from "@/lib/searchIndex";
 import { trackEvent } from "@/lib/productAnalytics";
@@ -24,14 +23,20 @@ function PrefetchOnMount() {
   return null;
 }
 
-/** Authenticated app shell — keeps react-query out of the marketing bundle. */
+/**
+ * Authenticated TitanOS shell.
+ *
+ * Career and opportunity workflows are the product core. Specialized driver
+ * activity support remains available for users who enter Driver Hub, but the
+ * retired DoorDash-specific keepalive is intentionally excluded from the
+ * global shell so unrelated users do not carry unnecessary background logic.
+ */
 export default function AuthenticatedShell() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <PrefetchOnMount />
       <ScheduledExportRunner />
       <DriverSessionKeepAlive />
-      <DoorDashKeepAlive />
       <AppLayout />
     </QueryClientProvider>
   );

@@ -1,0 +1,55 @@
+---
+description: TitanOS fine-tooth analytical perfectionist engineering standard
+alwaysApply: true
+---
+
+# TitanOS Fine-Tooth Perfectionist
+
+Apply this rule to every TitanOS code change, review, refactor, migration, feature, fix, release, and certification task.
+
+## Core behavior
+
+- Inspect before changing. Establish the current behavior, data flow, dependencies, authorization boundary, failure modes, and deployment impact before editing.
+- Fix root causes rather than masking symptoms.
+- Prefer the smallest complete solution over layered patches, duplicate abstractions, hidden fallbacks, or dead compatibility code.
+- Challenge assumptions. Verify important claims in code, schema, tests, runtime configuration, or other direct evidence.
+- Treat partial success as failure when it can corrupt state, mislead the user, weaken authorization, lose money/data, or create inconsistent behavior.
+- Do not call work complete, safe, production-ready, or perfected without evidence.
+
+## Mandatory inspection matrix
+
+For each meaningful change, inspect the applicable areas below:
+
+1. Architecture and responsibility boundaries
+2. Correctness of business logic and state transitions
+3. Authentication, authorization, tenant isolation, RLS, and least privilege
+4. Input validation, hostile input, output encoding, and secret handling
+5. Database constraints, ownership, indexes, migrations, transactions, idempotency, and rollback behavior
+6. API contracts, timeouts, retries, duplicate requests, rate limits, and partial failures
+7. Async behavior, race conditions, stale state, cancellation, double-submit, and concurrency
+8. Error handling, user-safe messages, recovery paths, logging, and observability
+9. Edge cases, empty/null/invalid states, offline/degraded behavior, and interrupted workflows
+10. Performance, bounded queries/lists, unnecessary renders, network chatter, memory, battery, GPS, and background work
+11. UI/UX consistency, navigation, loading, empty states, action feedback, and destructive-action safeguards
+12. Accessibility, keyboard/screen-reader behavior, focus, touch targets, contrast, reduced motion, and responsive layout
+13. Mobile/Capacitor behavior, permissions, lifecycle, safe areas, orientation, and network transitions
+14. Compatibility with Supabase, Vercel/serverless, Stripe/payment paths, Android, PWA, and external integrations where applicable
+15. Dead code, duplication, naming, typing, cohesion, comments, documentation, and maintainability
+16. Tests for happy paths, failure paths, regressions, boundary cases, and repeated/idempotent execution
+17. Deployment risk, environment assumptions, feature flags, migrations, rollback, and monitoring after release
+
+## Completion gate
+
+Before finishing significant work:
+
+- Re-read the changed code as a reviewer who did not write it.
+- Search for every call site and affected dependency when changing shared contracts.
+- Verify no obsolete path remains active unless intentionally retained and documented.
+- Run the strongest relevant automated checks available, including lint/build/tests when the repository supports them.
+- Inspect failures instead of suppressing or weakening checks.
+- Record unresolved risk explicitly; do not hide uncertainty behind a completion percentage.
+- If evidence conflicts with the requested implementation, preserve safety and data integrity and explain the conflict.
+
+## Quality target
+
+The target is code that is precise, cohesive, boring in the best engineering sense, maintainable by another developer, resistant to misuse and duplicate execution, observable when it fails, and difficult to improve further without changing product requirements.

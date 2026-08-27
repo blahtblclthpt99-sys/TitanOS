@@ -29,6 +29,14 @@ function currency(value) {
   return value == null ? "Pay not listed" : `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value)}/yr est.`;
 }
 
+function freshnessLabel(job) {
+  if (job?.freshness_status === "fresh" && Number.isFinite(job?.listing_age_days)) {
+    if (job.listing_age_days === 0) return "Posted today";
+    return `${job.listing_age_days}d old`;
+  }
+  return "Date not verified";
+}
+
 export default function JobSearchCommandCenter() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
@@ -116,14 +124,15 @@ export default function JobSearchCommandCenter() {
         const company = job.company_name || job.company || job.employer_name || job.source_name || "Employer not listed";
         const annual = annualizePay(job);
         const source = jobMatchSourceLabel(job);
-        const originalUrl = isExternalJobMatch(job) ? safeExternalJobUrl(job) : null;
-        return <article key={`${job.source || "titan"}-${job.id}`} className="titan-surface p-5 space-y-4">
+        const external = isExternalJobMatch(job);
+        const originalUrl = external ? safeExternalJobUrl(job) : null;
+        return <article key={`${external ? "external" : "titan"}-${job.id || job.source_job_id || job.external_id || `${job.title}-${company}`}`} className="titan-surface p-5 space-y-4">
           <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="text-base font-semibold">{job.title || "Opportunity"}</h2><p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><Building2 className="h-3.5 w-3.5" />{company}</p></div><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase text-primary">{Number(job.match?.score || 0)}% match</span></div>
-          <div className="flex flex-wrap gap-2 text-xs"><span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1"><ShieldCheck className="h-3.5 w-3.5" />{trust.label}</span><span className="rounded-full border border-border px-2 py-1">{source}</span>{(job.city || job.state) ? <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1"><MapPin className="h-3.5 w-3.5" />{[job.city, job.state].filter(Boolean).join(", ")}</span> : null}</div>
-          <p className="text-xs text-muted-foreground">{trust.detail}</p>
+          <div className="flex flex-wrap gap-2 text-xs"><span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1"><ShieldCheck className="h-3.5 w-3.5" />{trust.label}</span><span className="rounded-full border border-border px-2 py-1">{source}</span><span className="rounded-full border border-border px-2 py-1">{freshnessLabel(job)}</span>{(job.city || job.state) ? <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1"><MapPin className="h-3.5 w-3.5" />{[job.city, job.state].filter(Boolean).join(", ")}</span> : null}</div>
+          <p className="text-xs text-muted-foreground">{trust.detail}{job.freshness_verified ? " Listing date is within the active freshness window." : " Listing date could not be independently verified; confirm it is still open before applying."}</p>
           <div className="rounded-lg border border-border bg-background p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Compensation comparison</p><p className="mt-1 font-semibold">{currency(annual)}</p>{annual == null ? <p className="mt-1 text-xs text-muted-foreground">TitanOS will not guess missing salary data.</p> : null}</div>
           {job.description ? <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground">{job.description}</p> : null}
-          <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" disabled={busyId === job.id} onClick={() => track(job, "saved")}>Save</Button><Button variant="outline" disabled={busyId === job.id} onClick={() => track(job, "applied")}>Track application</Button><Button asChild><Link to={buildResumeLink(job)}><FileText className="mr-2 h-4 w-4" />Tailor resume</Link></Button>{originalUrl ? <Button asChild variant="outline"><a href={originalUrl} target="_blank" rel="noopener noreferrer">Original listing<ExternalLink className="ml-2 h-4 w-4" /></a></Button> : isExternalJobMatch(job) ? <Button variant="outline" disabled>Source link unavailable</Button> : <Button asChild variant="outline"><Link to={`/hire?tab=browse&job=${encodeURIComponent(job.id)}`}>Open Titan job</Link></Button>}</div>
+          <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" disabled={busyId === job.id} onClick={() => track(job, "saved")}>Save</Button><Button variant="outline" disabled={busyId === job.id} onClick={() => track(job, "applied")}>Track application</Button><Button asChild><Link to={buildResumeLink(job)}><FileText className="mr-2 h-4 w-4" />Tailor resume</Link></Button>{originalUrl ? <Button asChild variant="outline"><a href={originalUrl} target="_blank" rel="noopener noreferrer">Original listing<ExternalLink className="ml-2 h-4 w-4" /></a></Button> : external ? <Button variant="outline" disabled>Source link unavailable</Button> : <Button asChild variant="outline"><Link to={`/hire?tab=browse&job=${encodeURIComponent(job.id)}`}>Open Titan job</Link></Button>}</div>
         </article>;
       })}</section>}
 

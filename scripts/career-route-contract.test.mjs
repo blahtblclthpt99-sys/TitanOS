@@ -11,6 +11,7 @@ const landing = read("../src/pages/Landing.jsx");
 const schedule = read("../src/pages/Schedule.jsx");
 const routePlanner = read("../src/pages/RoutePlanner.jsx");
 const smartSchedule = read("../src/lib/smartSchedule.js");
+const workOrders = read("../src/pages/Jobs.jsx");
 const returnTo = read("../src/lib/returnTo.js");
 
 test("canonical /jobs route renders seeker search and legacy career URL redirects", () => {
@@ -36,10 +37,17 @@ test("career entry points use canonical seeker job search", () => {
 });
 
 test("operational surfaces never deep-link into seeker /jobs", () => {
-  for (const source of [schedule, routePlanner, smartSchedule]) {
+  for (const source of [schedule, routePlanner, smartSchedule, workOrders]) {
     assert.match(source, /\/work\/jobs/);
-    assert.doesNotMatch(source, /["'`]\/jobs(?:\?|["'`])/);
+    assert.doesNotMatch(source, /navigate\(["'`]\/jobs(?:\?|["'`])/);
   }
+});
+
+test("work orders keeps its own title and internal deep-link reset", () => {
+  assert.match(workOrders, /title="Work Orders"/);
+  assert.match(workOrders, /Work-order deep links: \/work\/jobs\?id=/);
+  assert.match(workOrders, /closeForm = \(\) => navigate\("\/work\/jobs", \{ replace: true \}\)/);
+  assert.doesNotMatch(workOrders, /navigate\("\/jobs", \{ replace: true \}\)/);
 });
 
 test("authentication defaults to Career Home instead of Driver Hub", () => {

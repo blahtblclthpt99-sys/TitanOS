@@ -16,6 +16,7 @@ function getTabRoot(pathname) {
   if (pathname.startsWith("/driver")) return "/driver";
   if (pathname.startsWith("/customers")) return "/customers";
   if (pathname.startsWith("/invoices")) return "/invoices";
+  if (pathname.startsWith("/work/jobs")) return "/work/jobs";
   if (pathname.startsWith("/jobs")) return "/jobs";
   if (pathname.startsWith("/estimates")) return "/estimates";
   if (pathname.startsWith("/marketplace")) return "/marketplace";

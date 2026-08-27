@@ -76,12 +76,23 @@ describe("native Titan job scoring", () => {
     assert.equal(rows[0].id, "best");
     assert.equal(rows.some((row) => row.id === "closed"), false);
   });
+
+  it("excludes native jobs after their application deadline and rejects malformed deadlines", () => {
+    const now = Date.parse("2026-08-27T12:00:00Z");
+    const rows = rankInternalJobMatches([
+      { ...strongJob, id: "open-deadline", deadline: "2026-08-28T12:00:00Z" },
+      { ...strongJob, id: "expired-deadline", deadline: "2026-08-26T12:00:00Z" },
+      { ...strongJob, id: "bad-deadline", deadline: "not-a-date" },
+    ], worker, { now });
+    assert.deepEqual(rows.map((row) => row.id), ["open-deadline"]);
+  });
 });
 
 describe("external fallback safety", () => {
   const external = normalizeExternalJob({
     id: "ext-1",
     title: "Box truck route driver",
+    company_name: "Route Logistics",
     city: "Oklahoma City",
     state: "OK",
     url: "https://jobs.example.test/route-driver",
@@ -95,10 +106,16 @@ describe("external fallback safety", () => {
     assert.throws(() => normalizeExternalJob({ id: "x", title: "Bad", url: "javascript:alert(1)" }, { name: "Example" }), /HTTPS/);
   });
 
+  it("requires a stable provider id and non-empty title", () => {
+    assert.throws(() => normalizeExternalJob({ title: "Driver", url: "https://jobs.example.test/x" }, { name: "Example" }), /external_id/);
+    assert.throws(() => normalizeExternalJob({ id: "x", title: "   ", url: "https://jobs.example.test/x" }, { name: "Example" }), /title/);
+  });
+
   it("bounds untrusted provider payload fields and numeric compensation", () => {
     const row = normalizeExternalJob({
       id: "x".repeat(500),
       title: "T".repeat(500),
+      company_name: "C".repeat(500),
       description: "D".repeat(15000),
       url: "https://jobs.example.test/x",
       budget_min: "not-a-number",
@@ -108,6 +125,7 @@ describe("external fallback safety", () => {
     }, { name: "P".repeat(200) });
     assert.equal(row.external_id.length, 300);
     assert.equal(row.title.length, 300);
+    assert.equal(row.company_name.length, 200);
     assert.equal(row.description.length, 12000);
     assert.equal(row.source_name.length, 120);
     assert.equal(row.budget_min, null);
@@ -132,7 +150,34 @@ describe("external fallback safety", () => {
     assert.equal(rows[0].id, "j1");
     assert.equal(rows[1].source, "external");
     assert.equal(rows[1].source_name, "Example Jobs");
+    assert.equal(rows[1].company_name, "Route Logistics");
     assert.match(rows[1].source_url, /^https:\/\//);
+  });
+
+  it("preserves same-role vacancies from different employers", () => {
+    const first = normalizeExternalJob({ ...external, id: "same-role-1", external_id: "same-role-1", company_name: "Company A", source_url: "https://jobs.example.test/opening?id=1" }, { name: "Example Jobs" });
+    const second = normalizeExternalJob({ ...external, id: "same-role-2", external_id: "same-role-2", company_name: "Company B", source_url: "https://jobs.example.test/opening?id=2" }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [first, second],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.deepEqual(rows.map((row) => row.company_name), ["Company A", "Company B"]);
+  });
+
+  it("removes tracking-only URL duplicates without collapsing job-specific query ids", () => {
+    const first = normalizeExternalJob({ ...external, id: "query-1", external_id: "query-1", company_name: "Company A", source_url: "https://jobs.example.test/opening?id=1&utm_source=titan" }, { name: "Example Jobs" });
+    const trackingDuplicate = normalizeExternalJob({ ...external, id: "query-1-copy", external_id: "query-1-copy", company_name: "Company A", source_url: "https://jobs.example.test/opening?id=1&utm_source=other" }, { name: "Example Jobs" });
+    const distinct = normalizeExternalJob({ ...external, id: "query-2", external_id: "query-2", company_name: "Company A", source_url: "https://jobs.example.test/opening?id=2" }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [first, trackingDuplicate, distinct],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows.map((row) => row.external_id), ["query-1", "query-2"]);
   });
 
   it("filters stale external listings", () => {

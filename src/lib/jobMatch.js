@@ -114,6 +114,12 @@ function scheduleScore(profile, job) {
   return { ratio: match.ratio, matched: match.matched };
 }
 
+function hasOpenDeadline(job, now = Date.now()) {
+  if (!job?.deadline) return true;
+  const deadline = Date.parse(job.deadline);
+  return Number.isFinite(deadline) && deadline >= now;
+}
+
 export function buildWorkerMatchProfile(driverProfile = {}) {
   return {
     user_id: driverProfile.user_id || driverProfile.userId || null,
@@ -178,9 +184,9 @@ export function scoreJobMatch(driverProfile, job = {}) {
   };
 }
 
-export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumScore = 25 } = {}) {
+export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumScore = 25, now = Date.now() } = {}) {
   return (jobs || [])
-    .filter((job) => job && (job.status || "open") === "open")
+    .filter((job) => job && (job.status || "open") === "open" && hasOpenDeadline(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
     .filter((job) => job.match.score >= minimumScore)
     .sort((a, b) => b.match.score - a.match.score || Number(Boolean(b.is_urgent)) - Number(Boolean(a.is_urgent)) || String(b.created_at || "").localeCompare(String(a.created_at || "")));
@@ -200,11 +206,14 @@ export function normalizeExternalJob(raw = {}, provider = {}) {
 
   const externalId = boundedText(raw.external_id || raw.id || "", 300);
   if (!externalId) throw new Error("External job requires an external_id.");
+  const title = boundedText(raw.title, 300);
+  if (!title) throw new Error("External job requires a title.");
 
   return {
     id: `external:${clean(sourceName)}:${externalId}`,
     external_id: externalId,
-    title: boundedText(raw.title, 300),
+    title,
+    company_name: boundedText(raw.company_name || raw.company || raw.employer_name, 200),
     description: boundedText(raw.description, 12000),
     category: boundedText(raw.category || "General", 120) || "General",
     city: boundedText(raw.city, 120),
@@ -228,12 +237,23 @@ export function normalizeExternalJob(raw = {}, provider = {}) {
 }
 
 function urlDedupeKey(job = {}) {
-  const direct = clean(job.source_url);
-  return direct ? direct.replace(/\?.*$/, "") : "";
+  const direct = String(job.source_url || "").trim();
+  if (!direct) return "";
+  try {
+    const parsed = new URL(direct);
+    parsed.hash = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || ["gclid", "fbclid", "msclkid"].includes(key.toLowerCase())) parsed.searchParams.delete(key);
+    }
+    return parsed.toString().toLowerCase();
+  } catch {
+    return clean(direct);
+  }
 }
 
 function vacancyFingerprint(job = {}) {
-  return [clean(job.title), clean(job.city), clean(job.state)].join("|");
+  const company = clean(job.company_name || job.company || job.employer_name);
+  return [clean(job.title), company, clean(job.city), clean(job.state)].join("|");
 }
 
 function isStale(job, now = Date.now()) {
@@ -251,7 +271,7 @@ function isStale(job, now = Date.now()) {
 }
 
 export function mergeRankedJobMatches({ internal = [], external = [], driverProfile = {}, now = Date.now() } = {}) {
-  const rankedInternal = rankInternalJobMatches(internal, driverProfile);
+  const rankedInternal = rankInternalJobMatches(internal, driverProfile, { now });
   if (!buildWorkerMatchProfile(driverProfile).external_job_search_consent) return rankedInternal;
 
   const seenUrls = new Set(rankedInternal.map(urlDedupeKey).filter(Boolean));

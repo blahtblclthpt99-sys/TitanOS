@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   policy-gate:
-    name: Career-core Android policy gate
+    name: Career-core policy gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,3 +25,6 @@ jobs:
 
       - name: Validate Android policy surface
         run: node scripts/google-play-policy-gate.mjs
+
+      - name: Validate job matching policy
+        run: node --test scripts/job-match.test.mjs

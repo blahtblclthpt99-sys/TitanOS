@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { annualizePay, buildResumeLink, filterJobSearch, safeExternalJobUrl, sortJobSearch, sourceTrust } from "../src/lib/jobSearchCommand.js";
+import { jobInteractionIdentity, jobSource } from "../src/lib/jobMatchIdentity.js";
 
 const native = {
   id: "n1", title: "Box Truck Driver", company_name: "Acme Logistics", city: "Oklahoma City", state: "OK",
@@ -47,6 +48,36 @@ test("only exposes HTTPS external listing URLs", () => {
   assert.equal(safeExternalJobUrl({ ...external, source_url: "http://jobs.example.test/e1" }), null);
   assert.equal(safeExternalJobUrl({ ...external, source_url: "javascript:alert(1)" }), null);
   assert.equal(safeExternalJobUrl({ ...external, source_url: "not a url" }), null);
+});
+
+test("nested match provenance remains external throughout tracking identity", () => {
+  const nestedExternal = {
+    id: "row-1",
+    external_id: "provider-42",
+    match: {
+      source: "external",
+      source_name: "Verified Jobs Feed",
+      source_url: "https://jobs.example.test/provider-42",
+    },
+  };
+  assert.equal(jobSource(nestedExternal), "external");
+  assert.deepEqual(jobInteractionIdentity(nestedExternal), {
+    source: "external",
+    sourceName: "Verified Jobs Feed",
+    sourceJobId: "provider-42",
+    sourceUrl: "https://jobs.example.test/provider-42",
+  });
+});
+
+test("tracking identity refuses unsafe external source URLs", () => {
+  const identity = jobInteractionIdentity({
+    id: "row-2",
+    source: "external",
+    source_name: "External Feed",
+    source_url: "javascript:alert(1)",
+  });
+  assert.equal(identity.source, "external");
+  assert.equal(identity.sourceUrl, null);
 });
 
 test("resume handoff carries only listing-provided role company and description", () => {

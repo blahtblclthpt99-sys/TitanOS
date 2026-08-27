@@ -10,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import NativeSelect from "@/components/shared/NativeSelect";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/AuthContext";
+import { CAREER_PIPELINE_STAGES, availableCareerStageTransitions } from "@/lib/careerPipelineState";
 import { safeExternalJobUrl } from "@/lib/jobSearchCommand";
 import { listMyJobMatchInteractions, saveMyCareerPipelineDetails, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
 
-const STAGES = ["saved", "applied", "screening", "interview", "offer", "hired", "closed"];
+const STAGES = CAREER_PIPELINE_STAGES;
 const ACTIVE_STAGES = ["applied", "screening", "interview", "offer"];
 
 function stageLabel(stage) {
@@ -69,7 +70,7 @@ export default function CareerPipeline() {
   const activeCount = ACTIVE_STAGES.reduce((sum, stage) => sum + (counts[stage] || 0), 0);
 
   const updateStage = async (row, state) => {
-    if (!user?.id || !state || busyId) return;
+    if (!user?.id || !state || busyId || state === row.state) return;
     setBusyId(row.id);
     try {
       const updated = await setMyJobMatchInteraction(user.id, {
@@ -82,8 +83,11 @@ export default function CareerPipeline() {
       }, state);
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, ...updated, state } : item));
       toast({ title: `Moved to ${stageLabel(state)}` });
-    } catch {
-      toast({ variant: "destructive", title: "Couldn't update application stage", description: "Please try again." });
+    } catch (error) {
+      const transitionMessage = /cannot move backward|invalid transition/i.test(String(error?.message || ""))
+        ? "That application stage change is not allowed. Refresh the pipeline and try again."
+        : "Please try again.";
+      toast({ variant: "destructive", title: "Couldn't update application stage", description: transitionMessage });
     } finally {
       setBusyId(null);
     }
@@ -135,6 +139,7 @@ export default function CareerPipeline() {
             const next = nextStage(row.state);
             const draft = drafts[row.id] || draftFromRow(row);
             const originalListingUrl = row.source === "external" ? safeExternalJobUrl(row) : null;
+            const availableStages = availableCareerStageTransitions(row.state).filter((stage) => stage !== row.state);
             return (
               <article key={row.id} className="titan-surface p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
@@ -157,12 +162,17 @@ export default function CareerPipeline() {
 
                 <Button type="button" variant="outline" className="w-full gap-2" disabled={busyId === row.id} onClick={() => saveDetails(row)}><Save className="h-4 w-4" />Save interview & notes</Button>
 
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <NativeSelect value={row.state} onChange={(e) => updateStage(row, e.target.value)} disabled={busyId === row.id} aria-label="Application stage">
-                    {STAGES.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}
-                  </NativeSelect>
-                  {next ? <Button type="button" disabled={busyId === row.id} onClick={() => updateStage(row, next)}>Move to {stageLabel(next)}<ChevronRight className="ml-1 h-4 w-4" /></Button> : null}
-                </div>
+                {availableStages.length ? (
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <NativeSelect defaultValue="" onChange={(e) => { if (e.target.value) updateStage(row, e.target.value); }} disabled={busyId === row.id} aria-label="Move application to stage">
+                      <option value="" disabled>Move to stage…</option>
+                      {availableStages.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}
+                    </NativeSelect>
+                    {next && availableStages.includes(next) ? <Button type="button" disabled={busyId === row.id} onClick={() => updateStage(row, next)}>Move to {stageLabel(next)}<ChevronRight className="ml-1 h-4 w-4" /></Button> : null}
+                  </div>
+                ) : (
+                  <p className="text-xs font-medium text-muted-foreground">This application is in a final stage.</p>
+                )}
 
                 <p className="text-[11px] text-muted-foreground">These notes and dates are private to your account and are not used to rank you for employers or make employment decisions.</p>
               </article>

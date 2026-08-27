@@ -12,7 +12,6 @@ import { normalizeAppPath } from "@/lib/routing";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
-
 const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
 const TAB_LRU_SIZE = 3;
 
@@ -21,14 +20,7 @@ const Jobs = lazy(() => import("@/pages/Jobs"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
-
-const TAB_COMPONENTS = {
-  "/": Dashboard,
-  "/driver": DriverHubTab,
-  "/comms": TitanCommsTab,
-  "/jobs": Jobs,
-  "/more": MoreMenu,
-};
+const TAB_COMPONENTS = { "/": Dashboard, "/driver": DriverHubTab, "/comms": TitanCommsTab, "/jobs": Jobs, "/more": MoreMenu };
 
 const Customers = lazy(() => import("@/pages/Customers"));
 const Invoices = lazy(() => import("@/pages/Invoices"));
@@ -36,6 +28,7 @@ const Marketplace = lazy(() => import("@/pages/Marketplace"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const CareerReadiness = lazy(() => import("@/pages/CareerReadiness"));
 const ResumeBuilder = lazy(() => import("@/pages/ResumeBuilder"));
+const JobSearchCommandCenter = lazy(() => import("@/pages/JobSearchCommandCenter"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
@@ -84,64 +77,24 @@ const BusinessDocuments = lazy(() => import("@/pages/BusinessDocuments"));
 const SecondMe = lazy(() => import("@/pages/SecondMe"));
 
 const LEGACY_REDIRECTS = {
-  "/messages": "/comms",
-  "/titan-score": "/analytics?titanScore=1",
-  "/growth-coach": "/assistant?mode=growth",
-  "/marketing": "/assistant?mode=marketing",
-  "/phone": "/assistant?mode=phone-script",
-  "/community": "/",
-  "/emergency": "/",
-  "/deals": "/",
-  "/escrow": "/",
+  "/messages": "/comms", "/titan-score": "/analytics?titanScore=1", "/growth-coach": "/assistant?mode=growth",
+  "/marketing": "/assistant?mode=marketing", "/phone": "/assistant?mode=phone-script", "/community": "/",
+  "/emergency": "/", "/deals": "/", "/escrow": "/",
 };
 
 const NON_TAB_ROUTES = {
-  "/schedule": Schedule,
-  "/estimates": Estimates,
-  "/job-estimator": JobEstimator,
-  "/finances": Finances,
-  "/receipts": ReceiptScanner,
-  "/fleet": Fleet,
-  "/tax-center": TaxCenter,
-  "/reports": Reports,
-  "/analytics": Analytics,
-  "/customers": Customers,
-  "/invoices": Invoices,
-  "/assistant": AIAssistant,
-  "/second-me": SecondMe,
-  "/business-documents": BusinessDocuments,
-  "/insurance": Insurance,
-  "/referral": Referral,
-  "/hire": Hire,
-  "/hire/matches": JobMatches,
-  "/career/pipeline": CareerPipeline,
-  "/career/readiness": CareerReadiness,
-  "/career/resume": ResumeBuilder,
-  "/hire/post-match-ready": MatchReadyJobPost,
-  "/hire/candidates": WorkerMatches,
-  "/hire/find-workers": ExistingPostWorkerMatches,
-  "/notifications": Notifications,
-  "/admin/moderation": AdminModeration,
-  "/admin/fees": AdminFees,
-  "/admin/tax-rules": AdminTaxRules,
-  "/admin": AdminControlCenter,
-  "/booking": Booking,
-  "/contracts": Contracts,
-  "/payments": Payments,
-  "/routes": RoutePlanner,
-  "/companies": Companies,
-  "/employees": Employees,
-  "/inventory": Inventory,
-  "/follow-ups": FollowUps,
-  "/autopilot": Autopilot,
-  "/reputation": Reputation,
-  "/credentials": Credentials,
-  "/leads": Leads,
-  "/settings": Settings,
-  "/subscription": Subscription,
-  "/trust-safety": TrustSafety,
-  "/design-system": DesignSystem,
-  "/profile": Profile,
+  "/schedule": Schedule, "/estimates": Estimates, "/job-estimator": JobEstimator, "/finances": Finances,
+  "/receipts": ReceiptScanner, "/fleet": Fleet, "/tax-center": TaxCenter, "/reports": Reports, "/analytics": Analytics,
+  "/customers": Customers, "/invoices": Invoices, "/assistant": AIAssistant, "/second-me": SecondMe,
+  "/business-documents": BusinessDocuments, "/insurance": Insurance, "/referral": Referral, "/hire": Hire,
+  "/hire/matches": JobMatches, "/career/search": JobSearchCommandCenter, "/career/pipeline": CareerPipeline,
+  "/career/readiness": CareerReadiness, "/career/resume": ResumeBuilder, "/hire/post-match-ready": MatchReadyJobPost,
+  "/hire/candidates": WorkerMatches, "/hire/find-workers": ExistingPostWorkerMatches, "/notifications": Notifications,
+  "/admin/moderation": AdminModeration, "/admin/fees": AdminFees, "/admin/tax-rules": AdminTaxRules, "/admin": AdminControlCenter,
+  "/booking": Booking, "/contracts": Contracts, "/payments": Payments, "/routes": RoutePlanner, "/companies": Companies,
+  "/employees": Employees, "/inventory": Inventory, "/follow-ups": FollowUps, "/autopilot": Autopilot,
+  "/reputation": Reputation, "/credentials": Credentials, "/leads": Leads, "/settings": Settings,
+  "/subscription": Subscription, "/trust-safety": TrustSafety, "/design-system": DesignSystem, "/profile": Profile,
   "/marketplace": Marketplace,
 };
 
@@ -150,13 +103,11 @@ function NonTabPage() {
   const pathname = normalizeAppPath(rawPath);
   const redirect = LEGACY_REDIRECTS[pathname];
   if (redirect) return <Navigate to={redirect} replace />;
-
   if (pathname.startsWith("/share/report/")) return <Suspense fallback={<Spinner />}><ShareReport /></Suspense>;
   if (pathname.startsWith("/customers/")) return <Suspense fallback={<Spinner />}><CustomerDetail /></Suspense>;
   if (pathname.startsWith("/invoices/")) return <Suspense fallback={<Spinner />}><InvoiceDetail /></Suspense>;
   if (pathname.startsWith("/driver/trip/")) return <Suspense fallback={<Spinner />}><DriverTripDetail /></Suspense>;
   if (pathname.startsWith("/driver/") && pathname !== "/driver/") return <Suspense fallback={<Spinner />}><DriverProfile /></Suspense>;
-
   const routeKey = pathname === "/ai-assistant" ? "/assistant" : pathname;
   const Page = NON_TAB_ROUTES[routeKey];
   if (!Page) return <Suspense fallback={<Spinner />}><PageNotFound /></Suspense>;
@@ -170,34 +121,20 @@ export default function TabStack() {
   const reduceMotion = usePrefersReducedMotion();
   const isTab = TAB_PATHS.includes(pathname);
   const activeTab = isTab ? pathname : null;
-
   if (activeTab) recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   const mountedTabs = new Set(["/", ...recentTabs.current]);
   if (activeTab) mountedTabs.add(activeTab);
 
-  return (
-    <div className="relative w-full min-h-[calc(100svh-8rem)]">
-      {TAB_PATHS.map((path) => {
-        const Page = TAB_COMPONENTS[path];
-        const isMounted = mountedTabs.has(path);
-        const isActive = activeTab === path;
-        if (!isMounted) return null;
-        return (
-          <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive} className={isActive && !reduceMotion ? "page-enter" : undefined}>
-            <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh.">
-              <Suspense fallback={<Spinner label="Loading" />}><Page isActive={isActive} /></Suspense>
-            </ErrorBoundary>
-          </div>
-        );
-      })}
-
-      {!isTab && (
-        <AnimatePresence mode="wait">
-          <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }} transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }} className="relative w-full">
-            <ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home."><NonTabPage /></ErrorBoundary>
-          </motion.div>
-        </AnimatePresence>
-      )}
-    </div>
-  );
+  return <div className="relative w-full min-h-[calc(100svh-8rem)]">
+    {TAB_PATHS.map((path) => {
+      const Page = TAB_COMPONENTS[path];
+      const isMounted = mountedTabs.has(path);
+      const isActive = activeTab === path;
+      if (!isMounted) return null;
+      return <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive} className={isActive && !reduceMotion ? "page-enter" : undefined}>
+        <ErrorBoundary message="This tab failed to load. Try switching away and back, or refresh."><Suspense fallback={<Spinner label="Loading" />}><Page isActive={isActive} /></Suspense></ErrorBoundary>
+      </div>;
+    })}
+    {!isTab && <AnimatePresence mode="wait"><motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }} transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }} className="relative w-full"><ErrorBoundary key={pathname} message="This page failed to load. Try again or go back to Home."><NonTabPage /></ErrorBoundary></motion.div></AnimatePresence>}
+  </div>;
 }

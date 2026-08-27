@@ -36,14 +36,14 @@ function enhanceProgress(node) {
 
 function enhanceDisabledGuidance(root = document) {
   root.querySelectorAll('button').forEach((button) => {
-    if (button.textContent?.trim() === 'Request payout') {
-      if (button.disabled) {
-        button.title = 'A minimum available balance of $5.00 is required to request a payout.';
-        button.setAttribute('aria-description', 'A minimum available balance of $5.00 is required to request a payout.');
-      } else {
-        button.removeAttribute('title');
-        button.removeAttribute('aria-description');
-      }
+    if (button.textContent?.trim() !== 'Request payout') return;
+    if (button.disabled) {
+      const guidance = 'A minimum available balance of $5.00 is required to request a payout.';
+      button.title = guidance;
+      button.setAttribute('aria-description', guidance);
+    } else {
+      button.removeAttribute('title');
+      button.removeAttribute('aria-description');
     }
   });
 }
@@ -54,8 +54,10 @@ export function installAttentionUxRuntime() {
   let activeDialog = null;
   let restoreTarget = null;
   let observer;
+  let syncFrame = 0;
 
   const sync = () => {
+    syncFrame = 0;
     document.querySelectorAll('.notice').forEach(enhanceNotice);
     document.querySelectorAll('.progress').forEach(enhanceProgress);
     enhanceDisabledGuidance();
@@ -93,6 +95,11 @@ export function installAttentionUxRuntime() {
     }
   };
 
+  const scheduleSync = () => {
+    if (syncFrame) return;
+    syncFrame = window.requestAnimationFrame(sync);
+  };
+
   const onKeyDown = (event) => {
     if (!activeDialog) return;
 
@@ -125,7 +132,7 @@ export function installAttentionUxRuntime() {
   };
 
   document.addEventListener('keydown', onKeyDown, true);
-  observer = new MutationObserver(sync);
+  observer = new MutationObserver(scheduleSync);
   observer.observe(document.body, {
     childList: true,
     subtree: true,
@@ -136,6 +143,7 @@ export function installAttentionUxRuntime() {
 
   return () => {
     observer?.disconnect();
+    if (syncFrame) window.cancelAnimationFrame(syncFrame);
     document.removeEventListener('keydown', onKeyDown, true);
     document.documentElement.classList.remove('modal-open');
   };

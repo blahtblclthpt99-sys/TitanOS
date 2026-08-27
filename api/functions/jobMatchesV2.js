@@ -33,6 +33,7 @@ function normalizeAdzunaResult(row = {}) {
   return normalizeExternalJob({
     external_id: row.id,
     title: row.title,
+    company_name: row.company?.display_name,
     description: row.description,
     category: row.category?.label || "General",
     city,

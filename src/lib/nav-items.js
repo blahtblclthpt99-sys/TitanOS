@@ -33,58 +33,58 @@ import {
   LifeBuoy,
   Brain,
   FolderOpen,
+  Search,
 } from "lucide-react";
 
 /**
- * TitanOS practical navigation.
- * Keep core destinations visible; merged/postponed tools remain available through
- * their canonical parent feature or compatibility routes rather than cluttering chrome.
+ * TitanOS primary information architecture.
+ *
+ * Product objective: help people find work, build careers, manage opportunities,
+ * and successfully complete the work they obtain. Operational business tooling
+ * remains available, but it is secondary to the jobs/career journey.
  */
 export const APP_NAV_ITEMS = [
-  // TODAY
-  { icon: LayoutDashboard, label: "Home", path: "/", group: "today" },
-  { icon: Bell, label: "Notifications", path: "/notifications", group: "today" },
+  // CAREER CORE — always first and easiest to reach.
+  { icon: LayoutDashboard, label: "Career Home", path: "/", group: "career" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "career" },
+  { icon: Search, label: "Opportunities", path: "/hire/matches", group: "career" },
+  { icon: User, label: "Career Profile", path: "/profile", group: "career" },
+  { icon: Building2, label: "Companies", path: "/companies", group: "career" },
+  { icon: Calendar, label: "Schedule", path: "/schedule", group: "career" },
+  { icon: Bell, label: "Notifications", path: "/notifications", group: "career" },
 
-  // WORK
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "work" },
-  { icon: Calendar, label: "Schedule", path: "/schedule", group: "work" },
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "work" },
-  { icon: Route, label: "Route Planner", path: "/routes", group: "work" },
-  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "work" },
-  { icon: UserCog, label: "Employees", path: "/employees", group: "work" },
-  { icon: Truck, label: "Fleet", path: "/fleet", group: "work" },
-  { icon: Package, label: "Inventory", path: "/inventory", group: "work" },
-  { icon: FolderOpen, label: "Business Documents", path: "/business-documents", group: "work" },
+  // CAREER ASSISTANCE — advisory and user-controlled automation.
+  { icon: Bot, label: "TitanAI Career Coach", path: "/assistant", group: "career_tools" },
+  { icon: Brain, label: "Second Me", path: "/second-me", group: "career_tools" },
+  { icon: Workflow, label: "Autopilot", path: "/autopilot", group: "career_tools" },
 
-  // CUSTOMERS
-  { icon: Users, label: "Customers", path: "/customers", group: "customers" },
-  { icon: ContactRound, label: "Leads", path: "/leads", group: "customers" },
-  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "customers" },
-  { icon: Radio, label: "Communications", legacyName: "TitanCom", path: "/comms", group: "customers" },
-  { icon: Star, label: "Reputation", path: "/reputation", group: "customers" },
+  // WORK TOOLS — useful after a user gets the work; intentionally secondary.
+  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "work_tools" },
+  { icon: Users, label: "Customers", path: "/customers", group: "work_tools" },
+  { icon: ContactRound, label: "Leads", path: "/leads", group: "work_tools" },
+  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "work_tools" },
+  { icon: Radio, label: "Communications", legacyName: "TitanCom", path: "/comms", group: "work_tools" },
+  { icon: Star, label: "Reputation", path: "/reputation", group: "work_tools" },
+  { icon: FileText, label: "Estimates", path: "/estimates", group: "work_tools" },
+  { icon: Receipt, label: "Invoices", path: "/invoices", group: "work_tools" },
+  { icon: CreditCard, label: "Payments", path: "/payments", group: "work_tools" },
+  { icon: DollarSign, label: "Finances", path: "/finances", group: "work_tools" },
+  { icon: BarChart3, label: "Reports", path: "/reports", group: "work_tools" },
+  { icon: ClipboardList, label: "Tax Center", path: "/tax-center", group: "work_tools" },
 
-  // MONEY
-  { icon: FileText, label: "Estimates", path: "/estimates", group: "money" },
-  { icon: Receipt, label: "Invoices", path: "/invoices", group: "money" },
-  { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
-  { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
-  { icon: BarChart3, label: "Reports", path: "/reports", group: "money" },
-  { icon: ClipboardList, label: "Tax Center", path: "/tax-center", group: "money" },
+  // SPECIALIZED OPERATIONS — opt-in tools, not TitanOS's default identity.
+  { icon: Car, label: "Driver Hub", path: "/driver", group: "operations" },
+  { icon: Route, label: "Route Planner", path: "/routes", group: "operations" },
+  { icon: UserCog, label: "Employees", path: "/employees", group: "operations" },
+  { icon: Truck, label: "Fleet", path: "/fleet", group: "operations" },
+  { icon: Package, label: "Inventory", path: "/inventory", group: "operations" },
+  { icon: FolderOpen, label: "Business Documents", path: "/business-documents", group: "operations" },
+  { icon: LineChart, label: "Analytics", path: "/analytics", group: "operations" },
 
-  // SECOND ME
-  { icon: Brain, label: "Second Me", path: "/second-me", group: "second_me" },
-  { icon: Bot, label: "TitanAI", path: "/assistant", group: "second_me" },
-  { icon: Workflow, label: "Autopilot", path: "/autopilot", group: "second_me" },
-
-  // BUSINESS
-  { icon: Building2, label: "My Business", path: "/companies", group: "business" },
-  { icon: User, label: "Profile", path: "/profile", group: "business" },
-  { icon: LineChart, label: "Analytics", path: "/analytics", group: "business" },
-  { icon: Settings, label: "Settings", path: "/settings", group: "business" },
-
-  // SUPPORT & SAFETY
-  { icon: LifeBuoy, label: "Titan Support", path: "/support", group: "support" },
-  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "support" },
+  // ACCOUNT + SUPPORT.
+  { icon: Settings, label: "Settings", path: "/settings", group: "account" },
+  { icon: LifeBuoy, label: "Titan Support", path: "/support", group: "account" },
+  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "account" },
 
   // ADMIN — actual server/route authorization is still mandatory.
   { icon: Shield, label: "Control Center", path: "/admin", group: "administration", adminOnly: true },
@@ -94,12 +94,8 @@ export const APP_NAV_ITEMS = [
   { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
 ];
 
-/**
- * Preserved internal workflows. These routes remain available to existing flows and
- * bookmarks but are intentionally excluded from the primary navigation and More menu.
- */
+/** Existing routes that remain available to established workflows/bookmarks. */
 export const INTERNAL_WORKFLOW_ITEMS = [
-  { label: "Job Matches", path: "/hire/matches", group: "live", hidden: true },
   { label: "Match-ready job", path: "/hire/post-match-ready", group: "live", hidden: true },
 ];
 
@@ -111,72 +107,58 @@ export const INTERNAL_WORKFLOW_GROUPS = [
 ];
 
 export const NAV_GROUP_META = {
-  today: { label: "Today", collapsible: false, defaultOpen: true },
-  work: { label: "Work", collapsible: true, defaultOpen: true },
-  customers: { label: "Customers", collapsible: true, defaultOpen: true },
-  money: { label: "Money", collapsible: true, defaultOpen: true },
-  second_me: { label: "Second Me", collapsible: true, defaultOpen: true },
-  business: { label: "Business", collapsible: true, defaultOpen: false },
-  support: { label: "Support & Safety", collapsible: true, defaultOpen: false },
+  career: { label: "Jobs & Career", collapsible: false, defaultOpen: true },
+  career_tools: { label: "Career Tools", collapsible: true, defaultOpen: true },
+  work_tools: { label: "Work Tools", collapsible: true, defaultOpen: false },
+  operations: { label: "Specialized Operations", collapsible: true, defaultOpen: false },
+  account: { label: "Account & Support", collapsible: true, defaultOpen: false },
   administration: { label: "Admin", collapsible: true, defaultOpen: false },
 };
 
 export const NAV_GROUP_ORDER = [
-  "today",
-  "work",
-  "customers",
-  "money",
-  "second_me",
-  "business",
-  "support",
+  "career",
+  "career_tools",
+  "work_tools",
+  "operations",
+  "account",
   "administration",
 ];
 
-/** Keep mobile focused on the four highest-frequency roots; More exposes the rest. */
+/** Mobile keeps the job-seeker journey one tap away. */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Car, label: "Driver", path: "/driver" },
-  { icon: Radio, label: "Comms", path: "/comms" },
+  { icon: Search, label: "Matches", path: "/hire/matches" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/driver", "/comms", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/hire/matches", "/profile", "/more"];
 
 export const MORE_MENU_GROUPS = [
   {
-    title: "Today",
-    description: "What is happening and what needs your attention",
-    paths: ["/", "/notifications"],
+    title: "Jobs & Career",
+    description: "Find work, evaluate opportunities, and strengthen your career profile",
+    paths: ["/", "/jobs", "/hire/matches", "/profile", "/companies", "/schedule", "/notifications"],
   },
   {
-    title: "Work",
-    description: "Plan, dispatch, complete, and document work",
-    paths: ["/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
+    title: "Career Tools",
+    description: "Get user-controlled AI help with career planning and work organization",
+    paths: ["/assistant", "/second-me", "/autopilot"],
   },
   {
-    title: "Customers",
-    description: "Manage customers, leads, communication, and reputation",
-    paths: ["/customers", "/leads", "/follow-ups", "/comms", "/reputation"],
+    title: "Work Tools",
+    description: "Manage clients, estimates, invoices, payments, and completed work",
+    paths: ["/booking", "/customers", "/leads", "/follow-ups", "/comms", "/reputation", "/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"],
   },
   {
-    title: "Money",
-    description: "Estimate, invoice, collect, track, and report",
-    paths: ["/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"],
+    title: "Specialized Operations",
+    description: "Optional tools for driving, routing, teams, fleets, inventory, and business records",
+    paths: ["/driver", "/routes", "/employees", "/fleet", "/inventory", "/business-documents", "/analytics"],
   },
   {
-    title: "Second Me",
-    description: "Memory, intelligence, and approved automation",
-    paths: ["/second-me", "/assistant", "/autopilot"],
-  },
-  {
-    title: "Business",
-    description: "Your business, profile, analytics, and settings",
-    paths: ["/companies", "/profile", "/analytics", "/settings"],
-  },
-  {
-    title: "Support & Safety",
-    description: "Get help and manage safety",
-    paths: ["/support", "/trust-safety"],
+    title: "Account & Support",
+    description: "Settings, support, privacy, and safety",
+    paths: ["/settings", "/support", "/trust-safety"],
   },
   {
     title: "Admin",
@@ -186,10 +168,10 @@ export const MORE_MENU_GROUPS = [
 ];
 
 export const QUICK_CREATE_ACTIONS = [
+  { label: "Find Jobs", path: "/jobs", icon: Briefcase },
+  { label: "View Matches", path: "/hire/matches", icon: Search },
+  { label: "Update Career Profile", path: "/profile", icon: User },
   { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
-  { label: "Create Estimate", path: "/estimates?new=1", icon: FileText },
-  { label: "Invoice", path: "/invoices?new=1", icon: Receipt },
-  { label: "Customer", path: "/customers?new=1", icon: Users },
 ];
 
 export function resolveNavDomain(pathname = "/") {
@@ -197,7 +179,7 @@ export function resolveNavDomain(pathname = "/") {
   const item =
     APP_NAV_ITEMS.find((n) => n.path === path) ||
     APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
-  return item?.group || "today";
+  return item?.group || "career";
 }
 
 export function navItemsByPaths(paths) {
@@ -211,7 +193,7 @@ export function filterNavItems(items, { isAdmin = false } = {}) {
 export function resolvePageTitle(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
 
-  if (path === "/") return "Home";
+  if (path === "/") return "Career Home";
   if (path === "/more") return "More";
   if (path.startsWith("/driver/trip")) return "Trip detail";
   if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
@@ -234,7 +216,7 @@ export function resolvePageTitle(pathname = "/") {
   if (exact) return exact.label;
 
   const tab = MOBILE_TAB_ITEMS.find((item) => item.path === path);
-  if (tab) return tab.label === "Driver" ? "Driver Hub" : tab.label;
+  if (tab) return tab.label;
 
   const prefix = APP_NAV_ITEMS.find((item) => item.path !== "/" && path.startsWith(`${item.path}/`));
   if (prefix) return prefix.label;
@@ -244,14 +226,16 @@ export function resolvePageTitle(pathname = "/") {
 
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
+  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
+  if (path.startsWith("/hire")) return { label: "Opportunities", path: "/hire/matches" };
+  if (path.startsWith("/profile")) return { label: "Career Profile", path: "/profile" };
+  if (path.startsWith("/companies")) return { label: "Companies", path: "/companies" };
   if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
-  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
   if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
   if (path.startsWith("/comms")) return { label: "Communications", path: "/comms" };
-  if (path.startsWith("/assistant")) return { label: "TitanAI", path: "/assistant" };
-  if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
+  if (path.startsWith("/assistant")) return { label: "TitanAI Career Coach", path: "/assistant" };
   if (path.startsWith("/business-documents") || path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
     return { label: "Business Documents", path: "/business-documents" };
   }

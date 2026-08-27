@@ -48,6 +48,7 @@ const progressActions = [
 ];
 
 const workTools = [
+  { title: "Work Orders", path: "/jobs" },
   { title: "Driver Hub", path: "/driver" },
   { title: "Route Planner", path: "/routes" },
   { title: "Customers", path: "/customers" },

@@ -37,6 +37,9 @@ jobs:
       # Career-core checks are intentionally split into named steps. A failure
       # must identify the subsystem immediately instead of hiding inside one
       # aggregate shell command.
+      - name: Career route separation regression
+        run: node --test scripts/career-route-contract.test.mjs
+
       - name: Career attention regression
         run: node --test scripts/career-attention.test.mjs
 

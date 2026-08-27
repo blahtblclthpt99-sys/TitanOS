@@ -1,6 +1,8 @@
 /**
  * Browser GPS activity tracker — foreground only during an active work session.
- * Minimizes battery: moderate update cadence, distance filter, no background collection.
+ * Career-core builds default to approximate/minimum-scope location. Precision may
+ * only be enabled by a separately reviewed distribution that has a valid core-use
+ * justification and matching user disclosure.
  */
 
 import { haversineMeters, metersToMiles, round1, speedMphBetween } from "./geo.js";
@@ -12,8 +14,7 @@ const MIN_MOVE_M = 12;
 export function createBrowserTracker(handlers = {}, options = {}) {
   const cfg = {
     ...DEFAULT_STOP_CONFIG,
-    enableHighAccuracy: true,
-    // Allow slightly stale fixes to cut GNSS wakeups while driving still feels live
+    enableHighAccuracy: false,
     maximumAge: 5000,
     timeout: 15000,
     ...options,
@@ -129,7 +130,7 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       paused = false;
       emit("tracking_resumed", {});
     },
-    /** Stop GNSS hardware (keeps counters). Use when tab is hidden to save battery. */
+    /** Stop location hardware access (keeps counters). Use when tab is hidden to save battery. */
     suspendHardware() {
       if (watchId != null && navigator.geolocation?.clearWatch) {
         navigator.geolocation.clearWatch(watchId);
@@ -137,7 +138,7 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       watchId = null;
       emit("tracking_hardware_suspended", {});
     },
-    /** Restart GNSS after suspendHardware. */
+    /** Restart location access after suspendHardware. */
     resumeHardware() {
       if (watchId != null) return true;
       if (typeof navigator === "undefined" || !navigator.geolocation) return false;
@@ -180,7 +181,7 @@ export function createBrowserTracker(handlers = {}, options = {}) {
       miles = round1(Math.max(0, Number(n) || 0));
     },
     /**
-     * Restore counters after page refresh so GPS continues from last saved totals.
+     * Restore counters after page refresh so location tracking continues from last saved totals.
      */
     seedTelemetry({
       miles: seedMi,

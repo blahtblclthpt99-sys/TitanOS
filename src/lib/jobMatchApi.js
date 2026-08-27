@@ -8,30 +8,42 @@ function listingTimestamp(job) {
   return job?.posted_at || job?.published_at || job?.created_at || job?.match?.posted_at || null;
 }
 
-function isExpired(job, now = Date.now()) {
-  const expires = job?.expires_at || job?.match?.expires_at;
-  if (!expires) return false;
-  const time = Date.parse(expires);
-  return Number.isFinite(time) && time < now;
+function parsedTime(value) {
+  if (!value) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
 }
 
-function isStale(job, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now()) {
-  const raw = listingTimestamp(job);
-  if (!raw) return false;
-  const time = Date.parse(raw);
-  if (!Number.isFinite(time)) return false;
-  return now - time > maxAgeDays * 86400000;
+function expiryTime(job) {
+  return parsedTime(job?.expires_at || job?.match?.expires_at);
+}
+
+function listingTime(job) {
+  return parsedTime(listingTimestamp(job));
+}
+
+function freshnessState(job, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now()) {
+  const expires = expiryTime(job);
+  if (expires != null && expires < now) return "expired";
+
+  const posted = listingTime(job);
+  if (posted == null) return "unknown";
+  if (posted > now + 86400000) return "unknown";
+  if (now - posted > maxAgeDays * 86400000) return "stale";
+  return "fresh";
 }
 
 function dedupeKey(job) {
-  const sourceId = job?.external_id || job?.source_job_id;
-  if (sourceId) return `${normalizedText(job?.source_name || job?.source)}:${String(sourceId)}`;
-  return [
+  const sourceId = job?.external_id || job?.source_job_id || job?.id;
+  if (sourceId) return `${normalizedText(job?.source_name || job?.source || job?.match?.source_name || job?.match?.source)}:${String(sourceId)}`;
+
+  const parts = [
     normalizedText(job?.title),
     normalizedText(job?.company_name || job?.company || job?.employer_name),
-    normalizedText(job?.city),
+    normalizedText(job?.city || job?.location),
     normalizedText(job?.state),
-  ].join("|");
+  ];
+  return parts.some(Boolean) ? parts.join("|") : null;
 }
 
 export function normalizeJobMatches(matches, { maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {
@@ -40,17 +52,21 @@ export function normalizeJobMatches(matches, { maxAgeDays = DEFAULT_MAX_AGE_DAYS
   const result = [];
 
   for (const raw of Array.isArray(matches) ? matches : []) {
-    if (!raw || isExpired(raw, now) || isStale(raw, maxAgeDays, now)) continue;
+    if (!raw || typeof raw !== "object") continue;
+
+    const freshness = freshnessState(raw, maxAgeDays, now);
+    if (freshness === "expired" || freshness === "stale") continue;
+
     const key = dedupeKey(raw);
     if (key && seen.has(key)) continue;
     if (key) seen.add(key);
 
+    const posted = listingTime(raw);
     result.push({
       ...raw,
-      listing_age_days: listingTimestamp(raw)
-        ? Math.max(0, Math.floor((now - Date.parse(listingTimestamp(raw))) / 86400000))
-        : null,
-      freshness_verified: !isExpired(raw, now) && !isStale(raw, maxAgeDays, now),
+      listing_age_days: posted == null ? null : Math.max(0, Math.floor((now - posted) / 86400000)),
+      freshness_status: freshness,
+      freshness_verified: freshness === "fresh",
     });
   }
 

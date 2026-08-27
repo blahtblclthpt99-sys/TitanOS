@@ -76,8 +76,6 @@ async function localFallback(functionName, payload) {
     const { answerFromSummary } = await import("@/lib/ai-business-summary");
     const last =
       (payload.messages || []).filter((m) => m.role === "user").slice(-1)[0]?.content || "";
-    // Offline: only answer from a client display snapshot with clear provenance —
-    // never claim server truth. Prefer empty/unavailable over invented facts.
     const summary = payload.offlineSnapshot || null;
     const local = summary ? answerFromSummary(last, summary) : null;
     return {
@@ -188,15 +186,11 @@ function candidateUrls(path) {
   if (base) urls.push(`${base}${path}`);
 
   if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    // Same-origin /api on Vercel / custom domains
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com") ||
-      hostname === "titanos-web.vercel.app"
-    ) {
+    const { origin, protocol } = window.location;
+    // Any normal web deployment should prefer its own /api surface. This keeps
+    // Cloudflare preview/custom domains, Vercel rollback, and localhost aligned
+    // while intentionally excluding capacitor:// and other native pseudo-origins.
+    if (protocol === "https:" || protocol === "http:") {
       urls.push(`${origin}${path}`);
       urls.push(path);
     }
@@ -237,8 +231,6 @@ export function createFunctionsModule() {
             }
           }
 
-          // Validation, authorization, entitlement, conflict, and rate-limit errors
-          // are real server decisions. Do not mask them as an offline condition.
           if (isClientRejection(lastError)) break;
         }
       }

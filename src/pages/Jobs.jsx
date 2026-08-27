@@ -99,13 +99,13 @@ export default function Jobs({ isActive = true }) {
   const showForm = searchParams.get("new") === "1";
   const deepLinkId = searchParams.get("id");
   const openForm  = () => navigate("?new=1");
-  const closeForm = () => navigate("/jobs", { replace: true });
+  const closeForm = () => navigate("/work/jobs", { replace: true });
 
   const displayJobs = localJobs ?? jobs;
 
   useEffect(() => { setLocalJobs(null); }, [jobs]);
 
-  // Home / deep links: /jobs?id=...
+  // Work-order deep links: /work/jobs?id=...
   useEffect(() => {
     if (!isActive || !deepLinkId) return undefined;
     let alive = true;
@@ -142,7 +142,7 @@ export default function Jobs({ isActive = true }) {
       } catch {
         if (alive) setJobPhotos((current) => ({ ...current, [job.id]: [] }));
       }
-      navigate("/jobs", { replace: true });
+      navigate("/work/jobs", { replace: true });
       requestAnimationFrame(() => {
         document.getElementById(`job-row-${job.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
@@ -595,8 +595,8 @@ export default function Jobs({ isActive = true }) {
 
       <PageHeader
         eyebrow="Daily work"
-        title="Jobs"
-        subtitle={`${jobs.length} total · Create, assign, and track every job from quote to done.`}
+        title="Work Orders"
+        subtitle={`${jobs.length} total · Create, assign, and track every work order from quote to done.`}
         actions={
           <>
             <ExportMenu spec={jobsExportSpec(jobs)} size="sm" />

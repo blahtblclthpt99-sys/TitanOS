@@ -1,4 +1,6 @@
-const SAVED_SEARCH_KEY = "titanos_career_saved_searches_v1";
+import { readCareerPreference, writeCareerPreference } from "./careerPreferenceStorage.js";
+
+const SAVED_SEARCH_NAME = "saved-searches";
 
 function text(value) {
   return String(value || "").trim();
@@ -75,17 +77,15 @@ export function buildResumeLink(job) {
   return `/career/resume?${params.toString()}`;
 }
 
-export function loadSavedSearches() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(SAVED_SEARCH_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.slice(0, 20) : [];
-  } catch {
-    return [];
-  }
+export function loadSavedSearches(userId) {
+  if (!userId) return [];
+  const parsed = readCareerPreference(userId, SAVED_SEARCH_NAME, []);
+  return Array.isArray(parsed) ? parsed.slice(0, 20) : [];
 }
 
-export function saveSearch(filters, name = "") {
-  const current = loadSavedSearches();
+export function saveSearch(userId, filters, name = "") {
+  if (!userId) return [];
+  const current = loadSavedSearches(userId);
   const item = {
     id: `search_${Date.now()}`,
     name: text(name) || text(filters.query) || text(filters.location) || "Saved search",
@@ -101,12 +101,13 @@ export function saveSearch(filters, name = "") {
     createdAt: new Date().toISOString(),
   };
   const next = [item, ...current].slice(0, 20);
-  window.localStorage.setItem(SAVED_SEARCH_KEY, JSON.stringify(next));
+  writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
   return next;
 }
 
-export function removeSavedSearch(id) {
-  const next = loadSavedSearches().filter((item) => item.id !== id);
-  window.localStorage.setItem(SAVED_SEARCH_KEY, JSON.stringify(next));
+export function removeSavedSearch(userId, id) {
+  if (!userId) return [];
+  const next = loadSavedSearches(userId).filter((item) => item.id !== id);
+  writeCareerPreference(userId, SAVED_SEARCH_NAME, next);
   return next;
 }

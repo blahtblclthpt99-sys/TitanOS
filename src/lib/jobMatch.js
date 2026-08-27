@@ -259,7 +259,15 @@ function vacancyFingerprint(job = {}) {
   return [clean(job.title), company, clean(job.city), clean(job.state)].join("|");
 }
 
+function externalIdentityKey(job = {}) {
+  if (clean(job.source) !== "external") return "";
+  const sourceName = clean(job.source_name);
+  const sourceJobId = clean(job.external_id || job.source_job_id);
+  return sourceName && sourceJobId ? `${sourceName}|${sourceJobId}` : "";
+}
+
 function isStale(job, now = Date.now()) {
+  if (clean(job.source) === "external" && !job.posted_at) return true;
   if (job.expires_at) {
     const expires = Date.parse(job.expires_at);
     if (!Number.isFinite(expires) || expires < now) return true;
@@ -279,20 +287,23 @@ export function mergeRankedJobMatches({ internal = [], external = [], driverProf
 
   const seenUrls = new Set(rankedInternal.map(urlDedupeKey).filter(Boolean));
   const seenVacancies = new Set(rankedInternal.map(vacancyFingerprint).filter(Boolean));
+  const seenExternalIdentities = new Set();
   const rankedExternal = external
     .filter((job) => !isStale(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    // External scores also order opportunities; they must not silently become
-    // an automated employment eligibility/rejection gate.
+    // External scores order opportunities only; they are not automated
+    // employment eligibility or rejection decisions.
     .filter((job) => {
       const urlKey = urlDedupeKey(job);
       const vacancyKey = vacancyFingerprint(job);
-      if ((urlKey && seenUrls.has(urlKey)) || (vacancyKey && seenVacancies.has(vacancyKey))) return false;
+      const identityKey = externalIdentityKey(job);
+      if ((identityKey && seenExternalIdentities.has(identityKey)) || (urlKey && seenUrls.has(urlKey)) || (vacancyKey && seenVacancies.has(vacancyKey))) return false;
+      if (identityKey) seenExternalIdentities.add(identityKey);
       if (urlKey) seenUrls.add(urlKey);
       if (vacancyKey) seenVacancies.add(vacancyKey);
       return true;
     })
-    .sort((a, b) => b.match.score - a.match.score);
+    .sort((a, b) => b.match.score - a.match.score || String(b.posted_at || "").localeCompare(String(a.posted_at || "")));
 
   return [...rankedInternal, ...rankedExternal];
 }

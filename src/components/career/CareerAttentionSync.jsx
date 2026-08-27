@@ -4,20 +4,11 @@ import { getJobMatches } from "@/lib/jobMatchApi";
 import { listMyJobMatchInteractions } from "@/lib/jobMatchInteractionsApi";
 import { getMyProfessionalProfile } from "@/lib/professionalProfileApi";
 import { buildCareerAttention } from "@/lib/careerAttention";
+import { readCareerPreference, writeCareerPreference } from "@/lib/careerPreferenceStorage";
 import { pushNotification } from "@/lib/notificationsApi";
 
-const ALERT_KEY = "titanos_job_alerts_v1";
-const NOTIFIED_PREFIX = "titanos_career_attention_notified_v1";
-const LAST_SYNC_PREFIX = "titanos_career_attention_last_sync_v1";
 const MIN_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const MAX_NOTIFIED_KEYS = 300;
-
-function readJson(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || "") || fallback; } catch { return fallback; }
-}
-function writeJson(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
-}
 
 export default function CareerAttentionSync() {
   const { user } = useAuth();
@@ -27,11 +18,9 @@ export default function CareerAttentionSync() {
     let alive = true;
 
     (async () => {
-      const lastSyncKey = `${LAST_SYNC_PREFIX}:${user.id}`;
-      const notifiedKey = `${NOTIFIED_PREFIX}:${user.id}`;
-      const lastSync = Number(readJson(lastSyncKey, 0));
+      const lastSync = Number(readCareerPreference(user.id, "attention-last-sync", 0));
       if (Date.now() - lastSync < MIN_SYNC_INTERVAL_MS) return;
-      writeJson(lastSyncKey, Date.now());
+      writeCareerPreference(user.id, "attention-last-sync", Date.now());
 
       try {
         const [interactions, matchResult, profile] = await Promise.all([
@@ -41,8 +30,8 @@ export default function CareerAttentionSync() {
         ]);
         if (!alive) return;
 
-        const alerts = readJson(ALERT_KEY, []);
-        const notified = new Set(readJson(notifiedKey, []));
+        const alerts = readCareerPreference(user.id, "job-alerts", []);
+        const notified = new Set(readCareerPreference(user.id, "attention-notified", []));
         const items = buildCareerAttention({
           interactions,
           jobs: matchResult.matches || [],
@@ -72,8 +61,11 @@ export default function CareerAttentionSync() {
         }
 
         if (successful.length) {
-          const merged = [...successful, ...notified].slice(0, MAX_NOTIFIED_KEYS);
-          writeJson(notifiedKey, merged);
+          writeCareerPreference(
+            user.id,
+            "attention-notified",
+            [...successful, ...notified].slice(0, MAX_NOTIFIED_KEYS)
+          );
         }
       } catch {
         // Career attention is advisory. Never block the authenticated shell when
@@ -82,7 +74,7 @@ export default function CareerAttentionSync() {
     })();
 
     return () => { alive = false; };
-  }, [user?.id]);
+  }, [user]);
 
   return null;
 }

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 import "./styles/attention-polish.css";
+import "./styles/attention-refine.css";
 
 async function purgeLegacyClientState() {
   if (typeof window === "undefined") return;

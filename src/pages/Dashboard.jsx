@@ -16,9 +16,9 @@ import {
 
 const primaryActions = [
   {
-    title: "Find jobs",
-    description: "Search and review current work opportunities.",
-    path: "/jobs",
+    title: "Job search",
+    description: "Search, filter, compare, and verify current work opportunities.",
+    path: "/career/search",
     icon: BriefcaseBusiness,
   },
   {
@@ -42,9 +42,9 @@ const primaryActions = [
 ];
 
 const progressActions = [
+  { title: "Career inbox", description: "See interviews, follow-ups, new matches, and deadlines that need attention.", path: "/career/attention", icon: Bell },
   { title: "Schedule", description: "Keep interviews, shifts, jobs, and follow-ups organized.", path: "/schedule", icon: CalendarDays },
-  { title: "Companies", description: "Research and organize employers and work relationships.", path: "/companies", icon: Building2 },
-  { title: "Notifications", description: "See updates that need your attention.", path: "/notifications", icon: Bell },
+  { title: "Employer intelligence", description: "Review employer context, source provenance, alerts, and risk signals.", path: "/career/employers", icon: Building2 },
 ];
 
 const workTools = [
@@ -98,18 +98,18 @@ export default function Dashboard() {
               TitanOS keeps the highest-value career actions in front of you: find opportunities, understand your matches, prepare stronger applications, and keep progress organized.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button type="button" onClick={() => navigate("/jobs")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" /> Find opportunities
+              <button type="button" onClick={() => navigate("/career/search")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" /> Search opportunities
               </button>
-              <button type="button" onClick={() => navigate("/assistant?mode=career")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <Sparkles className="h-4 w-4" aria-hidden="true" /> Ask TitanAI
+              <button type="button" onClick={() => navigate("/career/attention")} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Bell className="h-4 w-4" aria-hidden="true" /> What needs attention?
               </button>
             </div>
           </div>
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">TitanOS career path</p>
             <div className="mt-4 space-y-3">
-              {["Discover opportunities", "Match skills and goals", "Prepare and apply", "Interview and follow up", "Get hired and organize the work"].map((step, index) => (
+              {["Discover opportunities", "Verify and match", "Prepare and apply", "Interview and follow up", "Get hired and organize the work"].map((step, index) => (
                 <div key={step} className="flex items-center gap-3">
                   <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{index + 1}</span>
                   <span className="text-sm font-medium">{step}</span>

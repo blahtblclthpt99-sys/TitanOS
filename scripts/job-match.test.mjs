@@ -231,6 +231,35 @@ describe("external fallback safety", () => {
     assert.deepEqual(rows.map((row) => row.external_id), ["query-1", "query-2"]);
   });
 
+  it("deduplicates repeated provider identities even when URLs or copy drift", () => {
+    const first = normalizeExternalJob({ ...external, id: "provider-1", external_id: "provider-1", source_url: "https://jobs.example.test/opening?id=1" }, { name: "Example Jobs" });
+    const duplicate = normalizeExternalJob({ ...external, id: "provider-1", external_id: "provider-1", title: "Box truck route driver - updated", source_url: "https://jobs.example.test/opening?id=1&version=2" }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [first, duplicate],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].external_id, "provider-1");
+  });
+
+  it("filters external listings that have no verifiable posting date", () => {
+    const undated = normalizeExternalJob({
+      id: "undated",
+      title: "Undated driver opening",
+      company_name: "Unknown Freshness Logistics",
+      url: "https://jobs.example.test/undated",
+    }, { name: "Example Jobs" });
+    const rows = mergeRankedJobMatches({
+      internal: [],
+      external: [undated],
+      driverProfile: { ...worker, external_job_search_consent: true },
+      now: Date.parse("2026-08-17T00:00:00Z"),
+    });
+    assert.equal(rows.length, 0);
+  });
+
   it("filters stale external listings", () => {
     const stale = { ...external, id: "external:example:stale", posted_at: "2026-01-01T00:00:00Z" };
     const rows = mergeRankedJobMatches({

@@ -4,6 +4,7 @@ import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
 import { buildWorkerMatchProfile, mergeRankedJobMatches, normalizeExternalJob, rankInternalJobMatches } from "../../src/lib/jobMatch.js";
+import { jobInteractionIdentity } from "../../src/lib/jobMatchIdentity.js";
 import { filterByRadius } from "../../src/lib/jobMatchRadius.js";
 
 const INTERNAL_TARGET = 10;
@@ -89,21 +90,18 @@ function interactionKey(source, sourceName, sourceJobId) {
 }
 
 function jobInteractionKey(job) {
-  const external = job.source === "external" || job.match?.source === "external";
-  const source = external ? "external" : "titan";
-  const sourceName = external ? (job.source_name || job.match?.source_name || "External provider") : "TitanOS";
-  const sourceJobId = external ? (job.external_id || job.source_job_id || job.id) : job.id;
-  return interactionKey(source, sourceName, sourceJobId);
+  const identity = jobInteractionIdentity(job);
+  return interactionKey(identity.source, identity.sourceName, identity.sourceJobId);
 }
 
 function annotateAndFilter(jobs, interactionMap, nativeSavedIds, nativeAppliedIds) {
   return (jobs || []).flatMap((job) => {
-    const external = job.source === "external" || job.match?.source === "external";
+    const identity = jobInteractionIdentity(job);
     const interaction = interactionMap.get(jobInteractionKey(job));
-    const nativeId = String(job.id || "");
-    const state = !external && nativeAppliedIds.has(nativeId)
+    const nativeId = identity.source === "titan" ? identity.sourceJobId : "";
+    const state = identity.source === "titan" && nativeAppliedIds.has(nativeId)
       ? "applied"
-      : !external && nativeSavedIds.has(nativeId)
+      : identity.source === "titan" && nativeSavedIds.has(nativeId)
         ? "saved"
         : interaction?.state || null;
     if (state === "ignored") return [];

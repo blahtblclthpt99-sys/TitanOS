@@ -143,11 +143,11 @@ export default function Schedule() {
                     tabIndex={0}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    onClick={() => navigate(`/jobs?id=${job.id}`)}
+                    onClick={() => navigate(`/work/jobs?id=${job.id}`)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        navigate(`/jobs?id=${job.id}`);
+                        navigate(`/work/jobs?id=${job.id}`);
                       }
                     }}
                     className={`p-2 rounded-lg border-l-2 bg-muted/50 hover:bg-muted transition-colors cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
@@ -174,7 +174,7 @@ export default function Schedule() {
             icon={Calendar}
             title="No jobs this week"
             description="Nothing scheduled — enjoy the calm or add a new job."
-            onAction={() => navigate("/jobs?new=1")}
+            onAction={() => navigate("/work/jobs?new=1")}
             actionLabel="New job"
           />
         </div>
@@ -201,11 +201,11 @@ export default function Schedule() {
                       tabIndex={0}
                       initial={{ opacity: 0, x: -4 }}
                       animate={{ opacity: 1, x: 0 }}
-                      onClick={() => navigate(`/jobs?id=${job.id}`)}
+                      onClick={() => navigate(`/work/jobs?id=${job.id}`)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          navigate(`/jobs?id=${job.id}`);
+                          navigate(`/work/jobs?id=${job.id}`);
                         }
                       }}
                       className={`titan-surface rounded-md p-3 border-l-2 cursor-pointer focus-ring ${STATUS_BORDER[job.status] || STATUS_BORDER.scheduled}`}
@@ -241,7 +241,7 @@ export default function Schedule() {
             icon={Calendar}
             title="No jobs this week"
             description="Nothing scheduled — enjoy the calm or add a new job."
-            onAction={() => navigate("/jobs?new=1")}
+            onAction={() => navigate("/work/jobs?new=1")}
             actionLabel="New job"
           />
         )}

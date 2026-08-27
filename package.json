@@ -35,6 +35,7 @@
     "ops:readiness": "node scripts/payment-failure-scenarios.mjs && node scripts/backup-restore-drill.mjs --export && node scripts/outage-recovery-drill.mjs && node scripts/load-test.mjs --profile storm",
     "test:fees": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/fee-engine.test.mjs",
     "test:hire": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/hire-security.test.mjs",
+    "test:career": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/job-match.test.mjs scripts/job-search-command.test.mjs scripts/career-pipeline-details.test.mjs scripts/career-pipeline-state.test.mjs",
     "test:payments": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/payment-security.test.mjs scripts/stripe-webhook-policy.test.mjs scripts/mpp-helpers.test.mjs scripts/autopilot-service.test.mjs",
     "test:driver": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/driver-hub.test.mjs scripts/vehicle-capacity.test.mjs scripts/driver-activity.test.mjs scripts/driver-intelligence.test.mjs scripts/driver-logbook.test.mjs scripts/driver-trip-journal.test.mjs scripts/driver-offer-analyzer.test.mjs scripts/driver-autopilot.test.mjs scripts/driver-voice.test.mjs scripts/driver-true-cost.test.mjs scripts/driver-coach.test.mjs scripts/driver-session-persist.test.mjs scripts/door-dash-workflow.test.mjs",
     "icons:pwa": "node scripts/generate-pwa-icons.mjs",
@@ -67,8 +68,8 @@
     "test:e2e": "playwright test --project=chromium-desktop",
     "test:e2e:browsers": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit",
-    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
-    "gate:ship": "npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
+    "test": "npm run test:fees && npm run test:hire && npm run test:career && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
+    "gate:ship": "npm run lint && npm run typecheck && npm run test:career && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -145,7 +146,7 @@
     "eslint": "^9.39.5",
     "eslint-plugin-jsx-a11y": "^6.6.3",
     "eslint-plugin-react": "^7.37.0",
-    "eslint-plugin-react-hooks": "^5.0.1",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-unused-imports": "^4.0.0",
     "globals": "^15.0.0",
     "playwright": "^1.62.1",

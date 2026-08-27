@@ -29,6 +29,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const CareerReadiness = lazy(() => import("@/pages/CareerReadiness"));
 const ResumeBuilder = lazy(() => import("@/pages/ResumeBuilder"));
 const JobSearchCommandCenter = lazy(() => import("@/pages/JobSearchCommandCenter"));
+const EmployerIntelligence = lazy(() => import("@/pages/EmployerIntelligence"));
 const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
 const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
@@ -87,15 +88,15 @@ const NON_TAB_ROUTES = {
   "/receipts": ReceiptScanner, "/fleet": Fleet, "/tax-center": TaxCenter, "/reports": Reports, "/analytics": Analytics,
   "/customers": Customers, "/invoices": Invoices, "/assistant": AIAssistant, "/second-me": SecondMe,
   "/business-documents": BusinessDocuments, "/insurance": Insurance, "/referral": Referral, "/hire": Hire,
-  "/hire/matches": JobMatches, "/career/search": JobSearchCommandCenter, "/career/pipeline": CareerPipeline,
-  "/career/readiness": CareerReadiness, "/career/resume": ResumeBuilder, "/hire/post-match-ready": MatchReadyJobPost,
-  "/hire/candidates": WorkerMatches, "/hire/find-workers": ExistingPostWorkerMatches, "/notifications": Notifications,
-  "/admin/moderation": AdminModeration, "/admin/fees": AdminFees, "/admin/tax-rules": AdminTaxRules, "/admin": AdminControlCenter,
-  "/booking": Booking, "/contracts": Contracts, "/payments": Payments, "/routes": RoutePlanner, "/companies": Companies,
-  "/employees": Employees, "/inventory": Inventory, "/follow-ups": FollowUps, "/autopilot": Autopilot,
-  "/reputation": Reputation, "/credentials": Credentials, "/leads": Leads, "/settings": Settings,
-  "/subscription": Subscription, "/trust-safety": TrustSafety, "/design-system": DesignSystem, "/profile": Profile,
-  "/marketplace": Marketplace,
+  "/hire/matches": JobMatches, "/career/search": JobSearchCommandCenter, "/career/employers": EmployerIntelligence,
+  "/career/pipeline": CareerPipeline, "/career/readiness": CareerReadiness, "/career/resume": ResumeBuilder,
+  "/hire/post-match-ready": MatchReadyJobPost, "/hire/candidates": WorkerMatches, "/hire/find-workers": ExistingPostWorkerMatches,
+  "/notifications": Notifications, "/admin/moderation": AdminModeration, "/admin/fees": AdminFees,
+  "/admin/tax-rules": AdminTaxRules, "/admin": AdminControlCenter, "/booking": Booking, "/contracts": Contracts,
+  "/payments": Payments, "/routes": RoutePlanner, "/companies": Companies, "/employees": Employees,
+  "/inventory": Inventory, "/follow-ups": FollowUps, "/autopilot": Autopilot, "/reputation": Reputation,
+  "/credentials": Credentials, "/leads": Leads, "/settings": Settings, "/subscription": Subscription,
+  "/trust-safety": TrustSafety, "/design-system": DesignSystem, "/profile": Profile, "/marketplace": Marketplace,
 };
 
 function NonTabPage() {

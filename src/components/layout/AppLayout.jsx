@@ -39,20 +39,16 @@ export default function AppLayout() {
 
   return (
     <div className="titan-app-shell min-h-screen overflow-x-hidden bg-background text-foreground">
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <div className="sr-only" aria-live="polite" id="a11y-status" />
       <OfflineIndicator />
       <SessionExpiryBanner />
       <AppUpdateGate />
       <div className="contents">
         <Sidebar />
-        <DesktopTopBar />
+        <div className="hidden lg:contents"><DesktopTopBar /></div>
         <MobileHeader />
-        <nav aria-label="Mobile primary" className="lg:hidden contents">
-          <MobileNav />
-        </nav>
+        <nav aria-label="Mobile primary" className="lg:hidden contents"><MobileNav /></nav>
       </div>
 
       <main
@@ -60,11 +56,7 @@ export default function AppLayout() {
         tabIndex={-1}
         aria-label="Main content"
         className="titan-main-stage min-w-0 overflow-x-hidden lg:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] lg:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] lg:pb-8"
-        style={{
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
-          minHeight: "100svh",
-        }}
+        style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", minHeight: "100svh" }}
       >
         <div className="page-enter min-w-0">
           {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
@@ -73,9 +65,7 @@ export default function AppLayout() {
 
       <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />
       <TitanSupportButton />
-      <div className="hidden lg:contents">
-        <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      </div>
+      <div className="hidden lg:contents"><FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} /></div>
       <FeedbackButton ref={feedbackRef} />
       <AppDownloadBanner />
     </div>

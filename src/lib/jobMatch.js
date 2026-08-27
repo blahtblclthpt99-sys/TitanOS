@@ -184,11 +184,14 @@ export function scoreJobMatch(driverProfile, job = {}) {
   };
 }
 
-export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumScore = 25, now = Date.now() } = {}) {
+export function rankInternalJobMatches(jobs = [], driverProfile = {}, { minimumScore = 0, now = Date.now() } = {}) {
+  const threshold = Math.max(0, Math.min(100, Number(minimumScore) || 0));
   return (jobs || [])
     .filter((job) => job && (job.status || "open") === "open" && hasOpenDeadline(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    .filter((job) => job.match.score >= minimumScore)
+    // Match scores are seeker-side ordering assistance, not eligibility decisions.
+    // Only an explicit caller-provided threshold may hide lower-scoring jobs.
+    .filter((job) => job.match.score >= threshold)
     .sort((a, b) => b.match.score - a.match.score || Number(Boolean(b.is_urgent)) - Number(Boolean(a.is_urgent)) || String(b.created_at || "").localeCompare(String(a.created_at || "")));
 }
 
@@ -279,7 +282,8 @@ export function mergeRankedJobMatches({ internal = [], external = [], driverProf
   const rankedExternal = external
     .filter((job) => !isStale(job, now))
     .map((job) => ({ ...job, match: scoreJobMatch(driverProfile, job) }))
-    .filter((job) => job.match.score >= 25)
+    // External scores also order opportunities; they must not silently become
+    // an automated employment eligibility/rejection gate.
     .filter((job) => {
       const urlKey = urlDedupeKey(job);
       const vacancyKey = vacancyFingerprint(job);

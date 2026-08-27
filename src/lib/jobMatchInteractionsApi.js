@@ -1,5 +1,16 @@
 import { supabase } from "@/api/supabaseClient";
 
+const ALLOWED_STATES = new Set([
+  "saved",
+  "ignored",
+  "applied",
+  "screening",
+  "interview",
+  "offer",
+  "hired",
+  "closed",
+]);
+
 function normalizeSource(value) {
   return String(value || "titan").toLowerCase() === "external" ? "external" : "titan";
 }
@@ -21,7 +32,7 @@ export async function setMyJobMatchInteraction(userId, job, state) {
   const sourceName = String(job?.source_name || (source === "titan" ? "TitanOS" : "External provider")).trim();
   const sourceJobId = String(source === "external" ? (job?.external_id || job?.source_job_id || job?.id) : (job?.id || job?.source_job_id)).trim();
   if (!sourceJobId) throw new Error("Job reference is missing.");
-  if (!["saved", "ignored", "applied"].includes(state)) throw new Error("Invalid job match state.");
+  if (!ALLOWED_STATES.has(state)) throw new Error("Invalid job match state.");
 
   const row = {
     user_id: userId,

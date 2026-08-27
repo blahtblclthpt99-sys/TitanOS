@@ -19,7 +19,7 @@ export async function listMyJobMatchInteractions(userId) {
   if (!userId) return [];
   const { data, error } = await supabase
     .from("job_match_interactions")
-    .select("id,user_id,source,source_name,source_job_id,state,source_url,created_at,updated_at")
+    .select("id,user_id,source,source_name,source_job_id,state,source_url,interview_at,follow_up_at,private_notes,created_at,updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   if (error) throw error;
@@ -51,6 +51,26 @@ export async function setMyJobMatchInteraction(userId, job, state) {
     .select("*")
     .maybeSingle();
   if (error) throw error;
+  return data;
+}
+
+export async function saveMyCareerPipelineDetails(userId, interactionId, details = {}) {
+  if (!userId || !interactionId) throw new Error("Application reference is missing.");
+  const payload = {
+    interview_at: details.interviewAt ? new Date(details.interviewAt).toISOString() : null,
+    follow_up_at: details.followUpAt ? new Date(details.followUpAt).toISOString() : null,
+    private_notes: String(details.notes || "").slice(0, 5000) || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase
+    .from("job_match_interactions")
+    .update(payload)
+    .eq("id", interactionId)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Application was not found or is not owned by this account.");
   return data;
 }
 

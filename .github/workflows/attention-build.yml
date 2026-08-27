@@ -22,4 +22,6 @@ jobs:
       - run: npm ci
       - name: Verify payment trust boundaries
         run: node --test scripts/attention-payment-policy.test.mjs
+      - name: Verify runtime performance policy
+        run: node --test scripts/attention-runtime-policy.test.mjs
       - run: npm run build

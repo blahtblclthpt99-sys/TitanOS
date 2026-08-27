@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { BriefcaseBusiness, CalendarClock, CheckCircle2, ChevronRight, Clock3, Save, Sparkles } from "lucide-react";
+import { BriefcaseBusiness, Building2, CalendarClock, CheckCircle2, ChevronRight, Clock3, MapPin, Save, Sparkles } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
 import EmptyState from "@/components/shared/EmptyState";
@@ -80,6 +80,10 @@ export default function CareerPipeline() {
         external_id: row.source_job_id,
         id: row.source_job_id,
         source_url: row.source_url,
+        job_title: row.job_title,
+        company_name: row.company_name,
+        job_city: row.job_city,
+        job_state: row.job_state,
       }, state);
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, ...updated, state } : item));
       toast({ title: `Moved to ${stageLabel(state)}` });
@@ -140,13 +144,17 @@ export default function CareerPipeline() {
             const draft = drafts[row.id] || draftFromRow(row);
             const originalListingUrl = row.source === "external" ? safeExternalJobUrl(row) : null;
             const availableStages = availableCareerStageTransitions(row.state).filter((stage) => stage !== row.state);
+            const location = [row.job_city, row.job_state].filter(Boolean).join(", ");
+            const legacyTitle = row.job_title || (row.source === "external" ? "Tracked external opportunity" : "Tracked TitanOS opportunity");
             return (
               <article key={row.id} className="titan-surface p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary">{stageLabel(row.state)}</p>
-                    <h2 className="mt-1 truncate text-base font-semibold text-foreground">{row.source_name || "Opportunity"}</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">Job reference: {row.source_job_id}</p>
+                    <h2 className="mt-1 truncate text-base font-semibold text-foreground">{legacyTitle}</h2>
+                    {row.company_name ? <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{row.company_name}</p> : null}
+                    {location ? <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{location}</p> : null}
+                    <p className="mt-1 text-xs text-muted-foreground">{row.source === "external" ? `Source: ${row.source_name || "External provider"} · ` : "TitanOS · "}Job reference: {row.source_job_id}</p>
                   </div>
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 </div>
@@ -174,7 +182,7 @@ export default function CareerPipeline() {
                   <p className="text-xs font-medium text-muted-foreground">This application is in a final stage.</p>
                 )}
 
-                <p className="text-[11px] text-muted-foreground">These notes and dates are private to your account and are not used to rank you for employers or make employment decisions.</p>
+                <p className="text-[11px] text-muted-foreground">These notes, dates and opportunity details are private to your account and are not used to rank you for employers or make employment decisions.</p>
               </article>
             );
           })}

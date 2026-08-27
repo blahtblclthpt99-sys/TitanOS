@@ -120,7 +120,7 @@ export default function Sidebar() {
       initial={false}
       animate={{ width: expanded ? 256 : 72 }}
       transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="titan-sidebar hidden md:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40"
+      className="titan-sidebar hidden lg:flex flex-col h-screen bg-sidebar border-r border-sidebar-border fixed left-0 top-0 z-40"
       aria-label="Sidebar"
     >
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-2.5">

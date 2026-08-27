@@ -56,6 +56,15 @@ describe("native Titan job scoring", () => {
     const result = scoreJobMatch({ ...worker, certifications: [] }, strongJob);
     assert.ok(result.blockers.some((item) => item.includes("dot medical card")));
     assert.deepEqual(result.missing_certifications, ["dot medical card"]);
+    assert.equal(result.requirements_advisory, true);
+  });
+
+  it("does not silently disqualify a seeker from an open job for a missing credential", () => {
+    const rows = rankInternalJobMatches([strongJob], { ...worker, certifications: [] });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, "j1");
+    assert.equal(rows[0].match.requirements_advisory, true);
+    assert.ok(rows[0].match.blockers.length > 0);
   });
 
   it("ranks native open jobs and excludes closed jobs", () => {

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import "./hire-native-integrity.test.mjs";
+import "./hire-lifecycle-rls.test.mjs";
 
 const migrationPath = new URL("../supabase/migrations/20260827084500_enforce_career_pipeline_transitions.sql", import.meta.url);
 const sql = await readFile(migrationPath, "utf8");

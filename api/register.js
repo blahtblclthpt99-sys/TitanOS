@@ -8,10 +8,33 @@ import { captureApiException } from "./_lib/sentry.js";
 
 /**
  * Server-side registration.
- * Production (VERCEL_ENV=production) requires email confirm unless
+ * Production requires email confirmation unless
  * REGISTER_REQUIRE_EMAIL_CONFIRM is explicitly set to "false".
- * Non-production defaults to auto-confirm for closed beta — still rate-limited.
+ *
+ * Host-agnostic production detection is intentional. Cloudflare Workers do not
+ * provide VERCEL_ENV, so relying on provider-specific metadata can silently
+ * auto-confirm accounts after a hosting migration.
  */
+function isProductionRuntime() {
+  const runtime = String(
+    process.env.APP_ENV ||
+      process.env.SENTRY_ENVIRONMENT ||
+      process.env.NODE_ENV ||
+      process.env.VERCEL_ENV ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  return runtime === "production" || runtime === "prod";
+}
+
+export function shouldRequireEmailConfirmation(flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM) {
+  if (flag != null && String(flag).trim() !== "") {
+    return String(flag).trim().toLowerCase() === "true";
+  }
+  return isProductionRuntime();
+}
+
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
@@ -29,11 +52,7 @@ export default async function handler(req, res) {
       .toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
-    const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
-    const requireConfirm =
-      flag != null && String(flag).trim() !== ""
-        ? String(flag).toLowerCase() === "true"
-        : String(process.env.VERCEL_ENV || "").toLowerCase() === "production";
+    const requireConfirm = shouldRequireEmailConfirmation();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: "Valid email is required" });

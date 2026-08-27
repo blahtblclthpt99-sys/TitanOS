@@ -69,9 +69,30 @@ export default function ResumeBuilder() {
 
   const text = application[active] || "";
   const safeRole = (role || "application").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+  const aiPrompt = `Help me prepare for ${role || "this job"}${company ? ` at ${company}` : ""}. Use only facts from my actual career profile. Job description: ${jobDescription.slice(0, 5000)}`;
 
   return (
     <PageShell maxWidth="xl" className="space-y-6">
+      <style>{`@media print {
+        body * { visibility: hidden !important; }
+        #career-print-document, #career-print-document * { visibility: visible !important; }
+        #career-print-document {
+          position: absolute !important;
+          inset: 0 auto auto 0 !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0.5in !important;
+          border: 0 !important;
+          background: white !important;
+          color: black !important;
+          box-shadow: none !important;
+          white-space: pre-wrap !important;
+          font-family: Arial, sans-serif !important;
+          font-size: 11pt !important;
+          line-height: 1.45 !important;
+        }
+      }`}</style>
+
       <PageHeader eyebrow="Career" title="Resume & application package" subtitle="Create ATS-friendly materials from facts already in your TitanOS career profile. Titan never invents experience, credentials or accomplishments." />
 
       <section className="titan-surface p-5 space-y-4">
@@ -81,7 +102,7 @@ export default function ResumeBuilder() {
         </div>
         <label className="space-y-1.5 block"><span className="text-xs font-semibold">Job description</span><Textarea rows={10} value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the full job description here. TitanOS will only emphasize evidence that already exists in your profile." /></label>
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
-          {application.matchedEvidence.length ? `${application.matchedEvidence.length} profile terms align with this description.` : "Add a job description to identify profile evidence that already matches the role."} No unsupported claims are added.
+          {application.matchedEvidence.length ? `${application.matchedEvidence.length} meaningful profile terms align with this description.` : "Add a job description to identify profile evidence that already matches the role."} No unsupported claims are added.
         </div>
       </section>
 
@@ -94,9 +115,9 @@ export default function ResumeBuilder() {
             <Button type="button" variant="outline" onClick={() => downloadText(`${safeRole}-${active}.txt`, text)}><Download className="mr-2 h-4 w-4" />Download text</Button>
             <Button type="button" variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / Save PDF</Button>
             <Button type="button" variant="outline" onClick={() => downloadText(`${safeRole}-application-package.txt`, [application.tailoredResume, application.coverLetter, application.interviewBrief].join("\n\n==============================\n\n"))}><FileText className="mr-2 h-4 w-4" />Download full package</Button>
-            <Button asChild variant="outline"><a href={`/assistant?mode=interview&prompt=${encodeURIComponent(`Help me prepare for ${role || "this job"}${company ? ` at ${company}` : ""}. Use only facts from my actual career profile. Job description: ${jobDescription.slice(0, 5000)}`)}`}><Sparkles className="mr-2 h-4 w-4" />TitanAI prep</a></Button>
+            <Button asChild variant="outline"><a href={`/assistant?mode=interview&q=${encodeURIComponent(aiPrompt)}`}><Sparkles className="mr-2 h-4 w-4" />TitanAI prep</a></Button>
           </div>
-          <pre className="whitespace-pre-wrap rounded-lg border border-border bg-background p-5 text-sm leading-6 text-foreground font-sans">{text || "Your document will appear here."}</pre>
+          <pre id="career-print-document" className="whitespace-pre-wrap rounded-lg border border-border bg-background p-5 text-sm leading-6 text-foreground font-sans">{text || "Your document will appear here."}</pre>
         </div>
       </section>
 

@@ -8,6 +8,7 @@ import {
 
 export const APP_NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Career Home", path: "/", group: "career" },
+  { icon: Search, label: "Job Search", path: "/career/search", group: "career" },
   { icon: Briefcase, label: "Jobs", path: "/jobs", group: "career" },
   { icon: Search, label: "Opportunities", path: "/hire/matches", group: "career" },
   { icon: ClipboardList, label: "Applications", path: "/career/pipeline", group: "career" },
@@ -58,10 +59,7 @@ export const INTERNAL_WORKFLOW_ITEMS = [
   { label: "Match-ready job", path: "/hire/post-match-ready", group: "live", hidden: true },
 ];
 
-export const INTERNAL_WORKFLOW_GROUPS = [{
-  title: "Hiring",
-  paths: ["/hire/matches", "/hire/post-match-ready", "/hire/candidates", "/hire/find-workers"],
-}];
+export const INTERNAL_WORKFLOW_GROUPS = [{ title: "Hiring", paths: ["/hire/matches", "/hire/post-match-ready", "/hire/candidates", "/hire/find-workers"] }];
 
 export const NAV_GROUP_META = {
   career: { label: "Jobs & Career", collapsible: false, defaultOpen: true },
@@ -76,15 +74,15 @@ export const NAV_GROUP_ORDER = ["career", "career_tools", "work_tools", "operati
 
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
-  { icon: Briefcase, label: "Jobs", path: "/jobs" },
+  { icon: Search, label: "Search", path: "/career/search" },
   { icon: Search, label: "Matches", path: "/hire/matches" },
   { icon: ClipboardList, label: "Applications", path: "/career/pipeline" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/hire/matches", "/career/pipeline", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/career/search", "/hire/matches", "/career/pipeline", "/more"];
 
 export const MORE_MENU_GROUPS = [
-  { title: "Jobs & Career", description: "Find work, evaluate opportunities, track applications, and strengthen your career profile", paths: ["/", "/jobs", "/hire/matches", "/career/pipeline", "/career/readiness", "/career/resume", "/profile", "/companies", "/schedule", "/notifications"] },
+  { title: "Jobs & Career", description: "Find work, evaluate opportunities, track applications, and strengthen your career profile", paths: ["/", "/career/search", "/jobs", "/hire/matches", "/career/pipeline", "/career/readiness", "/career/resume", "/profile", "/companies", "/schedule", "/notifications"] },
   { title: "Career Tools", description: "Get user-controlled AI help with career planning and work organization", paths: ["/assistant", "/second-me", "/autopilot"] },
   { title: "Work Tools", description: "Manage clients, estimates, invoices, payments, and completed work", paths: ["/booking", "/customers", "/leads", "/follow-ups", "/comms", "/reputation", "/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"] },
   { title: "Specialized Operations", description: "Optional tools for driving, routing, teams, fleets, inventory, and business records", paths: ["/driver", "/routes", "/employees", "/fleet", "/inventory", "/business-documents", "/analytics"] },
@@ -93,7 +91,7 @@ export const MORE_MENU_GROUPS = [
 ];
 
 export const QUICK_CREATE_ACTIONS = [
-  { label: "Find Jobs", path: "/jobs", icon: Briefcase },
+  { label: "Search Jobs", path: "/career/search", icon: Search },
   { label: "View Matches", path: "/hire/matches", icon: Search },
   { label: "Track Applications", path: "/career/pipeline", icon: ClipboardList },
   { label: "Build Resume", path: "/career/resume", icon: FileText },
@@ -104,7 +102,6 @@ export function resolveNavDomain(pathname = "/") {
   const item = APP_NAV_ITEMS.find((n) => n.path === path) || APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
   return item?.group || "career";
 }
-
 export function navItemsByPaths(paths) { return paths.map((path) => APP_NAV_ITEMS.find((item) => item.path === path)).filter(Boolean); }
 export function filterNavItems(items, { isAdmin = false } = {}) { return items.filter((item) => !item.adminOnly || isAdmin); }
 
@@ -112,6 +109,7 @@ export function resolvePageTitle(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
   if (path === "/") return "Career Home";
   if (path === "/more") return "More";
+  if (path === "/career/search") return "Job Search";
   if (path === "/career/pipeline") return "Applications";
   if (path === "/career/readiness") return "Career Readiness";
   if (path === "/career/resume") return "Resume Builder";
@@ -141,6 +139,7 @@ export function resolvePageTitle(pathname = "/") {
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
   if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
+  if (path.startsWith("/career/search")) return { label: "Job Search", path: "/career/search" };
   if (path.startsWith("/career/pipeline")) return { label: "Applications", path: "/career/pipeline" };
   if (path.startsWith("/career/readiness")) return { label: "Career Readiness", path: "/career/readiness" };
   if (path.startsWith("/career/resume")) return { label: "Resume Builder", path: "/career/resume" };

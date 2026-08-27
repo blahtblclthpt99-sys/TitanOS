@@ -5,6 +5,7 @@ import { installAttentionUxRuntime } from "./lib/attentionUxRuntime.js";
 import "./index.css";
 import "./styles/attention-polish.css";
 import "./styles/attention-refine.css";
+import "./styles/attention-interaction.css";
 
 async function purgeLegacyClientState() {
   if (typeof window === "undefined") return;

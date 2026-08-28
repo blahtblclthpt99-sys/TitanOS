@@ -86,6 +86,7 @@ jobs:
             "api/functions/featureFlags.js"
             "api/register.js"
             "api/instrument.mjs"
+            "scripts/canonical-app-entry.test.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
@@ -106,6 +107,9 @@ jobs:
 
       - name: Install dependencies exactly from lockfile
         run: npm ci
+
+      - name: Canonical TitanOS application entrypoint suite
+        run: node --test scripts/canonical-app-entry.test.mjs
 
       - name: Lint
         run: npm run lint

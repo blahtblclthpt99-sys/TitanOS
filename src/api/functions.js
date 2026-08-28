@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "./supabaseClient";
 
 const FUNCTION_TIMEOUT_MS = 15_000;
@@ -187,7 +188,7 @@ function candidateUrls(path) {
   const base = functionsBaseUrl();
   if (base) urls.push(`${base}${path}`);
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     const { hostname, origin, protocol } = window.location;
     const localHttp = protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1");
     const secureWeb = protocol === "https:";

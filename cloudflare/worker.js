@@ -1,5 +1,11 @@
-const API_PREFIX = "/api/";
+import {
+  createAttentionCheckout,
+  handleAttentionStripeWebhook,
+} from "./attention-api.js";
+
 const EDGE_HEALTH_PATH = "/__titanos/edge-health";
+const CHECKOUT_PATH = "/api/attention/create-checkout";
+const STRIPE_WEBHOOK_PATH = "/api/functions/stripeWebhook";
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'none'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io; worker-src 'self' blob:; upgrade-insecure-requests",
@@ -11,30 +17,20 @@ const SECURITY_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
 };
 
-function normalizeOrigin(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return null;
-
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== "https:") return null;
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
 function applySecurityHeaders(headers) {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     headers.set(key, value);
   }
 }
 
-function withSecurityHeaders(response, pathname) {
+function secureResponse(response, pathname) {
   const headers = new Headers(response.headers);
   applySecurityHeaders(headers);
+  headers.set("X-TitanOS-Edge", "cloudflare");
 
-  if (pathname.startsWith("/assets/")) {
+  if (pathname.startsWith("/api/") || pathname.startsWith("/__titanos/")) {
+    headers.set("Cache-Control", "no-store");
+  } else if (pathname.startsWith("/assets/")) {
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
   } else if (pathname === "/sw.js") {
     headers.set("Cache-Control", "public, max-age=0, must-revalidate");
@@ -53,17 +49,27 @@ function withSecurityHeaders(response, pathname) {
   });
 }
 
+function paymentBindingsConfigured(env) {
+  return Boolean(
+    String(env.STRIPE_SECRET_KEY || "").trim() &&
+    String(env.STRIPE_WEBHOOK_SECRET || "").trim() &&
+    String(env.SUPABASE_URL || "").trim() &&
+    String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
+  );
+}
+
 function edgeHealthResponse(env) {
-  const legacyOrigin = normalizeOrigin(env.LEGACY_API_ORIGIN);
   return Response.json(
     {
       ok: true,
       service: "titanos-edge",
       runtime: "cloudflare-workers",
-      api_bridge_configured: Boolean(legacyOrigin),
+      api_runtime: "cloudflare-workers",
+      legacy_proxy: false,
+      payment_bindings_configured: paymentBindingsConfigured(env),
     },
     {
-      status: legacyOrigin ? 200 : 503,
+      status: 200,
       headers: {
         "Cache-Control": "no-store",
         "X-TitanOS-Edge": "cloudflare",
@@ -72,90 +78,30 @@ function edgeHealthResponse(env) {
   );
 }
 
-function rewriteLegacyRedirect(location, legacyOrigin, incomingOrigin) {
-  if (!location) return null;
-
-  try {
-    const target = new URL(location, legacyOrigin);
-    if (target.origin !== legacyOrigin) return location;
-
-    const rewritten = new URL(target.pathname + target.search + target.hash, incomingOrigin);
-    return rewritten.toString();
-  } catch {
-    return location;
-  }
-}
-
-async function proxyLegacyApi(request, env) {
-  const legacyOrigin = normalizeOrigin(env.LEGACY_API_ORIGIN);
-  if (!legacyOrigin) {
-    const headers = new Headers({
-      "Cache-Control": "no-store",
-      "X-TitanOS-Edge": "cloudflare",
-    });
-    applySecurityHeaders(headers);
-
-    return Response.json(
-      { error: "TitanOS API migration origin is not configured" },
-      { status: 503, headers },
-    );
-  }
-
-  const incoming = new URL(request.url);
-  const target = new URL(incoming.pathname + incoming.search, legacyOrigin);
-  const headers = new Headers(request.headers);
-  const requestId = headers.get("x-titanos-request-id") || crypto.randomUUID();
-
-  headers.set("x-forwarded-host", incoming.host);
-  headers.set("x-forwarded-proto", "https");
-  headers.set("x-titanos-edge", "cloudflare");
-  headers.set("x-titanos-request-id", requestId);
-  headers.delete("host");
-
-  const init = {
-    method: request.method,
-    headers,
-    redirect: "manual",
-  };
-
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    init.body = request.body;
-  }
-
-  const response = await fetch(target, init);
-  const outgoing = new Headers(response.headers);
-  outgoing.set("x-titanos-edge", "cloudflare");
-  outgoing.set("x-titanos-request-id", requestId);
-  outgoing.set("Cache-Control", "no-store");
-  applySecurityHeaders(outgoing);
-
-  const location = rewriteLegacyRedirect(
-    outgoing.get("Location"),
-    legacyOrigin,
-    incoming.origin,
+function apiNotFound() {
+  return Response.json(
+    { error: "API route not found" },
+    { status: 404, headers: { "Cache-Control": "no-store" } },
   );
-  if (location) outgoing.set("Location", location);
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: outgoing,
-  });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    let response;
 
     if (url.pathname === EDGE_HEALTH_PATH) {
-      return edgeHealthResponse(env);
+      response = edgeHealthResponse(env);
+    } else if (url.pathname === CHECKOUT_PATH) {
+      response = await createAttentionCheckout(request, env);
+    } else if (url.pathname === STRIPE_WEBHOOK_PATH) {
+      response = await handleAttentionStripeWebhook(request, env);
+    } else if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      response = apiNotFound();
+    } else {
+      response = await env.ASSETS.fetch(request);
     }
 
-    if (url.pathname === "/api" || url.pathname.startsWith(API_PREFIX)) {
-      return proxyLegacyApi(request, env);
-    }
-
-    const assetResponse = await env.ASSETS.fetch(request);
-    return withSecurityHeaders(assetResponse, url.pathname);
+    return secureResponse(response, url.pathname);
   },
 };

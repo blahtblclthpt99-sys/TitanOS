@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { apiCandidateUrls } from "./apiOrigin";
 
 const UPLOAD_BUCKET = "titanos-uploads";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -12,29 +13,6 @@ function apiError(message, status = 400) {
 function throwIfError(error) {
   if (!error) return;
   throw apiError(error.message || "Request failed");
-}
-
-function apiCandidates(path) {
-  const urls = [];
-  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) urls.push(`${configured}${path}`);
-
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com")
-    ) {
-      urls.push(`${origin}${path}`);
-      urls.push(path);
-    }
-    // Capacitor / static hosts: always allow production API
-    urls.push(`https://titanos-web.vercel.app${path}`);
-  }
-
-  return [...new Set(urls)];
 }
 
 function uploadObjectPath(value) {
@@ -152,7 +130,7 @@ async function sendEmail(payload) {
   const path = "/api/functions/sendEmail";
   let lastError;
 
-  for (const url of apiCandidates(path)) {
+  for (const url of apiCandidateUrls(path)) {
     try {
       const response = await fetch(url, {
         method: "POST",

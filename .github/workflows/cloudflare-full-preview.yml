@@ -1,0 +1,166 @@
+name: TitanOS Cloudflare Full App Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-titanos-migration"
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-full-preview.yml"
+      - ".github/workflows/cloudflare-full-validate.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-full-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: github.ref == 'refs/heads/infra/cloudflare-full-titanos-migration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TITAN_PREVIEW_WORKER_NAME: titanos-full-ci-preview
+      TITAN_PREVIEW_URL: https://titanos-full-ci-preview.blahtblclthpt99.workers.dev
+      LEGACY_API_ORIGIN: https://titanos-web.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify preview isolation and migration bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test "$TITAN_PREVIEW_WORKER_NAME" = "titanos-full-ci-preview"
+          test "$TITAN_PREVIEW_URL" = "https://${TITAN_PREVIEW_WORKER_NAME}.blahtblclthpt99.workers.dev"
+          [[ "$TITAN_PREVIEW_URL" == https://*.workers.dev ]]
+          [[ "$LEGACY_API_ORIGIN" == https://*.vercel.app ]]
+          test "$LEGACY_API_ORIGIN" != "$TITAN_PREVIEW_URL"
+
+      - name: Prove canonical TitanOS product surface is intact
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "src/components/ai/InvisibleInterface.jsx"
+            "src/components/shared/TitanSupportButton.jsx"
+            "src/components/driver/DriverShiftPanel.jsx"
+            "src/api/apiClient.js"
+            "api/functions/titanAI.js"
+            "api/functions/titanAILive.js"
+            "api/functions/supportAI.js"
+            "api/functions/stripeWebhook.js"
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
+          done
+
+      - name: Install dependencies exactly from lockfile
+        run: npm ci
+
+      - name: Build canonical production assets
+        run: npm run build
+
+      - name: Validate bundle before upload
+        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-preview-dry-run --name "$TITAN_PREVIEW_WORKER_NAME" --var "LEGACY_API_ORIGIN:$LEGACY_API_ORIGIN"
+
+      - name: Deploy isolated full-app preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.127.0 deploy \
+            --name "$TITAN_PREVIEW_WORKER_NAME" \
+            --var "LEGACY_API_ORIGIN:$LEGACY_API_ORIGIN"
+
+      - name: Verify Cloudflare edge health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 4 --retry-delay 2 --retry-all-errors \
+            "$TITAN_PREVIEW_URL/__titanos/edge-health" > /tmp/edge-health.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/edge-health.json', 'utf8'));
+          if (
+            d.ok !== true ||
+            d.runtime !== 'cloudflare-workers' ||
+            d.migration_mode !== 'full-app-strangler' ||
+            d.api_runtime !== 'legacy-bridge' ||
+            d.legacy_api_configured !== true ||
+            d.production_cutover_ready !== false
+          ) process.exit(1);
+          NODE
+
+      - name: Verify SPA root and deep-route fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 4 --retry-delay 2 --retry-all-errors \
+            -D /tmp/root-headers.txt "$TITAN_PREVIEW_URL/" -o /tmp/root.html
+          grep -qi '^content-type:.*text/html' /tmp/root-headers.txt
+          grep -qi '^x-titanos-edge-runtime:.*cloudflare-workers' /tmp/root-headers.txt
+          grep -qi '^strict-transport-security:' /tmp/root-headers.txt
+          grep -qi '^content-security-policy:' /tmp/root-headers.txt
+
+          curl --fail --silent --show-error \
+            -H 'Sec-Fetch-Mode: navigate' \
+            -D /tmp/deep-headers.txt "$TITAN_PREVIEW_URL/driver" -o /tmp/deep.html
+          grep -qi '^content-type:.*text/html' /tmp/deep-headers.txt
+          grep -qi '<!doctype html' /tmp/deep.html
+
+      - name: Verify API bridge reaches canonical TitanOS backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/api-health.json --dump-header /tmp/api-health-headers.txt --write-out '%{http_code}' \
+            "$TITAN_PREVIEW_URL/api/functions/health")"
+          test "$STATUS" = "200" || { cat /tmp/api-health.json; echo "Legacy API health bridge returned HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*legacy-bridge' /tmp/api-health-headers.txt
+          grep -qi '^cache-control:.*no-store' /tmp/api-health-headers.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/api-health.json', 'utf8'));
+          if (d.service !== 'titanos' || !d.checks || !d.readiness) process.exit(1);
+          NODE
+
+      - name: Verify API method/body/auth forwarding boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/auth-me.json --dump-header /tmp/auth-me-headers.txt --write-out '%{http_code}' \
+            -H 'Authorization: Bearer deliberately-invalid-cloudflare-cert-token' \
+            "$TITAN_PREVIEW_URL/api/functions/auth/me")"
+          test "$STATUS" = "401" || { cat /tmp/auth-me.json; echo "Invalid auth did not remain fail-closed through bridge: HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*legacy-bridge' /tmp/auth-me-headers.txt
+
+      - name: Assert preview cannot become production routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E 'workers_dev[[:space:]]*[:=][[:space:]]*false|custom_domains?|routes?[[:space:]]*[:=]' wrangler.jsonc cloudflare; then
+            echo "Production route/domain configuration detected in preview migration surface"
+            exit 1
+          fi
+          if grep -n -E -- '--route|--routes|--domain' .github/workflows/cloudflare-full-preview.yml; then
+            echo "Preview workflow attempts to attach production routing"
+            exit 1
+          fi

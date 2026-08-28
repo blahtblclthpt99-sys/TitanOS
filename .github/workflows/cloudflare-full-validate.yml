@@ -87,6 +87,8 @@ jobs:
             "scripts/landing-positioning.test.mjs"
             "scripts/payment-readiness.test.mjs"
             "scripts/database-destructive-migration-guard.test.mjs"
+            "scripts/database-migration-fidelity.manifest.json"
+            "scripts/database-migration-fidelity.test.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
@@ -117,6 +119,9 @@ jobs:
 
       - name: Block destructive database takeover migrations
         run: node --test scripts/database-destructive-migration-guard.test.mjs
+
+      - name: Verify authoritative migration fidelity
+        run: node --test scripts/database-migration-fidelity.test.mjs
 
       - name: Lint
         run: npm run lint

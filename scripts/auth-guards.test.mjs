@@ -27,11 +27,11 @@ const PROFILE_ALLOWED = new Set([
   "professional_profile",
   "community_opt_in",
   "referral_code",
-  "referred_by_code",
   "active_company_id",
 ]);
 
 const PROFILE_FORBIDDEN = [
+  "referred_by_code",
   "role",
   "is_pro",
   "lifetime_premium",
@@ -66,9 +66,10 @@ describe("updateMe privilege allowlist", () => {
     assert.equal(out.full_name, "Ada");
     assert.equal(out.phone, "555");
   });
-  it("strips privilege / billing fields", () => {
+  it("strips server-owned / privilege / billing fields", () => {
     const out = filterUpdateMe({
       full_name: "Ada",
+      referred_by_code: "SERVER-ONLY",
       role: "admin",
       is_pro: true,
       plan_tier: "enterprise",

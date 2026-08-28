@@ -83,6 +83,8 @@ jobs:
             command: npm run build
           - name: Cloudflare active API coverage
             command: node --test scripts/cloudflare-api-coverage.test.mjs
+          - name: Cloudflare runtime environment inventory
+            command: node scripts/cloudflare-runtime-env-audit.mjs
           - name: Cloudflare Wrangler dry-run
             command: npm run build && npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
           - name: Cloudflare production-surface Vercel independence

@@ -1,0 +1,141 @@
+name: TitanOS Cloudflare Production Certify
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-workers-migration"
+    paths:
+      - "cloudflare/production-cert-trigger.txt"
+      - ".github/workflows/cloudflare-production-certify.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-production-certify
+  cancel-in-progress: false
+
+jobs:
+  certify-production:
+    if: github.ref == 'refs/heads/infra/cloudflare-workers-migration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TITAN_PROD_WORKER_NAME: titanos
+      TITAN_PROD_WORKER_URL: https://titanos.blahtblclthpt99.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify certification is read-only and production-scoped
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test "$TITAN_PROD_WORKER_NAME" = "titanos" || { echo "Unexpected production Worker"; exit 1; }
+          test "$TITAN_PROD_WORKER_URL" = "https://${TITAN_PROD_WORKER_NAME}.blahtblclthpt99.workers.dev" || { echo "Production Worker URL mismatch"; exit 1; }
+          if grep -n -E 'wrangler(@[^ ]+)? (deploy|secret (put|bulk|delete)|versions (deploy|upload)|triggers deploy)|curl .* (-X|--request) (POST|PUT|PATCH|DELETE)' .github/workflows/cloudflare-production-certify.yml; then
+            echo "Production certification workflow contains a mutation command"
+            exit 1
+          fi
+
+      - name: Inspect current production deployment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 deployments status --name "$TITAN_PROD_WORKER_NAME" --json > /tmp/titan-prod-deployment.json
+          test -s /tmp/titan-prod-deployment.json || { echo "No production deployment metadata returned"; exit 1; }
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/titan-prod-deployment.json','utf8'));if(!d)process.exit(1);"
+
+      - name: Verify required production secret names exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 secret list --name "$TITAN_PROD_WORKER_NAME" --format json > /tmp/titan-prod-secrets.json
+          node <<'NODE'
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('/tmp/titan-prod-secrets.json', 'utf8'));
+          const entries = Array.isArray(data) ? data : (data?.secrets || []);
+          const names = new Set(entries.map((entry) => entry?.name).filter(Boolean));
+          const required = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+          const missing = required.filter((name) => !names.has(name));
+          if (missing.length) {
+            console.error(`Missing production secret names: ${missing.join(', ')}`);
+            process.exit(1);
+          }
+          console.log(`Required production secret names present: ${required.join(', ')}`);
+          NODE
+
+      - name: Certify production edge health and origin readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 2 --retry-all-errors \
+            "$TITAN_PROD_WORKER_URL/__titanos/edge-health" > /tmp/titan-prod-health.json
+          node <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/titan-prod-health.json', 'utf8'));
+          const expected = {
+            ok: true,
+            runtime: 'cloudflare-workers',
+            api_runtime: 'cloudflare-workers',
+            legacy_proxy: false,
+            app_origin_configured: true,
+            payment_bindings_configured: true,
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (d[key] !== value) {
+              console.error(`Edge health mismatch for ${key}: expected ${value}, got ${d[key]}`);
+              process.exit(1);
+            }
+          }
+          NODE
+
+      - name: Certify production root and security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --location --output /tmp/titan-prod-root.html --dump-header /tmp/titan-prod-headers.txt --write-out '%{http_code}' "$TITAN_PROD_WORKER_URL/")"
+          test "$STATUS" = "200" || { echo "Production root returned $STATUS"; exit 1; }
+          grep -qi '^x-titanos-edge: cloudflare' /tmp/titan-prod-headers.txt || { echo "Missing Cloudflare edge identity header"; exit 1; }
+          grep -qi '^content-security-policy:' /tmp/titan-prod-headers.txt || { echo "Missing CSP"; exit 1; }
+          grep -qi '^x-content-type-options: nosniff' /tmp/titan-prod-headers.txt || { echo "Missing nosniff header"; exit 1; }
+          grep -qi '^x-frame-options: DENY' /tmp/titan-prod-headers.txt || { echo "Missing frame denial header"; exit 1; }
+
+      - name: Certify production API fail-closed behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --output /tmp/retired.json --write-out '%{http_code}' "$TITAN_PROD_WORKER_URL/api/retired-certification-probe")"
+          test "$STATUS" = "404" || { cat /tmp/retired.json; echo "Retired API did not fail closed"; exit 1; }
+
+          CHECKOUT="$TITAN_PROD_WORKER_URL/api/attention/create-checkout"
+          STATUS="$(curl --silent --output /tmp/checkout-get.json --write-out '%{http_code}' "$CHECKOUT")"
+          test "$STATUS" = "405" || { cat /tmp/checkout-get.json; echo "Checkout GET did not fail closed"; exit 1; }
+
+          STATUS="$(curl --silent --output /tmp/checkout-noauth.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"campaign_id":"00000000-0000-0000-0000-000000000000"}' "$CHECKOUT")"
+          test "$STATUS" = "401" || { cat /tmp/checkout-noauth.json; echo "Unauthenticated checkout did not fail closed"; exit 1; }
+
+      - name: Confirm certification performed no deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 deployments status --name "$TITAN_PROD_WORKER_NAME" --json > /tmp/titan-prod-deployment-after.json
+          node <<'NODE'
+          const fs = require('fs');
+          const before = JSON.stringify(JSON.parse(fs.readFileSync('/tmp/titan-prod-deployment.json', 'utf8')));
+          const after = JSON.stringify(JSON.parse(fs.readFileSync('/tmp/titan-prod-deployment-after.json', 'utf8')));
+          if (before !== after) {
+            console.error('Production deployment metadata changed during read-only certification');
+            process.exit(1);
+          }
+          console.log('Production deployment metadata unchanged during certification');
+          NODE

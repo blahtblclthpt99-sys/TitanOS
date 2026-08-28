@@ -98,6 +98,8 @@ test('canonical production origin is app.titanfieldos.com across deployment and 
   const env = await readFile(new URL('.env.production.example', root), 'utf8');
   const auth = await readFile(new URL('src/lib/auth-redirect.js', root), 'utf8');
   const originDoc = await readFile(new URL('docs/TITANOS_PRODUCTION_ORIGIN.md', root), 'utf8');
+  const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
+  const certifier = await readFile(new URL('.github/workflows/cloudflare-production-certify.yml', root), 'utf8');
   const canonical = 'https://app.titanfieldos.com';
 
   assert.match(env, new RegExp(`VITE_TITANOS_PUBLIC_ORIGIN=${canonical.replaceAll('.', '\\.')}`));
@@ -105,8 +107,25 @@ test('canonical production origin is app.titanfieldos.com across deployment and 
   assert.match(env, new RegExp(`APP_ORIGIN=${canonical.replaceAll('.', '\\.')}`));
   assert.match(auth, /TITANOS_PRODUCTION_ORIGIN\s*=\s*["']https:\/\/app\.titanfieldos\.com["']/);
   assert.match(originDoc, /https:\/\/app\.titanfieldos\.com/);
+  assert.match(wrangler, /"APP_ORIGIN"\s*:\s*"https:\/\/app\.titanfieldos\.com"/);
+  assert.match(certifier, /TITAN_PROD_PUBLIC_ORIGIN:\s*https:\/\/app\.titanfieldos\.com/);
+  assert.doesNotMatch(certifier, /vars\.TITAN_PROD_PUBLIC_ORIGIN/);
   assert.doesNotMatch(env, /titanos-web\.vercel\.app/);
   assert.doesNotMatch(auth, /titanos-web\.vercel\.app/);
+});
+
+test('Wrangler declares the production public bindings and required encrypted secret names', async () => {
+  const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
+  assert.match(wrangler, /"SUPABASE_URL"\s*:\s*"https:\/\/xcfjpxcmokdfwkarwomy\.supabase\.co"/);
+  for (const secret of [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'ATTENTION_STRIPE_WEBHOOK_SECRET',
+    'SUPABASE_SERVICE_ROLE_KEY',
+  ]) {
+    assert.match(wrangler, new RegExp(`"${secret}"`));
+  }
+  assert.match(wrangler, /"secrets"\s*:\s*\{\s*"required"/s);
 });
 
 test('Cloudflare payment edge remains independent of the retired Vercel hostname', async () => {

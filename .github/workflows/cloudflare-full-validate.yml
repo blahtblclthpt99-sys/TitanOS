@@ -17,9 +17,7 @@ on:
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
-      - ".github/workflows/cloudflare-full-validate.yml"
-      - ".github/workflows/cloudflare-full-preview.yml"
-      - ".github/workflows/android-release.yml"
+      - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
   push:
@@ -39,9 +37,7 @@ on:
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
-      - ".github/workflows/cloudflare-full-validate.yml"
-      - ".github/workflows/cloudflare-full-preview.yml"
-      - ".github/workflows/android-release.yml"
+      - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
 
@@ -90,6 +86,7 @@ jobs:
             "scripts/canonical-app-entry.test.mjs"
             "scripts/landing-positioning.test.mjs"
             "scripts/payment-readiness.test.mjs"
+            "scripts/database-destructive-migration-guard.test.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
@@ -107,6 +104,7 @@ jobs:
             test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
           done
           test ! -e api/functions/sentryDebug.js || { echo "Retired Sentry debug route was restored"; exit 1; }
+          test ! -e .github/workflows/attention-build.yml || { echo "Titan Attention takeover workflow was restored"; exit 1; }
 
       - name: Install dependencies exactly from lockfile
         run: npm ci
@@ -116,6 +114,9 @@ jobs:
 
       - name: TitanOS landing positioning suite
         run: node --test scripts/landing-positioning.test.mjs
+
+      - name: Block destructive database takeover migrations
+        run: node --test scripts/database-destructive-migration-guard.test.mjs
 
       - name: Lint
         run: npm run lint

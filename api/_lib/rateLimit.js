@@ -10,6 +10,12 @@ const buckets = new Map();
 const MAX_KEYS = 20_000;
 
 function clientIp(req) {
+  // Workers supplies CF-Connecting-IP at the trusted edge. Prefer it over
+  // forwarding chains so a client-controlled leading X-Forwarded-For value
+  // cannot select another rate-limit bucket.
+  const cloudflareIp = req.headers?.["cf-connecting-ip"];
+  if (typeof cloudflareIp === "string" && cloudflareIp.trim()) return cloudflareIp.trim();
+
   const forwarded = req.headers?.["x-forwarded-for"];
   if (typeof forwarded === "string" && forwarded.trim()) return forwarded.split(",")[0].trim();
   if (Array.isArray(forwarded) && forwarded[0]) return String(forwarded[0]).trim();

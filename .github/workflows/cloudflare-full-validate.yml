@@ -1,0 +1,123 @@
+name: TitanOS Cloudflare Full App Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-full-validate.yml"
+      - ".github/workflows/cloudflare-full-preview.yml"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - "infra/cloudflare-full-titanos-migration"
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-full-validate.yml"
+      - ".github/workflows/cloudflare-full-preview.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-full-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Prove canonical TitanOS product surface is intact
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "src/components/ai/InvisibleInterface.jsx"
+            "src/components/shared/TitanSupportButton.jsx"
+            "src/components/driver/DriverShiftPanel.jsx"
+            "src/api/apiClient.js"
+            "api/functions/titanAI.js"
+            "api/functions/titanAILive.js"
+            "api/functions/supportAI.js"
+            "api/functions/stripeWebhook.js"
+            "api/functions/health.js"
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
+          done
+
+      - name: Install dependencies exactly from lockfile
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Authentication regression suite
+        run: npm run test:auth
+
+      - name: API regression suite
+        run: npm run test:api
+
+      - name: Payment regression suite
+        run: npm run test:payments
+
+      - name: Security regression suite
+        run: npm run test:security
+
+      - name: TitanAI regression suite
+        run: npm run test:ai
+
+      - name: Driver Hub regression suite
+        run: npm run test:driver
+
+      - name: GPS regression suite
+        run: npm run test:gps
+
+      - name: Offline/PWA regression suite
+        run: npm run test:offline
+
+      - name: Build canonical production assets
+        run: npm run build
+
+      - name: Validate Cloudflare Worker bundle without deployment
+        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-dry-run --var "LEGACY_API_ORIGIN:https://titanos-web.vercel.app"
+
+      - name: Enforce staged migration boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f cloudflare/worker.js
+          grep -q 'migration_mode: "full-app-strangler"' cloudflare/worker.js
+          grep -q 'production_cutover_ready: false' cloudflare/worker.js
+          grep -q 'not_found_handling.*single-page-application' wrangler.jsonc
+          grep -q '"/api/\*"' wrangler.jsonc
+          if grep -R -n -E 'routes?[[:space:]]*[:=]|custom_domains?|workers_dev[[:space:]]*[:=][[:space:]]*false' wrangler.jsonc cloudflare; then
+            echo "Production routing must not be configured in the migration validation branch"
+            exit 1
+          fi

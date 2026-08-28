@@ -10,6 +10,10 @@ on:
       - "public/**"
       - "scripts/**"
       - "supabase/**"
+      - "ops/**"
+      - "docs/CLOUDFLARE_API_MIGRATION_MATRIX.md"
+      - "docs/DEPLOYMENT_CHECKLIST.md"
+      - ".env.example"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -28,6 +32,10 @@ on:
       - "public/**"
       - "scripts/**"
       - "supabase/**"
+      - "ops/**"
+      - "docs/CLOUDFLARE_API_MIGRATION_MATRIX.md"
+      - "docs/DEPLOYMENT_CHECKLIST.md"
+      - ".env.example"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -90,6 +98,7 @@ jobs:
           for path in "${required[@]}"; do
             test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
           done
+          test ! -e api/functions/sentryDebug.js || { echo "Retired Sentry debug route was restored"; exit 1; }
 
       - name: Install dependencies exactly from lockfile
         run: npm ci
@@ -166,6 +175,10 @@ jobs:
           grep -q '"/api/functions/titanAICapabilities"' cloudflare/api-router.js
           grep -q '"/api/register"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/register"' cloudflare/api-router.js
+          ! grep -q 'sentryDebug' cloudflare/api-router.js
+          ! grep -q 'SENTRY_DEBUG_ROUTE' .env.example
+          ! grep -q 'SENTRY_DEBUG_ROUTE' ops/SENTRY_AND_RESEND.md
+          ! grep -q 'SENTRY_DEBUG_ROUTE' docs/DEPLOYMENT_CHECKLIST.md
           grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js
           grep -q 'Referral attribution is server-managed' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'Company access denied' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql

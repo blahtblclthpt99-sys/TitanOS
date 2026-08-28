@@ -1,14 +1,12 @@
 /**
- * Shared CORS helpers for Vercel serverless functions (web + Capacitor).
+ * Shared CORS helpers for TitanOS server handlers (web + Capacitor).
  * Origins are allowlisted — do not reflect arbitrary Origin with credentials.
  */
 
+const CANONICAL_PRODUCTION_ORIGIN = "https://app.titanfieldos.com";
+
 const DEFAULT_ALLOWED = [
-  "https://titanos-web.vercel.app",
-  "https://titanos.app",
-  "https://www.titanos.app",
-  "https://titanfieldos.com",
-  "https://www.titanfieldos.com",
+  CANONICAL_PRODUCTION_ORIGIN,
   "http://localhost:5173",
   "http://localhost:4173",
   "http://127.0.0.1:5173",
@@ -48,12 +46,13 @@ export function resolveAppOrigin(req) {
     process.env.VITE_TITANOS_PUBLIC_ORIGIN ||
     process.env.VITE_APP_URL ||
     process.env.PUBLIC_APP_URL ||
-    "";
-  if (configured && allowed.includes(configured.replace(/\/$/, ""))) {
-    return configured.replace(/\/$/, "");
+    CANONICAL_PRODUCTION_ORIGIN;
+  const normalized = configured.replace(/\/$/, "");
+  if (allowed.includes(normalized)) {
+    return normalized;
   }
-  // Do not accept arbitrary configured HTTPS URLs outside the allowlist.
-  return "https://titanos-web.vercel.app";
+  // Never fall back to a retired or arbitrary host.
+  return CANONICAL_PRODUCTION_ORIGIN;
 }
 
 export function applyCors(res, req) {
@@ -63,8 +62,8 @@ export function applyCors(res, req) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   } else if (!origin) {
-    // Non-browser / same-origin / server-to-server
-    res.setHeader("Access-Control-Allow-Origin", allowed[0]);
+    // Non-browser / same-origin / server-to-server.
+    res.setHeader("Access-Control-Allow-Origin", CANONICAL_PRODUCTION_ORIGIN);
   }
   // Unknown browser origins: omit ACAO (browser blocks). Do not echo Origin.
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,HEAD,OPTIONS");

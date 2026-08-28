@@ -151,85 +151,25 @@ jobs:
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/titan-webhook-response.json','utf8'));if(d.received!==true||d.ignored!==true)process.exit(1);"
           rm -f /tmp/titan-webhook-probe.json /tmp/titan-webhook-signature.txt /tmp/titan-webhook-response.json
 
-      - name: Retarget active Titan Stripe webhook to Cloudflare
+      - name: Verify Titan Stripe webhook routing without mutation
         shell: bash
         run: |
           set -euo pipefail
-          TARGET="$TITAN_PREVIEW_URL/api/functions/stripeWebhook"
-          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" > /tmp/titan-hook-before.json
-          node - <<'NODE'
-          const fs = require('fs');
-          const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook-before.json','utf8'));
-          const allowed = new Set(['https://titanos-web.vercel.app/api/functions/stripeWebhook','https://titanos-preview.blahtblclthpt99.workers.dev/api/functions/stripeWebhook']);
-          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || !allowed.has(hook?.url)) throw new Error(`Unsafe webhook precondition: ${hook?.id || 'missing'} ${hook?.status || 'missing'} ${hook?.url || 'missing'}`);
-          console.log(`Webhook precondition verified: ${hook.url}`);
-          NODE
+          EXPECTED_URL="$TITAN_PREVIEW_URL/api/functions/stripeWebhook"
           curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
-            -X POST "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" \
-            --data-urlencode "url=$TARGET" \
-            --data-urlencode 'enabled_events[]=checkout.session.completed' \
-            --data-urlencode 'enabled_events[]=checkout.session.async_payment_succeeded' \
-            --data-urlencode 'enabled_events[]=checkout.session.expired' \
-            --data-urlencode 'enabled_events[]=charge.refunded' \
-            --data-urlencode 'enabled_events[]=payment_intent.canceled' > /tmp/titan-hook-after.json
+            "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" > /tmp/titan-hook.json
           node - <<'NODE'
           const fs = require('fs');
-          const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook-after.json','utf8'));
-          const expectedUrl = 'https://titanos-preview.blahtblclthpt99.workers.dev/api/functions/stripeWebhook';
+          const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook.json','utf8'));
+          const expectedUrl = `${process.env.TITAN_PREVIEW_URL}/api/functions/stripeWebhook`;
           const expectedEvents = ['charge.refunded','checkout.session.async_payment_succeeded','checkout.session.completed','checkout.session.expired','payment_intent.canceled'].sort();
           const actualEvents = [...(hook.enabled_events || [])].sort();
-          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || hook?.url !== expectedUrl) throw new Error('Stripe webhook retarget verification failed');
-          if (JSON.stringify(actualEvents) !== JSON.stringify(expectedEvents)) throw new Error(`Unexpected enabled events: ${actualEvents.join(',')}`);
-          console.log(`Titan Stripe webhook migrated: ${hook.id} -> ${hook.url}`);
-          console.log(`Enabled events: ${actualEvents.join(',')}`);
+          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || hook?.url !== expectedUrl) {
+            throw new Error('Titan Stripe webhook routing drift detected');
+          }
+          if (JSON.stringify(actualEvents) !== JSON.stringify(expectedEvents)) {
+            throw new Error(`Unexpected enabled events: ${actualEvents.join(',')}`);
+          }
+          console.log(`Titan Stripe webhook routing verified: ${hook.id} -> ${hook.url}`);
           NODE
-          rm -f /tmp/titan-hook-before.json /tmp/titan-hook-after.json
-
-      - name: Verify real Stripe-originated webhook delivery without charging money
-        shell: bash
-        run: |
-          set -euo pipefail
-          STARTED_AT="$(date +%s)"
-          PROBE="titan-cloudflare-$(date +%s)-$RANDOM"
-          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
-            -X POST https://api.stripe.com/v1/payment_intents \
-            --data-urlencode 'amount=50' \
-            --data-urlencode 'currency=usd' \
-            --data-urlencode 'payment_method_types[]=card' \
-            --data-urlencode "description=Titan Cloudflare webhook certification $PROBE" \
-            --data-urlencode "metadata[certification_probe]=$PROBE" > /tmp/titan-probe-pi.json
-          PI_ID="$(node -e "const d=require('/tmp/titan-probe-pi.json');if(!d.id)process.exit(1);process.stdout.write(d.id)")"
-          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
-            -X POST "https://api.stripe.com/v1/payment_intents/$PI_ID/cancel" > /tmp/titan-probe-cancel.json
-          node -e "const d=require('/tmp/titan-probe-cancel.json');if(d.status!=='canceled')process.exit(1);"
-
-          EVENT_ID=''
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            curl --fail --silent --show-error -G -u "$STRIPE_SECRET_KEY:" \
-              https://api.stripe.com/v1/events \
-              --data-urlencode 'type=payment_intent.canceled' \
-              --data-urlencode "created[gte]=$STARTED_AT" \
-              --data-urlencode 'limit=20' > /tmp/titan-probe-events.json
-            EVENT_ID="$(node - <<'NODE'
-          const fs=require('fs');
-          const pi=JSON.parse(fs.readFileSync('/tmp/titan-probe-pi.json','utf8')).id;
-          const events=JSON.parse(fs.readFileSync('/tmp/titan-probe-events.json','utf8')).data || [];
-          const match=events.find((event)=>event?.data?.object?.id===pi);
-          if(match?.id) process.stdout.write(match.id);
-          NODE
-            )"
-            [ -n "$EVENT_ID" ] && break
-            sleep 2
-          done
-          test -n "$EVENT_ID" || { echo 'Stripe-originated cancellation event was not observed'; exit 1; }
-
-          DELIVERED='false'
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" "https://api.stripe.com/v1/events/$EVENT_ID" > /tmp/titan-probe-event.json
-            DELIVERED="$(node -e "const d=require('/tmp/titan-probe-event.json');process.stdout.write(d.pending_webhooks===0?'true':'false')")"
-            [ "$DELIVERED" = 'true' ] && break
-            sleep 2
-          done
-          test "$DELIVERED" = 'true' || { cat /tmp/titan-probe-event.json; echo 'Stripe webhook delivery remained pending'; exit 1; }
-          echo "Real Stripe-originated payment_intent.canceled delivered successfully: $EVENT_ID"
-          rm -f /tmp/titan-probe-pi.json /tmp/titan-probe-cancel.json /tmp/titan-probe-events.json /tmp/titan-probe-event.json
+          rm -f /tmp/titan-hook.json

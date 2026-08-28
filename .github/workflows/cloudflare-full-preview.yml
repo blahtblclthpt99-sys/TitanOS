@@ -35,7 +35,6 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TITAN_PREVIEW_WORKER_NAME: titanos-full-ci-preview
       TITAN_PREVIEW_URL: https://titanos-full-ci-preview.blahtblclthpt99.workers.dev
-      LEGACY_API_ORIGIN: https://titanos-web.vercel.app
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +43,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Verify preview isolation and migration bridge
+      - name: Verify preview isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -53,8 +52,6 @@ jobs:
           test "$TITAN_PREVIEW_WORKER_NAME" = "titanos-full-ci-preview"
           test "$TITAN_PREVIEW_URL" = "https://${TITAN_PREVIEW_WORKER_NAME}.blahtblclthpt99.workers.dev"
           [[ "$TITAN_PREVIEW_URL" == https://*.workers.dev ]]
-          [[ "$LEGACY_API_ORIGIN" == https://*.vercel.app ]]
-          test "$LEGACY_API_ORIGIN" != "$TITAN_PREVIEW_URL"
 
       - name: Prove canonical TitanOS product surface is intact
         shell: bash
@@ -69,6 +66,10 @@ jobs:
             "api/functions/titanAILive.js"
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
+            "api/functions/health.js"
+            "api/functions/auth/me.js"
+            "cloudflare/node-handler-adapter.js"
+            "cloudflare/api-router.js"
           )
           for path in "${required[@]}"; do
             test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
@@ -81,15 +82,13 @@ jobs:
         run: npm run build
 
       - name: Validate bundle before upload
-        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-preview-dry-run --name "$TITAN_PREVIEW_WORKER_NAME" --var "LEGACY_API_ORIGIN:$LEGACY_API_ORIGIN"
+        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-preview-dry-run --name "$TITAN_PREVIEW_WORKER_NAME"
 
       - name: Deploy isolated full-app preview
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.127.0 deploy \
-            --name "$TITAN_PREVIEW_WORKER_NAME" \
-            --var "LEGACY_API_ORIGIN:$LEGACY_API_ORIGIN"
+          npx --yes wrangler@4.127.0 deploy --name "$TITAN_PREVIEW_WORKER_NAME"
 
       - name: Verify Cloudflare edge health
         shell: bash
@@ -103,9 +102,10 @@ jobs:
           if (
             d.ok !== true ||
             d.runtime !== 'cloudflare-workers' ||
-            d.migration_mode !== 'full-app-strangler' ||
-            d.api_runtime !== 'legacy-bridge' ||
-            d.legacy_api_configured !== true ||
+            d.migration_mode !== 'full-app-native-staged' ||
+            d.api_runtime !== 'cloudflare-workers-native' ||
+            d.native_api_routes !== 2 ||
+            d.unmigrated_api_policy !== 'fail-closed' ||
             d.production_cutover_ready !== false
           ) process.exit(1);
           NODE
@@ -127,14 +127,14 @@ jobs:
           grep -qi '^content-type:.*text/html' /tmp/deep-headers.txt
           grep -qi '<!doctype html' /tmp/deep.html
 
-      - name: Verify API bridge reaches canonical TitanOS backend
+      - name: Verify canonical health handler runs natively on Workers
         shell: bash
         run: |
           set -euo pipefail
           STATUS="$(curl --silent --show-error --output /tmp/api-health.json --dump-header /tmp/api-health-headers.txt --write-out '%{http_code}' \
             "$TITAN_PREVIEW_URL/api/functions/health")"
-          test "$STATUS" = "200" || { cat /tmp/api-health.json; echo "Legacy API health bridge returned HTTP $STATUS"; exit 1; }
-          grep -qi '^x-titanos-api-runtime:.*legacy-bridge' /tmp/api-health-headers.txt
+          test "$STATUS" = "200" || { cat /tmp/api-health.json; echo "Native API health returned HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/api-health-headers.txt
           grep -qi '^cache-control:.*no-store' /tmp/api-health-headers.txt
           node - <<'NODE'
           const fs = require('fs');
@@ -142,15 +142,29 @@ jobs:
           if (d.service !== 'titanos' || !d.checks || !d.readiness) process.exit(1);
           NODE
 
-      - name: Verify API method/body/auth forwarding boundary
+      - name: Verify native authentication boundary fails closed without secrets
         shell: bash
         run: |
           set -euo pipefail
           STATUS="$(curl --silent --show-error --output /tmp/auth-me.json --dump-header /tmp/auth-me-headers.txt --write-out '%{http_code}' \
-            -H 'Authorization: Bearer deliberately-invalid-cloudflare-cert-token' \
             "$TITAN_PREVIEW_URL/api/functions/auth/me")"
-          test "$STATUS" = "401" || { cat /tmp/auth-me.json; echo "Invalid auth did not remain fail-closed through bridge: HTTP $STATUS"; exit 1; }
-          grep -qi '^x-titanos-api-runtime:.*legacy-bridge' /tmp/auth-me-headers.txt
+          test "$STATUS" = "401" || { cat /tmp/auth-me.json; echo "No-auth request did not remain fail-closed on Workers: HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/auth-me-headers.txt
+          grep -qi '^cache-control:.*no-store' /tmp/auth-me-headers.txt
+
+      - name: Verify unported API routes fail closed visibly
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/unported.json --dump-header /tmp/unported-headers.txt --write-out '%{http_code}' \
+            "$TITAN_PREVIEW_URL/api/functions/titanAI")"
+          test "$STATUS" = "503" || { cat /tmp/unported.json; echo "Unported API route did not fail closed: HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/unported-headers.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/unported.json', 'utf8'));
+          if (d.error !== 'api_route_not_migrated') process.exit(1);
+          NODE
 
       - name: Assert preview cannot become production routing
         shell: bash

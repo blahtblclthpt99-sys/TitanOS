@@ -8,6 +8,8 @@ on:
       - "supabase/migrations/**"
       - "scripts/supabase-postgres-validation-shim.sql"
       - "scripts/database-destructive-migration-guard.test.mjs"
+      - "scripts/database-migration-fidelity.manifest.json"
+      - "scripts/database-migration-fidelity.test.mjs"
       - ".github/workflows/database-recovery-validate.yml"
       - "docs/TITANOS_DATABASE_RECOVERY.md"
   pull_request:
@@ -16,6 +18,8 @@ on:
       - "supabase/migrations/**"
       - "scripts/supabase-postgres-validation-shim.sql"
       - "scripts/database-destructive-migration-guard.test.mjs"
+      - "scripts/database-migration-fidelity.manifest.json"
+      - "scripts/database-migration-fidelity.test.mjs"
       - ".github/workflows/database-recovery-validate.yml"
       - "docs/TITANOS_DATABASE_RECOVERY.md"
 
@@ -61,6 +65,9 @@ jobs:
 
       - name: Block destructive database takeover migrations
         run: node --test scripts/database-destructive-migration-guard.test.mjs
+
+      - name: Verify authoritative migration fidelity
+        run: node --test scripts/database-migration-fidelity.test.mjs
 
       - name: Verify PostgreSQL 17
         shell: bash

@@ -42,6 +42,10 @@ const PROFILE_FORBIDDEN = [
   "verification_notes",
 ];
 
+const PRIVILEGE_AND_BILLING_FORBIDDEN = PROFILE_FORBIDDEN.filter(
+  (key) => key !== "referred_by_code"
+);
+
 function filterUpdateMe(updates) {
   const payload = {};
   for (const key of PROFILE_ALLOWED) {
@@ -84,8 +88,12 @@ describe("updateMe privilege allowlist", () => {
 
 describe("server admin authorization boundary", () => {
   const authSource = readFileSync(new URL("../api/_lib/auth.js", import.meta.url), "utf8");
-  const migrationSource = readFileSync(
+  const originalGrantMigration = readFileSync(
     new URL("../supabase/migrations/20260816_lock_profile_privileged_columns.sql", import.meta.url),
+    "utf8"
+  );
+  const contextHardeningMigration = readFileSync(
+    new URL("../supabase/migrations/20260828033000_lock_profile_referral_company_context.sql", import.meta.url),
     "utf8"
   );
 
@@ -94,12 +102,12 @@ describe("server admin authorization boundary", () => {
     assert.doesNotMatch(authSource, /from\(["']profiles["']\)[\s\S]*select\(["']role["']\)/);
   });
 
-  it("revokes table-wide profile UPDATE and grants only bounded columns", () => {
-    assert.match(migrationSource, /revoke\s+update\s+on\s+table\s+public\.profiles\s+from\s+authenticated/i);
-    const grant = migrationSource.match(/grant\s+update\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.profiles\s+to\s+authenticated/i)?.[1] || "";
+  it("revokes table-wide profile UPDATE and grants only bounded privilege-safe columns", () => {
+    assert.match(originalGrantMigration, /revoke\s+update\s+on\s+table\s+public\.profiles\s+from\s+authenticated/i);
+    const grant = originalGrantMigration.match(/grant\s+update\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.profiles\s+to\s+authenticated/i)?.[1] || "";
     assert.ok(grant, "bounded authenticated UPDATE grant must exist");
     for (const forbidden of [
-      ...PROFILE_FORBIDDEN,
+      ...PRIVILEGE_AND_BILLING_FORBIDDEN,
       "founding_member",
       "founding_tier",
       "is_founding_titan",
@@ -107,6 +115,17 @@ describe("server admin authorization boundary", () => {
     ]) {
       assert.equal(new RegExp(`\\b${forbidden}\\b`, "i").test(grant), false, `${forbidden} must remain server-owned`);
     }
+  });
+
+  it("latest hardening migration removes referral attribution from direct client UPDATE", () => {
+    assert.match(contextHardeningMigration, /revoke\s+update\s+on\s+table\s+public\.profiles\s+from\s+authenticated/i);
+    const grant = contextHardeningMigration.match(/grant\s+update\s*\(([\s\S]*?)\)\s+on\s+table\s+public\.profiles\s+to\s+authenticated/i)?.[1] || "";
+    assert.ok(grant, "latest bounded authenticated UPDATE grant must exist");
+    assert.equal(/\breferred_by_code\b/i.test(grant), false, "referral attribution must be server-owned");
+    assert.equal(/\bactive_company_id\b/i.test(grant), true, "company context remains user-selectable within authorization rules");
+    assert.match(contextHardeningMigration, /Referral attribution is server-managed/);
+    assert.match(contextHardeningMigration, /Company access denied/);
+    assert.match(contextHardeningMigration, /company_members/);
   });
 });
 

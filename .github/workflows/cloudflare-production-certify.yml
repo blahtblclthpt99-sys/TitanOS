@@ -47,6 +47,29 @@ jobs:
             exit 1
           fi
 
+      - name: Inventory Cloudflare Worker scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
+            > /tmp/titan-worker-inventory.json
+          node <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync('/tmp/titan-worker-inventory.json', 'utf8'));
+          if (payload.success !== true || !Array.isArray(payload.result)) {
+            console.error('Unable to inventory Cloudflare Worker scripts');
+            process.exit(1);
+          }
+          const names = payload.result.map((item) => item?.id).filter(Boolean).sort();
+          console.log(`Cloudflare Worker scripts: ${names.join(', ') || '(none)'}`);
+          if (!names.includes(process.env.TITAN_PROD_WORKER_NAME)) {
+            console.error(`Required production Worker missing: ${process.env.TITAN_PROD_WORKER_NAME}`);
+            process.exit(1);
+          }
+          NODE
+
       - name: Inspect current production deployment metadata
         shell: bash
         run: |

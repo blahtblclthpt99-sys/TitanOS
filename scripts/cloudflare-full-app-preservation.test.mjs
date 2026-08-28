@@ -78,6 +78,11 @@ test('Cloudflare migration does not replace the full TitanOS package graph with 
   assert.ok(pkg.dependencies?.['@capacitor/core']);
 });
 
+test('Cloudflare Worker explicitly enables Node compatibility required by preserved handlers', async () => {
+  const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
+  assert.match(wrangler, /"compatibility_flags"\s*:\s*\[[^\]]*"nodejs_compat"[^\]]*\]/s);
+});
+
 test('Cloudflare payment edge remains independent of the retired Vercel hostname', async () => {
   const worker = await readFile(new URL('cloudflare/worker.js', root), 'utf8');
   const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');

@@ -18,6 +18,16 @@ const forbiddenRuntimePatterns = [
   { name: 'retired_vercel_origin', pattern: /titanos-web\.vercel\.app/g },
   { name: 'legacy_api_origin', pattern: /LEGACY_API_ORIGIN/g },
 ];
+const requiredProductionSecrets = [
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'ATTENTION_STRIPE_WEBHOOK_SECRET',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'PORTAL_OTP_PEPPER',
+  'AUDIT_IP_PEPPER',
+  'RESEND_API_KEY',
+  'OPENAI_API_KEY',
+];
 
 async function resolveLocalImport(fromFile, specifier) {
   if (!specifier.startsWith('.')) return null;
@@ -84,11 +94,21 @@ while (queue.length) {
 const env = [...envToFiles]
   .sort(([a], [b]) => a.localeCompare(b))
   .map(([name, files]) => ({ name, files: [...files].sort() }));
+const forbiddenVercelEnv = env.filter(({ name }) => name.startsWith('VERCEL_'));
+
+const wrangler = JSON.parse(await readFile(path.join(root, 'wrangler.jsonc'), 'utf8'));
+const declaredRequiredSecrets = new Set(wrangler?.secrets?.required || []);
+const missingRequiredSecretDeclarations = requiredProductionSecrets.filter(
+  (name) => !declaredRequiredSecrets.has(name)
+);
 
 console.log(JSON.stringify({
   activeEntry: path.relative(root, entry),
   filesScanned: visited.size,
   environmentVariables: env,
+  requiredProductionSecrets,
+  missingRequiredSecretDeclarations,
+  forbiddenVercelEnv,
   unresolvedLocalImports,
   forbiddenRuntimeReferences,
 }, null, 2));
@@ -97,8 +117,15 @@ if (unresolvedLocalImports.length) {
   console.error('Runtime environment audit found unresolved local imports.');
   process.exit(1);
 }
-
 if (forbiddenRuntimeReferences.length) {
   console.error('Active Cloudflare runtime graph contains retired or forbidden hosting references.');
+  process.exit(1);
+}
+if (forbiddenVercelEnv.length) {
+  console.error(`Active Cloudflare runtime still depends on Vercel environment variables: ${forbiddenVercelEnv.map(({ name }) => name).join(', ')}`);
+  process.exit(1);
+}
+if (missingRequiredSecretDeclarations.length) {
+  console.error(`Wrangler is missing required production secret declarations: ${missingRequiredSecretDeclarations.join(', ')}`);
   process.exit(1);
 }

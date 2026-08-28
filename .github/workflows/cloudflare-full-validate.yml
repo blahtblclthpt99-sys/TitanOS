@@ -90,6 +90,7 @@ jobs:
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
             "scripts/cloudflare-app-version.test.mjs"
+            "scripts/cloudflare-feature-flags.test.mjs"
             "scripts/auth-profile-policy.test.mjs"
             "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
             ".github/workflows/android-release.yml"
@@ -127,6 +128,9 @@ jobs:
 
       - name: Cloudflare app version contract suite
         run: node --test scripts/cloudflare-app-version.test.mjs
+
+      - name: Cloudflare feature flags integrity suite
+        run: node --test scripts/cloudflare-feature-flags.test.mjs
 
       - name: Cloudflare TitanAI capabilities contract suite
         run: node --test scripts/cloudflare-titanai-capabilities.test.mjs
@@ -184,6 +188,8 @@ jobs:
           grep -q 'fault-injection endpoint is retired' ops/SENTRY_AND_RESEND.md
           grep -q 'retired /api/functions/sentryDebug' docs/DEPLOYMENT_CHECKLIST.md
           grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js
+          grep -q 'normalizeLaunchRecord' api/functions/featureFlags.js
+          grep -q 'membershipPaymentsLive: false' api/functions/featureFlags.js
           grep -q 'Referral attribution is server-managed' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'Company access denied' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc

@@ -78,6 +78,7 @@ jobs:
             "api/register.js"
             "api/instrument.mjs"
             "scripts/cloudflare-registration.test.mjs"
+            "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/auth-profile-policy.test.mjs"
             "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
             ".github/workflows/android-release.yml"
@@ -108,6 +109,9 @@ jobs:
 
       - name: Cloudflare registration safety suite
         run: node --test scripts/cloudflare-registration.test.mjs
+
+      - name: Cloudflare Node adapter parity suite
+        run: node --test scripts/cloudflare-node-adapter.test.mjs
 
       - name: Payment regression suite
         run: npm run test:payments

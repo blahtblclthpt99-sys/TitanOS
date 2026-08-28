@@ -31,6 +31,8 @@ async function verifyViewport(name, viewport, screenshotPath) {
     const root = document.querySelector("#root");
     const styles = getComputedStyle(document.documentElement);
     const links = [...document.querySelectorAll("a")].map((link) => link.getAttribute("href") || "");
+    const heading = document.querySelector("h1");
+    const headingStyle = heading ? getComputedStyle(heading) : null;
     return {
       title: document.title,
       text: document.body.innerText,
@@ -39,6 +41,9 @@ async function verifyViewport(name, viewport, screenshotPath) {
       titanSurface: styles.getPropertyValue("--titan-surface-1").trim(),
       hasBuiltStylesheet: [...document.styleSheets].some((sheet) => String(sheet.href || "").includes("/assets/")),
       links,
+      hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 2,
+      headingFontSize: headingStyle ? Number.parseFloat(headingStyle.fontSize) : 0,
+      configWarningVisible: document.body.innerText.includes("TitanOS is misconfigured"),
     };
   });
 
@@ -50,6 +55,9 @@ async function verifyViewport(name, viewport, screenshotPath) {
   assert.ok(state.titanSurface, `${name}: --titan-surface-1 is missing; TitanOS design system did not load`);
   assert.equal(state.hasBuiltStylesheet, true, `${name}: built Vite stylesheet is not attached`);
   assert.ok(state.links.some((href) => href.includes("/register")), `${name}: registration navigation missing`);
+  assert.equal(state.hasHorizontalOverflow, false, `${name}: page has horizontal layout overflow`);
+  assert.equal(state.configWarningVisible, false, `${name}: isolated preview is obscured by production config warning`);
+  assert.ok(state.headingFontSize >= (name === "desktop" ? 40 : 30), `${name}: hero typography is unexpectedly collapsed`);
 
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

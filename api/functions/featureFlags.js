@@ -30,7 +30,7 @@ function loadFlags() {
       if (k in DEFAULTS && typeof v === "boolean") out[k] = v;
     }
   } catch {
-    /* ignore bad JSON */
+    /* ignore bad JSON; defaults are intentionally non-secret */
   }
   return out;
 }
@@ -41,8 +41,9 @@ async function loadLaunchStatus() {
     foundingClaimed: 0,
     spotsRemaining: FOUNDING_CAP_DEFAULT,
     betaActive: true,
-    /** Checkout always live — Founding 100 = first month free + price lock. */
-    membershipPaymentsLive: true,
+    membershipPaymentsLive: false,
+    verified: false,
+    source: "safe_fallback",
   };
   try {
     const { getSupabaseAdmin } = await import("../_lib/supabase.js");
@@ -61,7 +62,9 @@ async function loadLaunchStatus() {
       foundingClaimed: claimed,
       spotsRemaining: Math.max(0, cap - claimed),
       betaActive,
-      membershipPaymentsLive: true,
+      membershipPaymentsLive: process.env.MEMBERSHIP_PAYMENTS_LIVE === "true",
+      verified: true,
+      source: "platform_launch",
     };
   } catch {
     return fallback;
@@ -80,7 +83,10 @@ export default async function handler(req, res) {
     count: Object.keys(flags).length,
     betaActive: launch.betaActive,
     foundingClaimed: launch.foundingClaimed,
+    membershipPaymentsLive: launch.membershipPaymentsLive,
+    verified: launch.verified,
   });
+  res.setHeader("Cache-Control", "no-store");
   return res.status(200).json({
     flags,
     launch,

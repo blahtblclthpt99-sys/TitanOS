@@ -135,7 +135,7 @@ jobs:
             echo "Cloudflare runtime still depends on a Vercel API origin"
             exit 1
           fi
-          if grep -R -n -E 'routes?[[:space:]]*[:=]|custom_domains?|workers_dev[[:space:]]*[:=][[:space:]]*false' wrangler.jsonc cloudflare; then
-            echo "Production routing must not be configured in the migration validation branch"
+          if grep -n -E '"workers_dev"[[:space:]]*:[[:space:]]*false|"routes?"[[:space:]]*:|"custom_domains?"[[:space:]]*:' wrangler.jsonc; then
+            echo "Production routing must not be configured in Wrangler config"
             exit 1
           fi

@@ -83,6 +83,16 @@ test('Cloudflare Worker explicitly enables Node compatibility required by preser
   assert.match(wrangler, /"compatibility_flags"\s*:\s*\[[^\]]*"nodejs_compat"[^\]]*\]/s);
 });
 
+test('Cloudflare Worker exposes immutable version metadata for release certification', async () => {
+  const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
+  const worker = await readFile(new URL('cloudflare/worker.js', root), 'utf8');
+  assert.match(wrangler, /"version_metadata"\s*:\s*\{\s*"binding"\s*:\s*"CF_VERSION_METADATA"\s*\}/s);
+  assert.match(worker, /env\.CF_VERSION_METADATA/);
+  assert.match(worker, /worker_version_id:/);
+  assert.match(worker, /worker_version_tag:/);
+  assert.match(worker, /worker_version_timestamp:/);
+});
+
 test('Cloudflare payment edge remains independent of the retired Vercel hostname', async () => {
   const worker = await readFile(new URL('cloudflare/worker.js', root), 'utf8');
   const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');

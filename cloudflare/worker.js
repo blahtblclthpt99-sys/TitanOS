@@ -79,21 +79,71 @@ function cleanHttpsOrigin(value = "") {
   }
 }
 
+function bindingConfigured(value) {
+  return Boolean(String(value || "").trim());
+}
+
 function appOriginConfigured(env) {
   return Boolean(cleanHttpsOrigin(env.APP_ORIGIN));
 }
 
-function paymentBindingsConfigured(env) {
+function corePaymentBindingsConfigured(env) {
   return Boolean(
-    String(env.STRIPE_SECRET_KEY || "").trim() &&
-    String(env.STRIPE_WEBHOOK_SECRET || "").trim() &&
-    String(env.SUPABASE_URL || "").trim() &&
-    String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim() &&
+    bindingConfigured(env.STRIPE_SECRET_KEY) &&
+    bindingConfigured(env.STRIPE_WEBHOOK_SECRET) &&
+    bindingConfigured(env.SUPABASE_URL) &&
+    bindingConfigured(env.SUPABASE_SERVICE_ROLE_KEY)
+  );
+}
+
+function attentionPaymentBindingsConfigured(env) {
+  return Boolean(
+    bindingConfigured(env.STRIPE_SECRET_KEY) &&
+    bindingConfigured(env.ATTENTION_STRIPE_WEBHOOK_SECRET) &&
+    bindingConfigured(env.SUPABASE_URL) &&
+    bindingConfigured(env.SUPABASE_SERVICE_ROLE_KEY) &&
     appOriginConfigured(env)
   );
 }
 
+function webhookSigningSecretsDistinct(env) {
+  const coreWebhookSecret = String(env.STRIPE_WEBHOOK_SECRET || "").trim();
+  const attentionWebhookSecret = String(env.ATTENTION_STRIPE_WEBHOOK_SECRET || "").trim();
+  return Boolean(
+    coreWebhookSecret &&
+    attentionWebhookSecret &&
+    coreWebhookSecret !== attentionWebhookSecret
+  );
+}
+
+function paymentBindingsConfigured(env) {
+  return Boolean(
+    corePaymentBindingsConfigured(env) &&
+    attentionPaymentBindingsConfigured(env) &&
+    webhookSigningSecretsDistinct(env)
+  );
+}
+
+function attentionCheckoutBindings(env) {
+  return {
+    STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+    APP_ORIGIN: env.APP_ORIGIN,
+  };
+}
+
+function attentionWebhookBindings(env) {
+  return {
+    STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: env.ATTENTION_STRIPE_WEBHOOK_SECRET,
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+  };
+}
+
 function edgeHealthResponse(env) {
+  const version = env.CF_VERSION_METADATA || {};
   return Response.json(
     {
       ok: true,
@@ -102,7 +152,13 @@ function edgeHealthResponse(env) {
       api_runtime: "cloudflare-workers",
       legacy_proxy: false,
       app_origin_configured: appOriginConfigured(env),
+      core_payment_bindings_configured: corePaymentBindingsConfigured(env),
+      attention_payment_bindings_configured: attentionPaymentBindingsConfigured(env),
+      webhook_signing_secrets_distinct: webhookSigningSecretsDistinct(env),
       payment_bindings_configured: paymentBindingsConfigured(env),
+      worker_version_id: version.id || null,
+      worker_version_tag: version.tag || null,
+      worker_version_timestamp: version.timestamp || null,
     },
     {
       status: 200,
@@ -136,9 +192,9 @@ export default {
     if (url.pathname === EDGE_HEALTH_PATH) {
       response = edgeHealthResponse(env);
     } else if (url.pathname === CHECKOUT_PATH) {
-      response = await createAttentionCheckout(request, env);
+      response = await createAttentionCheckout(request, attentionCheckoutBindings(env));
     } else if (url.pathname === ATTENTION_STRIPE_WEBHOOK_PATH) {
-      response = await handleAttentionStripeWebhook(request, env);
+      response = await handleAttentionStripeWebhook(request, attentionWebhookBindings(env));
     } else if (url.pathname === GENERIC_STRIPE_WEBHOOK_PATH) {
       response = await runNodeHandler(genericStripeWebhook, request);
     } else {

@@ -125,12 +125,42 @@ test("every direct browser API path has an explicit Cloudflare ownership model",
   }
 });
 
-test("generic Stripe and Attention webhooks have distinct Cloudflare routes", () => {
+test("generic Stripe and Attention webhooks have distinct routes and signing-secret boundaries", () => {
   const worker = readFileSync(join(root, "cloudflare", "worker.js"), "utf8");
+  const attention = readFileSync(join(root, "cloudflare", "attention-api.js"), "utf8");
+  const generic = readFileSync(join(root, "api", "functions", "stripeWebhook.js"), "utf8");
+
   assert.match(worker, /GENERIC_STRIPE_WEBHOOK_PATH\s*=\s*["']\/api\/functions\/stripeWebhook["']/);
   assert.match(worker, /ATTENTION_STRIPE_WEBHOOK_PATH\s*=\s*["']\/api\/attention\/stripe-webhook["']/);
   assert.match(worker, /runNodeHandler\(genericStripeWebhook, request\)/);
-  assert.match(worker, /handleAttentionStripeWebhook\(request, env\)/);
+  assert.match(worker, /handleAttentionStripeWebhook\(request, attentionWebhookBindings\(env\)\)/);
+  assert.match(worker, /STRIPE_WEBHOOK_SECRET:\s*env\.ATTENTION_STRIPE_WEBHOOK_SECRET/);
+  assert.match(worker, /coreWebhookSecret !== attentionWebhookSecret/);
+  assert.match(generic, /process\.env\.STRIPE_WEBHOOK_SECRET/);
+  assert.match(attention, /env\.STRIPE_WEBHOOK_SECRET/);
+});
+
+test("Attention checkout and webhook receive least-privilege binding views", () => {
+  const worker = readFileSync(join(root, "cloudflare", "worker.js"), "utf8");
+  assert.match(worker, /createAttentionCheckout\(request, attentionCheckoutBindings\(env\)\)/);
+  assert.match(worker, /handleAttentionStripeWebhook\(request, attentionWebhookBindings\(env\)\)/);
+
+  const checkoutBlock = worker.match(/function attentionCheckoutBindings\(env\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  const webhookBlock = worker.match(/function attentionWebhookBindings\(env\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.doesNotMatch(checkoutBlock, /WEBHOOK_SECRET/);
+  assert.match(webhookBlock, /ATTENTION_STRIPE_WEBHOOK_SECRET/);
+  assert.doesNotMatch(webhookBlock, /APP_ORIGIN/);
+});
+
+test("edge readiness requires both distinct Stripe webhook signing secrets", () => {
+  const worker = readFileSync(join(root, "cloudflare", "worker.js"), "utf8");
+  assert.match(worker, /corePaymentBindingsConfigured\(env\)/);
+  assert.match(worker, /attentionPaymentBindingsConfigured\(env\)/);
+  assert.match(worker, /webhookSigningSecretsDistinct\(env\)/);
+  assert.match(worker, /core_payment_bindings_configured:/);
+  assert.match(worker, /attention_payment_bindings_configured:/);
+  assert.match(worker, /webhook_signing_secrets_distinct:/);
+  assert.match(worker, /payment_bindings_configured:/);
 });
 
 test("unknown API routes remain fail-closed", () => {

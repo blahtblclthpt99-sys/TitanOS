@@ -163,6 +163,26 @@ test("edge readiness requires both distinct Stripe webhook signing secrets", () 
   assert.match(worker, /payment_bindings_configured:/);
 });
 
+test("edge launch readiness requires production, portal security, email, and AI capability bindings", () => {
+  const worker = readFileSync(join(root, "cloudflare", "worker.js"), "utf8");
+  assert.match(worker, /function productionRuntimeConfigured\(env\)/);
+  assert.match(worker, /function portalSecurityBindingsConfigured\(env\)/);
+  assert.match(worker, /function emailBindingsConfigured\(env\)/);
+  assert.match(worker, /function aiBindingsConfigured\(env\)/);
+  assert.match(worker, /function launchBindingsConfigured\(env\)/);
+  assert.match(worker, /production_runtime_configured:/);
+  assert.match(worker, /portal_security_bindings_configured:/);
+  assert.match(worker, /email_bindings_configured:/);
+  assert.match(worker, /ai_bindings_configured:/);
+  assert.match(worker, /launch_bindings_configured:/);
+  assert.match(worker, /env\.PORTAL_OTP_PEPPER/);
+  assert.match(worker, /env\.AUDIT_IP_PEPPER/);
+  assert.match(worker, /env\.RESEND_API_KEY/);
+  assert.match(worker, /env\.OPENAI_API_KEY/);
+  assert.match(worker, /PORTAL_OTP_ALLOW_LEGACY/);
+  assert.match(worker, /PORTAL_TOKEN_ALLOW_LEGACY/);
+});
+
 test("unknown API routes remain fail-closed", () => {
   const worker = readFileSync(join(root, "cloudflare", "worker.js"), "utf8");
   assert.match(worker, /getActiveFunctionHandler\(name\)/);

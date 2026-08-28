@@ -117,14 +117,23 @@ test('canonical production origin is app.titanfieldos.com across deployment, aut
   }
 });
 
-test('Wrangler declares the production public bindings and required encrypted secret names', async () => {
+test('Wrangler declares the complete production launch binding contract', async () => {
   const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
   assert.match(wrangler, /"SUPABASE_URL"\s*:\s*"https:\/\/xcfjpxcmokdfwkarwomy\.supabase\.co"/);
+  assert.match(wrangler, /"NODE_ENV"\s*:\s*"production"/);
+  assert.match(wrangler, /"REGISTER_REQUIRE_EMAIL_CONFIRM"\s*:\s*"1"/);
+  assert.match(wrangler, /"PORTAL_OTP_ALLOW_LEGACY"\s*:\s*"0"/);
+  assert.match(wrangler, /"PORTAL_TOKEN_ALLOW_LEGACY"\s*:\s*"0"/);
+  assert.match(wrangler, /"RESEND_FROM"\s*:\s*"TitanOS <noreply@titanfieldos\.com>"/);
   for (const secret of [
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'ATTENTION_STRIPE_WEBHOOK_SECRET',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'PORTAL_OTP_PEPPER',
+    'AUDIT_IP_PEPPER',
+    'RESEND_API_KEY',
+    'OPENAI_API_KEY',
   ]) {
     assert.match(wrangler, new RegExp(`"${secret}"`));
   }

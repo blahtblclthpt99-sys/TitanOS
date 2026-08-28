@@ -1,5 +1,5 @@
 /**
- * Founding 100 / trial + price lock + catalog prices (pure).
+ * Founding 100 / trial + price lock + launch readiness (pure).
  */
 import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
@@ -10,8 +10,11 @@ import {
   FOUNDING_USER_CAP,
   normalizeLaunchStatus,
   applyLaunchStatus,
+  applyLaunchStatusFromServer,
+  invalidateLaunchPaymentReadiness,
   isBetaActive,
   isMembershipCheckoutLive,
+  isLaunchStatusVerified,
 } from "../src/lib/launchStatus.js";
 import {
   isFreeDuringBeta,
@@ -26,7 +29,20 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+function verifiedLaunch(overrides = {}) {
+  return {
+    foundingCap: 100,
+    foundingClaimed: 0,
+    betaActive: true,
+    membershipPaymentsLive: true,
+    verified: true,
+    source: "platform_launch",
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
+  // Local/untrusted application is deliberately display-only.
   applyLaunchStatus({
     foundingCap: 100,
     foundingClaimed: 0,
@@ -40,24 +56,60 @@ describe("founding launch status", () => {
     assert.equal(FOUNDING_USER_CAP, 100);
   });
 
-  it("normalizes spots; checkout stays live while enrollment open", () => {
-    const open = normalizeLaunchStatus({ founding_cap: 100, founding_claimed: 42, beta_active: true });
-    assert.equal(open.spotsRemaining, 58);
-    assert.equal(open.membershipPaymentsLive, true);
-
-    const closed = normalizeLaunchStatus({
-      foundingCap: 100,
-      foundingClaimed: 100,
-      betaActive: false,
-      membershipPaymentsLive: true,
+  it("normalizes display state but never trusts payment readiness by default", () => {
+    const open = normalizeLaunchStatus({
+      founding_cap: 100,
+      founding_claimed: 42,
+      beta_active: true,
+      membership_payments_live: true,
+      verified: true,
+      source: "platform_launch",
     });
-    assert.equal(closed.spotsRemaining, 0);
-    assert.equal(closed.membershipPaymentsLive, true);
+    assert.equal(open.spotsRemaining, 58);
+    assert.equal(open.membershipPaymentsLive, false);
+    assert.equal(open.verified, false);
   });
 
-  it("uses server-created Stripe checkout while founding enrollment is open", () => {
-    assert.equal(isFreeDuringBeta(), true);
+  it("enables checkout only from a verified current-session platform_launch response", () => {
+    applyLaunchStatusFromServer(verifiedLaunch({ foundingClaimed: 42 }));
+    assert.equal(isLaunchStatusVerified(), true);
     assert.equal(isMembershipCheckoutLive(), true);
+    assert.equal(isBetaActive(), true);
+
+    invalidateLaunchPaymentReadiness();
+    assert.equal(isLaunchStatusVerified(), false);
+    assert.equal(isMembershipCheckoutLive(), false);
+  });
+
+  it("safe server fallback and malformed values cannot activate checkout", () => {
+    applyLaunchStatusFromServer({
+      foundingCap: 100,
+      foundingClaimed: 0,
+      betaActive: true,
+      membershipPaymentsLive: false,
+      verified: false,
+      source: "safe_fallback",
+    });
+    assert.equal(isMembershipCheckoutLive(), false);
+
+    const malformed = normalizeLaunchStatus(
+      {
+        foundingCap: 100,
+        foundingClaimed: 1,
+        betaActive: "false",
+        membershipPaymentsLive: true,
+        verified: true,
+        source: "platform_launch",
+      },
+      { trustedServerResponse: true }
+    );
+    assert.equal(malformed.membershipPaymentsLive, false);
+    assert.equal(malformed.verified, false);
+  });
+
+  it("founding enrollment never bypasses the membership payment kill switch", () => {
+    assert.equal(isFreeDuringBeta(), true);
+    assert.equal(isMembershipCheckoutLive(), false);
     assert.equal(getPlanCheckoutUrl("worker_premium"), null);
     assert.equal(getPlanCheckoutUrl("starter"), null);
     const pricing = readFileSync(join(root, "src/pages/Pricing.jsx"), "utf8");
@@ -73,7 +125,10 @@ describe("founding launch status", () => {
   });
 
   it("founding trial unlocks Pro; expired trial without pay loses AI", () => {
-    applyLaunchStatus({ foundingCap: 100, foundingClaimed: 100, betaActive: false, membershipPaymentsLive: true });
+    applyLaunchStatusFromServer(verifiedLaunch({
+      foundingClaimed: 100,
+      betaActive: false,
+    }));
     const trial = {
       id: "u1",
       founding_user: true,
@@ -100,7 +155,6 @@ describe("founding launch status", () => {
       lifetime_premium: false,
     };
     assert.equal(isFoundingTrialActive(expired), false);
-    // Driver Hub add-ons are free; AI still requires Pro after trial ends
     assert.equal(canAccessFeature(expired, PRO_FEATURES.driverAddons), true);
     assert.equal(canAccessFeature(expired, PRO_FEATURES.aiAssistant), false);
 

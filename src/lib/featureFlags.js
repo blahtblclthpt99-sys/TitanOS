@@ -3,7 +3,10 @@
  * Not a full LaunchDarkly replacement; enough for gradual rollouts and incident kills.
  */
 import { envString } from "@/lib/viteEnv";
-import { getLaunchStatus } from './launchStatus.js';
+import {
+  applyLaunchStatusFromServer,
+  invalidateLaunchPaymentReadiness,
+} from "./launchStatus.js";
 
 const LOCAL_KEY = "titanos_feature_flags_override_v1";
 const CACHE_KEY = "titanos_feature_flags_remote_v1";
@@ -40,16 +43,16 @@ function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* */
+    /* storage is best-effort */
   }
 }
 
 function mergeFlags(...layers) {
   const out = { ...DEFAULT_FEATURE_FLAGS };
   for (const layer of layers) {
-    if (!layer || typeof layer !== "object") continue;
-    for (const [k, v] of Object.entries(layer)) {
-      if (k in DEFAULT_FEATURE_FLAGS && typeof v === "boolean") out[k] = v;
+    if (!layer || typeof layer !== "object" || Array.isArray(layer)) continue;
+    for (const [key, value] of Object.entries(layer)) {
+      if (key in DEFAULT_FEATURE_FLAGS && typeof value === "boolean") out[key] = value;
     }
   }
   return out;
@@ -59,7 +62,8 @@ function parseEnvOverlay() {
   const raw = envString("VITE_FEATURE_FLAGS_JSON");
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -70,7 +74,7 @@ export function hydrateFeatureFlags() {
   const local = readJson(LOCAL_KEY);
   memory = mergeFlags(parseEnvOverlay(), remote?.flags, local);
   hydrated = true;
-  return memory;
+  return { ...memory };
 }
 
 export function getFeatureFlags() {
@@ -80,13 +84,13 @@ export function getFeatureFlags() {
 
 export function isFeatureEnabled(flag) {
   if (!hydrated) hydrateFeatureFlags();
-  return Boolean(memory[flag]);
+  return memory[flag] === true;
 }
 
 /** Dev / support: local override (does not persist to server). */
 export function setLocalFeatureFlag(flag, value) {
   if (!(flag in DEFAULT_FEATURE_FLAGS)) return getFeatureFlags();
-  const local = { ...(readJson(LOCAL_KEY) || {}), [flag]: Boolean(value) };
+  const local = { ...(readJson(LOCAL_KEY) || {}), [flag]: value === true };
   writeJson(LOCAL_KEY, local);
   memory = mergeFlags(parseEnvOverlay(), readJson(CACHE_KEY)?.flags, local);
   return { ...memory };
@@ -102,24 +106,39 @@ export function clearLocalFeatureOverrides() {
   return { ...memory };
 }
 
-/** Fetch public flags from API (best-effort). */
+/**
+ * Fetch public flags from the same-origin API.
+ *
+ * Launch/payment state is intentionally not trusted from cache. Only the launch
+ * object carried by this fresh successful response may establish checkout
+ * readiness for the current browser session.
+ */
 export async function refreshFeatureFlagsFromServer() {
   try {
-    const res = await fetch("/api/functions/featureFlags", { credentials: "same-origin" });
-    if (!res.ok) return getFeatureFlags();
+    const res = await fetch("/api/functions/featureFlags", {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      invalidateLaunchPaymentReadiness();
+      return getFeatureFlags();
+    }
+
     const data = await res.json();
-    if (data?.flags && typeof data.flags === "object") {
+    if (data?.flags && typeof data.flags === "object" && !Array.isArray(data.flags)) {
       writeJson(CACHE_KEY, { flags: data.flags, fetchedAt: Date.now() });
       memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));
     }
-    if (data?.launch && typeof data.launch === "object") {
-      const status = await getLaunchStatus(data.launch);
-      if (status) {
-        memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));
-      }
+
+    if (data?.launch && typeof data.launch === "object" && !Array.isArray(data.launch)) {
+      applyLaunchStatusFromServer(data.launch);
+    } else {
+      invalidateLaunchPaymentReadiness();
     }
   } catch {
-    /* offline — keep cache */
+    // Offline/network failure keeps non-financial feature flags but revokes checkout.
+    invalidateLaunchPaymentReadiness();
   }
   return getFeatureFlags();
 }

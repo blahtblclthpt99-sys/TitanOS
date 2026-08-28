@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
+import TitanAttention from '@/pages/TitanAttention'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { initSentry, captureException } from '@/lib/sentry'
 import { hydrateFeatureFlags, refreshFeatureFlagsFromServer } from '@/lib/featureFlags'
@@ -12,6 +13,8 @@ import '@/index.css'
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
+const attentionStandalone =
+  typeof window !== "undefined" && window.location.pathname === "/attention";
 
 // Observability — crash/perf (Sentry), flags, first-party analytics
 initSentry();
@@ -118,7 +121,7 @@ function BootProbe({ children }) {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary message="The app failed to load." fullScreen showHome>
     <BootProbe>
-      <App />
+      {attentionStandalone ? <TitanAttention /> : <App />}
     </BootProbe>
   </ErrorBoundary>
 )

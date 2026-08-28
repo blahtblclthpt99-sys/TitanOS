@@ -168,7 +168,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -n -E 'TITAN_STRIPE_WEBHOOK_ID|secrets\.STRIPE_|secrets\.SUPABASE_|webhook_endpoints/[^ ]+.*(-X|--request)[[:space:]]+(POST|PUT|PATCH)|(-X|--request)[[:space:]]+(POST|PUT|PATCH).*webhook_endpoints/' .github/workflows/cloudflare-preview-deploy.yml; then
-            echo "Preview workflow references production application authority or Stripe webhook mutation"
+          WORKFLOW=.github/workflows/cloudflare-preview-deploy.yml
+          PROD_SECRET_PREFIX="secrets""."
+          PROD_HOOK_ID="TITAN_STRIPE_""WEBHOOK_ID"
+          WEBHOOK_API_PATH="webhook_""endpoints/"
+
+          if grep -n "$PROD_SECRET_PREFIX" "$WORKFLOW" | grep -E '(STRIPE|SUPABASE)'; then
+            echo "Preview workflow references production Stripe or Supabase repository secrets"
+            exit 1
+          fi
+          if grep -n "$PROD_HOOK_ID" "$WORKFLOW"; then
+            echo "Preview workflow references a production Stripe webhook ID"
+            exit 1
+          fi
+          if grep -n "$WEBHOOK_API_PATH" "$WORKFLOW"; then
+            echo "Preview workflow contains direct Stripe webhook-endpoint API access"
             exit 1
           fi

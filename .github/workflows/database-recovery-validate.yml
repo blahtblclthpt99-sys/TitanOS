@@ -104,7 +104,7 @@ jobs:
             stripe_webhook_events
             fee_rules
             platform_launch
-            titan_support_tickets
+            support_cases
             titan_ai_knowledge
             service_profiles
             employment_profiles

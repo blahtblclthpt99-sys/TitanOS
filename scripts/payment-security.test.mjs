@@ -29,19 +29,20 @@ describe("payment status client policy", () => {
 });
 
 describe("checkout return origin allowlist (cors module)", () => {
-  it("includes production origin", () => {
-    assert.ok(allowedOrigins().includes("https://titanos-web.vercel.app"));
+  it("includes canonical TitanOS custom origins and excludes retired Vercel origin", () => {
+    assert.ok(allowedOrigins().includes("https://titanos.app"));
+    assert.ok(allowedOrigins().includes("https://titanfieldos.com"));
+    assert.equal(allowedOrigins().includes("https://titanos-web.vercel.app"), false);
   });
-  it("accepts allowlisted Origin header", () => {
+
+  it("accepts an allowlisted Origin header", () => {
     assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://titanos-web.vercel.app" } }),
-      "https://titanos-web.vercel.app"
+      resolveAppOrigin({ headers: { origin: "https://titanos.app" } }),
+      "https://titanos.app"
     );
   });
-  it("rejects spoofed Origin header", () => {
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://evil.example" } }),
-      "https://titanos-web.vercel.app"
-    );
+
+  it("rejects spoofed Origin without falling back to another host", () => {
+    assert.equal(resolveAppOrigin({ headers: { origin: "https://evil.example" } }), "");
   });
 });

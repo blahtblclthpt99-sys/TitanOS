@@ -13,13 +13,21 @@ const missing =
       import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
     ));
 
+function isIsolatedWorkersPreview() {
+  if (typeof window === "undefined") return false;
+  const host = String(window.location?.hostname || "").toLowerCase();
+  return host.endsWith(".workers.dev");
+}
+
 /**
- * Visible fail-closed banner when production is missing Supabase env.
- * Prevents a silent "auth broken" launch.
+ * Visible fail-closed banner when a production-facing TitanOS origin is missing Supabase env.
+ * Isolated workers.dev migration previews deliberately omit live credentials and keep
+ * authenticated/data APIs fail-closed, so they do not present a production misconfiguration banner.
  */
 export default function ConfigMissingBanner() {
   if (!missing) return null;
   if (!import.meta.env.PROD) return null;
+  if (isIsolatedWorkersPreview()) return null;
 
   return (
     <div
@@ -28,7 +36,7 @@ export default function ConfigMissingBanner() {
     >
       <span className="inline-flex items-center justify-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-        TitanOS is misconfigured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before launch.
+        TitanOS is misconfigured — configure the Supabase URL and publishable key before production launch.
       </span>
     </div>
   );

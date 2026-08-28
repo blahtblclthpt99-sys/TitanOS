@@ -1,31 +1,66 @@
 name: TitanOS Cloudflare Browser Preview
 
 on:
-  workflow_run:
-    workflows: ["TitanOS Cloudflare Full App Preview"]
-    types: [completed]
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-titanos-migration"
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "scripts/cloudflare-preview-browser.test.mjs"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".github/workflows/cloudflare-full-preview.yml"
+      - ".github/workflows/cloudflare-browser-preview.yml"
+      - "package.json"
+      - "package-lock.json"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: titanos-cloudflare-browser-preview
+  group: titanos-cloudflare-browser-preview-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   browser-smoke:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'infra/cloudflare-full-titanos-migration'
+    if: github.ref == 'refs/heads/infra/cloudflare-full-titanos-migration'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       TITAN_PREVIEW_URL: https://titanos-full-ci-preview.blahtblclthpt99.workers.dev
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout exact deployed revision
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/checkout@v4
+
+      - name: Require successful preview deployment for this exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            RUN_JSON="$(gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/cloudflare-full-preview.yml/runs?branch=infra%2Fcloudflare-full-titanos-migration&head_sha=${GITHUB_SHA}&per_page=10")"
+            RUN_ID="$(printf '%s' "$RUN_JSON" | jq -r '.workflow_runs[0].id // empty')"
+            STATUS="$(printf '%s' "$RUN_JSON" | jq -r '.workflow_runs[0].status // empty')"
+            CONCLUSION="$(printf '%s' "$RUN_JSON" | jq -r '.workflow_runs[0].conclusion // empty')"
+
+            if [[ -n "$RUN_ID" && "$STATUS" == "completed" ]]; then
+              echo "Preview run $RUN_ID completed with conclusion: $CONCLUSION"
+              test "$CONCLUSION" = "success"
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "No successful exact-SHA Cloudflare preview deployment completed"
+          exit 1
 
       - uses: actions/setup-node@v4
         with:
@@ -45,7 +80,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: titanos-cloudflare-preview-screenshots-${{ github.event.workflow_run.head_sha }}
+          name: titanos-cloudflare-preview-screenshots-${{ github.sha }}
           path: artifacts/titanos-preview-*.png
           if-no-files-found: warn
           retention-days: 7

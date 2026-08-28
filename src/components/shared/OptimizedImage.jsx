@@ -1,12 +1,14 @@
 import React, { memo, useMemo } from "react";
 
+const URL_PARSE_BASE = "https://titanos.invalid";
+
 /**
  * Build responsive Unsplash srcset (w= + q=) when possible.
  * Falls back to the original URL for other hosts.
  */
 function unsplashSrcSet(src, widths = [80, 160, 240, 320, 480]) {
   try {
-    const u = new URL(src, typeof window !== "undefined" ? window.location.origin : "https://titanos-web.vercel.app");
+    const u = new URL(src, typeof window !== "undefined" ? window.location.origin : URL_PARSE_BASE);
     if (!u.hostname.includes("images.unsplash.com") && !u.hostname.includes("unsplash.com")) {
       return null;
     }

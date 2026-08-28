@@ -18,6 +18,7 @@ on:
       - "package-lock.json"
       - "vite.config.js"
       - "postcss.config.js"
+      - ".env.production.example"
       - "scripts/**"
       - ".github/workflows/cloudflare-full-app-gate.yml"
 
@@ -84,8 +85,8 @@ jobs:
             command: node --test scripts/cloudflare-api-coverage.test.mjs
           - name: Cloudflare Wrangler dry-run
             command: npm run build && npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
-          - name: Cloudflare edge Vercel independence
-            command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc"
+          - name: Cloudflare production-surface Vercel independence
+            command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc src/lib/auth-redirect.js .env.production.example"
     steps:
       - uses: actions/checkout@v4
 

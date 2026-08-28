@@ -50,12 +50,21 @@ test('production boot does not purge TitanOS state or unregister the PWA at modu
   assert.match(main, /serviceWorker\.register\(['"]\/sw\.js['"]\)/);
 });
 
-test('Titan Attention remains preserved as a separate migration module', async () => {
+test('Titan Attention remains preserved and isolated behind /attention', async () => {
   await access(new URL('src/attention/App.jsx', root));
   await access(new URL('src/attention/index.css', root));
+  await access(new URL('src/pages/TitanAttention.jsx', root));
+
+  const main = await readFile(new URL('src/main.jsx', root), 'utf8');
   const attention = await readFile(new URL('src/attention/App.jsx', root), 'utf8');
+  const wrapper = await readFile(new URL('src/pages/TitanAttention.jsx', root), 'utf8');
+
   assert.match(attention, /Titan Attention/);
   assert.match(attention, /attention-api/);
+  assert.match(main, /window\.location\.pathname === ['"]\/attention['"]/);
+  assert.match(main, /attentionStandalone \? <TitanAttention \/> : <App \/>/);
+  assert.match(wrapper, /attachShadow\(\{ mode: ['"]open['"] \}\)/);
+  assert.match(wrapper, /index\.css\?inline/);
 });
 
 test('Cloudflare migration does not replace the full TitanOS package graph with a mini-app', async () => {

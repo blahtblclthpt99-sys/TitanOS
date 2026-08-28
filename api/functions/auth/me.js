@@ -1,11 +1,10 @@
 import { applyCors, handleOptions } from "../../_lib/cors.js";
+import { sendApiError, sendDbClientError } from "../../_lib/apiError.js";
 import { getSupabaseAdmin, readJson } from "../../_lib/supabase.js";
-
-function unauthorized(message = "Authentication required") {
-  const error = new Error(message);
-  error.status = 401;
-  return error;
-}
+import {
+  authorizeActiveCompanySelection,
+  pickProfileUpdates,
+} from "./profilePolicy.js";
 
 function extractBearerToken(req) {
   const header = req?.headers?.authorization || req?.headers?.Authorization || "";
@@ -63,9 +62,7 @@ async function fetchProfile(admin, userId) {
     .eq("id", userId)
     .maybeSingle();
 
-  if (error && error.code !== "PGRST116") {
-    throw error;
-  }
+  if (error && error.code !== "PGRST116") throw error;
   return data || null;
 }
 
@@ -119,37 +116,6 @@ function buildUser(authUser, profile) {
   };
 }
 
-function pickProfileUpdates(input = {}) {
-  const allowed = [
-    "full_name",
-    "phone",
-    "username",
-    "avatar_url",
-    "bio",
-    "city",
-    "state",
-    "company_name",
-    "company_address",
-    "company_city",
-    "company_state",
-    "company_zip",
-    "company_logo_url",
-    "theme_pref",
-    "notification_prefs",
-    "marketing_prefs",
-    "privacy_prefs",
-    "professional_profile",
-    "community_opt_in",
-    "referral_code",
-    "referred_by_code",
-    "active_company_id",
-  ];
-  return allowed.reduce((acc, key) => {
-    if (input[key] !== undefined) acc[key] = input[key];
-    return acc;
-  }, {});
-}
-
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(res, req);
@@ -184,19 +150,37 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No profile fields provided" });
     }
 
+    if (updates.active_company_id !== undefined) {
+      updates.active_company_id = await authorizeActiveCompanySelection(
+        admin,
+        authUser.id,
+        updates.active_company_id,
+      );
+    }
+
     const { error: updateError } = await admin
       .from("profiles")
       .upsert({ id: authUser.id, ...updates }, { onConflict: "id" });
 
     if (updateError) {
-      return res.status(400).json({ error: updateError.message || "Profile update failed" });
+      return sendDbClientError(res, updateError, {
+        route: "auth/me",
+        category: "auth",
+        publicMessage: "Profile update failed",
+        publicCode: "PROFILE_UPDATE_FAILED",
+      });
     }
 
     const profile = await fetchProfile(admin, authUser.id);
     return res.status(200).json(buildUser(authUser, profile));
   } catch (error) {
-    const status = Number(error?.status) || 500;
-    const message = status >= 500 ? "Internal server error" : error?.message || "Request failed";
-    return res.status(status).json({ error: message });
+    return sendApiError(res, error, {
+      req,
+      route: "auth/me",
+      category: "auth",
+      publicMessage:
+        Number(error?.status) >= 500 ? "Profile service is temporarily unavailable" : undefined,
+      publicCode: Number(error?.status) >= 500 ? "PROFILE_SERVICE_UNAVAILABLE" : undefined,
+    });
   }
 }

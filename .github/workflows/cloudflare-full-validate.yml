@@ -87,6 +87,7 @@ jobs:
             "api/register.js"
             "api/instrument.mjs"
             "scripts/canonical-app-entry.test.mjs"
+            "scripts/landing-positioning.test.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
@@ -110,6 +111,9 @@ jobs:
 
       - name: Canonical TitanOS application entrypoint suite
         run: node --test scripts/canonical-app-entry.test.mjs
+
+      - name: TitanOS landing positioning suite
+        run: node --test scripts/landing-positioning.test.mjs
 
       - name: Lint
         run: npm run lint

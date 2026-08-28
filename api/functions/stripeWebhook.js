@@ -18,6 +18,15 @@ export const config = {
   },
 };
 
+const CHECKOUT_SUCCESS_EVENTS = new Set([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+]);
+
+export function checkoutPaymentIsSettled(eventType, session) {
+  return CHECKOUT_SUCCESS_EVENTS.has(eventType) && session?.payment_status === "paid";
+}
+
 async function readRawBody(req) {
   if (Buffer.isBuffer(req.rawBody)) return req.rawBody;
   if (typeof req.body === "string") return Buffer.from(req.body);
@@ -199,7 +208,7 @@ export default async function handler(req, res) {
       const expectedPlatformFee =
         session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
-      if (event.type === "checkout.session.completed" && session.mode === "subscription") {
+      if (CHECKOUT_SUCCESS_EVENTS.has(event.type) && session.mode === "subscription") {
         const stripe = new (await import("stripe")).default(stripeKey);
         const subscriptionId =
           typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
@@ -215,9 +224,13 @@ export default async function handler(req, res) {
         event.type === "customer.subscription.deleted"
       ) {
         await syncStripeSubscription(admin, session);
-      } else if (event.type === "checkout.session.completed") {
-        if (session.metadata?.task_type === "invoice_recovery_sprint" && session.payment_status !== "paid") {
-          return res.status(200).json({ received: true, type: event.type, ignored: "payment_not_settled" });
+      } else if (CHECKOUT_SUCCESS_EVENTS.has(event.type)) {
+        if (!checkoutPaymentIsSettled(event.type, session)) {
+          return res.status(200).json({
+            received: true,
+            type: event.type,
+            ignored: "payment_not_settled",
+          });
         }
         if (paymentId) {
           const { data: payRow } = await admin

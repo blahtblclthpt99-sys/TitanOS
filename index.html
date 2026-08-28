@@ -49,37 +49,7 @@
       crossorigin
     />
     <title>TitanOS — Work & Business Operating System</title>
-    <script>
-      /* OAuth may return to /?code=…; forward before React boots. */
-      (function () {
-        try {
-          var p = new URLSearchParams(location.search);
-          var path = location.pathname || "/";
-          if (
-            path !== "/auth/callback" &&
-            path !== "/reset-password" &&
-            (p.has("code") || p.has("access_token") || p.get("error") === "access_denied" || p.has("error_description"))
-          ) {
-            location.replace("/auth/callback" + location.search + location.hash);
-          }
-        } catch (e) {}
-      })();
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "TitanOS",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web, Android",
-        "description": "AI-powered operating system for jobs, independent work, field teams, and business operations.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
-      }
-    </script>
+    <script src="/auth-bootstrap.js"></script>
   </head>
   <body>
     <div id="root">

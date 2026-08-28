@@ -81,7 +81,7 @@ jobs:
           - name: Full production build
             command: npm run build
           - name: Cloudflare Wrangler dry-run
-            command: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
+            command: npm run build && npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
           - name: Cloudflare edge Vercel independence
             command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc"
     steps:

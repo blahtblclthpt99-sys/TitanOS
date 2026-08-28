@@ -3,11 +3,13 @@ import { shouldUseHashRouter } from "@/lib/routing";
 
 /**
  * Canonical public HTTPS origins that must be allow-listed in Supabase Auth.
- * Keep in sync with Vercel / custom domains.
+ * Keep in sync with the production Cloudflare/custom-domain configuration.
  */
 export const AUTH_PUBLIC_ORIGINS = [
-  "https://titanos-web.vercel.app",
+  "https://titanos.app",
+  "https://www.titanos.app",
   "https://titanfieldos.com",
+  "https://www.titanfieldos.com",
   "http://localhost:5173",
 ];
 
@@ -25,7 +27,7 @@ function withPath(origin, path) {
 /**
  * OAuth / email redirect URL.
  * - Native app → custom scheme deep link (handled by capacitor-auth.js)
- * - Web → current browser origin (so Vercel / IONOS / custom domains all work)
+ * - Web → current browser origin (Cloudflare/custom domains work without vendor logic)
  * - Fallback → configured VITE_TITANOS_PUBLIC_ORIGIN
  */
 export function getAuthRedirectTo(path = "/auth/callback") {
@@ -35,7 +37,7 @@ export function getAuthRedirectTo(path = "/auth/callback") {
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin;
-    // Prefer the live host the user is actually on
+    // Prefer the HTTPS/localhost host the user is actually on.
     if (origin.startsWith("http://") || origin.startsWith("https://")) {
       return withPath(origin, path);
     }
@@ -49,7 +51,7 @@ export function getAuthRedirectTo(path = "/auth/callback") {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-/** Redirect URLs to paste into Supabase → Authentication → URL Configuration */
+/** Redirect URLs to configure in Supabase → Authentication → URL Configuration. */
 export function getSupabaseRedirectAllowList() {
   // Include site roots: some providers / Site URL configs return ?code= on `/`
   // (PathNormalizer forwards those to /auth/callback).

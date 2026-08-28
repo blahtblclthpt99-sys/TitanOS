@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { apiCandidateUrls } from "./apiOrigin";
 
 const FUNCTION_TIMEOUT_MS = 15_000;
 
@@ -28,12 +29,6 @@ async function getAccessToken({ forceRefresh = false } = {}) {
   }
 
   return data.session.access_token || null;
-}
-
-function functionsBaseUrl() {
-  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) return configured;
-  return "";
 }
 
 async function postJson(url, payload, token) {
@@ -182,29 +177,6 @@ async function localFallback(functionName, payload) {
   throw apiError(`Function "${functionName}" is unavailable offline`, 503, "OFFLINE_UNAVAILABLE");
 }
 
-function candidateUrls(path) {
-  const urls = [];
-  const base = functionsBaseUrl();
-  if (base) urls.push(`${base}${path}`);
-
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    // Same-origin /api on Vercel / custom domains
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com") ||
-      hostname === "titanos-web.vercel.app"
-    ) {
-      urls.push(`${origin}${path}`);
-      urls.push(path);
-    }
-  }
-
-  return [...new Set(urls)];
-}
-
 function isClientRejection(error) {
   const status = Number(error?.status || 0);
   return status >= 400 && status < 500;
@@ -215,7 +187,7 @@ export function createFunctionsModule() {
     async invoke(functionName, payload = {}) {
       let token = await getAccessToken();
       const path = `/api/functions/${functionName}`;
-      const candidates = candidateUrls(path);
+      const candidates = apiCandidateUrls(path);
 
       let lastError;
       let refreshedAfter401 = false;

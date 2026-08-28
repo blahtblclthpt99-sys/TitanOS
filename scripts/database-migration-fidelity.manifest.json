@@ -115,5 +115,12 @@
     "add_attention_campaign_funding",
     "harden_attention_rls_and_indexes",
     "harden_attention_funding_activation_session_binding"
-  ]
+  ],
+  "ciGate": {
+    "test": "scripts/database-migration-fidelity.test.mjs",
+    "requiredBy": [
+      ".github/workflows/database-recovery-validate.yml",
+      ".github/workflows/cloudflare-full-validate.yml"
+    ]
+  }
 }

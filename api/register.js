@@ -2,15 +2,15 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.js";
 import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
-import { assertRateLimit } from "./_lib/rateLimit.js";
+import { assertRateLimitAsync } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
 /**
  * Server-side registration.
- * Production (VERCEL_ENV=production) requires email confirm unless
- * REGISTER_REQUIRE_EMAIL_CONFIRM is explicitly set to "false".
- * Non-production defaults to auto-confirm for closed beta — still rate-limited.
+ * Email confirmation is required by default on every runtime. Closed/internal
+ * test environments may explicitly set REGISTER_REQUIRE_EMAIL_CONFIRM=false.
+ * Production also requires a durable cross-instance rate-limit backend.
  */
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -18,7 +18,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!assertRateLimit(req, res, { limit: 8, windowMs: 60 * 60 * 1000, key: "register" })) {
+  if (!(await assertRateLimitAsync(req, res, {
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+    key: "register",
+    requireDurable: true,
+  }))) {
     return;
   }
 
@@ -29,11 +34,8 @@ export default async function handler(req, res) {
       .toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
-    const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
-    const requireConfirm =
-      flag != null && String(flag).trim() !== ""
-        ? String(flag).toLowerCase() === "true"
-        : String(process.env.VERCEL_ENV || "").toLowerCase() === "production";
+    const flag = String(process.env.REGISTER_REQUIRE_EMAIL_CONFIRM || "").trim().toLowerCase();
+    const requireConfirm = flag !== "false";
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: "Valid email is required" });

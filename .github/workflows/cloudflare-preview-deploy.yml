@@ -7,6 +7,9 @@ on:
       - "infra/cloudflare-workers-migration"
     paths:
       - "cloudflare/preview-trigger.txt"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
+      - "cloudflare/**"
+      - "wrangler.jsonc"
 
 permissions:
   contents: read
@@ -23,11 +26,10 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      STRIPE_PREVIEW_SECRET_KEY: ${{ secrets.STRIPE_PREVIEW_SECRET_KEY }}
+      STRIPE_PREVIEW_WEBHOOK_SECRET: ${{ secrets.STRIPE_PREVIEW_WEBHOOK_SECRET }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      TITAN_STRIPE_WEBHOOK_ID: we_1U4TMOEfgMoCUJrZYAwGUp2o
       TITAN_PREVIEW_URL: https://titanos-preview.blahtblclthpt99.workers.dev
     steps:
       - uses: actions/checkout@v4
@@ -37,29 +39,32 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Verify required deployment credentials are configured
+      - name: Verify required preview credentials are configured
         shell: bash
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
-          test -n "$STRIPE_SECRET_KEY" || { echo "Missing STRIPE_SECRET_KEY repository secret"; exit 1; }
-          test -n "$STRIPE_WEBHOOK_SECRET" || { echo "Missing STRIPE_WEBHOOK_SECRET repository secret"; exit 1; }
+          test -n "$STRIPE_PREVIEW_SECRET_KEY" || { echo "Missing STRIPE_PREVIEW_SECRET_KEY repository secret"; exit 1; }
+          test -n "$STRIPE_PREVIEW_WEBHOOK_SECRET" || { echo "Missing STRIPE_PREVIEW_WEBHOOK_SECRET repository secret"; exit 1; }
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY repository secret"; exit 1; }
-          [[ "$TITAN_PREVIEW_URL" == https://* ]] || { echo "TITAN_PREVIEW_URL must be HTTPS"; exit 1; }
+          [[ "$TITAN_PREVIEW_URL" == https://*.workers.dev ]] || { echo "Preview must stay on an isolated workers.dev hostname"; exit 1; }
+          case "$STRIPE_PREVIEW_SECRET_KEY" in
+            sk_live_*|rk_live_*) echo "Refusing live-mode Stripe credential in preview"; exit 1 ;;
+          esac
+          [[ "$STRIPE_PREVIEW_WEBHOOK_SECRET" == whsec_* ]] || { echo "Preview webhook secret has unexpected format"; exit 1; }
 
-      - name: Verify Titan Stripe account and Supabase service role
+      - name: Verify Stripe preview account and Supabase service role
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" https://api.stripe.com/v1/account > /tmp/stripe-account.json
+          curl --fail --silent --show-error -u "$STRIPE_PREVIEW_SECRET_KEY:" https://api.stripe.com/v1/account > /tmp/stripe-account.json
           node - <<'NODE'
           const fs = require('fs');
           const account = JSON.parse(fs.readFileSync('/tmp/stripe-account.json', 'utf8'));
-          if (account?.id !== 'acct_1Tzwq3EfgMoCUJrZ') throw new Error(`Unexpected Stripe account: ${account?.id || 'missing'}`);
-          if (!account.charges_enabled) throw new Error('Titan Stripe account cannot accept charges');
-          console.log(`Titan Stripe account verified: ${account.id}`);
+          if (!account?.id) throw new Error('Stripe preview credential did not resolve an account');
+          console.log(`Stripe preview credential verified for account: ${account.id}`);
           NODE
           rm -f /tmp/stripe-account.json
 
@@ -91,10 +96,12 @@ jobs:
       - name: Validate Cloudflare bundle before upload
         run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-preview-dry-run
 
-      - name: Provision preview Worker payment secrets
+      - name: Provision isolated preview secrets
         shell: bash
         run: |
           set -euo pipefail
+          STRIPE_SECRET_KEY="$STRIPE_PREVIEW_SECRET_KEY" \
+          STRIPE_WEBHOOK_SECRET="$STRIPE_PREVIEW_WEBHOOK_SECRET" \
           node <<'NODE'
           const fs = require('fs');
           const values = {
@@ -153,6 +160,8 @@ jobs:
 
       - name: Verify signed Cloudflare webhook handling without financial mutation
         shell: bash
+        env:
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_PREVIEW_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -177,24 +186,15 @@ jobs:
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/titan-webhook-response.json','utf8'));if(d.received!==true||d.ignored!==true)process.exit(1);"
           rm -f /tmp/titan-webhook-probe.json /tmp/titan-webhook-signature.txt /tmp/titan-webhook-response.json
 
-      - name: Verify Titan Stripe webhook routing without mutation
+      - name: Assert preview workflow cannot retarget Stripe webhooks
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
-            "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" > /tmp/titan-hook.json
-          node - <<'NODE'
-          const fs = require('fs');
-          const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook.json','utf8'));
-          const expectedUrl = `${process.env.TITAN_PREVIEW_URL}/api/functions/stripeWebhook`;
-          const expectedEvents = ['charge.refunded','checkout.session.async_payment_succeeded','checkout.session.completed','checkout.session.expired','payment_intent.canceled'].sort();
-          const actualEvents = [...(hook.enabled_events || [])].sort();
-          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || hook?.url !== expectedUrl) {
-            throw new Error('Titan Stripe webhook routing drift detected');
-          }
-          if (JSON.stringify(actualEvents) !== JSON.stringify(expectedEvents)) {
-            throw new Error(`Unexpected enabled events: ${actualEvents.join(',')}`);
-          }
-          console.log(`Titan Stripe webhook routing verified: ${hook.id} -> ${hook.url}`);
-          NODE
-          rm -f /tmp/titan-hook.json
+          if grep -n -E 'webhook_endpoints/[^ ]+.*(-X|--request)[[:space:]]+(POST|PUT|PATCH)|(-X|--request)[[:space:]]+(POST|PUT|PATCH).*webhook_endpoints/' .github/workflows/cloudflare-preview-deploy.yml; then
+            echo "Preview workflow contains a Stripe webhook mutation command"
+            exit 1
+          fi
+          if grep -n -E 'TITAN_STRIPE_WEBHOOK_ID|STRIPE_SECRET_KEY:[[:space:]]*\$\{\{[[:space:]]*secrets\.STRIPE_SECRET_KEY' .github/workflows/cloudflare-preview-deploy.yml; then
+            echo "Preview workflow references production Stripe routing or live secret names"
+            exit 1
+          fi

@@ -8,6 +8,8 @@ const main = read("../src/main.jsx");
 const css = read("../src/index.css");
 const html = read("../index.html");
 const manifest = read("../public/manifest.webmanifest");
+const authBootstrap = read("../public/auth-bootstrap.js");
+const configBanner = read("../src/components/shared/ConfigMissingBanner.jsx");
 
 describe("canonical TitanOS application entrypoint", () => {
   it("boots through the authenticated TitanOS shell", () => {
@@ -67,15 +69,20 @@ describe("canonical TitanOS application entrypoint", () => {
     assert.doesNotMatch(css, /\.budget-card\s*\{/);
   });
 
-  it("keeps the browser and PWA shell branded as TitanOS", () => {
+  it("keeps browser and PWA identity on TitanOS with strict-CSP-safe bootstrap", () => {
     assert.match(html, /<title>TitanOS/);
     assert.match(html, /Loading TitanOS/);
     assert.match(html, /href="\/favicon\.svg"/);
     assert.match(html, /href="\/manifest\.webmanifest"/);
     assert.match(html, /href="\/apple-touch-icon\.png"/);
-    assert.match(html, /location\.replace\("\/auth\/callback"/);
+    assert.match(html, /<script src="\/auth-bootstrap\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script(?![^>]*src=)[^>]*>[\s\S]*?<\/script>/i);
     assert.doesNotMatch(html, /Titan Attention/);
     assert.doesNotMatch(html, /\.vercel\.app/);
+
+    assert.match(authBootstrap, /\/auth\/callback/);
+    assert.match(authBootstrap, /window\.location\.replace/);
+    assert.doesNotMatch(authBootstrap, /\.vercel\.app/);
 
     const pwa = JSON.parse(manifest);
     assert.equal(pwa.name, "TitanOS");
@@ -84,6 +91,13 @@ describe("canonical TitanOS application entrypoint", () => {
     assert.ok(pwa.icons.some((icon) => icon.src === "/pwa-192.png"));
     assert.ok(pwa.icons.some((icon) => icon.src === "/pwa-512.png"));
     assert.doesNotMatch(manifest, /Titan Attention/);
+  });
+
+  it("suppresses missing-config chrome only on isolated workers.dev previews", () => {
+    assert.match(configBanner, /endsWith\(["']\.workers\.dev["']\)/);
+    assert.match(configBanner, /if \(isIsolatedWorkersPreview\(\)\) return null/);
+    assert.match(configBanner, /TitanOS is misconfigured/);
+    assert.doesNotMatch(configBanner, /localhost|127\.0\.0\.1/);
   });
 
   it("cannot silently become the standalone Titan Attention application", () => {

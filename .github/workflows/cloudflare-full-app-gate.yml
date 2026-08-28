@@ -54,13 +54,54 @@ jobs:
       - name: Verify full TitanOS application preservation
         run: node --test scripts/cloudflare-full-app-preservation.test.mjs
 
-      - name: Run TitanOS production ship gate
-        run: npm run gate:ship
+      - id: lint
+        name: Lint full application
+        continue-on-error: true
+        run: npm run lint
 
-      - name: Validate Cloudflare bundle without deploying
+      - id: typecheck
+        name: Typecheck full application
+        continue-on-error: true
+        run: npm run typecheck
+
+      - id: payments
+        name: Run payment security suite
+        continue-on-error: true
+        run: npm run test:payments
+
+      - id: hardening
+        name: Run production hardening suite
+        continue-on-error: true
+        run: npm run test:hardening
+
+      - id: security
+        name: Run security regression suite
+        continue-on-error: true
+        run: npm run test:security
+
+      - id: integration
+        name: Run integration merge suite
+        continue-on-error: true
+        run: npm run test:integration-merge
+
+      - id: finalqa
+        name: Run final QA suite
+        continue-on-error: true
+        run: npm run test:final-qa
+
+      - id: build
+        name: Build full production application
+        continue-on-error: true
+        run: npm run build
+
+      - id: wrangler
+        name: Validate Cloudflare bundle without deploying
+        continue-on-error: true
         run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
 
-      - name: Verify Cloudflare payment edge has no Vercel proxy dependency
+      - id: edge
+        name: Verify Cloudflare payment edge has no Vercel proxy dependency
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -68,3 +109,26 @@ jobs:
             echo "Legacy Vercel runtime dependency detected in Cloudflare payment edge"
             exit 1
           fi
+
+      - name: Aggregate production gate results
+        shell: bash
+        env:
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          PAYMENTS: ${{ steps.payments.outcome }}
+          HARDENING: ${{ steps.hardening.outcome }}
+          SECURITY: ${{ steps.security.outcome }}
+          INTEGRATION: ${{ steps.integration.outcome }}
+          FINAL_QA: ${{ steps.finalqa.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          WRANGLER: ${{ steps.wrangler.outcome }}
+          EDGE: ${{ steps.edge.outcome }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for name in LINT TYPECHECK PAYMENTS HARDENING SECURITY INTEGRATION FINAL_QA BUILD WRANGLER EDGE; do
+            value="${!name}"
+            printf '%-12s %s\n' "$name" "$value"
+            if [[ "$value" != "success" ]]; then failed=1; fi
+          done
+          exit "$failed"

@@ -124,6 +124,42 @@ function paymentBindingsConfigured(env) {
   );
 }
 
+function productionRuntimeConfigured(env) {
+  return String(env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
+function portalSecurityBindingsConfigured(env) {
+  return Boolean(
+    productionRuntimeConfigured(env) &&
+    bindingConfigured(env.PORTAL_OTP_PEPPER) &&
+    bindingConfigured(env.AUDIT_IP_PEPPER) &&
+    String(env.PORTAL_OTP_ALLOW_LEGACY || "0") !== "1" &&
+    String(env.PORTAL_TOKEN_ALLOW_LEGACY || "0") !== "1"
+  );
+}
+
+function emailBindingsConfigured(env) {
+  return Boolean(
+    bindingConfigured(env.RESEND_API_KEY) &&
+    bindingConfigured(env.RESEND_FROM)
+  );
+}
+
+function aiBindingsConfigured(env) {
+  return bindingConfigured(env.OPENAI_API_KEY);
+}
+
+function launchBindingsConfigured(env) {
+  return Boolean(
+    appOriginConfigured(env) &&
+    paymentBindingsConfigured(env) &&
+    productionRuntimeConfigured(env) &&
+    portalSecurityBindingsConfigured(env) &&
+    emailBindingsConfigured(env) &&
+    aiBindingsConfigured(env)
+  );
+}
+
 function attentionCheckoutBindings(env) {
   return {
     STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY,
@@ -157,6 +193,11 @@ function edgeHealthResponse(env) {
       attention_payment_bindings_configured: attentionPaymentBindingsConfigured(env),
       webhook_signing_secrets_distinct: webhookSigningSecretsDistinct(env),
       payment_bindings_configured: paymentBindingsConfigured(env),
+      production_runtime_configured: productionRuntimeConfigured(env),
+      portal_security_bindings_configured: portalSecurityBindingsConfigured(env),
+      email_bindings_configured: emailBindingsConfigured(env),
+      ai_bindings_configured: aiBindingsConfigured(env),
+      launch_bindings_configured: launchBindingsConfigured(env),
       worker_version_id: version.id || null,
       worker_version_tag: version.tag || null,
       worker_version_timestamp: version.timestamp || null,

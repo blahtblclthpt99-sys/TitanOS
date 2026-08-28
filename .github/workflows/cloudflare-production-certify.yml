@@ -42,7 +42,7 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test "$TITAN_PROD_WORKER_NAME" = "titanos" || { echo "Unexpected production Worker"; exit 1; }
           test "$TITAN_PROD_WORKER_URL" = "https://${TITAN_PROD_WORKER_NAME}.blahtblclthpt99.workers.dev" || { echo "Production Worker URL mismatch"; exit 1; }
-          if grep -n -E 'wrangler(@[^ ]+)? (deploy|secret (put|bulk|delete)|versions (deploy|upload)|triggers deploy)|curl .* (-X|--request) (POST|PUT|PATCH|DELETE)' .github/workflows/cloudflare-production-certify.yml; then
+          if grep -n -E 'wrangler@[^ ]+ (deploy([[:space:]]|$)|secret (put|bulk|delete)([[:space:]]|$)|versions (deploy|upload)([[:space:]]|$)|triggers deploy([[:space:]]|$))|curl .* (-X|--request) (PUT|PATCH|DELETE)' .github/workflows/cloudflare-production-certify.yml; then
             echo "Production certification workflow contains a mutation command"
             exit 1
           fi

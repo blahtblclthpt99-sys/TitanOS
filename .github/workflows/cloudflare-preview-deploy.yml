@@ -145,11 +145,8 @@ jobs:
           NODE
           SIGNATURE="$(cat /tmp/titan-webhook-signature.txt)"
           STATUS="$(curl --silent --show-error --output /tmp/titan-webhook-response.json --write-out '%{http_code}' \
-            -X POST \
-            -H 'Content-Type: application/json' \
-            -H "Stripe-Signature: $SIGNATURE" \
-            --data-binary @/tmp/titan-webhook-probe.json \
-            "$TITAN_PREVIEW_URL/api/functions/stripeWebhook")"
+            -X POST -H 'Content-Type: application/json' -H "Stripe-Signature: $SIGNATURE" \
+            --data-binary @/tmp/titan-webhook-probe.json "$TITAN_PREVIEW_URL/api/functions/stripeWebhook")"
           test "$STATUS" = "200" || { cat /tmp/titan-webhook-response.json; echo "Signed webhook probe failed"; exit 1; }
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/titan-webhook-response.json','utf8'));if(d.received!==true||d.ignored!==true)process.exit(1);"
           rm -f /tmp/titan-webhook-probe.json /tmp/titan-webhook-signature.txt /tmp/titan-webhook-response.json
@@ -159,18 +156,14 @@ jobs:
         run: |
           set -euo pipefail
           TARGET="$TITAN_PREVIEW_URL/api/functions/stripeWebhook"
-          OLD='https://titanos-web.vercel.app/api/functions/stripeWebhook'
           curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" > /tmp/titan-hook-before.json
           node - <<'NODE'
           const fs = require('fs');
           const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook-before.json','utf8'));
           const allowed = new Set(['https://titanos-web.vercel.app/api/functions/stripeWebhook','https://titanos-preview.blahtblclthpt99.workers.dev/api/functions/stripeWebhook']);
-          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || !allowed.has(hook?.url)) {
-            throw new Error(`Unsafe webhook precondition: ${hook?.id || 'missing'} ${hook?.status || 'missing'} ${hook?.url || 'missing'}`);
-          }
+          if (hook?.id !== process.env.TITAN_STRIPE_WEBHOOK_ID || hook?.status !== 'enabled' || !allowed.has(hook?.url)) throw new Error(`Unsafe webhook precondition: ${hook?.id || 'missing'} ${hook?.status || 'missing'} ${hook?.url || 'missing'}`);
           console.log(`Webhook precondition verified: ${hook.url}`);
           NODE
-
           curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
             -X POST "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" \
             --data-urlencode "url=$TARGET" \
@@ -179,7 +172,6 @@ jobs:
             --data-urlencode 'enabled_events[]=checkout.session.expired' \
             --data-urlencode 'enabled_events[]=charge.refunded' \
             --data-urlencode 'enabled_events[]=payment_intent.canceled' > /tmp/titan-hook-after.json
-
           node - <<'NODE'
           const fs = require('fs');
           const hook = JSON.parse(fs.readFileSync('/tmp/titan-hook-after.json','utf8'));
@@ -192,3 +184,52 @@ jobs:
           console.log(`Enabled events: ${actualEvents.join(',')}`);
           NODE
           rm -f /tmp/titan-hook-before.json /tmp/titan-hook-after.json
+
+      - name: Verify real Stripe-originated webhook delivery without charging money
+        shell: bash
+        run: |
+          set -euo pipefail
+          STARTED_AT="$(date +%s)"
+          PROBE="titan-cloudflare-$(date +%s)-$RANDOM"
+          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
+            -X POST https://api.stripe.com/v1/payment_intents \
+            --data-urlencode 'amount=50' \
+            --data-urlencode 'currency=usd' \
+            --data-urlencode 'payment_method_types[]=card' \
+            --data-urlencode "description=Titan Cloudflare webhook certification $PROBE" \
+            --data-urlencode "metadata[certification_probe]=$PROBE" > /tmp/titan-probe-pi.json
+          PI_ID="$(node -e "const d=require('/tmp/titan-probe-pi.json');if(!d.id)process.exit(1);process.stdout.write(d.id)")"
+          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
+            -X POST "https://api.stripe.com/v1/payment_intents/$PI_ID/cancel" > /tmp/titan-probe-cancel.json
+          node -e "const d=require('/tmp/titan-probe-cancel.json');if(d.status!=='canceled')process.exit(1);"
+
+          EVENT_ID=''
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            curl --fail --silent --show-error -G -u "$STRIPE_SECRET_KEY:" \
+              https://api.stripe.com/v1/events \
+              --data-urlencode 'type=payment_intent.canceled' \
+              --data-urlencode "created[gte]=$STARTED_AT" \
+              --data-urlencode 'limit=20' > /tmp/titan-probe-events.json
+            EVENT_ID="$(node - <<'NODE'
+          const fs=require('fs');
+          const pi=JSON.parse(fs.readFileSync('/tmp/titan-probe-pi.json','utf8')).id;
+          const events=JSON.parse(fs.readFileSync('/tmp/titan-probe-events.json','utf8')).data || [];
+          const match=events.find((event)=>event?.data?.object?.id===pi);
+          if(match?.id) process.stdout.write(match.id);
+          NODE
+            )"
+            [ -n "$EVENT_ID" ] && break
+            sleep 2
+          done
+          test -n "$EVENT_ID" || { echo 'Stripe-originated cancellation event was not observed'; exit 1; }
+
+          DELIVERED='false'
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" "https://api.stripe.com/v1/events/$EVENT_ID" > /tmp/titan-probe-event.json
+            DELIVERED="$(node -e "const d=require('/tmp/titan-probe-event.json');process.stdout.write(d.pending_webhooks===0?'true':'false')")"
+            [ "$DELIVERED" = 'true' ] && break
+            sleep 2
+          done
+          test "$DELIVERED" = 'true' || { cat /tmp/titan-probe-event.json; echo 'Stripe webhook delivery remained pending'; exit 1; }
+          echo "Real Stripe-originated payment_intent.canceled delivered successfully: $EVENT_ID"
+          rm -f /tmp/titan-probe-pi.json /tmp/titan-probe-cancel.json /tmp/titan-probe-events.json /tmp/titan-probe-event.json

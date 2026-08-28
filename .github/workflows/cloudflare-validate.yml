@@ -7,6 +7,8 @@ on:
       - "cloudflare/**"
       - "src/**"
       - "public/**"
+      - "api/attention/**"
+      - "vercel.json"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -23,6 +25,8 @@ on:
       - "cloudflare/**"
       - "src/**"
       - "public/**"
+      - "api/attention/**"
+      - "vercel.json"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -52,10 +56,20 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
-      - name: Reject legacy runtime references
+      - name: Reject retired Vercel and Attention serverless surfaces
         shell: bash
         run: |
           set -euo pipefail
+
+          forbidden_paths=()
+          [[ -e vercel.json ]] && forbidden_paths+=("vercel.json")
+          [[ -d api/attention ]] && forbidden_paths+=("api/attention")
+
+          if (( ${#forbidden_paths[@]} > 0 )); then
+            printf 'Retired runtime surface reintroduced: %s\n' "${forbidden_paths[@]}"
+            exit 1
+          fi
+
           if grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\.vercel\.app' cloudflare wrangler.jsonc; then
             echo "Legacy Vercel runtime reference detected in Cloudflare deployment surface"
             exit 1

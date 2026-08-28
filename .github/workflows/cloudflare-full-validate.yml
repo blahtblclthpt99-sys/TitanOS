@@ -17,6 +17,7 @@ on:
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
+      - "vercel.json"
       - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
@@ -37,6 +38,7 @@ on:
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
+      - "vercel.json"
       - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
@@ -86,6 +88,7 @@ jobs:
             "scripts/canonical-app-entry.test.mjs"
             "scripts/landing-positioning.test.mjs"
             "scripts/payment-readiness.test.mjs"
+            "scripts/no-attention-commerce-residue.test.mjs"
             "scripts/database-destructive-migration-guard.test.mjs"
             "scripts/database-migration-fidelity.manifest.json"
             "scripts/database-migration-fidelity.test.mjs"
@@ -106,6 +109,8 @@ jobs:
             test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
           done
           test ! -e api/functions/sentryDebug.js || { echo "Retired Sentry debug route was restored"; exit 1; }
+          test ! -e api/attention || { echo "Titan Attention API surface was restored"; exit 1; }
+          test ! -e vercel.json || { echo "Retired Vercel runtime config was restored"; exit 1; }
           test ! -e .github/workflows/attention-build.yml || { echo "Titan Attention takeover workflow was restored"; exit 1; }
 
       - name: Install dependencies exactly from lockfile
@@ -122,6 +127,9 @@ jobs:
 
       - name: Verify authoritative migration fidelity
         run: node --test scripts/database-migration-fidelity.test.mjs
+
+      - name: Retired Attention commerce residue suite
+        run: node --test scripts/no-attention-commerce-residue.test.mjs
 
       - name: Lint
         run: npm run lint

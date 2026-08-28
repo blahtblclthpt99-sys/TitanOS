@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 
 function pepper() {
-  return (
-    process.env.PORTAL_OTP_PEPPER ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "titanos-portal-otp-dev-only"
-  );
+  const value = String(process.env.PORTAL_OTP_PEPPER || "").trim();
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PORTAL_OTP_PEPPER is required in production");
+  }
+  return "titanos-portal-otp-dev-only";
 }
 
 const SESSION_FIELDS = "id,created_at,updated_at,created_by_id,email,customer_id,otp_expires_at,verified,token,token_expires_at";

@@ -3,7 +3,10 @@ import {
   createAttentionCheckout,
   handleAttentionStripeWebhook,
 } from "./attention-api.js";
-import { getActiveFunctionHandler } from "./active-function-registry.js";
+import {
+  getActiveFunctionHandler,
+  getActiveTopLevelApiHandler,
+} from "./active-function-registry.js";
 import { runNodeHandler } from "./node-handler-adapter.js";
 
 const EDGE_HEALTH_PATH = "/__titanos/edge-health";
@@ -139,7 +142,7 @@ export default {
     } else if (url.pathname === GENERIC_STRIPE_WEBHOOK_PATH) {
       response = await runNodeHandler(genericStripeWebhook, request);
     } else {
-      const handler = activeFunctionHandler(url.pathname);
+      const handler = activeFunctionHandler(url.pathname) || getActiveTopLevelApiHandler(url.pathname);
       if (handler) {
         response = await runNodeHandler(handler, request);
       } else if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {

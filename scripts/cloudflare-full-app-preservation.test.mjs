@@ -94,9 +94,10 @@ test('Cloudflare Worker exposes immutable version metadata and exact app origin 
   assert.match(worker, /worker_version_timestamp:/);
 });
 
-test('canonical production origin is app.titanfieldos.com across deployment and auth contracts', async () => {
+test('canonical production origin is app.titanfieldos.com across deployment, auth, and active CORS contracts', async () => {
   const env = await readFile(new URL('.env.production.example', root), 'utf8');
   const auth = await readFile(new URL('src/lib/auth-redirect.js', root), 'utf8');
+  const cors = await readFile(new URL('api/_lib/cors.js', root), 'utf8');
   const originDoc = await readFile(new URL('docs/TITANOS_PRODUCTION_ORIGIN.md', root), 'utf8');
   const wrangler = await readFile(new URL('wrangler.jsonc', root), 'utf8');
   const certifier = await readFile(new URL('.github/workflows/cloudflare-production-certify.yml', root), 'utf8');
@@ -106,12 +107,14 @@ test('canonical production origin is app.titanfieldos.com across deployment and 
   assert.match(env, new RegExp(`VITE_API_BASE_URL=${canonical.replaceAll('.', '\\.')}`));
   assert.match(env, new RegExp(`APP_ORIGIN=${canonical.replaceAll('.', '\\.')}`));
   assert.match(auth, /TITANOS_PRODUCTION_ORIGIN\s*=\s*["']https:\/\/app\.titanfieldos\.com["']/);
+  assert.match(cors, /CANONICAL_PRODUCTION_ORIGIN\s*=\s*["']https:\/\/app\.titanfieldos\.com["']/);
   assert.match(originDoc, /https:\/\/app\.titanfieldos\.com/);
   assert.match(wrangler, /"APP_ORIGIN"\s*:\s*"https:\/\/app\.titanfieldos\.com"/);
   assert.match(certifier, /TITAN_PROD_PUBLIC_ORIGIN:\s*https:\/\/app\.titanfieldos\.com/);
   assert.doesNotMatch(certifier, /vars\.TITAN_PROD_PUBLIC_ORIGIN/);
-  assert.doesNotMatch(env, /titanos-web\.vercel\.app/);
-  assert.doesNotMatch(auth, /titanos-web\.vercel\.app/);
+  for (const source of [env, auth, cors, wrangler]) {
+    assert.doesNotMatch(source, /titanos-web\.vercel\.app/);
+  }
 });
 
 test('Wrangler declares the production public bindings and required encrypted secret names', async () => {

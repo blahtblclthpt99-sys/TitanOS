@@ -2,7 +2,11 @@ import Stripe from "stripe";
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
-import { stripePlanCatalog, stripeSubscriptionsConfigured } from "../_lib/stripeSubscriptions.js";
+import {
+  membershipPaymentsEnabled,
+  stripePlanCatalog,
+  stripeSubscriptionsConfigured,
+} from "../_lib/stripeSubscriptions.js";
 
 function bearer(req) {
   return String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
@@ -15,9 +19,16 @@ export default async function handler(req, res) {
   if (!(await assertRateLimitAsync(req, res, { limit: 8, windowMs: 60_000, key: "subscriptionCheckout" }))) return;
 
   try {
+    // Financial permission is distinct from having credentials configured.
+    // Keep this check before auth/Stripe work so incident response can stop all
+    // new membership checkout creation with one authoritative environment gate.
+    if (!membershipPaymentsEnabled()) {
+      return res.status(503).json({ error: "Membership checkout is not enabled" });
+    }
     if (!stripeSubscriptionsConfigured()) {
       return res.status(503).json({ error: "Subscriptions are not configured yet" });
     }
+
     const admin = getSupabaseAdmin();
     const { data, error } = await admin.auth.getUser(bearer(req));
     if (error || !data?.user) return res.status(401).json({ error: "Authentication required" });

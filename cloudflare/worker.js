@@ -1,3 +1,5 @@
+import { dispatchNativeApi } from "./api-router.js";
+
 const EDGE_HEALTH_PATH = "/__titanos/edge-health";
 const API_PREFIX = "/api";
 
@@ -32,6 +34,12 @@ function requestIdFor(request) {
   return crypto.randomUUID();
 }
 
+function applySecurityHeaders(headers) {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+}
+
 function jsonResponse(body, status, requestId) {
   const headers = new Headers({
     "Content-Type": "application/json; charset=utf-8",
@@ -42,121 +50,20 @@ function jsonResponse(body, status, requestId) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-function applySecurityHeaders(headers) {
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-    headers.set(name, value);
-  }
-}
-
-function parseLegacyOrigin(env) {
-  const raw = env.LEGACY_API_ORIGIN?.trim();
-  if (!raw) return null;
-
-  let origin;
-  try {
-    origin = new URL(raw);
-  } catch {
-    return null;
-  }
-
-  if (origin.protocol !== "https:") return null;
-  if (origin.username || origin.password || origin.search || origin.hash) return null;
-  if (origin.pathname !== "/" && origin.pathname !== "") return null;
-  return origin.origin;
-}
-
 function isApiPath(pathname) {
   return pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
 }
 
-function rewriteLegacyLocation(location, legacyOrigin, edgeOrigin) {
-  if (!location) return location;
+function secureApiResponse(response, requestId) {
+  const headers = new Headers(response.headers);
+  applySecurityHeaders(headers);
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-TitanOS-Request-Id", requestId);
 
-  try {
-    const resolved = new URL(location, legacyOrigin);
-    if (resolved.origin !== legacyOrigin) return location;
-    return `${edgeOrigin}${resolved.pathname}${resolved.search}${resolved.hash}`;
-  } catch {
-    return location;
-  }
-}
-
-async function proxyLegacyApi(request, env, requestId) {
-  const legacyOrigin = parseLegacyOrigin(env);
-  if (!legacyOrigin) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: "legacy_api_origin_not_configured",
-        message: "TitanOS API compatibility bridge is unavailable.",
-      },
-      503,
-      requestId,
-    );
-  }
-
-  const incomingUrl = new URL(request.url);
-  const upstreamUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, legacyOrigin);
-  const headers = new Headers(request.headers);
-
-  headers.delete("host");
-  headers.delete("cf-connecting-ip");
-  headers.delete("cf-ipcountry");
-  headers.delete("cf-ray");
-  headers.delete("cf-visitor");
-  headers.set("x-forwarded-host", incomingUrl.host);
-  headers.set("x-forwarded-proto", "https");
-  headers.set("x-titanos-edge-runtime", "cloudflare-workers");
-  headers.set("x-titanos-request-id", requestId);
-
-  const init = {
-    method: request.method,
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
     headers,
-    redirect: "manual",
-  };
-
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    init.body = request.body;
-  }
-
-  let upstream;
-  try {
-    upstream = await fetch(upstreamUrl, init);
-  } catch (error) {
-    console.error("TitanOS legacy API bridge fetch failed", {
-      requestId,
-      path: incomingUrl.pathname,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return jsonResponse(
-      {
-        ok: false,
-        error: "legacy_api_unavailable",
-        message: "TitanOS API is temporarily unavailable.",
-      },
-      502,
-      requestId,
-    );
-  }
-
-  const responseHeaders = new Headers(upstream.headers);
-  responseHeaders.set("Cache-Control", "no-store");
-  responseHeaders.set("X-TitanOS-Request-Id", requestId);
-  responseHeaders.set("X-TitanOS-API-Runtime", "legacy-bridge");
-  applySecurityHeaders(responseHeaders);
-
-  const location = responseHeaders.get("Location");
-  if (location) {
-    responseHeaders.set(
-      "Location",
-      rewriteLegacyLocation(location, legacyOrigin, incomingUrl.origin),
-    );
-  }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: responseHeaders,
   });
 }
 
@@ -204,9 +111,10 @@ export default {
           ok: true,
           service: "titanos-edge",
           runtime: "cloudflare-workers",
-          migration_mode: "full-app-strangler",
-          api_runtime: "legacy-bridge",
-          legacy_api_configured: Boolean(parseLegacyOrigin(env)),
+          migration_mode: "full-app-native-staged",
+          api_runtime: "cloudflare-workers-native",
+          native_api_routes: 2,
+          unmigrated_api_policy: "fail-closed",
           production_cutover_ready: false,
         },
         200,
@@ -215,7 +123,8 @@ export default {
     }
 
     if (isApiPath(url.pathname)) {
-      return proxyLegacyApi(request, env, requestId);
+      const apiResponse = await dispatchNativeApi(request, requestId);
+      return secureApiResponse(apiResponse, requestId);
     }
 
     return serveAsset(request, env, requestId);

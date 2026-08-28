@@ -13,7 +13,8 @@
     "SENTRY_ENVIRONMENT": "production",
     "REGISTER_REQUIRE_EMAIL_CONFIRM": "1",
     "PORTAL_OTP_ALLOW_LEGACY": "0",
-    "PORTAL_TOKEN_ALLOW_LEGACY": "0"
+    "PORTAL_TOKEN_ALLOW_LEGACY": "0",
+    "RESEND_FROM": "TitanOS <noreply@titanfieldos.com>"
   },
   "secrets": {
     "required": [

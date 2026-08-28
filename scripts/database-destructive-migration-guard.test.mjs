@@ -25,6 +25,7 @@ const CORE_TABLES = [
   "platform_launch",
   "support_cases",
   "titan_ai_knowledge",
+  "titan_rate_limit_buckets",
 ];
 
 function normalized(sql) {

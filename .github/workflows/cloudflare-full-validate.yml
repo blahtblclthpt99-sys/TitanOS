@@ -61,12 +61,15 @@ jobs:
             "src/components/shared/TitanSupportButton.jsx"
             "src/components/driver/DriverShiftPanel.jsx"
             "src/api/apiClient.js"
+            "src/api/apiOrigin.js"
             "api/functions/titanAI.js"
             "api/functions/titanAILive.js"
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
             "api/functions/health.js"
             "api/functions/auth/me.js"
+            "api/functions/appVersion.js"
+            "api/functions/featureFlags.js"
             ".github/workflows/android-release.yml"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
@@ -112,7 +115,11 @@ jobs:
         run: npm run build
 
       - name: Validate Cloudflare Worker bundle without deployment
-        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-dry-run
+        run: >-
+          npx --yes wrangler@4.127.0 deploy --dry-run
+          --outdir .wrangler-full-dry-run
+          --var "APP_LATEST_VERSION:2.0.0"
+          --var "APP_MINIMUM_VERSION:2.0.0"
 
       - name: Enforce staged native migration boundary
         shell: bash
@@ -123,10 +130,13 @@ jobs:
           test -f cloudflare/node-handler-adapter.js
           grep -q 'migration_mode: "full-app-native-staged"' cloudflare/worker.js
           grep -q 'api_runtime: "cloudflare-workers-native"' cloudflare/worker.js
+          grep -q 'native_api_routes: 4' cloudflare/worker.js
           grep -q 'unmigrated_api_policy: "fail-closed"' cloudflare/worker.js
           grep -q 'production_cutover_ready: false' cloudflare/worker.js
           grep -q '"/api/functions/health"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/me"' cloudflare/api-router.js
+          grep -q '"/api/functions/appVersion"' cloudflare/api-router.js
+          grep -q '"/api/functions/featureFlags"' cloudflare/api-router.js
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc
           grep -q '"/\*"' wrangler.jsonc
           grep -q '"!/assets/\*"' wrangler.jsonc

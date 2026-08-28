@@ -68,6 +68,7 @@ jobs:
             "src/api/apiOrigin.js"
             "api/functions/titanAI.js"
             "api/functions/titanAILive.js"
+            "api/functions/titanAICapabilities.js"
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
             "api/functions/health.js"
@@ -79,6 +80,7 @@ jobs:
             "api/instrument.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
+            "scripts/cloudflare-titanai-capabilities.test.mjs"
             "scripts/auth-profile-policy.test.mjs"
             "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
             ".github/workflows/android-release.yml"
@@ -112,6 +114,9 @@ jobs:
 
       - name: Cloudflare Node adapter parity suite
         run: node --test scripts/cloudflare-node-adapter.test.mjs
+
+      - name: Cloudflare TitanAI capabilities contract suite
+        run: node --test scripts/cloudflare-titanai-capabilities.test.mjs
 
       - name: Payment regression suite
         run: npm run test:payments
@@ -151,13 +156,14 @@ jobs:
           test -f cloudflare/node-handler-adapter.js
           grep -q 'migration_mode: "full-app-native-staged"' cloudflare/worker.js
           grep -q 'api_runtime: "cloudflare-workers-native"' cloudflare/worker.js
-          grep -q 'native_api_routes: 6' cloudflare/worker.js
+          grep -q 'native_api_routes: 7' cloudflare/worker.js
           grep -q 'unmigrated_api_policy: "fail-closed"' cloudflare/worker.js
           grep -q 'production_cutover_ready: false' cloudflare/worker.js
           grep -q '"/api/functions/health"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/me"' cloudflare/api-router.js
           grep -q '"/api/functions/appVersion"' cloudflare/api-router.js
           grep -q '"/api/functions/featureFlags"' cloudflare/api-router.js
+          grep -q '"/api/functions/titanAICapabilities"' cloudflare/api-router.js
           grep -q '"/api/register"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/register"' cloudflare/api-router.js
           grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js

@@ -40,9 +40,9 @@ function isDevLike() {
 const dsn = resolveDsn();
 export const sentryEnabled = Boolean(dsn);
 
-// @sentry/profiling-node depends on Node-native profiler machinery and cannot
-// safely be part of the Worker bundle. Error reporting/tracing remain enabled;
-// Worker profiling can be added later with a Cloudflare-native integration.
+// Native Node CPU profiling machinery is intentionally excluded from the
+// Worker bundle. Error reporting/tracing remain enabled; Worker profiling can
+// be added later with a Cloudflare-native integration.
 const profilingLoaded = false;
 
 if (sentryEnabled) {

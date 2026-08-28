@@ -26,7 +26,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TITAN_PROD_WORKER_NAME: titanos
       TITAN_PROD_WORKER_URL: https://titanos.blahtblclthpt99.workers.dev
-      TITAN_PROD_PUBLIC_ORIGIN: ${{ vars.TITAN_PROD_PUBLIC_ORIGIN }}
+      TITAN_PROD_PUBLIC_ORIGIN: https://app.titanfieldos.com
       EXPECTED_RELEASE_SHA: ${{ github.sha }}
       EXPECTED_RELEASE_TAG: git-${{ github.sha }}
 
@@ -44,6 +44,7 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test "$TITAN_PROD_WORKER_NAME" = "titanos" || { echo "Unexpected production Worker"; exit 1; }
+          test "$TITAN_PROD_PUBLIC_ORIGIN" = "https://app.titanfieldos.com" || { echo "Unexpected canonical production origin"; exit 1; }
           [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Expected release SHA is not a full Git SHA"; exit 1; }
           test "$EXPECTED_RELEASE_TAG" = "git-$EXPECTED_RELEASE_SHA" || { echo "Release tag/SHA mismatch"; exit 1; }
 
@@ -190,7 +191,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$TITAN_PROD_PUBLIC_ORIGIN" || { echo "Missing repository variable TITAN_PROD_PUBLIC_ORIGIN"; exit 1; }
           node -e 'const u=new URL(process.env.TITAN_PROD_PUBLIC_ORIGIN);if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||u.pathname!=="/")process.exit(1)' \
             || { echo "TITAN_PROD_PUBLIC_ORIGIN must be a clean HTTPS origin"; exit 1; }
 

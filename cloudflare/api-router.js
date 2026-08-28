@@ -1,10 +1,14 @@
 import healthHandler from "../api/functions/health.js";
 import authMeHandler from "../api/functions/auth/me.js";
+import appVersionHandler from "../api/functions/appVersion.js";
+import featureFlagsHandler from "../api/functions/featureFlags.js";
 import { invokeNodeHandler } from "./node-handler-adapter.js";
 
 const ROUTES = new Map([
   ["/api/functions/health", healthHandler],
   ["/api/functions/auth/me", authMeHandler],
+  ["/api/functions/appVersion", appVersionHandler],
+  ["/api/functions/featureFlags", featureFlagsHandler],
 ]);
 
 function json(body, status, requestId) {

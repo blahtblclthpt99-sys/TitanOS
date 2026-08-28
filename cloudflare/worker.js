@@ -1,11 +1,16 @@
+import genericStripeWebhook from "../api/functions/stripeWebhook.js";
 import {
   createAttentionCheckout,
   handleAttentionStripeWebhook,
 } from "./attention-api.js";
+import { getActiveFunctionHandler } from "./active-function-registry.js";
+import { runNodeHandler } from "./node-handler-adapter.js";
 
 const EDGE_HEALTH_PATH = "/__titanos/edge-health";
 const CHECKOUT_PATH = "/api/attention/create-checkout";
-const STRIPE_WEBHOOK_PATH = "/api/functions/stripeWebhook";
+const ATTENTION_STRIPE_WEBHOOK_PATH = "/api/attention/stripe-webhook";
+const GENERIC_STRIPE_WEBHOOK_PATH = "/api/functions/stripeWebhook";
+const FUNCTION_PATH_PREFIX = "/api/functions/";
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'none'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io; worker-src 'self' blob:; upgrade-insecure-requests",
@@ -113,6 +118,13 @@ function apiNotFound() {
   );
 }
 
+function activeFunctionHandler(pathname) {
+  if (!pathname.startsWith(FUNCTION_PATH_PREFIX)) return null;
+  const name = pathname.slice(FUNCTION_PATH_PREFIX.length);
+  if (!name || name.includes("/")) return null;
+  return getActiveFunctionHandler(name);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -122,12 +134,19 @@ export default {
       response = edgeHealthResponse(env);
     } else if (url.pathname === CHECKOUT_PATH) {
       response = await createAttentionCheckout(request, env);
-    } else if (url.pathname === STRIPE_WEBHOOK_PATH) {
+    } else if (url.pathname === ATTENTION_STRIPE_WEBHOOK_PATH) {
       response = await handleAttentionStripeWebhook(request, env);
-    } else if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-      response = apiNotFound();
+    } else if (url.pathname === GENERIC_STRIPE_WEBHOOK_PATH) {
+      response = await runNodeHandler(genericStripeWebhook, request);
     } else {
-      response = await env.ASSETS.fetch(request);
+      const handler = activeFunctionHandler(url.pathname);
+      if (handler) {
+        response = await runNodeHandler(handler, request);
+      } else if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+        response = apiNotFound();
+      } else {
+        response = await env.ASSETS.fetch(request);
+      }
     }
 
     return secureResponse(response, url.pathname);

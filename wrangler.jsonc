@@ -3,9 +3,6 @@
   "name": "titanos",
   "main": "./cloudflare/worker.js",
   "compatibility_date": "2026-08-27",
-  "vars": {
-    "LEGACY_API_ORIGIN": "https://titanos-web.vercel.app"
-  },
   "assets": {
     "directory": "./dist/",
     "binding": "ASSETS",

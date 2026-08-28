@@ -23,7 +23,7 @@ const CORE_TABLES = [
   "stripe_webhook_events",
   "fee_rules",
   "platform_launch",
-  "titan_support_tickets",
+  "support_cases",
   "titan_ai_knowledge",
 ];
 

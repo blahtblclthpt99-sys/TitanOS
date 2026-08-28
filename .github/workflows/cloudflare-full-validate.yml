@@ -79,6 +79,7 @@ jobs:
             "api/functions/titanAICapabilities.js"
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
+            "api/functions/createSubscriptionCheckout.js"
             "api/functions/health.js"
             "api/functions/auth/me.js"
             "api/functions/auth/profilePolicy.js"
@@ -88,6 +89,7 @@ jobs:
             "api/instrument.mjs"
             "scripts/canonical-app-entry.test.mjs"
             "scripts/landing-positioning.test.mjs"
+            "scripts/payment-readiness.test.mjs"
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
@@ -145,6 +147,9 @@ jobs:
       - name: Founding launch model and migration suite
         run: npm run test:founding
 
+      - name: Payment readiness fail-closed suite
+        run: node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/payment-readiness.test.mjs
+
       - name: Cloudflare TitanAI capabilities contract suite
         run: node --test scripts/cloudflare-titanai-capabilities.test.mjs
 
@@ -197,12 +202,15 @@ jobs:
           grep -q '"/api/register"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/register"' cloudflare/api-router.js
           ! grep -q 'sentryDebug' cloudflare/api-router.js
+          ! grep -q 'createSubscriptionCheckout' cloudflare/api-router.js
           ! grep -Eq '^[[:space:]#]*SENTRY_DEBUG_ROUTE[[:space:]]*=' .env.example
           grep -q 'fault-injection endpoint is retired' ops/SENTRY_AND_RESEND.md
           grep -q 'retired /api/functions/sentryDebug' docs/DEPLOYMENT_CHECKLIST.md
           grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js
           grep -q 'normalizeLaunchRecord' api/functions/featureFlags.js
           grep -q 'membershipPaymentsLive: false' api/functions/featureFlags.js
+          grep -q 'MEMBERSHIP_PAYMENTS_LIVE === "true"' api/_lib/stripeSubscriptions.js
+          grep -q 'membershipPaymentsEnabled' api/functions/createSubscriptionCheckout.js
           grep -q 'pg_advisory_xact_lock(87231401)' supabase/migrations/20260828041500_platform_launch_integrity.sql
           grep -q 'founding_claimed BETWEEN 0 AND founding_cap' supabase/migrations/20260828041500_platform_launch_integrity.sql
           grep -q 'Referral attribution is server-managed' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql

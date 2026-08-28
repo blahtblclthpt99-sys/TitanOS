@@ -25,10 +25,11 @@ The connected TitanOS Vercel deployments return HTTP 402 `DEPLOYMENT_DISABLED`, 
 | --- | --- | --- |
 | `/api/functions/health` | `NATIVE_WORKER` | Deployed Worker health, readiness structure, no-store, security headers, native-runtime header, and full regression validation passed in the four-route preview/validator wave. |
 | `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Deployed missing-auth 401 boundary passed; authenticated GET/PATCH parity against Supabase, profile mutation isolation, and tenant/role behavior remain. |
-| `/api/functions/appVersion` | `NATIVE_CANDIDATE` | Deployed Worker returned explicit configured release metadata and no stale fallback; native/Android update-gate behavior on the final production API origin remains. |
-| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Deployed no-secret preview proved `membershipPaymentsLive=false`, `verified=false`, and safe fallback behavior; Supabase-backed launch-state parity remains. |
+| `/api/functions/appVersion` | `NATIVE_WORKER` | Exact runtime head `4a26d7f747ccf0dcc6da6f48a63c7f2a3d8abf6b` passed explicit metadata, missing/malformed metadata, HEAD, and mutating-method contract tests; preview run `33140738152` and validator run `33140738153` both succeeded. Final-origin/Android update-gate smoke remains a production-cutover check, not a route-certification blocker. |
+| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Deployed no-secret preview proved `membershipPaymentsLive=false`, `verified=false`, and safe fallback behavior; Supabase-backed launch-state parity and launch-record integrity hardening remain. |
 | `/api/register` and `/api/functions/auth/register` | `NATIVE_CANDIDATE` | Worker routing, method/input guards, durable-rate-limit fail-closed tests, and non-mutating preview checks exist; real non-production Supabase create/duplicate/email-confirmation behavior remains. |
 | `/api/functions/titanAICapabilities` | `NATIVE_WORKER` | Exact runtime head `2c10b3c1cec7e9f4e8b04c2f5a4e122f99fabdaf` passed route-level contract/method tests and deployed Worker GET/HEAD, 405 mutation rejection, no-store/native-runtime headers, and capability truth checks in preview run `33140295161`; full validator run `33140295163` also passed. |
+| `/api/functions/sentryDebug` | `RETIRED` | Temporary public fault-injection handler was deleted after repository caller audit. Runtime head `2f890d8ae8b39a5e69791cf9cca1ac937dbbbbc1` passed preview run `33140624935`, proving the path remains fail-closed with HTTP 503 `api_route_not_migrated`. Static retirement checks are enforced in the full validator. |
 
 Every other `/api/*` route is currently `UNMIGRATED_BLOCKED` on the Cloudflare migration runtime unless this ledger and the Worker router are deliberately updated together.
 
@@ -48,6 +49,15 @@ The seven-route wave at exact runtime head `2c10b3c1cec7e9f4e8b04c2f5a4e122f99fa
 
 This certifies `/api/functions/titanAICapabilities` as `NATIVE_WORKER`. It does **not** certify `/api/functions/titanAI`, `/api/functions/titanAILive`, or `/api/functions/aiExecuteAction`.
 
+The Sentry-debug retirement wave at runtime head `2f890d8ae8b39a5e69791cf9cca1ac937dbbbbc1` passed preview run `33140624935`, including source-absence checks and a deployed 503 `api_route_not_migrated` probe for `/api/functions/sentryDebug`. The route remains absent from the native router and is classified `RETIRED`.
+
+The app-version certification wave at exact runtime head `4a26d7f747ccf0dcc6da6f48a63c7f2a3d8abf6b` passed both required workflows:
+
+- `TitanOS Cloudflare Full App Preview` run `33140738152`: isolated Worker deployment, edge health, SPA/deep-route checks, native app-version happy path, existing identity/capabilities boundaries, Sentry-debug retirement, unmigrated TitanAI fail-closed behavior, and no-production-routing assertion all passed.
+- `TitanOS Cloudflare Full App Validate` run `33140738153`: the new app-version contract suite passed explicit valid release metadata, absent/malformed metadata fail-closed behavior, HEAD semantics, and rejection of POST/PUT/PATCH/DELETE, alongside the full canonical regression/build/Wrangler gate.
+
+This certifies `/api/functions/appVersion` as `NATIVE_WORKER`. Android packaging and final production-origin validation remain release-cutover gates because the Android workflow still intentionally points at the disabled pre-migration backend.
+
 These results certify the current **staging topology**, not production cutover.
 
 ## Migration waves
@@ -57,9 +67,9 @@ These results certify the current **staging topology**, not production cutover.
 | Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
 | `/api/functions/health` | `NATIVE_WORKER` | Certified in deployed four-route wave; re-run at final production origin before DNS cutover. |
-| `/api/functions/appVersion` | `NATIVE_CANDIDATE` | Native/Android update behavior on final production API origin and production release metadata. |
-| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Supabase-backed launch-state parity and explicit production payment-readiness configuration. |
-| `/api/functions/sentryDebug` | `UNMIGRATED_BLOCKED` | Environment restriction and non-production exposure policy. |
+| `/api/functions/appVersion` | `NATIVE_WORKER` | Certified on runtime head `4a26d7f747ccf0dcc6da6f48a63c7f2a3d8abf6b` by preview `33140738152` and validator `33140738153`; re-check final production-origin and packaged Android behavior before cutover. |
+| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Harden launch-record normalization, then prove Supabase-backed launch-state parity and explicit production payment-readiness configuration. |
+| `/api/functions/sentryDebug` | `RETIRED` | Source removed and deployed fail-closed 503 proven in preview `33140624935`; must remain absent/unrouted. |
 
 ### Wave 1 — Identity and account boundary
 

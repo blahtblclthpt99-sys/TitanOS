@@ -91,8 +91,10 @@ jobs:
             "scripts/cloudflare-titanai-capabilities.test.mjs"
             "scripts/cloudflare-app-version.test.mjs"
             "scripts/cloudflare-feature-flags.test.mjs"
+            "scripts/founding-beta.test.mjs"
             "scripts/auth-profile-policy.test.mjs"
             "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
+            "supabase/migrations/20260828041500_platform_launch_integrity.sql"
             ".github/workflows/android-release.yml"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
@@ -131,6 +133,9 @@ jobs:
 
       - name: Cloudflare feature flags integrity suite
         run: node --test scripts/cloudflare-feature-flags.test.mjs
+
+      - name: Founding launch model and migration suite
+        run: npm run test:founding
 
       - name: Cloudflare TitanAI capabilities contract suite
         run: node --test scripts/cloudflare-titanai-capabilities.test.mjs
@@ -190,6 +195,8 @@ jobs:
           grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js
           grep -q 'normalizeLaunchRecord' api/functions/featureFlags.js
           grep -q 'membershipPaymentsLive: false' api/functions/featureFlags.js
+          grep -q 'pg_advisory_xact_lock(87231401)' supabase/migrations/20260828041500_platform_launch_integrity.sql
+          grep -q 'founding_claimed BETWEEN 0 AND founding_cap' supabase/migrations/20260828041500_platform_launch_integrity.sql
           grep -q 'Referral attribution is server-managed' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'Company access denied' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc

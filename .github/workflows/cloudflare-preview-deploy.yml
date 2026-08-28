@@ -46,6 +46,30 @@ jobs:
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY repository secret"; exit 1; }
 
+      - name: Identify bound Stripe account and validate Supabase service role
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -u "$STRIPE_SECRET_KEY:" \
+            https://api.stripe.com/v1/account > /tmp/stripe-account.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const account = JSON.parse(fs.readFileSync('/tmp/stripe-account.json', 'utf8'));
+          if (!account?.id || !String(account.id).startsWith('acct_')) process.exit(1);
+          console.log(`Titan Stripe account: ${account.id}`);
+          console.log(`Stripe charges enabled: ${Boolean(account.charges_enabled)}`);
+          NODE
+          rm -f /tmp/stripe-account.json
+
+          SUPABASE_BASE="${SUPABASE_URL%/}"
+          curl --fail --silent --show-error \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$SUPABASE_BASE/rest/v1/attention_profiles?select=user_id&limit=0" > /tmp/supabase-check.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/supabase-check.json','utf8'));if(!Array.isArray(d))process.exit(1);"
+          rm -f /tmp/supabase-check.json
+
       - name: Install dependencies
         run: npm ci
 

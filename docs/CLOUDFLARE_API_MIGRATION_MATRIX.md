@@ -27,6 +27,8 @@ The connected TitanOS Vercel deployments return HTTP 402 `DEPLOYMENT_DISABLED`, 
 | `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Deployed missing-auth 401 boundary passed; authenticated GET/PATCH parity against Supabase, profile mutation isolation, and tenant/role behavior remain. |
 | `/api/functions/appVersion` | `NATIVE_CANDIDATE` | Deployed Worker returned explicit configured release metadata and no stale fallback; native/Android update-gate behavior on the final production API origin remains. |
 | `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Deployed no-secret preview proved `membershipPaymentsLive=false`, `verified=false`, and safe fallback behavior; Supabase-backed launch-state parity remains. |
+| `/api/register` and `/api/functions/auth/register` | `NATIVE_CANDIDATE` | Worker routing, method/input guards, durable-rate-limit fail-closed tests, and non-mutating preview checks exist; real non-production Supabase create/duplicate/email-confirmation behavior remains. |
+| `/api/functions/titanAICapabilities` | `NATIVE_CANDIDATE` | GET/HEAD-only stateless contract is routed through the Worker adapter with dedicated truthfulness/method tests; deployed Worker preview probe is still required before promotion. |
 
 Every other `/api/*` route is currently `UNMIGRATED_BLOCKED` on the Cloudflare migration runtime unless this ledger and the Worker router are deliberately updated together.
 
@@ -36,6 +38,10 @@ The four-route wave at branch head `c984ed25dc8bab15e7df4d3ff141c41c1aaec235` pa
 
 - `TitanOS Cloudflare Full App Validate` run `33138131411`: canonical-product preservation, exact dependency install, lint, typecheck, authentication, API, payment, security, TitanAI, Driver Hub, GPS, offline/PWA, production build, Wrangler dry-run, and staged-native boundary gate all passed.
 - `TitanOS Cloudflare Full App Preview` run `33138131414`: isolated Workers deployment, edge health, SPA root/deep-route fallback, native health, explicit app-version truth, feature-flag payment fail-closed behavior, no-auth auth boundary, unmigrated-route fail-closed behavior, and no-production-routing assertion all passed.
+
+The later identity/adapter hardening baseline at branch head `456879f2f3a0567280675ba7400811b5b4386945` passed the full validator including the mandatory Cloudflare Node-adapter parity suite and profile/referral policy gates. This proves the shared buffered adapter and static security gates at that revision; it does not by itself promote authenticated identity routes or production data policy.
+
+The seven-route candidate wave adds `/api/functions/titanAICapabilities` only as a stateless candidate. Promotion requires a successful isolated Worker preview probe at the resulting exact runtime head.
 
 These results certify the current **staging topology**, not production cutover.
 
@@ -56,9 +62,9 @@ These results certify the current **staging topology**, not production cutover.
 | --- | --- | --- |
 | `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Missing-token and invalid-token 401, authenticated GET/PATCH parity, role/tenant isolation, CORS behavior. |
 | Other `/api/functions/auth/*` | `UNMIGRATED_BLOCKED` | Session/bearer parity, invalid-token behavior, role/tenant authorization, cookie/header behavior. |
-| `/api/register` and `/api/functions/auth/register` | `UNMIGRATED_BLOCKED` | Signup validation, duplicate identity behavior, email flow, abuse/rate controls. |
+| `/api/register` and `/api/functions/auth/register` | `NATIVE_CANDIDATE` | Real non-production signup creation, duplicate identity behavior, email-confirmation flow, and durable abuse-control integration. |
 | `/api/functions/accountDeletionRequest` | `UNMIGRATED_BLOCKED` | Reauthentication/ownership, deletion workflow, audit trail, data-retention policy. |
-| `/api/signup-emails` | `UNMIGRATED_BLOCKED` | Trigger authorization, replay protection, provider failure behavior. |
+| `/api/signup-emails` | `UNMIGRATED_BLOCKED` | Public POST is retired; any retained GET/export path needs explicit administrative authorization and route ownership before migration. |
 
 ### Wave 2 — TitanAI and action execution
 
@@ -66,7 +72,7 @@ These results certify the current **staging topology**, not production cutover.
 | --- | --- | --- |
 | `/api/functions/titanAI` | `UNMIGRATED_BLOCKED` | Auth, workspace context isolation, input limits, provider failure behavior, observability. |
 | `/api/functions/titanAILive` | `UNMIGRATED_BLOCKED` | True streaming/SSE parity, disconnect handling, backpressure, auth, timeout behavior. |
-| `/api/functions/titanAICapabilities` | `UNMIGRATED_BLOCKED` | Capability truthfulness and entitlement boundaries. |
+| `/api/functions/titanAICapabilities` | `NATIVE_CANDIDATE` | Dedicated contract/method tests are wired; deployed Worker GET/HEAD behavior, security headers, and contract truthfulness must pass before promotion. |
 | `/api/functions/aiExecuteAction` | `UNMIGRATED_BLOCKED` | Action authorization, confirmation gates, idempotency, compensating actions, audit trail. |
 
 The current Node-handler adapter buffers `res.write()` output; therefore it is **not yet certified for live streaming endpoints such as TitanAILive**.
@@ -144,6 +150,8 @@ Before the adapter can be used broadly, tests must prove:
 8. Multipart/file-upload handlers receive dedicated compatibility testing before migration.
 9. API responses remain `Cache-Control: no-store` and receive request-correlation headers.
 10. Unmapped routes return deterministic `503 api_route_not_migrated` without leaking implementation details.
+
+The shared buffered adapter has passed its current parity suite on the `456879f2f3a0567280675ba7400811b5b4386945` baseline. This does **not** certify SSE/live streaming or multipart handlers; those require dedicated implementations/tests before route promotion.
 
 ## Environment and secret rule
 

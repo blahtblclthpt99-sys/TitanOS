@@ -89,3 +89,13 @@ $$;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('titanos-uploads', 'titanos-uploads', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- Supabase Realtime provisions this publication at the platform layer.
+-- Plain PostgreSQL needs it explicitly for deterministic migration replay.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END
+$$;

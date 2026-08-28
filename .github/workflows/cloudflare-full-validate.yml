@@ -145,6 +145,19 @@ jobs:
             echo "Cloudflare runtime still depends on a Vercel API origin"
             exit 1
           fi
+
+          if grep -R -n -F 'titanos-web.vercel.app' \
+            src/api \
+            src/lib/auth-redirect.js \
+            src/components/shared/AppUpdateGate.jsx \
+            src/components/shared/OptimizedImage.jsx \
+            api/_lib/cors.js \
+            cloudflare \
+            wrangler.jsonc; then
+            echo "Retired TitanOS Vercel host is present in executable Cloudflare/browser runtime code"
+            exit 1
+          fi
+
           if grep -n -E '"workers_dev"[[:space:]]*:[[:space:]]*false|"routes?"[[:space:]]*:|"custom_domains?"[[:space:]]*:' wrangler.jsonc; then
             echo "Production routing must not be configured in Wrangler config"
             exit 1

@@ -13,6 +13,7 @@ on:
       - "wrangler.jsonc"
       - ".github/workflows/cloudflare-full-validate.yml"
       - ".github/workflows/cloudflare-full-preview.yml"
+      - ".github/workflows/android-release.yml"
       - "package.json"
       - "package-lock.json"
   push:
@@ -28,6 +29,7 @@ on:
       - "wrangler.jsonc"
       - ".github/workflows/cloudflare-full-validate.yml"
       - ".github/workflows/cloudflare-full-preview.yml"
+      - ".github/workflows/android-release.yml"
       - "package.json"
       - "package-lock.json"
 
@@ -64,6 +66,10 @@ jobs:
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
             "api/functions/health.js"
+            "api/functions/auth/me.js"
+            ".github/workflows/android-release.yml"
+            "cloudflare/node-handler-adapter.js"
+            "cloudflare/api-router.js"
           )
           for path in "${required[@]}"; do
             test -f "$path" || { echo "Canonical TitanOS surface missing: $path"; exit 1; }
@@ -106,17 +112,29 @@ jobs:
         run: npm run build
 
       - name: Validate Cloudflare Worker bundle without deployment
-        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-dry-run --var "LEGACY_API_ORIGIN:https://titanos-web.vercel.app"
+        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-dry-run
 
-      - name: Enforce staged migration boundary
+      - name: Enforce staged native migration boundary
         shell: bash
         run: |
           set -euo pipefail
           test -f cloudflare/worker.js
-          grep -q 'migration_mode: "full-app-strangler"' cloudflare/worker.js
+          test -f cloudflare/api-router.js
+          test -f cloudflare/node-handler-adapter.js
+          grep -q 'migration_mode: "full-app-native-staged"' cloudflare/worker.js
+          grep -q 'api_runtime: "cloudflare-workers-native"' cloudflare/worker.js
+          grep -q 'unmigrated_api_policy: "fail-closed"' cloudflare/worker.js
           grep -q 'production_cutover_ready: false' cloudflare/worker.js
+          grep -q '"/api/functions/health"' cloudflare/api-router.js
+          grep -q '"/api/functions/auth/me"' cloudflare/api-router.js
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc
-          grep -q '"/api/\*"' wrangler.jsonc
+          grep -q '"/\*"' wrangler.jsonc
+          grep -q '"!/assets/\*"' wrangler.jsonc
+
+          if grep -R -n -E 'LEGACY_API_ORIGIN|\.vercel\.app' cloudflare wrangler.jsonc .github/workflows/cloudflare-full-preview.yml; then
+            echo "Cloudflare runtime still depends on a Vercel API origin"
+            exit 1
+          fi
           if grep -R -n -E 'routes?[[:space:]]*[:=]|custom_domains?|workers_dev[[:space:]]*[:=][[:space:]]*false' wrangler.jsonc cloudflare; then
             echo "Production routing must not be configured in the migration validation branch"
             exit 1

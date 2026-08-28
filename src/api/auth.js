@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
 import { resolveStoredUploadUrl } from "./integrations";
+import { apiCandidateUrls } from "./apiOrigin";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
 import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 
@@ -156,22 +157,10 @@ async function assertOAuthProviderEnabled(provider) {
 }
 
 async function registerViaServer({ email, password, fullName }) {
-  const bases = [];
-  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) bases.push(configured);
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
-      bases.push(origin);
-    }
-    // Always allow production API as last resort (Capacitor / IONOS)
-    bases.push("https://titanos-web.vercel.app");
-  }
-
   let lastError;
-  for (const base of [...new Set(bases)]) {
+  for (const url of apiCandidateUrls("/api/register")) {
     try {
-      const response = await fetch(`${base}/api/register`, {
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, fullName }),
@@ -260,15 +249,10 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
-        // Best-effort: log email when client falls back to direct Supabase signup
+        // Best-effort: log email when client falls back to direct Supabase signup.
         try {
-          const bases = [];
-          const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-          if (configured) bases.push(configured);
-          if (typeof window !== "undefined") bases.push(window.location.origin);
-          bases.push("https://titanos-web.vercel.app");
-          for (const base of [...new Set(bases)]) {
-            const res = await fetch(`${base}/api/signup-emails`, {
+          for (const url of apiCandidateUrls("/api/signup-emails")) {
+            const res = await fetch(url, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email, fullName, source: "supabase_fallback" }),

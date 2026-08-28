@@ -160,7 +160,12 @@ jobs:
             echo "Production route/domain configuration detected in preview migration surface"
             exit 1
           fi
-          if grep -n -E -- '--route|--routes|--domain' .github/workflows/cloudflare-full-preview.yml; then
+
+          WORKFLOW=.github/workflows/cloudflare-full-preview.yml
+          ROUTE_OPT="--rou""te"
+          ROUTES_OPT="--rou""tes"
+          DOMAIN_OPT="--dom""ain"
+          if grep -n -E -- "${ROUTE_OPT}|${ROUTES_OPT}|${DOMAIN_OPT}" "$WORKFLOW"; then
             echo "Preview workflow attempts to attach production routing"
             exit 1
           fi

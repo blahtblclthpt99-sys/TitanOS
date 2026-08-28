@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+const app = read("../src/App.jsx");
+const main = read("../src/main.jsx");
+const css = read("../src/index.css");
+const html = read("../index.html");
+const manifest = read("../public/manifest.webmanifest");
 
 describe("canonical TitanOS application entrypoint", () => {
   it("boots through the authenticated TitanOS shell", () => {
@@ -31,6 +36,54 @@ describe("canonical TitanOS application entrypoint", () => {
     assert.match(app, /rememberReturnTo\(location\)/);
     assert.match(app, /resolveBookingSlugFromHost/);
     assert.match(app, /shouldUseHashRouter/);
+  });
+
+  it("uses the full TitanOS browser bootstrap instead of the Attention purge bootstrap", () => {
+    for (const marker of [
+      "initSentry();",
+      "hydrateFeatureFlags();",
+      "hydrateLaunchStatus();",
+      "refreshFeatureFlagsFromServer()",
+      "applyTheme(getStoredTheme())",
+      'window.addEventListener("vite:preloadError"',
+      "installNativeAuthDeepLinks",
+      "navigator.serviceWorker.register('/sw.js')",
+      "<ErrorBoundary",
+    ]) {
+      assert.ok(main.includes(marker), `missing TitanOS bootstrap marker: ${marker}`);
+    }
+    assert.doesNotMatch(main, /purgeLegacyClientState/);
+    assert.doesNotMatch(main, /titan-attention/i);
+  });
+
+  it("loads the TitanOS Tailwind design system and local fonts", () => {
+    assert.match(css, /@import\s+["']tailwindcss["']/);
+    assert.match(css, /@config\s+["']\.\.\/tailwind\.config\.js["']/);
+    assert.match(css, /TitanOS v2 Design System/);
+    assert.match(css, /--titan-cyan:/);
+    assert.match(css, /plus-jakarta-sans-latin\.woff2/);
+    assert.doesNotMatch(css, /fonts\.googleapis\.com/);
+    assert.doesNotMatch(css, /\.site-shell\s*\{/);
+    assert.doesNotMatch(css, /\.budget-card\s*\{/);
+  });
+
+  it("keeps the browser and PWA shell branded as TitanOS", () => {
+    assert.match(html, /<title>TitanOS/);
+    assert.match(html, /Loading TitanOS/);
+    assert.match(html, /href="\/favicon\.svg"/);
+    assert.match(html, /href="\/manifest\.webmanifest"/);
+    assert.match(html, /href="\/apple-touch-icon\.png"/);
+    assert.match(html, /location\.replace\("\/auth\/callback"/);
+    assert.doesNotMatch(html, /Titan Attention/);
+    assert.doesNotMatch(html, /\.vercel\.app/);
+
+    const pwa = JSON.parse(manifest);
+    assert.equal(pwa.name, "TitanOS");
+    assert.equal(pwa.short_name, "TitanOS");
+    assert.equal(pwa.display, "standalone");
+    assert.ok(pwa.icons.some((icon) => icon.src === "/pwa-192.png"));
+    assert.ok(pwa.icons.some((icon) => icon.src === "/pwa-512.png"));
+    assert.doesNotMatch(manifest, /Titan Attention/);
   });
 
   it("cannot silently become the standalone Titan Attention application", () => {

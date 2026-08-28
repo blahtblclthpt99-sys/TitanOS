@@ -1,10 +1,9 @@
 /**
- * Shared CORS helpers for Vercel serverless functions (web + Capacitor).
+ * Shared CORS helpers for TitanOS server functions (web + Capacitor).
  * Origins are allowlisted — do not reflect arbitrary Origin with credentials.
  */
 
 const DEFAULT_ALLOWED = [
-  "https://titanos-web.vercel.app",
   "https://titanos.app",
   "https://www.titanos.app",
   "https://titanfieldos.com",
@@ -32,41 +31,41 @@ function isTrustedDynamicOrigin(origin) {
 export function allowedOrigins() {
   const extra = String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ""))
     .filter(Boolean);
   return [...new Set([...DEFAULT_ALLOWED, ...extra])];
 }
 
 /** Resolve a safe app origin for redirects (never trust raw Origin alone). */
 export function resolveAppOrigin(req) {
-  const origin = req?.headers?.origin || "";
+  const origin = String(req?.headers?.origin || "").replace(/\/$/, "");
   const allowed = allowedOrigins();
   if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
     return origin;
   }
-  const configured =
-    process.env.VITE_TITANOS_PUBLIC_ORIGIN ||
-    process.env.VITE_APP_URL ||
-    process.env.PUBLIC_APP_URL ||
-    "";
-  if (configured && allowed.includes(configured.replace(/\/$/, ""))) {
-    return configured.replace(/\/$/, "");
+  const configured = String(
+    process.env.TITANOS_PUBLIC_ORIGIN ||
+      process.env.VITE_TITANOS_PUBLIC_ORIGIN ||
+      process.env.VITE_APP_URL ||
+      process.env.PUBLIC_APP_URL ||
+      ""
+  ).replace(/\/$/, "");
+  if (configured && (allowed.includes(configured) || isTrustedDynamicOrigin(configured))) {
+    return configured;
   }
-  // Do not accept arbitrary configured HTTPS URLs outside the allowlist.
-  return "https://titanos-web.vercel.app";
+  // Payment/OAuth callers must handle an empty value as a fail-closed condition.
+  return "";
 }
 
 export function applyCors(res, req) {
-  const origin = req?.headers?.origin || "";
+  const origin = String(req?.headers?.origin || "").replace(/\/$/, "");
   const allowed = allowedOrigins();
   if (origin && (allowed.includes(origin) || isTrustedDynamicOrigin(origin))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
-  } else if (!origin) {
-    // Non-browser / same-origin / server-to-server
-    res.setHeader("Access-Control-Allow-Origin", allowed[0]);
   }
-  // Unknown browser origins: omit ACAO (browser blocks). Do not echo Origin.
+  // No Origin normally means same-origin navigation/server-to-server. Do not
+  // invent an ACAO value. Unknown browser origins intentionally receive none.
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,HEAD,OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",

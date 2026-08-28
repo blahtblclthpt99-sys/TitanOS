@@ -4,10 +4,18 @@
 import { createHash } from "node:crypto";
 import { logWarn, redactValue } from "./safeLog.js";
 
+function auditIpPepper() {
+  const value = String(process.env.AUDIT_IP_PEPPER || "").trim();
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUDIT_IP_PEPPER is required in production");
+  }
+  return "titanos-audit-dev-only";
+}
+
 function hashIp(ip) {
   if (!ip) return null;
-  const pepper = process.env.AUDIT_IP_PEPPER || process.env.PORTAL_OTP_PEPPER || "titanos-audit";
-  return createHash("sha256").update(`${pepper}:${ip}`).digest("hex").slice(0, 32);
+  return createHash("sha256").update(`${auditIpPepper()}:${ip}`).digest("hex").slice(0, 32);
 }
 
 /**

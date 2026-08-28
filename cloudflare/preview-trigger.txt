@@ -1,4 +1,4 @@
 TitanOS Cloudflare preview deployment trigger.
 Purpose: controlled one-purpose workflow trigger for the isolated titanos-preview Worker.
 Production DNS and production Worker routing are intentionally unaffected.
-Certification trigger: verify a real Stripe-originated unpaid cancellation webhook reaches Cloudflare.
+Certification trigger: verify checkout authorization, explicit preview return origin, signed webhook handling, and read-only Stripe routing drift checks without moving money.

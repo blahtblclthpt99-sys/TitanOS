@@ -9,6 +9,7 @@ on:
       - "api/**"
       - "public/**"
       - "scripts/**"
+      - "supabase/**"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -26,6 +27,7 @@ on:
       - "api/**"
       - "public/**"
       - "scripts/**"
+      - "supabase/**"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -70,10 +72,14 @@ jobs:
             "api/functions/stripeWebhook.js"
             "api/functions/health.js"
             "api/functions/auth/me.js"
+            "api/functions/auth/profilePolicy.js"
             "api/functions/appVersion.js"
             "api/functions/featureFlags.js"
             "api/register.js"
+            "api/instrument.mjs"
             "scripts/cloudflare-registration.test.mjs"
+            "scripts/auth-profile-policy.test.mjs"
+            "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
             ".github/workflows/android-release.yml"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
@@ -93,6 +99,9 @@ jobs:
 
       - name: Authentication regression suite
         run: npm run test:auth
+
+      - name: Auth profile policy suite
+        run: node --test scripts/auth-profile-policy.test.mjs
 
       - name: API regression suite
         run: npm run test:api
@@ -147,9 +156,17 @@ jobs:
           grep -q '"/api/functions/featureFlags"' cloudflare/api-router.js
           grep -q '"/api/register"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/register"' cloudflare/api-router.js
+          grep -q 'authorizeActiveCompanySelection' api/functions/auth/me.js
+          grep -q 'Referral attribution is server-managed' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
+          grep -q 'Company access denied' supabase/migrations/20260828033000_lock_profile_referral_company_context.sql
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc
           grep -q '"/\*"' wrangler.jsonc
           grep -q '"!/assets/\*"' wrangler.jsonc
+
+          if grep -R -n -E 'createRequire|@sentry/profiling-node' api/instrument.mjs; then
+            echo "Node-native Sentry profiler/bootstrap leaked into Worker instrumentation"
+            exit 1
+          fi
 
           if grep -R -n -E 'LEGACY_API_ORIGIN|\.vercel\.app' cloudflare wrangler.jsonc .github/workflows/cloudflare-full-preview.yml; then
             echo "Cloudflare runtime still depends on a Vercel API origin"

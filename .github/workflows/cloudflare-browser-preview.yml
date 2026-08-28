@@ -1,0 +1,51 @@
+name: TitanOS Cloudflare Browser Preview
+
+on:
+  workflow_run:
+    workflows: ["TitanOS Cloudflare Full App Preview"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-browser-preview
+  cancel-in-progress: true
+
+jobs:
+  browser-smoke:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'infra/cloudflare-full-titanos-migration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TITAN_PREVIEW_URL: https://titanos-full-ci-preview.blahtblclthpt99.workers.dev
+    steps:
+      - name: Checkout exact deployed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies exactly from lockfile
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify deployed TitanOS in a real browser
+        run: node scripts/cloudflare-preview-browser.test.mjs
+
+      - name: Upload preview screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: titanos-cloudflare-preview-screenshots-${{ github.event.workflow_run.head_sha }}
+          path: artifacts/titanos-preview-*.png
+          if-no-files-found: warn
+          retention-days: 7

@@ -101,11 +101,21 @@ jobs:
             companies
             company_members
             driver_profiles
+            driver_performance_summaries
             stripe_webhook_events
             fee_rules
             platform_launch
+            lead_outreach_webhook_events
             support_cases
             titan_ai_knowledge
+            titan_rules
+            titan_rule_runs
+            titan_memory_nodes
+            titan_memory_edges
+            titan_threads
+            titan_thread_items
+            titan_action_runs
+            titan_action_idempotency
             service_profiles
             employment_profiles
             job_match_preferences
@@ -119,11 +129,18 @@ jobs:
             }
           done
 
-          exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regprocedure('public.consume_rate_limit(text,integer,integer)') is not null")"
-          test "$exists" = "t" || {
-            echo "Recovered TitanOS schema missing durable rate-limit RPC"
-            exit 1
-          }
+          required_rpcs=(
+            "public.consume_rate_limit(text,integer,integer)"
+            "public.claim_lead_outreach(uuid,uuid,integer)"
+            "public.get_driver_performance_benchmark()"
+          )
+          for rpc in "${required_rpcs[@]}"; do
+            exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regprocedure('${rpc}') is not null")"
+            test "$exists" = "t" || {
+              echo "Recovered TitanOS schema missing required RPC: ${rpc}"
+              exit 1
+            }
+          done
 
       - name: Reject Titan Attention schema residue
         shell: bash

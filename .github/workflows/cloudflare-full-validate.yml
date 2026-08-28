@@ -89,6 +89,7 @@ jobs:
             "scripts/cloudflare-registration.test.mjs"
             "scripts/cloudflare-node-adapter.test.mjs"
             "scripts/cloudflare-titanai-capabilities.test.mjs"
+            "scripts/cloudflare-app-version.test.mjs"
             "scripts/auth-profile-policy.test.mjs"
             "supabase/migrations/20260828033000_lock_profile_referral_company_context.sql"
             ".github/workflows/android-release.yml"
@@ -123,6 +124,9 @@ jobs:
 
       - name: Cloudflare Node adapter parity suite
         run: node --test scripts/cloudflare-node-adapter.test.mjs
+
+      - name: Cloudflare app version contract suite
+        run: node --test scripts/cloudflare-app-version.test.mjs
 
       - name: Cloudflare TitanAI capabilities contract suite
         run: node --test scripts/cloudflare-titanai-capabilities.test.mjs

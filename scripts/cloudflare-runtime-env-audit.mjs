@@ -14,6 +14,10 @@ const envPatterns = [
   /process\.env\.([A-Z][A-Z0-9_]*)/g,
   /process\.env\[\s*["']([A-Z][A-Z0-9_]*)["']\s*\]/g,
 ];
+const forbiddenRuntimePatterns = [
+  { name: 'retired_vercel_origin', pattern: /titanos-web\.vercel\.app/g },
+  { name: 'legacy_api_origin', pattern: /LEGACY_API_ORIGIN/g },
+];
 
 async function resolveLocalImport(fromFile, specifier) {
   if (!specifier.startsWith('.')) return null;
@@ -34,6 +38,7 @@ const visited = new Set();
 const queue = [entry];
 const envToFiles = new Map();
 const unresolvedLocalImports = [];
+const forbiddenRuntimeReferences = [];
 
 while (queue.length) {
   const file = queue.shift();
@@ -41,12 +46,21 @@ while (queue.length) {
   visited.add(file);
 
   const source = await readFile(file, 'utf8');
+  const relativeFile = path.relative(root, file);
+
   for (const pattern of envPatterns) {
     pattern.lastIndex = 0;
     for (const match of source.matchAll(pattern)) {
       const key = match[1];
       if (!envToFiles.has(key)) envToFiles.set(key, new Set());
-      envToFiles.get(key).add(path.relative(root, file));
+      envToFiles.get(key).add(relativeFile);
+    }
+  }
+
+  for (const forbidden of forbiddenRuntimePatterns) {
+    forbidden.pattern.lastIndex = 0;
+    if (forbidden.pattern.test(source)) {
+      forbiddenRuntimeReferences.push({ file: relativeFile, token: forbidden.name });
     }
   }
 
@@ -60,7 +74,7 @@ while (queue.length) {
     if (!specifier.startsWith('.')) continue;
     const resolved = await resolveLocalImport(file, specifier);
     if (!resolved) {
-      unresolvedLocalImports.push({ from: path.relative(root, file), specifier });
+      unresolvedLocalImports.push({ from: relativeFile, specifier });
       continue;
     }
     if (!visited.has(resolved)) queue.push(resolved);
@@ -76,9 +90,15 @@ console.log(JSON.stringify({
   filesScanned: visited.size,
   environmentVariables: env,
   unresolvedLocalImports,
+  forbiddenRuntimeReferences,
 }, null, 2));
 
 if (unresolvedLocalImports.length) {
   console.error('Runtime environment audit found unresolved local imports.');
+  process.exit(1);
+}
+
+if (forbiddenRuntimeReferences.length) {
+  console.error('Active Cloudflare runtime graph contains retired or forbidden hosting references.');
   process.exit(1);
 }

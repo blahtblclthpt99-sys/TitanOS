@@ -2,157 +2,167 @@
 
 ## Release rule
 
-TitanOS is using a staged strangler migration. Cloudflare owns the web edge and SPA delivery first; the canonical Vercel API remains a temporary compatibility origin until each production-used route is either ported to Cloudflare, explicitly retired, or independently certified to remain on a separate backend.
+TitanOS is migrating the complete canonical application to Cloudflare Workers without deleting product surfaces and without relying on Vercel as a hidden runtime fallback.
 
-**The compatibility bridge must not be removed while any production-used route remains `BRIDGED`.**
+The connected TitanOS Vercel deployments currently return HTTP 402 `DEPLOYMENT_DISABLED`, so the Cloudflare runtime must be self-sufficient for every production-used API path before production traffic moves.
 
-A route may move to `NATIVE_WORKER` only after its authentication, authorization, input validation, side effects, idempotency, error behavior, observability, and regression tests pass against the Cloudflare implementation.
+**Any production-used API route that is not natively certified, intentionally assigned to an independently certified external backend, or explicitly retired remains a production cutover blocker.**
 
 ## Status definitions
 
 | Status | Meaning | Cutover implication |
 | --- | --- | --- |
-| `BRIDGED` | Cloudflare forwards the request unchanged to the canonical TitanOS Vercel API origin. | Allowed during staged migration; blocks removal of legacy API origin. |
-| `NATIVE_WORKER` | Route executes on Cloudflare Workers and has passed parity/security certification. | Eligible for permanent Cloudflare operation. |
-| `EXTERNAL_BACKEND` | Route intentionally targets another independently certified backend. | Allowed only with an explicit owner, health check, and rollback path. |
-| `RETIRED` | Route has no production callers and has been intentionally removed. | Must fail closed. |
-| `BLOCKED` | Route has unresolved security, data-integrity, payment, or platform incompatibility. | Blocks production cutover for any dependent feature. |
+| `NATIVE_CANDIDATE` | Canonical handler is routed through the Cloudflare Worker adapter, but full parity/security/integration certification is incomplete. | Not sufficient by itself for production cutover. |
+| `NATIVE_WORKER` | Route executes on Cloudflare Workers and has passed its required parity, authorization, data-integrity, error, and observability gates. | Eligible for production use. |
+| `UNMIGRATED_BLOCKED` | Route is intentionally unavailable on the Cloudflare migration runtime and returns fail-closed HTTP 503. | Blocks any dependent production feature. |
+| `EXTERNAL_BACKEND` | Route intentionally targets a separately certified non-Worker backend. | Allowed only with an explicit owner, health check, security review, and rollback path. |
+| `RETIRED` | Route has no production callers and has been intentionally removed. | Must remain fail-closed. |
+| `BLOCKED` | Route has unresolved security, compatibility, data-integrity, or operational defects. | Hard production blocker. |
+
+## Current native execution surface
+
+| Route | Current status | Evidence still required |
+| --- | --- | --- |
+| `/api/functions/health` | `NATIVE_CANDIDATE` | Deployed Worker response, readiness semantics, no-store, security headers, no secret disclosure. |
+| `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Deployed no-auth 401 boundary plus authenticated GET/PATCH parity against Supabase before promotion to `NATIVE_WORKER`. |
+
+All other `/api/*` routes are currently `UNMIGRATED_BLOCKED` on the Cloudflare migration runtime unless this ledger and the Worker router are deliberately updated together.
 
 ## Migration waves
 
-All routes below begin as `BRIDGED` unless a later commit changes the ledger together with implementation and certification evidence.
+### Wave 0 — Edge and low-risk platform APIs
 
-### Wave 0 — Edge and health
-
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/health` | `BRIDGED` | GET/HEAD parity, deep-health authorization, readiness semantics, no secret disclosure, no-store. |
-| `/api/functions/appVersion` | `BRIDGED` | Version/cache semantics and mobile update behavior. |
-| `/api/functions/featureFlags` | `BRIDGED` | Auth/tenant visibility, cache policy, safe defaults. |
-| `/api/functions/sentryDebug` | `BRIDGED` | Environment restriction and non-production exposure policy. |
+| `/api/functions/health` | `NATIVE_CANDIDATE` | GET/HEAD parity, readiness semantics, no secret disclosure, no-store. |
+| `/api/functions/appVersion` | `UNMIGRATED_BLOCKED` | Version/cache semantics and mobile update behavior. |
+| `/api/functions/featureFlags` | `UNMIGRATED_BLOCKED` | Auth/tenant visibility, cache policy, safe defaults. |
+| `/api/functions/sentryDebug` | `UNMIGRATED_BLOCKED` | Environment restriction and non-production exposure policy. |
 
 ### Wave 1 — Identity and account boundary
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/auth/*` | `BRIDGED` | Session/bearer parity, invalid-token 401, role/tenant authorization, cookie/header behavior. |
-| `/api/register` and `/api/functions/auth/register` | `BRIDGED` | Signup validation, duplicate identity behavior, email flow, abuse/rate controls. |
-| `/api/functions/accountDeletionRequest` | `BRIDGED` | Reauthentication/ownership, deletion workflow, audit trail, data-retention policy. |
-| `/api/signup-emails` | `BRIDGED` | Trigger authorization, replay protection, provider failure behavior. |
+| `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Missing-token and invalid-token 401, authenticated GET/PATCH parity, role/tenant isolation, CORS behavior. |
+| Other `/api/functions/auth/*` | `UNMIGRATED_BLOCKED` | Session/bearer parity, invalid-token behavior, role/tenant authorization, cookie/header behavior. |
+| `/api/register` and `/api/functions/auth/register` | `UNMIGRATED_BLOCKED` | Signup validation, duplicate identity behavior, email flow, abuse/rate controls. |
+| `/api/functions/accountDeletionRequest` | `UNMIGRATED_BLOCKED` | Reauthentication/ownership, deletion workflow, audit trail, data-retention policy. |
+| `/api/signup-emails` | `UNMIGRATED_BLOCKED` | Trigger authorization, replay protection, provider failure behavior. |
 
 ### Wave 2 — TitanAI and action execution
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/titanAI` | `BRIDGED` | Auth, workspace context isolation, prompt/input limits, failure behavior, observability. |
-| `/api/functions/titanAILive` | `BRIDGED` | Streaming/live parity, disconnect handling, auth, timeout behavior. |
-| `/api/functions/titanAICapabilities` | `BRIDGED` | Capability truthfulness and entitlement boundaries. |
-| `/api/functions/aiExecuteAction` | `BRIDGED` | Action authorization, confirmation gates, idempotency, compensating actions, audit trail. |
+| `/api/functions/titanAI` | `UNMIGRATED_BLOCKED` | Auth, workspace context isolation, input limits, provider failure behavior, observability. |
+| `/api/functions/titanAILive` | `UNMIGRATED_BLOCKED` | True streaming/SSE parity, disconnect handling, backpressure, auth, timeout behavior. |
+| `/api/functions/titanAICapabilities` | `UNMIGRATED_BLOCKED` | Capability truthfulness and entitlement boundaries. |
+| `/api/functions/aiExecuteAction` | `UNMIGRATED_BLOCKED` | Action authorization, confirmation gates, idempotency, compensating actions, audit trail. |
+
+The current Node-handler adapter buffers `res.write()` output; therefore it is **not yet certified for live streaming endpoints such as TitanAILive**.
 
 ### Wave 3 — Titan Support
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/supportAI` | `BRIDGED` | Workspace-aware context without authorization leakage; escalation behavior. |
-| `/api/functions/supportCreateCase` | `BRIDGED` | Ownership, validation, deduplication, auditability. |
-| `/api/functions/supportListCases` | `BRIDGED` | Tenant/user isolation. |
-| `/api/functions/supportGetCase` | `BRIDGED` | Case ownership/agent authorization. |
-| `/api/functions/supportPostMessage` | `BRIDGED` | Sender authorization, attachment/content boundaries. |
-| `/api/functions/supportRegisterAttachment` | `BRIDGED` | File metadata validation and authorization. |
-| `/api/functions/supportReopenCase` | `BRIDGED` | State-machine correctness and authorization. |
-| `/api/functions/supportSubmitCsat` | `BRIDGED` | Case/user association and duplicate handling. |
-| `/api/functions/supportEscalate` | `BRIDGED` | Escalation permission and audit trail. |
-| `/api/functions/supportAgentInbox` | `BRIDGED` | Agent/admin authorization and tenant boundaries. |
-| `/api/functions/supportAgentGetCase` | `BRIDGED` | Agent authorization and sensitive-data handling. |
-| `/api/functions/supportAgentReply` | `BRIDGED` | Agent authorization, message integrity, audit trail. |
-| `/api/functions/supportAdminAssignCase` | `BRIDGED` | Admin-only enforcement and assignment consistency. |
-| `/api/functions/supportIncidentAdmin` | `BRIDGED` | Admin-only enforcement and incident state integrity. |
-| `/api/functions/supportAnalytics` | `BRIDGED` | Admin/agent scope, aggregation privacy. |
-| `/api/functions/supportRefreshSubscription` | `BRIDGED` | Billing source of truth and authorization. |
+| `/api/functions/supportAI` | `UNMIGRATED_BLOCKED` | Workspace-aware context without authorization leakage; escalation behavior. |
+| `/api/functions/supportCreateCase` | `UNMIGRATED_BLOCKED` | Ownership, validation, deduplication, auditability. |
+| `/api/functions/supportListCases` | `UNMIGRATED_BLOCKED` | Tenant/user isolation. |
+| `/api/functions/supportGetCase` | `UNMIGRATED_BLOCKED` | Case ownership/agent authorization. |
+| `/api/functions/supportPostMessage` | `UNMIGRATED_BLOCKED` | Sender authorization, content/attachment boundaries. |
+| `/api/functions/supportRegisterAttachment` | `UNMIGRATED_BLOCKED` | File metadata validation and authorization. |
+| `/api/functions/supportReopenCase` | `UNMIGRATED_BLOCKED` | State-machine correctness and authorization. |
+| `/api/functions/supportSubmitCsat` | `UNMIGRATED_BLOCKED` | Case/user association and duplicate handling. |
+| `/api/functions/supportEscalate` | `UNMIGRATED_BLOCKED` | Escalation permission and audit trail. |
+| Support agent/admin routes | `UNMIGRATED_BLOCKED` | Agent/admin authorization, tenant boundaries, assignment/state integrity, audit trail. |
 
 ### Wave 4 — Money, billing, and commerce
 
-These routes receive the strictest migration gate. No payment route becomes native merely because it compiles or accepts a synthetic request.
+No payment route becomes native merely because it compiles. Production financial state must be certified independently.
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/attention/create-checkout` | `BRIDGED` | Authenticated ownership, server-side amount authority, idempotency, exact return origin. |
-| `/api/functions/stripeWebhook` | `BRIDGED` | Raw-body signature verification, event idempotency, duplicate delivery, authoritative DB transitions, rollback. |
-| `/api/functions/createPaymentLink` | `BRIDGED` | Server-side amount/customer authority, idempotency, redirect integrity. |
-| `/api/functions/createSubscriptionCheckout` | `BRIDGED` | Plan catalog authority, entitlement mapping, idempotency. |
-| `/api/functions/stripeCustomerPortal` | `BRIDGED` | Customer ownership, return URL allowlist. |
-| `/api/functions/subscriptionStatus` | `BRIDGED` | Stripe/DB reconciliation and stale-state behavior. |
-| `/api/functions/calculateFee` | `BRIDGED` | Deterministic fee parity and tamper resistance. |
-| `/api/functions/adminFees` | `BRIDGED` | Admin-only access, configuration integrity, audit log. |
-| `/api/functions/paypalWebhook` | `BRIDGED` | Signature/authenticity verification, idempotency, authoritative DB transitions. |
-| `/api/functions/mppPaid` | `BRIDGED` | Payment proof validation, replay protection, authoritative state transitions. |
-| `/api/functions/createAutopilotOrder` | `BRIDGED` | Authorization, amount/order integrity, idempotency. |
-| `/api/functions/runAutopilotOrder` | `BRIDGED` | Execution authorization, retry safety, duplicate prevention. |
-| `/api/functions/runAutopilotMembership` | `BRIDGED` | Subscription/entitlement authority and replay safety. |
-| `/api/functions/googlePlayVerifySubscription` | `BRIDGED` | Store verification, package/product binding, replay prevention. |
+| `/api/attention/create-checkout` | `UNMIGRATED_BLOCKED` | Authenticated ownership, server-side amount authority, idempotency, allowed return origin. |
+| `/api/functions/stripeWebhook` | `UNMIGRATED_BLOCKED` | Raw-body signature verification, event idempotency, duplicate delivery, authoritative DB transitions, rollback. |
+| `/api/functions/createPaymentLink` | `UNMIGRATED_BLOCKED` | Server-side amount/customer authority, idempotency, redirect integrity. |
+| `/api/functions/createSubscriptionCheckout` | `UNMIGRATED_BLOCKED` | Plan catalog authority, entitlement mapping, idempotency. |
+| `/api/functions/stripeCustomerPortal` | `UNMIGRATED_BLOCKED` | Customer ownership, return URL allowlist. |
+| `/api/functions/subscriptionStatus` | `UNMIGRATED_BLOCKED` | Stripe/DB reconciliation and stale-state behavior. |
+| `/api/functions/calculateFee` | `UNMIGRATED_BLOCKED` | Deterministic fee parity and tamper resistance. |
+| `/api/functions/adminFees` | `UNMIGRATED_BLOCKED` | Admin-only access, configuration integrity, audit log. |
+| Other payment/order/subscription handlers | `UNMIGRATED_BLOCKED` | Provider verification, ownership, replay/idempotency, state integrity, rollback. |
 
 ### Wave 5 — Work, jobs, routes, and communications
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/jobMatches` | `BRIDGED` | Tenant/user scope, fairness policy, deterministic error behavior. |
-| `/api/functions/jobMatchesV2` | `BRIDGED` | Same as above plus version-parity contract. |
-| `/api/functions/directionsOptimize` | `BRIDGED` | Auth, provider-key isolation, coordinate validation, timeout/fallback behavior. |
-| `/api/functions/createNotification` | `BRIDGED` | Recipient authorization, duplicate prevention, delivery audit. |
-| `/api/functions/sendEmail` | `BRIDGED` | Sender/recipient authorization, injection resistance, provider failure handling. |
-| `/api/functions/sendFollowUp` | `BRIDGED` | Ownership, scheduling/replay safety, delivery audit. |
-| `/api/functions/analyticsIngest` | `BRIDGED` | Abuse limits, schema validation, privacy/tenant separation. |
-| `/api/functions/submitFeedback` | `BRIDGED` | Input limits, abuse controls, delivery failure behavior. |
+| `/api/functions/jobMatches*` | `UNMIGRATED_BLOCKED` | Tenant/user scope, fairness policy, deterministic error behavior. |
+| `/api/functions/directionsOptimize` | `UNMIGRATED_BLOCKED` | Auth, provider-key isolation, coordinate validation, timeout/fallback behavior. |
+| `/api/functions/createNotification` | `UNMIGRATED_BLOCKED` | Recipient authorization, duplicate prevention, delivery audit. |
+| `/api/functions/sendEmail` | `UNMIGRATED_BLOCKED` | Sender/recipient authorization, injection resistance, provider failure handling. |
+| `/api/functions/sendFollowUp` | `UNMIGRATED_BLOCKED` | Ownership, scheduling/replay safety, delivery audit. |
+| `/api/functions/analyticsIngest` | `UNMIGRATED_BLOCKED` | Abuse limits, schema validation, privacy/tenant separation. |
+| `/api/functions/submitFeedback` | `UNMIGRATED_BLOCKED` | Input limits, abuse controls, delivery failure behavior. |
 
 ### Wave 6 — Customer portal, contracts, marketplace, and referrals
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/portalRequestOtp` | `BRIDGED` | Rate limiting, enumeration resistance, expiration behavior. |
-| `/api/functions/portalVerifyOtp` | `BRIDGED` | One-time use, expiry, brute-force limits, session integrity. |
-| `/api/functions/portalGetData` | `BRIDGED` | Token/session scope and least-data exposure. |
-| `/api/functions/portalAcceptEstimate` | `BRIDGED` | Customer authority, immutable acceptance evidence, replay protection. |
-| `/api/functions/portalPayInvoice` | `BRIDGED` | Invoice/customer authority, amount integrity, payment idempotency. |
-| `/api/functions/portalLeaveReview` | `BRIDGED` | Customer/job association, duplicate handling, moderation policy. |
-| `/api/functions/publicContract` | `BRIDGED` | Share-token scope, expiry, least-data exposure. |
-| `/api/functions/contractShareToken` | `BRIDGED` | Ownership, token entropy, expiry/revocation. |
-| `/api/functions/installMarketplaceModule` | `BRIDGED` | Entitlement/admin boundary and module allowlist. |
-| `/api/functions/seedMarketplace` | `BRIDGED` | Non-production/admin restriction and idempotency. |
-| `/api/functions/attachReferral` | `BRIDGED` | Referral ownership, anti-self-referral rules, idempotency. |
-| `/api/functions/markReferralPaying` | `BRIDGED` | Payment authority, duplicate prevention, audit trail. |
+| Portal OTP/data/payment/review handlers | `UNMIGRATED_BLOCKED` | Rate limits, enumeration resistance, token/session scope, ownership, replay protection. |
+| Public contract/share-token handlers | `UNMIGRATED_BLOCKED` | Ownership, entropy, expiry/revocation, least-data exposure. |
+| Marketplace install/seed handlers | `UNMIGRATED_BLOCKED` | Entitlement/admin boundary, allowlists, idempotency. |
+| Referral handlers | `UNMIGRATED_BLOCKED` | Ownership, anti-self-referral controls, payment authority, idempotency. |
 
 ### Wave 7 — Administrative and specialized services
 
-| Route / family | Initial status | Required certification before native cutover |
+| Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/adminControl` | `BRIDGED` | Strong admin authorization, CSRF/request controls where applicable, audit log. |
-| `/api/functions/receiptVisionOcr` | `BRIDGED` | File/content limits, provider-secret isolation, privacy and retention behavior. |
+| `/api/functions/adminControl` | `UNMIGRATED_BLOCKED` | Strong admin authorization, request controls, audit log. |
+| `/api/functions/receiptVisionOcr` | `UNMIGRATED_BLOCKED` | File/content limits, provider-secret isolation, privacy and retention behavior. |
 
-## Bridge certification requirements
+## Native adapter certification requirements
 
-Before the Cloudflare frontend is allowed to serve production traffic while APIs remain bridged, the preview must prove:
+Before the adapter can be used broadly, tests must prove:
 
-1. GET, HEAD, POST, PUT/PATCH where used, DELETE where used, and OPTIONS semantics survive the bridge.
-2. Authorization, cookies, content type, raw request bodies, and idempotency headers are preserved.
-3. Stripe/external redirects remain external; only redirects back to the legacy TitanOS origin are rewritten to the Cloudflare origin.
-4. API responses are never cached by Cloudflare.
-5. Upstream failures return a deterministic 502/503 edge failure without exposing secrets.
-6. Request correlation IDs cross the edge boundary.
-7. No Cloudflare preview deployment can attach production routes or mutate payment-provider routing.
-8. The canonical Vercel backend remains deployed and healthy until the final bridged route is retired or ported.
+1. GET, HEAD, POST, PATCH, PUT, DELETE, and OPTIONS semantics used by TitanOS are preserved.
+2. Query strings and repeated query keys are mapped correctly.
+3. Authorization, Origin, Content-Type, Stripe-Signature, idempotency, and application headers are preserved without trusting Cloudflare client-IP headers as application authority.
+4. JSON, URL-encoded, text, binary, and raw webhook bodies are preserved exactly where required.
+5. Response status, JSON, text, binary data, redirects, CORS, and multiple response headers remain correct.
+6. Multiple `Set-Cookie` values are preserved before any cookie-emitting handler is promoted.
+7. Streaming/SSE endpoints use a true streaming implementation rather than the adapter's current buffered `res.write()` behavior.
+8. Multipart/file-upload handlers receive dedicated compatibility testing before migration.
+9. API responses remain `Cache-Control: no-store` and receive request-correlation headers.
+10. Unmapped routes return deterministic `503 api_route_not_migrated` without leaking implementation details.
+
+## Environment and secret rule
+
+- Preview deployment receives Cloudflare deployment authority only unless a dedicated non-production integration credential is intentionally provisioned.
+- Production Supabase service-role, Stripe, email-provider, AI-provider, and other privileged secrets must not be copied into a public preview merely to make tests pass.
+- Each privileged integration requires its own certification gate before the corresponding native route is enabled in production.
+- The Cloudflare runtime must not reintroduce `LEGACY_API_ORIGIN` or `.vercel.app` as an API dependency.
+
+## Android/mobile rule
+
+The restored Android release workflow remains manual and fail-closed while its configured live API URL points to the disabled Vercel deployment. It must not resume automatic release packaging until the production Cloudflare API origin is deliberately selected, verified, added to CORS/OAuth/deep-link configuration as applicable, and the Android workflow plus regression test are updated together.
 
 ## Production cutover gate
 
 Production traffic remains **NO-GO** until all of the following are independently evidenced:
 
-- full canonical TitanOS build and regression suites pass;
-- isolated Cloudflare preview passes SPA, auth boundary, API bridge, security-header, PWA/deep-link, and device-capability checks;
-- OAuth/auth redirect allowlists include the intended production origin;
-- Stripe and any other financial integrations are certified with deliberate production procedures, not preview automation;
-- TitanAI, Titan Support, Driver Hub/GPS, jobs/workflows, customer portal, and billing flows are exercised end-to-end on the migration topology;
-- production DNS/custom-domain activation has an exact rollback procedure;
-- the Worker health endpoint continues to report `production_cutover_ready: false` until the final release gate is deliberately changed in a reviewed commit.
+- the complete canonical TitanOS application remains intact;
+- full lint/typecheck and required auth/API/payment/security/TitanAI/Driver/GPS/offline suites pass;
+- isolated Cloudflare preview passes SPA, deep-route, security-header, and native API checks;
+- every production-used `/api` route is `NATIVE_WORKER`, `EXTERNAL_BACKEND`, or `RETIRED`;
+- authenticated Supabase paths are certified without exposing production service-role secrets to preview;
+- Stripe and other financial integrations pass deliberate production-safe certification;
+- TitanAI streaming and Titan Support behavior pass on the Worker topology;
+- Driver Hub/GPS, PWA, Capacitor/Android, camera/microphone/geolocation, and deep-link behavior pass on the target origin;
+- CORS, OAuth callbacks, redirect allowlists, CSP, and public-origin settings reference the intended Cloudflare production origin rather than the disabled Vercel origin;
+- production custom-domain/DNS activation has an exact rollback procedure;
+- `/__titanos/edge-health` continues to report `production_cutover_ready: false` until a final reviewed release-gate commit deliberately changes it.
 
-## Retirement rule
+## Promotion rule
 
-The `LEGACY_API_ORIGIN` binding and `/api/*` compatibility proxy may be deleted only when this ledger contains no `BRIDGED` production-used routes and the replacement topology has passed the same regression/security suites that protected the original API.
+A route status may change from `UNMIGRATED_BLOCKED` to `NATIVE_CANDIDATE` only in the same reviewed change that adds its Worker route and route-specific tests. It may change from `NATIVE_CANDIDATE` to `NATIVE_WORKER` only after deployed certification evidence exists.
+
+There is no compatibility-bridge retirement step: the Cloudflare migration runtime intentionally has no Vercel API fallback.

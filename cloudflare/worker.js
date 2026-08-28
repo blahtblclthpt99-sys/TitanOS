@@ -49,12 +49,39 @@ function secureResponse(response, pathname) {
   });
 }
 
+function cleanHttpsOrigin(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.pathname !== "/"
+    ) {
+      return "";
+    }
+    return parsed.origin;
+  } catch {
+    return "";
+  }
+}
+
+function appOriginConfigured(env) {
+  return Boolean(cleanHttpsOrigin(env.APP_ORIGIN));
+}
+
 function paymentBindingsConfigured(env) {
   return Boolean(
     String(env.STRIPE_SECRET_KEY || "").trim() &&
     String(env.STRIPE_WEBHOOK_SECRET || "").trim() &&
     String(env.SUPABASE_URL || "").trim() &&
-    String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
+    String(env.SUPABASE_SERVICE_ROLE_KEY || "").trim() &&
+    appOriginConfigured(env)
   );
 }
 
@@ -66,6 +93,7 @@ function edgeHealthResponse(env) {
       runtime: "cloudflare-workers",
       api_runtime: "cloudflare-workers",
       legacy_proxy: false,
+      app_origin_configured: appOriginConfigured(env),
       payment_bindings_configured: paymentBindingsConfigured(env),
     },
     {

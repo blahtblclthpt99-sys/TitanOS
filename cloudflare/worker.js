@@ -113,7 +113,7 @@ export default {
           runtime: "cloudflare-workers",
           migration_mode: "full-app-native-staged",
           api_runtime: "cloudflare-workers-native",
-          native_api_routes: 4,
+          native_api_routes: 6,
           unmigrated_api_policy: "fail-closed",
           production_cutover_ready: false,
         },

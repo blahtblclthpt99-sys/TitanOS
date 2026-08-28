@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "api/**"
       - "public/**"
+      - "scripts/**"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -24,6 +25,7 @@ on:
       - "src/**"
       - "api/**"
       - "public/**"
+      - "scripts/**"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
@@ -70,6 +72,8 @@ jobs:
             "api/functions/auth/me.js"
             "api/functions/appVersion.js"
             "api/functions/featureFlags.js"
+            "api/register.js"
+            "scripts/cloudflare-registration.test.mjs"
             ".github/workflows/android-release.yml"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
@@ -92,6 +96,9 @@ jobs:
 
       - name: API regression suite
         run: npm run test:api
+
+      - name: Cloudflare registration safety suite
+        run: node --test scripts/cloudflare-registration.test.mjs
 
       - name: Payment regression suite
         run: npm run test:payments
@@ -118,6 +125,7 @@ jobs:
         run: >-
           npx --yes wrangler@4.127.0 deploy --dry-run
           --outdir .wrangler-full-dry-run
+          --var "TITANOS_ENV:preview"
           --var "APP_LATEST_VERSION:2.0.0"
           --var "APP_MINIMUM_VERSION:2.0.0"
 
@@ -130,13 +138,15 @@ jobs:
           test -f cloudflare/node-handler-adapter.js
           grep -q 'migration_mode: "full-app-native-staged"' cloudflare/worker.js
           grep -q 'api_runtime: "cloudflare-workers-native"' cloudflare/worker.js
-          grep -q 'native_api_routes: 4' cloudflare/worker.js
+          grep -q 'native_api_routes: 6' cloudflare/worker.js
           grep -q 'unmigrated_api_policy: "fail-closed"' cloudflare/worker.js
           grep -q 'production_cutover_ready: false' cloudflare/worker.js
           grep -q '"/api/functions/health"' cloudflare/api-router.js
           grep -q '"/api/functions/auth/me"' cloudflare/api-router.js
           grep -q '"/api/functions/appVersion"' cloudflare/api-router.js
           grep -q '"/api/functions/featureFlags"' cloudflare/api-router.js
+          grep -q '"/api/register"' cloudflare/api-router.js
+          grep -q '"/api/functions/auth/register"' cloudflare/api-router.js
           grep -q 'not_found_handling.*single-page-application' wrangler.jsonc
           grep -q '"/\*"' wrangler.jsonc
           grep -q '"!/assets/\*"' wrangler.jsonc

@@ -6,7 +6,7 @@ The full TitanOS Cloudflare application candidate is code-side certified through
 
 ### Code-side certification
 
-Last fully green runtime head before this documentation-only refresh: `38bbb0f45d62e4095402f058df72c194b7e1314f`
+Last fully green runtime head before documentation-only certification-record refreshes: `38bbb0f45d62e4095402f058df72c194b7e1314f`
 
 Verified on the full-app candidate:
 

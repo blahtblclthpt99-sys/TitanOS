@@ -146,3 +146,15 @@ test("server registration is email-confirmation safe by default on Cloudflare", 
   assert.match(registration, /REGISTER_REQUIRE_EMAIL_CONFIRM/);
   assert.match(registration, /const requireConfirm = flag === "false" \? false : true/);
 });
+
+test("browser API routing is Cloudflare-domain agnostic and native routing requires configured origin", () => {
+  const auth = readFileSync(join(root, "src", "api", "auth.js"), "utf8");
+  const functions = readFileSync(join(root, "src", "api", "functions.js"), "utf8");
+
+  for (const source of [auth, functions]) {
+    assert.doesNotMatch(source, /titanos-web\.vercel\.app|\.vercel\.app/);
+    assert.match(source, /VITE_API_BASE_URL/);
+    assert.match(source, /Capacitor\.isNativePlatform\(\)/);
+    assert.match(source, /protocol === "https:"/);
+  }
+});

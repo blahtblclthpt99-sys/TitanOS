@@ -8,11 +8,13 @@ Move TitanOS from Vercel-hosted delivery to Cloudflare Workers without an unsafe
 
 - Cloudflare Workers Static Assets serves the Vite `dist/` application.
 - `cloudflare/worker.js` is the Cloudflare request entry point and uses the `ASSETS` binding for application assets.
+- `/api`, `/api/*`, and `/__titanos/*` are explicitly Worker-first so SPA asset fallback cannot intercept backend requests.
 - `/__titanos/edge-health` reports the Cloudflare runtime and whether required runtime bindings are present.
 - `/api/attention/create-checkout` and `/api/functions/stripeWebhook` have Cloudflare-native implementations for Titan Attention.
 - Unported `/api` routes fail closed with HTTP 404 on the Cloudflare Worker; the preview does **not** silently proxy them to Vercel.
-- The preview Worker is intentionally isolated as `titanos-preview` on a `workers.dev` hostname.
-- Vercel remains rollback/origin infrastructure until Cloudflare production certification is complete.
+- Automated preview certification deploys only to the dedicated `titanos-ci-preview` Worker on its `workers.dev` hostname.
+- The Worker named `titanos-preview` is reserved from preview CI because a prior certification run observed the live Titan Stripe webhook routed there. CI must not overwrite its code or secrets.
+- Vercel is not part of the Cloudflare runtime path for this branch.
 
 Cloudflare Workers Static Assets is the intended hosting model for this migration. The Worker and static assets deploy together, and `env.ASSETS.fetch()` is the supported runtime binding used by the Worker entry point.
 
@@ -25,7 +27,7 @@ Do not commit either value to the repository.
 
 The preview workflow intentionally does **not** consume production Stripe credentials or production Supabase service-role credentials. It generates inert, run-scoped application bindings so runtime behavior can be tested without giving the public preview financial or database authority.
 
-Cloudflare recommends a user API token scoped to the target account as narrowly as possible. For Worker script deployment, grant only the Worker deployment permission required for the preview. DNS/custom-domain permissions are a separate production-cutover capability and must not be added merely to make preview deployment convenient.
+Cloudflare recommends a user API token scoped to the target account as narrowly as possible. For Worker script deployment, grant only the Worker deployment permission required for preview. DNS/custom-domain permissions are a separate production-cutover capability and must not be added merely to make preview deployment convenient.
 
 ## Cloudflare API token setup
 
@@ -46,21 +48,21 @@ Allowed branch: `infra/cloudflare-workers-migration`
 The workflow is fail-closed. It:
 
 1. verifies the Cloudflare deployment credentials exist;
-2. verifies the target is the isolated `workers.dev` preview hostname;
+2. verifies the target is exactly the isolated `titanos-ci-preview` Worker and rejects the reserved `titanos-preview` Worker name;
 3. generates inert Stripe/Supabase application bindings for that workflow run;
 4. installs dependencies with `npm ci`;
 5. builds production assets;
 6. rejects legacy Vercel runtime references from the Cloudflare deployment surface;
 7. performs a pinned Wrangler dry-run compile;
-8. uploads the inert bindings only to `titanos-preview`;
-9. deploys only the isolated preview Worker;
+8. uploads the inert bindings only to `titanos-ci-preview`;
+9. deploys only `titanos-ci-preview`;
 10. verifies `/__titanos/edge-health`;
 11. verifies retired/unported API routes fail closed;
 12. verifies checkout method and no-auth boundaries without database authority;
 13. verifies Stripe webhook signature parsing with a synthetic non-financial event;
-14. self-audits the workflow for production Stripe/Supabase secret references and Stripe webhook mutation commands.
+14. self-audits the workflow for production Stripe/Supabase secret references and any Stripe webhook-endpoint API access.
 
-The preview workflow is a **runtime smoke certification**, not a production-integration certification.
+The preview workflow is a **runtime smoke certification**, not a production-integration certification. It must never be used to infer the current live Stripe webhook destination.
 
 ## Required preview certification
 
@@ -123,11 +125,14 @@ Preview runtime smoke:
 - unauthenticated checkout fails closed;
 - webhook raw-body signature verification works;
 - synthetic non-financial webhook events are safely ignored;
-- no preview step can retarget a Stripe webhook;
+- no preview step can inspect or retarget a live Stripe webhook;
 - no preview Worker receives production Stripe or production Supabase service-role credentials.
 
 Production payment certification is separate and must verify:
 
+- the current live Stripe webhook destination immediately before cutover;
+- the final production webhook points only to the intended production Cloudflare Worker/custom domain, never the CI preview Worker;
+- the exact enabled-event set and production signing secret match the final endpoint;
 - real authenticated checkout creation against the intended Stripe account;
 - exact price/amount integrity;
 - customer-portal redirects where applicable;
@@ -135,7 +140,6 @@ Production payment certification is separate and must verify:
 - webhook idempotency and duplicate-event handling;
 - refund/cancellation/reversal behavior;
 - authoritative database state transitions;
-- production webhook endpoint routing only during deliberate cutover;
 - rollback behavior if Cloudflare payment processing fails certification.
 
 No production payment endpoint may move solely because the frontend or isolated preview works.
@@ -170,8 +174,8 @@ Cutover remains **NO-GO** until all of the following are true:
 6. production Stripe integration is certified separately from preview smoke testing;
 7. the production Worker has only the minimum required production secrets and bindings;
 8. custom-domain/TLS configuration is validated before traffic movement;
-9. DNS change and rollback procedures are documented and executable;
-10. Vercel remains available as rollback infrastructure during the observation window.
+9. the exact production Worker version, custom-domain/DNS state, and Stripe endpoint state are recorded immediately before cutover;
+10. a Cloudflare-native rollback procedure is documented and executable without depending on preview CI or an obsolete Vercel runtime path.
 
 ## Stripe webhook cutover rule
 
@@ -181,10 +185,12 @@ When the Cloudflare production payment endpoint is independently certified, webh
 
 - the exact destination URL verified before mutation;
 - the required event set verified;
-- a recorded previous endpoint URL for rollback;
+- the previous endpoint URL and event set recorded for rollback/audit;
 - a post-change signed event verification;
 - an immediate rollback path if verification fails.
 
+The CI Worker `titanos-ci-preview` is never an allowed live Stripe webhook target.
+
 ## Immediate rollback
 
-If Cloudflare production behavior differs from the certified target behavior, restore traffic to the known-good legacy origin and investigate before another cutover attempt. Do not leave affected production traffic on a failing authentication, payment, data-integrity, or routing path while debugging.
+If Cloudflare production behavior differs from the certified target behavior, stop the cutover and restore the last recorded known-good Cloudflare Worker/version and routing state. If the fault is domain/DNS-specific, restore the recorded pre-cutover DNS/routing state. If the fault is payment-specific, restore the recorded pre-cutover Stripe endpoint state before retrying. Do not debug authentication, payment, data-integrity, or routing regressions while affected production traffic remains on a failing path.

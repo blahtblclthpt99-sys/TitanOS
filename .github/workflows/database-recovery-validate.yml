@@ -109,7 +109,7 @@ jobs:
             service_profiles
             employment_profiles
             job_match_preferences
-            durable_rate_limits
+            titan_rate_limit_buckets
           )
           for table in "${required_tables[@]}"; do
             exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regclass('public.${table}') is not null")"
@@ -118,6 +118,12 @@ jobs:
               exit 1
             }
           done
+
+          exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regprocedure('public.consume_rate_limit(text,integer,integer)') is not null")"
+          test "$exists" = "t" || {
+            echo "Recovered TitanOS schema missing durable rate-limit RPC"
+            exit 1
+          }
 
       - name: Reject Titan Attention schema residue
         shell: bash

@@ -6,14 +6,25 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "APP_ORIGIN": "https://app.titanfieldos.com",
-    "SUPABASE_URL": "https://xcfjpxcmokdfwkarwomy.supabase.co"
+    "PUBLIC_APP_URL": "https://app.titanfieldos.com",
+    "CORS_ALLOWED_ORIGINS": "https://app.titanfieldos.com",
+    "SUPABASE_URL": "https://xcfjpxcmokdfwkarwomy.supabase.co",
+    "NODE_ENV": "production",
+    "SENTRY_ENVIRONMENT": "production",
+    "REGISTER_REQUIRE_EMAIL_CONFIRM": "1",
+    "PORTAL_OTP_ALLOW_LEGACY": "0",
+    "PORTAL_TOKEN_ALLOW_LEGACY": "0"
   },
   "secrets": {
     "required": [
       "STRIPE_SECRET_KEY",
       "STRIPE_WEBHOOK_SECRET",
       "ATTENTION_STRIPE_WEBHOOK_SECRET",
-      "SUPABASE_SERVICE_ROLE_KEY"
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PORTAL_OTP_PEPPER",
+      "AUDIT_IP_PEPPER",
+      "RESEND_API_KEY",
+      "OPENAI_API_KEY"
     ]
   },
   "version_metadata": {

@@ -46,23 +46,31 @@ jobs:
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY repository secret"; exit 1; }
 
-      - name: Identify bound Stripe account and validate Supabase service role
+      - name: Identify bound Stripe account, inventory webhooks, validate Supabase service role
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
-            -u "$STRIPE_SECRET_KEY:" \
-            https://api.stripe.com/v1/account > /tmp/stripe-account.json
+          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" https://api.stripe.com/v1/account > /tmp/stripe-account.json
+          curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" 'https://api.stripe.com/v1/webhook_endpoints?limit=100' > /tmp/stripe-webhooks.json
           node - <<'NODE'
           const fs = require('fs');
           const account = JSON.parse(fs.readFileSync('/tmp/stripe-account.json', 'utf8'));
+          const hooks = JSON.parse(fs.readFileSync('/tmp/stripe-webhooks.json', 'utf8'));
           if (!account?.id || !String(account.id).startsWith('acct_')) process.exit(1);
+          if (!Array.isArray(hooks?.data)) process.exit(1);
           console.log(`Titan Stripe account: ${account.id}`);
           console.log(`Stripe charges enabled: ${Boolean(account.charges_enabled)}`);
+          console.log(`Titan Stripe webhook count: ${hooks.data.length}`);
+          for (const hook of hooks.data) {
+            console.log(`Stripe webhook: ${hook.id} | ${hook.status} | ${hook.url}`);
+            console.log(`Enabled events: ${(hook.enabled_events || []).join(',')}`);
+          }
           NODE
-          rm -f /tmp/stripe-account.json
+          rm -f /tmp/stripe-account.json /tmp/stripe-webhooks.json
 
           SUPABASE_BASE="${SUPABASE_URL%/}"
+          SUPABASE_BASE="${SUPABASE_BASE%/rest/v1}"
+          SUPABASE_BASE="${SUPABASE_BASE%/auth/v1}"
           curl --fail --silent --show-error \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -94,12 +102,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const names = [
-            'STRIPE_SECRET_KEY',
-            'STRIPE_WEBHOOK_SECRET',
-            'SUPABASE_URL',
-            'SUPABASE_SERVICE_ROLE_KEY',
-          ];
+          const names = ['STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
           const payload = Object.fromEntries(names.map((name) => [name, process.env[name]]));
           fs.writeFileSync('/tmp/titanos-preview-secrets.json', JSON.stringify(payload));
           NODE
@@ -122,18 +125,9 @@ jobs:
         run: |
           set -euo pipefail
           RAW_URL="${DEPLOYMENT_URL%% *}"
-          if [ -z "$RAW_URL" ]; then
-            echo "Cloudflare deployment completed but no deployment URL was emitted."
-            exit 1
-          fi
-          case "$RAW_URL" in
-            http://*|https://*) BASE_URL="$RAW_URL" ;;
-            *) BASE_URL="https://$RAW_URL" ;;
-          esac
-          echo "Smoke testing Cloudflare-native preview edge health"
-          curl --fail --silent --show-error --location \
-            --retry 4 --retry-delay 3 --retry-all-errors \
-            "$BASE_URL/__titanos/edge-health" | tee /tmp/titanos-edge-health.json
+          if [ -z "$RAW_URL" ]; then echo "Cloudflare deployment completed but no deployment URL was emitted."; exit 1; fi
+          case "$RAW_URL" in http://*|https://*) BASE_URL="$RAW_URL" ;; *) BASE_URL="https://$RAW_URL" ;; esac
+          curl --fail --silent --show-error --location --retry 4 --retry-delay 3 --retry-all-errors "$BASE_URL/__titanos/edge-health" | tee /tmp/titanos-edge-health.json
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/titanos-edge-health.json','utf8'));if(d.ok!==true||d.runtime!=='cloudflare-workers'||d.api_runtime!=='cloudflare-workers'||d.legacy_proxy!==false||d.payment_bindings_configured!==true)process.exit(1);"
 
       - name: Smoke-test retired API paths fail closed
@@ -143,9 +137,6 @@ jobs:
         run: |
           set -euo pipefail
           RAW_URL="${DEPLOYMENT_URL%% *}"
-          case "$RAW_URL" in
-            http://*|https://*) BASE_URL="$RAW_URL" ;;
-            *) BASE_URL="https://$RAW_URL" ;;
-          esac
+          case "$RAW_URL" in http://*|https://*) BASE_URL="$RAW_URL" ;; *) BASE_URL="https://$RAW_URL" ;; esac
           STATUS="$(curl --silent --output /tmp/retired-api.json --write-out '%{http_code}' "$BASE_URL/api/retired-probe")"
           test "$STATUS" = "404" || { cat /tmp/retired-api.json; echo "Retired API path did not fail closed"; exit 1; }

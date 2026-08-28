@@ -1,0 +1,78 @@
+name: TitanOS Cloudflare Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "public/**"
+      - "api/attention/**"
+      - "vercel.json"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".env.production.example"
+      - ".github/workflows/cloudflare-validate.yml"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/**"
+  push:
+    branches:
+      - "infra/cloudflare-workers-migration"
+    paths:
+      - "cloudflare/**"
+      - "src/**"
+      - "public/**"
+      - "api/attention/**"
+      - "vercel.json"
+      - "index.html"
+      - "vite.config.js"
+      - "wrangler.jsonc"
+      - ".env.production.example"
+      - ".github/workflows/cloudflare-validate.yml"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify active Attention policies
+        run: npm test
+      - name: Build production assets
+        run: npm run build
+      - name: Reject retired Vercel and Attention serverless surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          forbidden_paths=()
+          [[ -e vercel.json ]] && forbidden_paths+=("vercel.json")
+          [[ -d api/attention ]] && forbidden_paths+=("api/attention")
+
+          if (( ${#forbidden_paths[@]} > 0 )); then
+            printf 'Retired runtime surface reintroduced: %s\n' "${forbidden_paths[@]}"
+            exit 1
+          fi
+
+          if grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\.vercel\.app' cloudflare wrangler.jsonc; then
+            echo "Legacy Vercel runtime reference detected in Cloudflare deployment surface"
+            exit 1
+          fi
+      - name: Validate Cloudflare bundle without deploying
+        run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-dry-run

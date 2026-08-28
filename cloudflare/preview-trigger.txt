@@ -1,0 +1,5 @@
+TitanOS Cloudflare preview deployment trigger.
+Purpose: controlled one-purpose workflow trigger for the isolated titanos-ci-preview Worker.
+Production DNS, the production Worker, and the reserved titanos-preview Worker are intentionally unaffected.
+Certification trigger: verify current-head edge health, retired API fail-closed behavior, checkout authorization boundaries, explicit preview return origin, signed non-financial webhook handling, and preview isolation without moving money.
+Re-certification head: 0a7a081726b0ffecb824be71ffedd01a59a4dfc5

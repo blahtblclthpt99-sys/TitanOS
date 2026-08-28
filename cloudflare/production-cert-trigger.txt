@@ -1,0 +1,6 @@
+TitanOS Cloudflare production certification trigger.
+Purpose: execute the read-only production certification workflow against the intended `titanos` Worker.
+This trigger must not deploy code, modify secrets, change DNS, retarget Stripe, or move money.
+Re-certification requested: 2026-08-28.
+Previous certification result: NO-GO — intended production Worker `titanos` was not present; no custom Worker domain was attached; full-app preservation also failed.
+Latest certification record: docs/PRODUCTION_GATE_CERTIFICATION.md

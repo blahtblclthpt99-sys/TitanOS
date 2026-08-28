@@ -1,0 +1,25 @@
+/* Active interaction-level hardening for Titan Attention. */
+html.modal-open,
+html.modal-open body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+[role="dialog"]:focus {
+  outline: none;
+}
+
+[role="progressbar"] {
+  position: relative;
+}
+
+button[aria-description][disabled] {
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  html.modal-open body {
+    position: fixed;
+    width: 100%;
+  }
+}

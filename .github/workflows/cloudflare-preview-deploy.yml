@@ -47,6 +47,7 @@ jobs:
           test -n "$STRIPE_WEBHOOK_SECRET" || { echo "Missing STRIPE_WEBHOOK_SECRET repository secret"; exit 1; }
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY repository secret"; exit 1; }
+          [[ "$TITAN_PREVIEW_URL" == https://* ]] || { echo "TITAN_PREVIEW_URL must be HTTPS"; exit 1; }
 
       - name: Verify Titan Stripe account and Supabase service role
         shell: bash
@@ -96,8 +97,14 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const names = ['STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
-          fs.writeFileSync('/tmp/titanos-preview-secrets.json', JSON.stringify(Object.fromEntries(names.map((name) => [name, process.env[name]]))));
+          const values = {
+            STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+            STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+            SUPABASE_URL: process.env.SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            APP_ORIGIN: process.env.TITAN_PREVIEW_URL,
+          };
+          fs.writeFileSync('/tmp/titanos-preview-secrets.json', JSON.stringify(values));
           NODE
           npx --yes wrangler@4.102.0 secret bulk /tmp/titanos-preview-secrets.json --name titanos-preview
           rm -f /tmp/titanos-preview-secrets.json
@@ -124,6 +131,25 @@ jobs:
           set -euo pipefail
           STATUS="$(curl --silent --output /tmp/retired-api.json --write-out '%{http_code}' "$TITAN_PREVIEW_URL/api/retired-probe")"
           test "$STATUS" = "404" || { cat /tmp/retired-api.json; echo "Retired API path did not fail closed"; exit 1; }
+
+      - name: Smoke-test checkout authorization boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHECKOUT="$TITAN_PREVIEW_URL/api/attention/create-checkout"
+
+          STATUS="$(curl --silent --output /tmp/checkout-get.json --write-out '%{http_code}' "$CHECKOUT")"
+          test "$STATUS" = "405" || { cat /tmp/checkout-get.json; echo "Checkout GET did not fail closed"; exit 1; }
+
+          STATUS="$(curl --silent --output /tmp/checkout-noauth.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data '{"campaign_id":"00000000-0000-0000-0000-000000000000"}' "$CHECKOUT")"
+          test "$STATUS" = "401" || { cat /tmp/checkout-noauth.json; echo "Unauthenticated checkout did not fail closed"; exit 1; }
+
+          STATUS="$(curl --silent --output /tmp/checkout-badtoken.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer invalid-certification-token' \
+            --data '{"campaign_id":"00000000-0000-0000-0000-000000000000"}' "$CHECKOUT")"
+          test "$STATUS" = "401" || { cat /tmp/checkout-badtoken.json; echo "Invalid-token checkout did not fail closed"; exit 1; }
+          rm -f /tmp/checkout-get.json /tmp/checkout-noauth.json /tmp/checkout-badtoken.json
 
       - name: Verify signed Cloudflare webhook handling without financial mutation
         shell: bash
@@ -155,7 +181,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          EXPECTED_URL="$TITAN_PREVIEW_URL/api/functions/stripeWebhook"
           curl --fail --silent --show-error -u "$STRIPE_SECRET_KEY:" \
             "https://api.stripe.com/v1/webhook_endpoints/$TITAN_STRIPE_WEBHOOK_ID" > /tmp/titan-hook.json
           node - <<'NODE'

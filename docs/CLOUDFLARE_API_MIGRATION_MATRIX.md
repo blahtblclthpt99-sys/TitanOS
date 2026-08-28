@@ -4,7 +4,7 @@
 
 TitanOS is migrating the complete canonical application to Cloudflare Workers without deleting product surfaces and without relying on Vercel as a hidden runtime fallback.
 
-The connected TitanOS Vercel deployments currently return HTTP 402 `DEPLOYMENT_DISABLED`, so the Cloudflare runtime must be self-sufficient for every production-used API path before production traffic moves.
+The connected TitanOS Vercel deployments return HTTP 402 `DEPLOYMENT_DISABLED`, so the Cloudflare runtime must be self-sufficient for every production-used API path before production traffic moves.
 
 **Any production-used API route that is not natively certified, intentionally assigned to an independently certified external backend, or explicitly retired remains a production cutover blocker.**
 
@@ -21,12 +21,23 @@ The connected TitanOS Vercel deployments currently return HTTP 402 `DEPLOYMENT_D
 
 ## Current native execution surface
 
-| Route | Current status | Evidence still required |
+| Route | Current status | Evidence / remaining requirement |
 | --- | --- | --- |
-| `/api/functions/health` | `NATIVE_CANDIDATE` | Deployed Worker response, readiness semantics, no-store, security headers, no secret disclosure. |
-| `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Deployed no-auth 401 boundary plus authenticated GET/PATCH parity against Supabase before promotion to `NATIVE_WORKER`. |
+| `/api/functions/health` | `NATIVE_WORKER` | Deployed Worker health, readiness structure, no-store, security headers, native-runtime header, and full regression validation passed in the four-route preview/validator wave. |
+| `/api/functions/auth/me` | `NATIVE_CANDIDATE` | Deployed missing-auth 401 boundary passed; authenticated GET/PATCH parity against Supabase, profile mutation isolation, and tenant/role behavior remain. |
+| `/api/functions/appVersion` | `NATIVE_CANDIDATE` | Deployed Worker returned explicit configured release metadata and no stale fallback; native/Android update-gate behavior on the final production API origin remains. |
+| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Deployed no-secret preview proved `membershipPaymentsLive=false`, `verified=false`, and safe fallback behavior; Supabase-backed launch-state parity remains. |
 
-All other `/api/*` routes are currently `UNMIGRATED_BLOCKED` on the Cloudflare migration runtime unless this ledger and the Worker router are deliberately updated together.
+Every other `/api/*` route is currently `UNMIGRATED_BLOCKED` on the Cloudflare migration runtime unless this ledger and the Worker router are deliberately updated together.
+
+## Latest certification evidence
+
+The four-route wave at branch head `c984ed25dc8bab15e7df4d3ff141c41c1aaec235` passed both required workflows:
+
+- `TitanOS Cloudflare Full App Validate` run `33138131411`: canonical-product preservation, exact dependency install, lint, typecheck, authentication, API, payment, security, TitanAI, Driver Hub, GPS, offline/PWA, production build, Wrangler dry-run, and staged-native boundary gate all passed.
+- `TitanOS Cloudflare Full App Preview` run `33138131414`: isolated Workers deployment, edge health, SPA root/deep-route fallback, native health, explicit app-version truth, feature-flag payment fail-closed behavior, no-auth auth boundary, unmigrated-route fail-closed behavior, and no-production-routing assertion all passed.
+
+These results certify the current **staging topology**, not production cutover.
 
 ## Migration waves
 
@@ -34,9 +45,9 @@ All other `/api/*` routes are currently `UNMIGRATED_BLOCKED` on the Cloudflare m
 
 | Route / family | Current status | Required certification before native promotion |
 | --- | --- | --- |
-| `/api/functions/health` | `NATIVE_CANDIDATE` | GET/HEAD parity, readiness semantics, no secret disclosure, no-store. |
-| `/api/functions/appVersion` | `UNMIGRATED_BLOCKED` | Version/cache semantics and mobile update behavior. |
-| `/api/functions/featureFlags` | `UNMIGRATED_BLOCKED` | Auth/tenant visibility, cache policy, safe defaults. |
+| `/api/functions/health` | `NATIVE_WORKER` | Certified in deployed four-route wave; re-run at final production origin before DNS cutover. |
+| `/api/functions/appVersion` | `NATIVE_CANDIDATE` | Native/Android update behavior on final production API origin and production release metadata. |
+| `/api/functions/featureFlags` | `NATIVE_CANDIDATE` | Supabase-backed launch-state parity and explicit production payment-readiness configuration. |
 | `/api/functions/sentryDebug` | `UNMIGRATED_BLOCKED` | Environment restriction and non-production exposure policy. |
 
 ### Wave 1 — Identity and account boundary
@@ -139,7 +150,8 @@ Before the adapter can be used broadly, tests must prove:
 - Preview deployment receives Cloudflare deployment authority only unless a dedicated non-production integration credential is intentionally provisioned.
 - Production Supabase service-role, Stripe, email-provider, AI-provider, and other privileged secrets must not be copied into a public preview merely to make tests pass.
 - Each privileged integration requires its own certification gate before the corresponding native route is enabled in production.
-- The Cloudflare runtime must not reintroduce `LEGACY_API_ORIGIN` or `.vercel.app` as an API dependency.
+- The Cloudflare runtime must not reintroduce `LEGACY_API_ORIGIN`, `titanos-web.vercel.app`, or any `.vercel.app` API dependency.
+- Browser builds use same-origin `/api` by default; native/packaged builds require an explicit `VITE_API_BASE_URL` pointing to the final production HTTPS origin.
 
 ## Android/mobile rule
 
@@ -163,6 +175,6 @@ Production traffic remains **NO-GO** until all of the following are independentl
 
 ## Promotion rule
 
-A route status may change from `UNMIGRATED_BLOCKED` to `NATIVE_CANDIDATE` only in the same reviewed change that adds its Worker route and route-specific tests. It may change from `NATIVE_CANDIDATE` to `NATIVE_WORKER` only after deployed certification evidence exists.
+A route status may change from `UNMIGRATED_BLOCKED` to `NATIVE_CANDIDATE` only in the same reviewed change that adds its Worker route and route-specific tests. It may change from `NATIVE_CANDIDATE` to `NATIVE_WORKER` only after deployed certification evidence exists for the route's complete required behavior.
 
 There is no compatibility-bridge retirement step: the Cloudflare migration runtime intentionally has no Vercel API fallback.

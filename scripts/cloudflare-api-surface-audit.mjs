@@ -45,9 +45,12 @@ const rows = [...invoked.entries()]
     cloudflare_direct: directlyOwned.has(name),
   }));
 
+const activeHandlers = rows.filter((r) => r.server_handler).map((r) => r.name);
+console.log(`ACTIVE_HANDLER_NAMES=${activeHandlers.join(",")}`);
+console.log(`ACTIVE_HANDLER_COUNT=${activeHandlers.length}`);
 console.log(JSON.stringify({
   invoked_count: rows.length,
-  server_handler_count: rows.filter((r) => r.server_handler).length,
+  server_handler_count: activeHandlers.length,
   cloudflare_direct_count: rows.filter((r) => r.cloudflare_direct).length,
   invoked: rows,
 }, null, 2));

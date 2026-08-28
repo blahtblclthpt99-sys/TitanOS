@@ -49,6 +49,15 @@ test("Worker owns only the active Attention payment routes and has no Vercel pro
   assert.doesNotMatch(wrangler, /LEGACY_API_ORIGIN|titanos-web\.vercel\.app/);
 });
 
+test("Cloudflare edge readiness requires an explicit clean APP_ORIGIN", async () => {
+  const worker = await source(workerPath);
+  assert.match(worker, /function cleanHttpsOrigin\(value = ""\)/);
+  assert.match(worker, /function appOriginConfigured\(env\)/);
+  assert.match(worker, /function paymentBindingsConfigured\(env\)[\s\S]*appOriginConfigured\(env\)/);
+  assert.match(worker, /app_origin_configured:\s*appOriginConfigured\(env\)/);
+  assert.match(worker, /payment_bindings_configured:\s*paymentBindingsConfigured\(env\)/);
+});
+
 test("client keeps funding initiation authenticated and same-origin", async () => {
   const code = await source(appPath);
   assert.match(code, /fetch\("\/api\/attention\/create-checkout"/);

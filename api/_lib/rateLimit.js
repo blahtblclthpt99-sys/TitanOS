@@ -80,7 +80,18 @@ function deny(res, retryAfterSec) {
   res.status(429).json({ error: "Too many requests. Please try again shortly." });
   return false;
 }
-function productionRuntime() { return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production"; }
+
+function productionRuntime() {
+  const environment = String(
+    process.env.TITANOS_ENV ||
+      process.env.DEPLOYMENT_ENV ||
+      process.env.ENVIRONMENT ||
+      process.env.NODE_ENV ||
+      ""
+  ).trim().toLowerCase();
+  return environment === "production" || environment === "prod";
+}
+
 function durableUnavailable(res) {
   res.setHeader("Retry-After", "60");
   res.status(503).json({ error: "Verification protection is temporarily unavailable. Please try again shortly." });

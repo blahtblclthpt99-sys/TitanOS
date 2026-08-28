@@ -15,6 +15,7 @@ on:
       - ".github/workflows/cloudflare-preview-deploy.yml"
       - "package.json"
       - "package-lock.json"
+      - "scripts/**"
   push:
     branches:
       - "infra/cloudflare-workers-migration"
@@ -30,6 +31,7 @@ on:
       - ".github/workflows/cloudflare-preview-deploy.yml"
       - "package.json"
       - "package-lock.json"
+      - "scripts/**"
 
 permissions:
   contents: read
@@ -46,7 +48,17 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify active Attention policies
+        run: npm test
       - name: Build production assets
         run: npm run build
+      - name: Reject legacy runtime references
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\.vercel\.app' cloudflare wrangler.jsonc; then
+            echo "Legacy Vercel runtime reference detected in Cloudflare deployment surface"
+            exit 1
+          fi
       - name: Validate Cloudflare bundle without deploying
         run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-dry-run

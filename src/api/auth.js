@@ -225,12 +225,12 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and confirms the account immediately for Play testers.
+      // Prefer server registration so signup policy and durable audit logging
+      // stay centralized; preserve direct Supabase signup as availability fallback.
       try {
         return await registerViaServer({ email, password, fullName });
       } catch (serverError) {
-        // Fall back to direct Supabase signup when API is unavailable
+        // Fall back to direct Supabase signup when API is unavailable.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -248,19 +248,6 @@ export function createAuthModule() {
             );
           }
           throwIfError(error);
-        }
-        // Best-effort: log email when client falls back to direct Supabase signup.
-        try {
-          for (const url of apiCandidateUrls("/api/signup-emails")) {
-            const res = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, fullName, source: "supabase_fallback" }),
-            });
-            if (res.ok) break;
-          }
-        } catch {
-          /* ignore logging failures */
         }
         return {
           session: data.session,
@@ -383,10 +370,10 @@ export function createAuthModule() {
         "professional_profile",
         "community_opt_in",
         "referral_code",
-        "referred_by_code",
         "active_company_id",
-        // Intentionally excluded (server/admin only): role, is_pro, lifetime_premium,
-        // paying_subscriber, plan_tier, account_type, verified_worker, verification_notes
+        // Intentionally excluded (server/admin only): referred_by_code, role, is_pro,
+        // lifetime_premium, paying_subscriber, plan_tier, account_type,
+        // verified_worker, verification_notes
       ];
 
       const payload = {};

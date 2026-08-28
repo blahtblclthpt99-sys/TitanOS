@@ -1,0 +1,140 @@
+name: TitanOS Database Recovery Validate
+
+on:
+  push:
+    branches:
+      - infra/cloudflare-full-titanos-migration
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/supabase-postgres-validation-shim.sql"
+      - "scripts/database-destructive-migration-guard.test.mjs"
+      - ".github/workflows/database-recovery-validate.yml"
+      - "docs/TITANOS_DATABASE_RECOVERY.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/supabase-postgres-validation-shim.sql"
+      - "scripts/database-destructive-migration-guard.test.mjs"
+      - ".github/workflows/database-recovery-validate.yml"
+      - "docs/TITANOS_DATABASE_RECOVERY.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-database-recovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recovery-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: titanos_recovery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d titanos_recovery"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: titanos_recovery
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Block destructive database takeover migrations
+        run: node --test scripts/database-destructive-migration-guard.test.mjs
+
+      - name: Verify PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql --version
+          psql -v ON_ERROR_STOP=1 -Atc "show server_version;" | grep -q '^17\.'
+
+      - name: Install validation-only Supabase compatibility shim
+        run: psql -v ON_ERROR_STOP=1 -f scripts/supabase-postgres-validation-shim.sql
+
+      - name: Replay committed TitanOS migrations in deterministic order
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t MIGRATIONS < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | LC_ALL=C sort)
+          test "${#MIGRATIONS[@]}" -gt 0
+          printf 'Replaying %s migration files\n' "${#MIGRATIONS[@]}"
+          for migration in "${MIGRATIONS[@]}"; do
+            echo "::group::${migration}"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+            echo "::endgroup::"
+          done
+
+      - name: Require recovered TitanOS schema surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_tables=(
+            profiles
+            customers
+            jobs
+            invoices
+            estimates
+            expenses
+            employees
+            mileage_trips
+            companies
+            company_members
+            driver_profiles
+            stripe_webhook_events
+            fee_rules
+            platform_launch
+            titan_support_tickets
+            titan_ai_knowledge
+            service_profiles
+            employment_profiles
+            job_match_preferences
+            durable_rate_limits
+          )
+          for table in "${required_tables[@]}"; do
+            exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regclass('public.${table}') is not null")"
+            test "$exists" = "t" || {
+              echo "Recovered TitanOS schema missing required table: public.${table}"
+              exit 1
+            }
+          done
+
+      - name: Reject Titan Attention schema residue
+        shell: bash
+        run: |
+          set -euo pipefail
+          for table in attention_profiles attention_campaigns attention_views attention_withdrawals attention_payment_events; do
+            exists="$(psql -v ON_ERROR_STOP=1 -Atc "select to_regclass('public.${table}') is not null")"
+            test "$exists" = "f" || {
+              echo "Titan Attention residue detected: public.${table}"
+              exit 1
+            }
+          done
+
+      - name: Recovery schema inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -Atc "select count(*) from pg_tables where schemaname='public';" | sed 's/^/public_table_count=/'
+          psql -v ON_ERROR_STOP=1 -Atc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public';" | sed 's/^/public_function_count=/'
+          psql -v ON_ERROR_STOP=1 -Atc "select count(*) from pg_policies where schemaname='public';" | sed 's/^/public_policy_count=/'

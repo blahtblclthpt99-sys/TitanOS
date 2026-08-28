@@ -1,0 +1,302 @@
+name: TitanOS Cloudflare Production Certify
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-app-candidate"
+    paths:
+      - "cloudflare/production-cert-trigger.txt"
+      - ".github/workflows/cloudflare-production-certify.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-cloudflare-production-certify
+  cancel-in-progress: false
+
+jobs:
+  certify-production:
+    if: github.ref == 'refs/heads/infra/cloudflare-full-app-candidate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TITAN_PROD_WORKER_NAME: titanos
+      TITAN_PROD_WORKER_URL: https://titanos.blahtblclthpt99.workers.dev
+      TITAN_PROD_PUBLIC_ORIGIN: ${{ vars.TITAN_PROD_PUBLIC_ORIGIN }}
+      EXPECTED_RELEASE_SHA: ${{ github.sha }}
+      EXPECTED_RELEASE_TAG: git-${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify certification is read-only and release-scoped
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test "$TITAN_PROD_WORKER_NAME" = "titanos" || { echo "Unexpected production Worker"; exit 1; }
+          [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Expected release SHA is not a full Git SHA"; exit 1; }
+          test "$EXPECTED_RELEASE_TAG" = "git-$EXPECTED_RELEASE_SHA" || { echo "Release tag/SHA mismatch"; exit 1; }
+
+          if grep -n -E 'wrangler@[^ ]+ (deploy([[:space:]]|$)|versions (deploy|upload|secret)([[:space:]]|$)|secret (put|bulk|delete)([[:space:]]|$)|triggers deploy([[:space:]]|$))|curl .* (-X|--request) (PUT|PATCH|DELETE)' .github/workflows/cloudflare-production-certify.yml; then
+            echo "Production certification workflow contains a mutation command"
+            exit 1
+          fi
+
+      - name: Inventory production Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
+            > /tmp/titan-worker-inventory.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync("/tmp/titan-worker-inventory.json", "utf8"));
+          if (payload.success !== true || !Array.isArray(payload.result)) {
+            console.error("Unable to inventory Cloudflare Worker scripts");
+            process.exit(1);
+          }
+          const names = payload.result.map((item) => item?.id).filter(Boolean).sort();
+          console.log(`Cloudflare Worker scripts: ${names.join(", ") || "(none)"}`);
+          if (!names.includes(process.env.TITAN_PROD_WORKER_NAME)) {
+            console.error(`Required production Worker missing: ${process.env.TITAN_PROD_WORKER_NAME}`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Snapshot current production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 deployments status \
+            --name "$TITAN_PROD_WORKER_NAME" \
+            --json > /tmp/titan-prod-deployment-before.json
+          test -s /tmp/titan-prod-deployment-before.json || { echo "No production deployment metadata returned"; exit 1; }
+
+      - name: Resolve approved immutable Worker version
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 versions list \
+            --name "$TITAN_PROD_WORKER_NAME" \
+            --json > /tmp/titan-prod-versions.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const raw = JSON.parse(fs.readFileSync("/tmp/titan-prod-versions.json", "utf8"));
+          const entries = Array.isArray(raw) ? raw : Array.isArray(raw?.versions) ? raw.versions : Array.isArray(raw?.result) ? raw.result : [];
+          const tagOf = (entry) => entry?.tag ?? entry?.metadata?.tag ?? entry?.annotations?.["workers/tag"] ?? entry?.metadata?.annotations?.["workers/tag"] ?? null;
+          const matches = entries.filter((entry) => tagOf(entry) === process.env.EXPECTED_RELEASE_TAG);
+          if (matches.length !== 1) {
+            console.error(`Expected exactly one Worker version tagged ${process.env.EXPECTED_RELEASE_TAG}; found ${matches.length}`);
+            process.exit(1);
+          }
+          const versionId = matches[0]?.id ?? matches[0]?.version_id ?? matches[0]?.versionId;
+          if (!versionId) {
+            console.error("Approved Worker version is missing a version ID");
+            process.exit(1);
+          }
+          fs.writeFileSync("/tmp/titan-approved-version-id.txt", String(versionId));
+          console.log(`Approved immutable Worker version: ${versionId}`);
+          NODE
+
+      - name: Verify production deployment is exactly the approved version at 100 percent
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const deployment = JSON.parse(fs.readFileSync("/tmp/titan-prod-deployment-before.json", "utf8"));
+          const expectedId = fs.readFileSync("/tmp/titan-approved-version-id.txt", "utf8").trim();
+          const candidates = [];
+          const visit = (value) => {
+            if (!value || typeof value !== "object") return;
+            if (Array.isArray(value)) {
+              for (const item of value) visit(item);
+              return;
+            }
+            const percentage = value.percentage ?? value.percent ?? value.traffic_percentage ?? value.trafficPercentage;
+            const versionId = value.version_id ?? value.versionId ?? value.id;
+            if (versionId && percentage !== undefined && percentage !== null) {
+              const n = Number(percentage);
+              if (Number.isFinite(n)) candidates.push({ versionId: String(versionId), percentage: n });
+            }
+            for (const nested of Object.values(value)) visit(nested);
+          };
+          visit(deployment);
+          const serving = candidates.filter((item) => item.percentage > 0);
+          if (serving.length !== 1 || serving[0].percentage !== 100 || serving[0].versionId !== expectedId) {
+            console.error("Production is not a single 100% deployment of the approved immutable version");
+            console.error(JSON.stringify(serving, null, 2));
+            process.exit(1);
+          }
+          console.log(`Production deployment: ${expectedId} @ 100%`);
+          NODE
+
+      - name: Verify production binding names and secret types
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_ID="$(cat /tmp/titan-approved-version-id.txt)"
+          npx --yes wrangler@4.102.0 versions view "$VERSION_ID" \
+            --name "$TITAN_PROD_WORKER_NAME" \
+            --json > /tmp/titan-prod-version.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync("/tmp/titan-prod-version.json", "utf8"));
+          const bindings = [];
+          const visit = (value) => {
+            if (!value || typeof value !== "object") return;
+            if (Array.isArray(value)) {
+              for (const item of value) visit(item);
+              return;
+            }
+            if (typeof value.name === "string" && typeof value.type === "string") {
+              bindings.push({ name: value.name, type: value.type });
+            }
+            for (const nested of Object.values(value)) visit(nested);
+          };
+          visit(payload);
+          const byName = new Map(bindings.map((item) => [item.name, item.type]));
+          const required = ["APP_ORIGIN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "ATTENTION_STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "CF_VERSION_METADATA"];
+          const missing = required.filter((name) => !byName.has(name));
+          if (missing.length) {
+            console.error(`Missing production bindings: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+          const requiredSecrets = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "ATTENTION_STRIPE_WEBHOOK_SECRET", "SUPABASE_SERVICE_ROLE_KEY"];
+          const wrongType = requiredSecrets.filter((name) => byName.get(name) !== "secret_text");
+          if (wrongType.length) {
+            console.error(`Sensitive bindings are not secret_text: ${wrongType.map((name) => `${name}=${byName.get(name)}`).join(", ")}`);
+            process.exit(1);
+          }
+          console.log("Required production bindings and sensitive secret types verified");
+          NODE
+
+      - name: Certify production edge health, origin, and release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TITAN_PROD_PUBLIC_ORIGIN" || { echo "Missing repository variable TITAN_PROD_PUBLIC_ORIGIN"; exit 1; }
+          node -e 'const u=new URL(process.env.TITAN_PROD_PUBLIC_ORIGIN);if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||u.pathname!=="/")process.exit(1)' \
+            || { echo "TITAN_PROD_PUBLIC_ORIGIN must be a clean HTTPS origin"; exit 1; }
+
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 2 --retry-all-errors \
+            "$TITAN_PROD_WORKER_URL/__titanos/edge-health" > /tmp/titan-prod-health.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const d = JSON.parse(fs.readFileSync("/tmp/titan-prod-health.json", "utf8"));
+          const expectedVersionId = fs.readFileSync("/tmp/titan-approved-version-id.txt", "utf8").trim();
+          const expected = {
+            ok: true,
+            runtime: "cloudflare-workers",
+            api_runtime: "cloudflare-workers",
+            legacy_proxy: false,
+            app_origin_configured: true,
+            core_payment_bindings_configured: true,
+            attention_payment_bindings_configured: true,
+            webhook_signing_secrets_distinct: true,
+            payment_bindings_configured: true,
+            app_origin: process.env.TITAN_PROD_PUBLIC_ORIGIN,
+            worker_version_id: expectedVersionId,
+            worker_version_tag: process.env.EXPECTED_RELEASE_TAG,
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (d[key] !== value) {
+              console.error(`Edge health mismatch for ${key}: expected ${value}, got ${d[key]}`);
+              process.exit(1);
+            }
+          }
+          if (!d.worker_version_timestamp) {
+            console.error("Worker version timestamp missing");
+            process.exit(1);
+          }
+          NODE
+
+      - name: Certify canonical production origin and security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --location \
+            --output /tmp/titan-prod-root.html \
+            --dump-header /tmp/titan-prod-headers.txt \
+            --write-out '%{http_code}' \
+            "$TITAN_PROD_PUBLIC_ORIGIN/")"
+          test "$STATUS" = "200" || { echo "Canonical production root returned $STATUS"; exit 1; }
+          grep -qi '^x-titanos-edge: cloudflare' /tmp/titan-prod-headers.txt || { echo "Missing Cloudflare edge identity header"; exit 1; }
+          grep -qi '^content-security-policy:' /tmp/titan-prod-headers.txt || { echo "Missing CSP"; exit 1; }
+          grep -qi '^strict-transport-security:' /tmp/titan-prod-headers.txt || { echo "Missing HSTS"; exit 1; }
+          grep -qi '^x-content-type-options: nosniff' /tmp/titan-prod-headers.txt || { echo "Missing nosniff header"; exit 1; }
+          grep -qi '^x-frame-options: DENY' /tmp/titan-prod-headers.txt || { echo "Missing frame denial header"; exit 1; }
+
+          curl --fail --silent --show-error --location \
+            "$TITAN_PROD_PUBLIC_ORIGIN/__titanos/edge-health" > /tmp/titan-public-health.json
+          node <<'NODE'
+          const fs = require("fs");
+          const d = JSON.parse(fs.readFileSync("/tmp/titan-public-health.json", "utf8"));
+          const expectedVersionId = fs.readFileSync("/tmp/titan-approved-version-id.txt", "utf8").trim();
+          if (d.worker_version_id !== expectedVersionId || d.worker_version_tag !== process.env.EXPECTED_RELEASE_TAG) {
+            console.error("Canonical production origin is not serving the approved Worker release");
+            process.exit(1);
+          }
+          NODE
+
+      - name: Certify production API fail-closed behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --output /tmp/retired.json --write-out '%{http_code}' \
+            "$TITAN_PROD_PUBLIC_ORIGIN/api/retired-certification-probe")"
+          test "$STATUS" = "404" || { cat /tmp/retired.json; echo "Retired API did not fail closed"; exit 1; }
+
+          CHECKOUT="$TITAN_PROD_PUBLIC_ORIGIN/api/attention/create-checkout"
+          STATUS="$(curl --silent --output /tmp/checkout-get.json --write-out '%{http_code}' "$CHECKOUT")"
+          test "$STATUS" = "405" || { cat /tmp/checkout-get.json; echo "Checkout GET did not fail closed"; exit 1; }
+
+          STATUS="$(curl --silent --output /tmp/checkout-noauth.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' \
+            --data '{"campaign_id":"00000000-0000-0000-0000-000000000000"}' \
+            "$CHECKOUT")"
+          test "$STATUS" = "401" || { cat /tmp/checkout-noauth.json; echo "Unauthenticated checkout did not fail closed"; exit 1; }
+
+          CORE_WEBHOOK="$TITAN_PROD_PUBLIC_ORIGIN/api/functions/stripeWebhook"
+          STATUS="$(curl --silent --output /tmp/core-webhook-no-signature.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data '{}' "$CORE_WEBHOOK")"
+          test "$STATUS" = "400" || { cat /tmp/core-webhook-no-signature.json; echo "Core Stripe webhook did not reject unsigned request"; exit 1; }
+
+          ATTENTION_WEBHOOK="$TITAN_PROD_PUBLIC_ORIGIN/api/attention/stripe-webhook"
+          STATUS="$(curl --silent --output /tmp/attention-webhook-no-signature.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data '{}' "$ATTENTION_WEBHOOK")"
+          test "$STATUS" = "400" || { cat /tmp/attention-webhook-no-signature.json; echo "Attention Stripe webhook did not reject unsigned request"; exit 1; }
+
+      - name: Confirm certification performed no deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.102.0 deployments status \
+            --name "$TITAN_PROD_WORKER_NAME" \
+            --json > /tmp/titan-prod-deployment-after.json
+          node <<'NODE'
+          const fs = require("fs");
+          const before = JSON.stringify(JSON.parse(fs.readFileSync("/tmp/titan-prod-deployment-before.json", "utf8")));
+          const after = JSON.stringify(JSON.parse(fs.readFileSync("/tmp/titan-prod-deployment-after.json", "utf8")));
+          if (before !== after) {
+            console.error("Production deployment metadata changed during read-only certification");
+            process.exit(1);
+          }
+          console.log("Production deployment metadata unchanged during certification");
+          NODE

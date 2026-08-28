@@ -152,6 +152,7 @@ function edgeHealthResponse(env) {
       api_runtime: "cloudflare-workers",
       legacy_proxy: false,
       app_origin_configured: appOriginConfigured(env),
+      app_origin: cleanHttpsOrigin(env.APP_ORIGIN) || null,
       core_payment_bindings_configured: corePaymentBindingsConfigured(env),
       attention_payment_bindings_configured: attentionPaymentBindingsConfigured(env),
       webhook_signing_secrets_distinct: webhookSigningSecretsDistinct(env),

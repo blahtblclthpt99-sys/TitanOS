@@ -14,7 +14,7 @@ Do **not** deploy or change production DNS if build/lint/typecheck fails, requir
 - [ ] `production_cutover_ready` remains `false` until the final explicit production release gate.
 - [ ] Every production-used `/api/*` route is recorded in `docs/CLOUDFLARE_API_MIGRATION_MATRIX.md` as `NATIVE_WORKER`, independently certified `EXTERNAL_BACKEND`, or `RETIRED`.
 - [ ] Unmigrated routes fail closed with deterministic 503 behavior.
-- [ ] The retired `/api/functions/sentryDebug` fault-injection route does not exist and remains unrouted.
+- [ ] The retired /api/functions/sentryDebug fault-injection route does not exist and remains unrouted.
 
 ## 2. Exact-head validation
 

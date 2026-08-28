@@ -1,0 +1,70 @@
+name: TitanOS Cloudflare Full App Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-app-candidate"
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - "wrangler.jsonc"
+      - "public/_headers"
+      - "supabase/migrations/**"
+      - "src/**"
+      - "api/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "postcss.config.js"
+      - "scripts/**"
+      - ".github/workflows/cloudflare-full-app-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  full-app-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Reject destructive full-app migration diffs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status origin/main...HEAD > /tmp/titanos-cloudflare-diff.txt
+          if awk '$1 == "D" && ($2 ~ /^src\// || $2 ~ /^api\// || $2 == "package.json" || $2 == "package-lock.json" || $2 == "vite.config.js" || $2 == "postcss.config.js") { print; found=1 } END { exit found ? 0 : 1 }' /tmp/titanos-cloudflare-diff.txt; then
+            echo "Cloudflare candidate deletes required TitanOS application/runtime files"
+            exit 1
+          fi
+
+      - name: Verify full TitanOS application preservation
+        run: node --test scripts/cloudflare-full-app-preservation.test.mjs
+
+      - name: Run TitanOS production ship gate
+        run: npm run gate:ship
+
+      - name: Validate Cloudflare bundle without deploying
+        run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
+
+      - name: Verify Cloudflare payment edge has no Vercel proxy dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\.vercel\.app' cloudflare wrangler.jsonc; then
+            echo "Legacy Vercel runtime dependency detected in Cloudflare payment edge"
+            exit 1
+          fi

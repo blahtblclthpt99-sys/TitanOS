@@ -122,4 +122,19 @@ describe("founding launch status", () => {
     assert.match(sql37, /founding_price_lock/);
     assert.match(sql37, /9\.99/);
   });
+
+  it("ships a fail-safe platform_launch integrity migration", () => {
+    const path = join(root, "supabase/migrations/20260828041500_platform_launch_integrity.sql");
+    assert.ok(existsSync(path));
+    const sql = readFileSync(path, "utf8");
+
+    assert.match(sql, /pg_advisory_xact_lock\(87231401\)/);
+    assert.match(sql, /COUNT\(\*\)::integer[\s\S]*founding_user IS TRUE/i);
+    assert.match(sql, /v_actual_claimed > v_cap/i);
+    assert.match(sql, /RAISE EXCEPTION[\s\S]*exceeds configured platform_launch founding_cap/i);
+    assert.match(sql, /founding_cap BETWEEN 1 AND 1000000/i);
+    assert.match(sql, /founding_claimed BETWEEN 0 AND founding_cap/i);
+    assert.match(sql, /founding_claimed < founding_cap OR beta_active = false/i);
+    assert.doesNotMatch(sql, /SET\s+founding_cap\s*=\s*(?:GREATEST|v_actual_claimed)/i);
+  });
 });

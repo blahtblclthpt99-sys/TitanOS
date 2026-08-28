@@ -1,11 +1,14 @@
 import accountDeletionRequest from "../api/functions/accountDeletionRequest.js";
 import adminControl from "../api/functions/adminControl.js";
 import adminFees from "../api/functions/adminFees.js";
+import analyticsIngest from "../api/functions/analyticsIngest.js";
+import appVersion from "../api/functions/appVersion.js";
 import attachReferral from "../api/functions/attachReferral.js";
 import createAutopilotOrder from "../api/functions/createAutopilotOrder.js";
 import createNotification from "../api/functions/createNotification.js";
 import createPaymentLink from "../api/functions/createPaymentLink.js";
 import directionsOptimize from "../api/functions/directionsOptimize.js";
+import featureFlags from "../api/functions/featureFlags.js";
 import installMarketplaceModule from "../api/functions/installMarketplaceModule.js";
 import jobMatchesV2 from "../api/functions/jobMatchesV2.js";
 import markReferralPaying from "../api/functions/markReferralPaying.js";
@@ -34,16 +37,21 @@ import supportRegisterAttachment from "../api/functions/supportRegisterAttachmen
 import supportReopenCase from "../api/functions/supportReopenCase.js";
 import supportSubmitCsat from "../api/functions/supportSubmitCsat.js";
 import titanAI from "../api/functions/titanAI.js";
+import register from "../api/register.js";
+import signupEmails from "../api/signup-emails.js";
 
 export const ACTIVE_FUNCTION_REGISTRY = Object.freeze({
   accountDeletionRequest,
   adminControl,
   adminFees,
+  analyticsIngest,
+  appVersion,
   attachReferral,
   createAutopilotOrder,
   createNotification,
   createPaymentLink,
   directionsOptimize,
+  featureFlags,
   installMarketplaceModule,
   jobMatchesV2,
   markReferralPaying,
@@ -74,9 +82,20 @@ export const ACTIVE_FUNCTION_REGISTRY = Object.freeze({
   titanAI,
 });
 
+export const ACTIVE_TOP_LEVEL_API_REGISTRY = Object.freeze({
+  "/api/register": register,
+  "/api/signup-emails": signupEmails,
+});
+
 export const ACTIVE_FUNCTION_NAMES = Object.freeze(Object.keys(ACTIVE_FUNCTION_REGISTRY).sort());
+export const ACTIVE_TOP_LEVEL_API_PATHS = Object.freeze(Object.keys(ACTIVE_TOP_LEVEL_API_REGISTRY).sort());
 
 export function getActiveFunctionHandler(name) {
   if (typeof name !== "string" || !/^[A-Za-z0-9_-]+$/.test(name)) return null;
   return ACTIVE_FUNCTION_REGISTRY[name] || null;
+}
+
+export function getActiveTopLevelApiHandler(pathname) {
+  if (typeof pathname !== "string") return null;
+  return ACTIVE_TOP_LEVEL_API_REGISTRY[pathname] || null;
 }

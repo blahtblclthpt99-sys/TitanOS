@@ -121,6 +121,11 @@
     "requiredBy": [
       ".github/workflows/database-recovery-validate.yml",
       ".github/workflows/cloudflare-full-validate.yml"
-    ]
+    ],
+    "previewCertification": {
+      "deploymentWorkflow": ".github/workflows/cloudflare-full-preview.yml",
+      "browserWorkflow": ".github/workflows/cloudflare-browser-preview.yml",
+      "requireExactSha": true
+    }
   }
 }

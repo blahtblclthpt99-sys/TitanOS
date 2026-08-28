@@ -112,23 +112,27 @@ jobs:
 
       - name: Aggregate production gate results
         shell: bash
-        env:
-          LINT: ${{ steps.lint.outcome }}
-          TYPECHECK: ${{ steps.typecheck.outcome }}
-          PAYMENTS: ${{ steps.payments.outcome }}
-          HARDENING: ${{ steps.hardening.outcome }}
-          SECURITY: ${{ steps.security.outcome }}
-          INTEGRATION: ${{ steps.integration.outcome }}
-          FINAL_QA: ${{ steps.finalqa.outcome }}
-          BUILD: ${{ steps.build.outcome }}
-          WRANGLER: ${{ steps.wrangler.outcome }}
-          EDGE: ${{ steps.edge.outcome }}
         run: |
           set -euo pipefail
-          failed=0
-          for name in LINT TYPECHECK PAYMENTS HARDENING SECURITY INTEGRATION FINAL_QA BUILD WRANGLER EDGE; do
-            value="${!name}"
-            printf '%-12s %s\n' "$name" "$value"
-            if [[ "$value" != "success" ]]; then failed=1; fi
-          done
-          exit "$failed"
+          printf 'lint=%s\n' '${{ steps.lint.outcome }}'
+          printf 'typecheck=%s\n' '${{ steps.typecheck.outcome }}'
+          printf 'payments=%s\n' '${{ steps.payments.outcome }}'
+          printf 'hardening=%s\n' '${{ steps.hardening.outcome }}'
+          printf 'security=%s\n' '${{ steps.security.outcome }}'
+          printf 'integration=%s\n' '${{ steps.integration.outcome }}'
+          printf 'final_qa=%s\n' '${{ steps.finalqa.outcome }}'
+          printf 'build=%s\n' '${{ steps.build.outcome }}'
+          printf 'wrangler=%s\n' '${{ steps.wrangler.outcome }}'
+          printf 'edge=%s\n' '${{ steps.edge.outcome }}'
+          if [[ '${{ steps.lint.outcome }}' != 'success' || \
+                '${{ steps.typecheck.outcome }}' != 'success' || \
+                '${{ steps.payments.outcome }}' != 'success' || \
+                '${{ steps.hardening.outcome }}' != 'success' || \
+                '${{ steps.security.outcome }}' != 'success' || \
+                '${{ steps.integration.outcome }}' != 'success' || \
+                '${{ steps.finalqa.outcome }}' != 'success' || \
+                '${{ steps.build.outcome }}' != 'success' || \
+                '${{ steps.wrangler.outcome }}' != 'success' || \
+                '${{ steps.edge.outcome }}' != 'success' ]]; then
+            exit 1
+          fi

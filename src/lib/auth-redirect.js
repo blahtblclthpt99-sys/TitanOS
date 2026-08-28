@@ -1,11 +1,10 @@
 import { Capacitor } from "@capacitor/core";
 import { shouldUseHashRouter } from "@/lib/routing";
 
-/**
- * Development origins that may be included in the Supabase Auth allow-list.
- * Production origins are configuration-driven so retired hosting domains do not
- * remain permanently trusted in the client bundle.
- */
+/** Canonical TitanOS production web origin. */
+export const TITANOS_PRODUCTION_ORIGIN = "https://app.titanfieldos.com";
+
+/** Development origins that may be included in the Supabase Auth allow-list. */
 export const AUTH_PUBLIC_ORIGINS = ["http://localhost:5173"];
 
 export const NATIVE_AUTH_CALLBACK = "com.titanos.myapp://auth/callback";
@@ -35,7 +34,9 @@ function cleanPublicWebOrigin(value = "") {
 }
 
 function configuredPublicOrigin() {
-  return cleanPublicWebOrigin(import.meta.env?.VITE_TITANOS_PUBLIC_ORIGIN || "");
+  return cleanPublicWebOrigin(
+    import.meta.env?.VITE_TITANOS_PUBLIC_ORIGIN || TITANOS_PRODUCTION_ORIGIN,
+  );
 }
 
 function currentPublicOrigin() {
@@ -56,7 +57,7 @@ function withPath(origin, path) {
  * OAuth / email redirect URL.
  * - Native app → custom scheme deep link (handled by capacitor-auth.js)
  * - Web → current secure browser origin
- * - Fallback → configured VITE_TITANOS_PUBLIC_ORIGIN
+ * - Fallback → configured canonical TitanOS production origin
  */
 export function getAuthRedirectTo(path = "/auth/callback") {
   if (Capacitor.isNativePlatform()) {

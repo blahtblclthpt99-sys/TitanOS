@@ -1,14 +1,11 @@
 /**
- * Sentry Node.js instrument — load before other app modules.
- * Per https://skills.sentry.dev/instrument (Node SDK recommended defaults).
+ * TitanOS server-side Sentry bootstrap.
  *
- * Vercel serverless: imported via api/_lib/sentry.js so handlers that use
- * captureApiException initialize Sentry on cold start.
+ * This module is bundled into Cloudflare Workers as canonical API handlers are
+ * migrated. Keep it free of Node-native profiler/bootstrap assumptions that
+ * Cloudflare cannot validate at upload time.
  */
 import * as Sentry from "@sentry/node";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
 
 function resolveDsn() {
   const dsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN || "";
@@ -18,7 +15,9 @@ function resolveDsn() {
 function resolveEnvironment() {
   return (
     process.env.SENTRY_ENVIRONMENT ||
-    process.env.VERCEL_ENV ||
+    process.env.TITANOS_ENV ||
+    process.env.DEPLOYMENT_ENV ||
+    process.env.ENVIRONMENT ||
     process.env.NODE_ENV ||
     "development"
   );
@@ -27,8 +26,8 @@ function resolveEnvironment() {
 function resolveRelease() {
   return (
     process.env.SENTRY_RELEASE ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.VERCEL_GIT_COMMIT_REF ||
+    process.env.CF_VERSION_METADATA_ID ||
+    process.env.GITHUB_SHA ||
     undefined
   );
 }
@@ -41,24 +40,12 @@ function isDevLike() {
 const dsn = resolveDsn();
 export const sentryEnabled = Boolean(dsn);
 
-let profilingLoaded = false;
-const integrations = [];
+// @sentry/profiling-node depends on Node-native profiler machinery and cannot
+// safely be part of the Worker bundle. Error reporting/tracing remain enabled;
+// Worker profiling can be added later with a Cloudflare-native integration.
+const profilingLoaded = false;
 
 if (sentryEnabled) {
-  // Opt-in: native profiler can be heavy / unavailable on some hosts (set SENTRY_PROFILING=1)
-  if (String(process.env.SENTRY_PROFILING || "") === "1") {
-    try {
-      const { nodeProfilingIntegration } = require("@sentry/profiling-node");
-      integrations.push(nodeProfilingIntegration());
-      profilingLoaded = true;
-    } catch (err) {
-      console.warn(
-        "[sentry:api] @sentry/profiling-node unavailable — continuing without profiling:",
-        err?.message || err
-      );
-    }
-  }
-
   Sentry.init({
     dsn,
     environment: resolveEnvironment(),
@@ -70,20 +57,10 @@ if (sentryEnabled) {
       // httpBodies: [],
     },
 
-    // Recommended baseline: errors + tracing
     tracesSampleRate: isDevLike() ? 1.0 : 0.1,
     includeLocalVariables: true,
     enableLogs: true,
-
-    integrations,
-
-    // Profiling (requires tracing). Session sample decided once per process.
-    ...(profilingLoaded
-      ? {
-          profileSessionSampleRate: isDevLike() ? 1.0 : 0.1,
-          profileLifecycle: "trace",
-        }
-      : {}),
+    integrations: [],
   });
 }
 

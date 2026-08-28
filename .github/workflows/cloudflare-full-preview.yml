@@ -72,6 +72,8 @@ jobs:
             "api/functions/auth/me.js"
             "api/functions/appVersion.js"
             "api/functions/featureFlags.js"
+            "api/register.js"
+            "scripts/cloudflare-registration.test.mjs"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
           )
@@ -90,6 +92,7 @@ jobs:
           npx --yes wrangler@4.127.0 deploy --dry-run
           --outdir .wrangler-full-preview-dry-run
           --name "$TITAN_PREVIEW_WORKER_NAME"
+          --var "TITANOS_ENV:preview"
           --var "APP_LATEST_VERSION:$PREVIEW_APP_VERSION"
           --var "APP_MINIMUM_VERSION:$PREVIEW_APP_VERSION"
 
@@ -99,6 +102,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.127.0 deploy \
             --name "$TITAN_PREVIEW_WORKER_NAME" \
+            --var "TITANOS_ENV:preview" \
             --var "APP_LATEST_VERSION:$PREVIEW_APP_VERSION" \
             --var "APP_MINIMUM_VERSION:$PREVIEW_APP_VERSION"
 
@@ -116,7 +120,7 @@ jobs:
             d.runtime !== 'cloudflare-workers' ||
             d.migration_mode !== 'full-app-native-staged' ||
             d.api_runtime !== 'cloudflare-workers-native' ||
-            d.native_api_routes !== 4 ||
+            d.native_api_routes !== 6 ||
             d.unmigrated_api_policy !== 'fail-closed' ||
             d.production_cutover_ready !== false
           ) process.exit(1);
@@ -195,6 +199,27 @@ jobs:
           test "$STATUS" = "401" || { cat /tmp/auth-me.json; echo "No-auth request did not remain fail-closed on Workers: HTTP $STATUS"; exit 1; }
           grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/auth-me-headers.txt
           grep -qi '^cache-control:.*no-store' /tmp/auth-me-headers.txt
+
+      - name: Verify registration candidate rejects without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/register.json --dump-header /tmp/register-headers.txt --write-out '%{http_code}' \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"not-an-email","password":"validlength"}' \
+            "$TITAN_PREVIEW_URL/api/register")"
+          test "$STATUS" = "400" || { cat /tmp/register.json; echo "Registration validation returned HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/register-headers.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/register.json', 'utf8'));
+          if (d.error !== 'Valid email is required') process.exit(1);
+          NODE
+
+          ALIAS_STATUS="$(curl --silent --show-error --output /tmp/register-alias.json --write-out '%{http_code}' \
+            "$TITAN_PREVIEW_URL/api/functions/auth/register")"
+          test "$ALIAS_STATUS" = "405" || { cat /tmp/register-alias.json; echo "Registration alias method guard returned HTTP $ALIAS_STATUS"; exit 1; }
 
       - name: Verify unported API routes fail closed visibly
         shell: bash

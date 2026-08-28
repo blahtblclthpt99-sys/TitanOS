@@ -1,5 +1,10 @@
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
 
+/** New membership checkout is enabled only by an explicit production gate. */
+export function membershipPaymentsEnabled() {
+  return process.env.MEMBERSHIP_PAYMENTS_LIVE === "true";
+}
+
 export function stripePlanCatalog() {
   return {
     starter: process.env.STRIPE_PRICE_STARTER_MONTHLY || "",
@@ -13,6 +18,7 @@ export function planForStripePrice(priceId) {
   return match?.[0] || null;
 }
 
+/** Configuration presence is separate from permission to open new checkout. */
 export function stripeSubscriptionsConfigured() {
   const prices = stripePlanCatalog();
   return Boolean(process.env.STRIPE_SECRET_KEY && prices.starter && prices.worker_premium && prices.business);

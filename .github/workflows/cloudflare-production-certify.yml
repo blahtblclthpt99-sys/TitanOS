@@ -172,19 +172,47 @@ jobs:
           };
           visit(payload);
           const byName = new Map(bindings.map((item) => [item.name, item.type]));
-          const required = ["APP_ORIGIN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "ATTENTION_STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "CF_VERSION_METADATA"];
+          const required = [
+            "APP_ORIGIN",
+            "PUBLIC_APP_URL",
+            "CORS_ALLOWED_ORIGINS",
+            "SUPABASE_URL",
+            "NODE_ENV",
+            "REGISTER_REQUIRE_EMAIL_CONFIRM",
+            "PORTAL_OTP_ALLOW_LEGACY",
+            "PORTAL_TOKEN_ALLOW_LEGACY",
+            "RESEND_FROM",
+            "STRIPE_SECRET_KEY",
+            "STRIPE_WEBHOOK_SECRET",
+            "ATTENTION_STRIPE_WEBHOOK_SECRET",
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "PORTAL_OTP_PEPPER",
+            "AUDIT_IP_PEPPER",
+            "RESEND_API_KEY",
+            "OPENAI_API_KEY",
+            "CF_VERSION_METADATA",
+          ];
           const missing = required.filter((name) => !byName.has(name));
           if (missing.length) {
             console.error(`Missing production bindings: ${missing.join(", ")}`);
             process.exit(1);
           }
-          const requiredSecrets = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "ATTENTION_STRIPE_WEBHOOK_SECRET", "SUPABASE_SERVICE_ROLE_KEY"];
+          const requiredSecrets = [
+            "STRIPE_SECRET_KEY",
+            "STRIPE_WEBHOOK_SECRET",
+            "ATTENTION_STRIPE_WEBHOOK_SECRET",
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "PORTAL_OTP_PEPPER",
+            "AUDIT_IP_PEPPER",
+            "RESEND_API_KEY",
+            "OPENAI_API_KEY",
+          ];
           const wrongType = requiredSecrets.filter((name) => byName.get(name) !== "secret_text");
           if (wrongType.length) {
             console.error(`Sensitive bindings are not secret_text: ${wrongType.map((name) => `${name}=${byName.get(name)}`).join(", ")}`);
             process.exit(1);
           }
-          console.log("Required production bindings and sensitive secret types verified");
+          console.log("Complete TitanOS launch binding contract and sensitive secret types verified");
           NODE
 
       - name: Certify production edge health, origin, and release identity
@@ -211,6 +239,11 @@ jobs:
             attention_payment_bindings_configured: true,
             webhook_signing_secrets_distinct: true,
             payment_bindings_configured: true,
+            production_runtime_configured: true,
+            portal_security_bindings_configured: true,
+            email_bindings_configured: true,
+            ai_bindings_configured: true,
+            launch_bindings_configured: true,
             app_origin: process.env.TITAN_PROD_PUBLIC_ORIGIN,
             worker_version_id: expectedVersionId,
             worker_version_tag: process.env.EXPECTED_RELEASE_TAG,
@@ -249,8 +282,8 @@ jobs:
           const fs = require("fs");
           const d = JSON.parse(fs.readFileSync("/tmp/titan-public-health.json", "utf8"));
           const expectedVersionId = fs.readFileSync("/tmp/titan-approved-version-id.txt", "utf8").trim();
-          if (d.worker_version_id !== expectedVersionId || d.worker_version_tag !== process.env.EXPECTED_RELEASE_TAG) {
-            console.error("Canonical production origin is not serving the approved Worker release");
+          if (d.worker_version_id !== expectedVersionId || d.worker_version_tag !== process.env.EXPECTED_RELEASE_TAG || d.launch_bindings_configured !== true) {
+            console.error("Canonical production origin is not serving the approved launch-ready Worker release");
             process.exit(1);
           }
           NODE

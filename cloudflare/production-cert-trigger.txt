@@ -1,0 +1,4 @@
+TitanOS Cloudflare production certification trigger.
+Purpose: execute the read-only production certification workflow against the current `titanos` Worker.
+This trigger must not deploy code, modify secrets, change DNS, retarget Stripe, or move money.
+Certification branch head before trigger: 252b6f1a8a3db4aa21a6c1e16a3b780c3af31fca

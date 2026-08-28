@@ -10,11 +10,13 @@ on:
       - "src/**"
       - "api/**"
       - "public/**"
+      - "scripts/**"
       - "index.html"
       - "vite.config.js"
       - "wrangler.jsonc"
       - ".github/workflows/cloudflare-full-preview.yml"
       - ".github/workflows/cloudflare-full-validate.yml"
+      - ".github/workflows/cloudflare-browser-preview.yml"
       - "package.json"
       - "package-lock.json"
 

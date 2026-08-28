@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "project": "TitanOS",
+  "source": {
+    "historicalSupabaseProjectRef": "xcfjpxcmokdfwkarwomy",
+    "authoritativePreAttentionCount": 60,
+    "lastTitanOSMigration": [
+      "20260818203624",
+      "engagement_event_triggers"
+    ],
+    "attentionBoundary": [
+      "20260818215755",
+      "create_attention_marketplace_core"
+    ],
+    "ledgerSha256": "81307920564a7a6190a5fe0ff3d5d0ab252401e47e5cf764598ac1b47867429e"
+  },
+  "columns": [
+    "sourceVersion",
+    "sourceName",
+    "classification",
+    "localFileOrReplacementCsv"
+  ],
+  "classifications": {
+    "E": "restored_exact_version",
+    "R": "restored_equivalent",
+    "C": "superseded_contract",
+    "S": "superseded_security"
+  },
+  "ledger": [
+    ["20260802012204", "google_play_subscriptions", "R", "041_google_play_subscriptions.sql"],
+    ["20260802075447", "credential_renewal_and_feedback_workflow", "R", "20260802073841_credential_renewal_and_feedback_workflow.sql"],
+    ["20260802075530", "secure_feedback_insert_policy", "R", "20260802075515_secure_feedback_insert_policy.sql"],
+    ["20260802092438", "titan_autopilot", "R", "041_titan_autopilot.sql"],
+    ["20260802094450", "autopilot_membership_claims", "R", "042_autopilot_membership_claims.sql"],
+    ["20260809035141", "harden_lead_outreach", "E", "20260809035141_harden_lead_outreach.sql"],
+    ["20260809054335", "driver_performance_benchmarks", "E", "20260809054335_driver_performance_benchmarks.sql"],
+    ["20260813182732", "titan_memory_and_rules", "E", "20260813182732_titan_memory_and_rules.sql"],
+    ["20260813182734", "context_threads", "E", "20260813182734_context_threads.sql"],
+    ["20260813182735", "production_action_runs", "E", "20260813182735_production_action_runs.sql"],
+    ["20260813223541", "founding_25_lifetime_and_three_day_trial", "C", "035_founding_100_beta.sql,037_founding_trial_price_lock.sql,20260828041500_platform_launch_integrity.sql"],
+    ["20260813223639", "reconcile_founding_25_backfill", "C", "035_founding_100_beta.sql,037_founding_trial_price_lock.sql,20260828041500_platform_launch_integrity.sql"],
+    ["20260814011440", "rerun_017_fee_engine_20260813", "R", "017_fee_engine.sql"],
+    ["20260814020146", "harden_internal_security_definer_rpcs", "E", "20260814020146_harden_internal_security_definer_rpcs.sql"],
+    ["20260814020156", "harden_authorization_helper_rpc_visibility", "E", "20260814020156_harden_authorization_helper_rpc_visibility.sql"],
+    ["20260814020454", "remove_duplicate_notifications_index", "E", "20260814020454_remove_duplicate_notifications_index.sql"],
+    ["20260814115934", "harden_public_contract_share_rpc", "E", "20260814115934_harden_public_contract_share_rpc.sql"],
+    ["20260814120002", "restore_contract_signature_metadata_columns", "E", "20260814120002_restore_contract_signature_metadata_columns.sql"],
+    ["20260814120204", "archive_and_remove_legacy_demo_fixture_records", "E", "20260814120204_archive_and_remove_legacy_demo_fixture_records.sql"],
+    ["20260814120817", "restore_jobs_site_geofence_columns", "E", "20260814120817_restore_jobs_site_geofence_columns.sql"],
+    ["20260814120831", "persist_public_contract_signature_image", "E", "20260814120831_persist_public_contract_signature_image.sql"],
+    ["20260814120854", "archive_and_remove_explicit_test_auth_accounts", "E", "20260814120854_archive_and_remove_explicit_test_auth_accounts.sql"],
+    ["20260814153621", "harden_public_contract_capability", "E", "20260814153621_harden_public_contract_capability.sql"],
+    ["20260814155025", "lock_profile_privileges_unconditionally", "S", "021_privilege_money_integrity.sql,037_founding_trial_price_lock.sql,20260816_lock_profile_privileged_columns.sql"],
+    ["20260814155717", "index_core_titan_foreign_keys", "E", "20260814155717_index_core_titan_foreign_keys.sql"],
+    ["20260814221704", "add_server_runtime_secrets", "E", "20260814221704_add_server_runtime_secrets.sql"],
+    ["20260814222720", "harden_security_definer_execution", "E", "20260814222720_harden_security_definer_execution.sql"],
+    ["20260814222744", "revoke_client_grants_on_service_only_tables", "E", "20260814222744_revoke_client_grants_on_service_only_tables.sql"],
+    ["20260814222819", "sync_profiles_marketing_professional_columns", "E", "20260814222819_sync_profiles_marketing_professional_columns.sql"],
+    ["20260814222911", "tighten_profiles_rls_roles_and_checks", "E", "20260814222911_tighten_profiles_rls_roles_and_checks.sql"],
+    ["20260814223007", "tighten_core_business_rls_to_authenticated", "E", "20260814223007_tighten_core_business_rls_to_authenticated.sql"],
+    ["20260814223042", "add_missing_update_with_checks", "E", "20260814223042_add_missing_update_with_checks.sql"],
+    ["20260814223200", "harden_authorization_helper_search_paths", "E", "20260814223200_harden_authorization_helper_search_paths.sql"],
+    ["20260815203704", "invoice_payment_settlement_integrity", "R", "20260815201000_invoice_payment_settlement_integrity.sql"],
+    ["20260815203714", "payment_authority_lockdown", "R", "20260815202000_payment_authority_lockdown.sql"],
+    ["20260815203721", "core_tenant_ownership_lockdown", "R", "20260815203000_core_tenant_ownership_lockdown.sql"],
+    ["20260815203730", "contract_share_token_hashing", "R", "20260815204000_contract_share_token_hashing.sql"],
+    ["20260815204146", "revoke_5000x_trigger_function_execution", "R", "20260815205000_revoke_5000x_trigger_function_execution.sql"],
+    ["20260816221930", "second_me_action_idempotency", "R", "20260816_second_me_action_idempotency.sql"],
+    ["20260816230641", "lock_profile_privileged_columns", "R", "20260816_lock_profile_privileged_columns.sql"],
+    ["20260816232320", "durable_rate_limits", "R", "20260816231000_durable_rate_limits.sql"],
+    ["20260817033425", "job_match_profiles_and_requirements", "R", "20260817002500_job_match_profiles_and_requirements.sql"],
+    ["20260817033826", "private_job_match_preferences", "R", "20260817004000_private_job_match_preferences.sql"],
+    ["20260817133543", "job_match_radius_and_interactions", "R", "20260817083000_job_match_radius_and_interactions.sql"],
+    ["20260817134320", "private_job_match_origin", "R", "20260817084000_private_job_match_origin.sql"],
+    ["20260817211956", "account_deletion_requests", "R", "20260817204500_account_deletion_requests.sql"],
+    ["20260817215246", "play_ugc_safety", "R", "20260817_play_ugc_safety.sql"],
+    ["20260818075156", "titan_ai_knowledge", "E", "20260818075156_titan_ai_knowledge.sql"],
+    ["20260818080634", "align_admin_authority_and_revoke_trigger_rpc", "E", "20260818080634_align_admin_authority_and_revoke_trigger_rpc.sql"],
+    ["20260818080843", "harden_is_admin_security_invoker", "E", "20260818080843_harden_is_admin_security_invoker.sql"],
+    ["20260818082531", "optimize_core_rls_initplans", "E", "20260818082531_optimize_core_rls_initplans.sql"],
+    ["20260818083244", "optimize_hot_secondary_rls", "E", "20260818083244_optimize_hot_secondary_rls.sql"],
+    ["20260818084626", "harden_marketplace_table_privileges", "E", "20260818084626_harden_marketplace_table_privileges.sql"],
+    ["20260818085628", "split_marketplace_catalog_admin_policies", "E", "20260818085628_split_marketplace_catalog_admin_policies.sql"],
+    ["20260818113540", "titan_support_core", "R", "20260818113000_titan_support_core.sql"],
+    ["20260818114844", "titan_support_realtime", "R", "20260818120500_titan_support_realtime.sql"],
+    ["20260818135831", "fix_company_rls_recursion", "R", "20260818141500_fix_company_rls_recursion.sql"],
+    ["20260818195936", "three_sided_work_ecosystem", "E", "20260818195936_three_sided_work_ecosystem.sql"],
+    ["20260818201919", "employment_profiles", "E", "20260818201919_employment_profiles.sql"],
+    ["20260818203624", "engagement_event_triggers", "E", "20260818203624_engagement_event_triggers.sql"]
+  ],
+  "recoveryPrerequisites": [
+    {
+      "file": "20260809030000_recover_lead_outreach_foundation.sql",
+      "classification": "reconstructed_production_drift",
+      "requiredMarkers": ["production schema drift", "website TEXT", "outreach_status TEXT", "emailed_at TIMESTAMPTZ"]
+    },
+    {
+      "file": "20260814000000_recover_company_tenant_foundation.sql",
+      "classification": "reconstructed_production_drift",
+      "requiredMarkers": ["RECOVERY RECONSTRUCTION", "is_company_member", "company_id"]
+    },
+    {
+      "file": "20260814010000_recover_unledgered_internal_trigger_functions.sql",
+      "classification": "compatibility_signature_only",
+      "requiredMarkers": ["Compatibility-only reconstruction", "assign_active_company_id", "detach_deleted_customer_references", "no trigger attachment"],
+      "forbiddenMarkers": ["CREATE TRIGGER"]
+    }
+  ],
+  "forbiddenMigrationNames": [
+    "create_attention_marketplace_core",
+    "add_attention_atomic_reward_functions",
+    "add_attention_active_view_heartbeats",
+    "purge_legacy_titanos_public_schema",
+    "enable_pg_net_for_storage_cleanup",
+    "add_attention_campaign_funding",
+    "harden_attention_rls_and_indexes",
+    "harden_attention_funding_activation_session_binding"
+  ]
+}

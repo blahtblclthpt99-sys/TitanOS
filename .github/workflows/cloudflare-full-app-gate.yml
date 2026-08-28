@@ -25,9 +25,10 @@ permissions:
   contents: read
 
 jobs:
-  full-app-gate:
+  preservation:
+    name: Preserve complete TitanOS application
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,85 +55,46 @@ jobs:
       - name: Verify full TitanOS application preservation
         run: node --test scripts/cloudflare-full-app-preservation.test.mjs
 
-      - id: lint
-        name: Lint full application
-        continue-on-error: true
-        run: npm run lint
+  production-gates:
+    name: ${{ matrix.name }}
+    needs: preservation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint full application
+            command: npm run lint
+          - name: Typecheck full application
+            command: npm run typecheck
+          - name: Payment security suite
+            command: npm run test:payments
+          - name: Production hardening suite
+            command: npm run test:hardening
+          - name: Security regression suite
+            command: npm run test:security
+          - name: Integration merge suite
+            command: npm run test:integration-merge
+          - name: Final QA suite
+            command: npm run test:final-qa
+          - name: Full production build
+            command: npm run build
+          - name: Cloudflare Wrangler dry-run
+            command: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
+          - name: Cloudflare edge Vercel independence
+            command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc"
+    steps:
+      - uses: actions/checkout@v4
 
-      - id: typecheck
-        name: Typecheck full application
-        continue-on-error: true
-        run: npm run typecheck
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
 
-      - id: payments
-        name: Run payment security suite
-        continue-on-error: true
-        run: npm run test:payments
+      - name: Install exact dependencies
+        run: npm ci
 
-      - id: hardening
-        name: Run production hardening suite
-        continue-on-error: true
-        run: npm run test:hardening
-
-      - id: security
-        name: Run security regression suite
-        continue-on-error: true
-        run: npm run test:security
-
-      - id: integration
-        name: Run integration merge suite
-        continue-on-error: true
-        run: npm run test:integration-merge
-
-      - id: finalqa
-        name: Run final QA suite
-        continue-on-error: true
-        run: npm run test:final-qa
-
-      - id: build
-        name: Build full production application
-        continue-on-error: true
-        run: npm run build
-
-      - id: wrangler
-        name: Validate Cloudflare bundle without deploying
-        continue-on-error: true
-        run: npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
-
-      - id: edge
-        name: Verify Cloudflare payment edge has no Vercel proxy dependency
-        continue-on-error: true
+      - name: Run gate
         shell: bash
-        run: |
-          set -euo pipefail
-          if grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\.vercel\.app' cloudflare wrangler.jsonc; then
-            echo "Legacy Vercel runtime dependency detected in Cloudflare payment edge"
-            exit 1
-          fi
-
-      - name: Aggregate production gate results
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf 'lint=%s\n' '${{ steps.lint.outcome }}'
-          printf 'typecheck=%s\n' '${{ steps.typecheck.outcome }}'
-          printf 'payments=%s\n' '${{ steps.payments.outcome }}'
-          printf 'hardening=%s\n' '${{ steps.hardening.outcome }}'
-          printf 'security=%s\n' '${{ steps.security.outcome }}'
-          printf 'integration=%s\n' '${{ steps.integration.outcome }}'
-          printf 'final_qa=%s\n' '${{ steps.finalqa.outcome }}'
-          printf 'build=%s\n' '${{ steps.build.outcome }}'
-          printf 'wrangler=%s\n' '${{ steps.wrangler.outcome }}'
-          printf 'edge=%s\n' '${{ steps.edge.outcome }}'
-          if [[ '${{ steps.lint.outcome }}' != 'success' || \
-                '${{ steps.typecheck.outcome }}' != 'success' || \
-                '${{ steps.payments.outcome }}' != 'success' || \
-                '${{ steps.hardening.outcome }}' != 'success' || \
-                '${{ steps.security.outcome }}' != 'success' || \
-                '${{ steps.integration.outcome }}' != 'success' || \
-                '${{ steps.finalqa.outcome }}' != 'success' || \
-                '${{ steps.build.outcome }}' != 'success' || \
-                '${{ steps.wrangler.outcome }}' != 'success' || \
-                '${{ steps.edge.outcome }}' != 'success' ]]; then
-            exit 1
-          fi
+        run: ${{ matrix.command }}

@@ -35,6 +35,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TITAN_PREVIEW_WORKER_NAME: titanos-full-ci-preview
       TITAN_PREVIEW_URL: https://titanos-full-ci-preview.blahtblclthpt99.workers.dev
+      PREVIEW_APP_VERSION: 2.0.0
     steps:
       - uses: actions/checkout@v4
 
@@ -62,12 +63,15 @@ jobs:
             "src/components/shared/TitanSupportButton.jsx"
             "src/components/driver/DriverShiftPanel.jsx"
             "src/api/apiClient.js"
+            "src/api/apiOrigin.js"
             "api/functions/titanAI.js"
             "api/functions/titanAILive.js"
             "api/functions/supportAI.js"
             "api/functions/stripeWebhook.js"
             "api/functions/health.js"
             "api/functions/auth/me.js"
+            "api/functions/appVersion.js"
+            "api/functions/featureFlags.js"
             "cloudflare/node-handler-adapter.js"
             "cloudflare/api-router.js"
           )
@@ -82,13 +86,21 @@ jobs:
         run: npm run build
 
       - name: Validate bundle before upload
-        run: npx --yes wrangler@4.127.0 deploy --dry-run --outdir .wrangler-full-preview-dry-run --name "$TITAN_PREVIEW_WORKER_NAME"
+        run: >-
+          npx --yes wrangler@4.127.0 deploy --dry-run
+          --outdir .wrangler-full-preview-dry-run
+          --name "$TITAN_PREVIEW_WORKER_NAME"
+          --var "APP_LATEST_VERSION:$PREVIEW_APP_VERSION"
+          --var "APP_MINIMUM_VERSION:$PREVIEW_APP_VERSION"
 
       - name: Deploy isolated full-app preview
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.127.0 deploy --name "$TITAN_PREVIEW_WORKER_NAME"
+          npx --yes wrangler@4.127.0 deploy \
+            --name "$TITAN_PREVIEW_WORKER_NAME" \
+            --var "APP_LATEST_VERSION:$PREVIEW_APP_VERSION" \
+            --var "APP_MINIMUM_VERSION:$PREVIEW_APP_VERSION"
 
       - name: Verify Cloudflare edge health
         shell: bash
@@ -104,7 +116,7 @@ jobs:
             d.runtime !== 'cloudflare-workers' ||
             d.migration_mode !== 'full-app-native-staged' ||
             d.api_runtime !== 'cloudflare-workers-native' ||
-            d.native_api_routes !== 2 ||
+            d.native_api_routes !== 4 ||
             d.unmigrated_api_policy !== 'fail-closed' ||
             d.production_cutover_ready !== false
           ) process.exit(1);
@@ -140,6 +152,38 @@ jobs:
           const fs = require('fs');
           const d = JSON.parse(fs.readFileSync('/tmp/api-health.json', 'utf8'));
           if (d.service !== 'titanos' || !d.checks || !d.readiness) process.exit(1);
+          NODE
+
+      - name: Verify app version route uses explicit preview release truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/app-version.json --dump-header /tmp/app-version-headers.txt --write-out '%{http_code}' \
+            "$TITAN_PREVIEW_URL/api/functions/appVersion")"
+          test "$STATUS" = "200" || { cat /tmp/app-version.json; echo "Native appVersion returned HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/app-version-headers.txt
+          grep -qi '^cache-control:.*no-store' /tmp/app-version-headers.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/app-version.json', 'utf8'));
+          if (d.latest !== '2.0.0' || d.minimum !== '2.0.0') process.exit(1);
+          NODE
+
+      - name: Verify feature flags fail closed on payment readiness without integration secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/feature-flags.json --dump-header /tmp/feature-flags-headers.txt --write-out '%{http_code}' \
+            "$TITAN_PREVIEW_URL/api/functions/featureFlags")"
+          test "$STATUS" = "200" || { cat /tmp/feature-flags.json; echo "Native featureFlags returned HTTP $STATUS"; exit 1; }
+          grep -qi '^x-titanos-api-runtime:.*cloudflare-workers-native' /tmp/feature-flags-headers.txt
+          grep -qi '^cache-control:.*no-store' /tmp/feature-flags-headers.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const d = JSON.parse(fs.readFileSync('/tmp/feature-flags.json', 'utf8'));
+          if (!d.flags || !d.launch) process.exit(1);
+          if (d.launch.membershipPaymentsLive !== false) process.exit(1);
+          if (d.launch.verified !== false || d.launch.source !== 'safe_fallback') process.exit(1);
           NODE
 
       - name: Verify native authentication boundary fails closed without secrets

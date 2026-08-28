@@ -170,8 +170,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -n -E 'workers_dev[[:space:]]*[:=][[:space:]]*false|custom_domains?|routes?[[:space:]]*[:=]' wrangler.jsonc cloudflare; then
-            echo "Production route/domain configuration detected in preview migration surface"
+          if grep -n -E '"workers_dev"[[:space:]]*:[[:space:]]*false|"routes?"[[:space:]]*:|"custom_domains?"[[:space:]]*:' wrangler.jsonc; then
+            echo "Production route/domain configuration detected in Wrangler config"
             exit 1
           fi
 

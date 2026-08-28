@@ -2,6 +2,7 @@ import healthHandler from "../api/functions/health.js";
 import authMeHandler from "../api/functions/auth/me.js";
 import appVersionHandler from "../api/functions/appVersion.js";
 import featureFlagsHandler from "../api/functions/featureFlags.js";
+import titanAiCapabilitiesHandler from "../api/functions/titanAICapabilities.js";
 import registerHandler from "../api/register.js";
 import { invokeNodeHandler } from "./node-handler-adapter.js";
 
@@ -10,6 +11,7 @@ const ROUTES = new Map([
   ["/api/functions/auth/me", authMeHandler],
   ["/api/functions/appVersion", appVersionHandler],
   ["/api/functions/featureFlags", featureFlagsHandler],
+  ["/api/functions/titanAICapabilities", titanAiCapabilitiesHandler],
   ["/api/register", registerHandler],
   ["/api/functions/auth/register", registerHandler],
 ]);

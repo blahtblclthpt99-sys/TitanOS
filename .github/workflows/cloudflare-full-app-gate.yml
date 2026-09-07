@@ -6,7 +6,7 @@ on:
     branches:
       - "infra/cloudflare-full-app-candidate"
   pull_request:
-    branches: [main]
+    branches: [main, infra/cloudflare-full-app-candidate]
     paths:
       - "cloudflare/**"
       - "wrangler.jsonc"
@@ -69,6 +69,8 @@ jobs:
             command: npm run lint
           - name: Typecheck full application
             command: npm run typecheck
+          - name: Performance regression suite
+            command: npm run test:perf && node --test scripts/shell-startup-performance.test.mjs
           - name: Payment security suite
             command: npm run test:payments
           - name: Production hardening suite

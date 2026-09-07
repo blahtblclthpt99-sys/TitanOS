@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
 import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
 import DoorDashKeepAlive from "@/components/driver/activity/DoorDashKeepAlive";
+import PlayEntitlementSync from "@/components/billing/PlayEntitlementSync";
 import { useAuth } from "@/lib/AuthContext";
 import { setSearchIndexUser, warmSearchIndex } from "@/lib/searchIndex";
 import { trackEvent } from "@/lib/productAnalytics";
@@ -72,6 +73,7 @@ export default function AuthenticatedShell() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <PrefetchOnMount />
+      <PlayEntitlementSync />
       <ScheduledExportRunner />
       <DriverSessionKeepAlive />
       <DoorDashKeepAlive />

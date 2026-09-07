@@ -80,7 +80,7 @@ function deny(res, retryAfterSec) {
   res.status(429).json({ error: "Too many requests. Please try again shortly." });
   return false;
 }
-function productionRuntime() { return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production"; }
+function productionRuntime() { return process.env.NODE_ENV === "production"; }
 function durableUnavailable(res) {
   res.setHeader("Retry-After", "60");
   res.status(503).json({ error: "Verification protection is temporarily unavailable. Please try again shortly." });

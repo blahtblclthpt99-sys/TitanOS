@@ -40,7 +40,7 @@ export async function alertProductionFailure(payload) {
   const url = webhookUrl();
   if (!url) return { sent: false, reason: "no_webhook" };
 
-  const env = process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV;
+  const env = process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "production";
   if (env === "development" && String(process.env.OPS_ALERT_IN_DEV || "") !== "1") {
     return { sent: false, reason: "dev_skip" };
   }

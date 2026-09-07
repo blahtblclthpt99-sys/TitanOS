@@ -1,0 +1,105 @@
+name: TitanOS Cloudflare Full App Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-app-candidate"
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - "wrangler.jsonc"
+      - "public/_headers"
+      - "supabase/migrations/**"
+      - "src/**"
+      - "api/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "postcss.config.js"
+      - ".env.production.example"
+      - "scripts/**"
+      - ".github/workflows/cloudflare-full-app-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  preservation:
+    name: Preserve complete TitanOS application
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Reject destructive full-app migration diffs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status origin/main...HEAD > /tmp/titanos-cloudflare-diff.txt
+          if awk '$1 == "D" && ($2 ~ /^src\// || $2 ~ /^api\// || $2 == "package.json" || $2 == "package-lock.json" || $2 == "vite.config.js" || $2 == "postcss.config.js") { print; found=1 } END { exit found ? 0 : 1 }' /tmp/titanos-cloudflare-diff.txt; then
+            echo "Cloudflare candidate deletes required TitanOS application/runtime files"
+            exit 1
+          fi
+
+      - name: Verify full TitanOS application preservation
+        run: node --test scripts/cloudflare-full-app-preservation.test.mjs
+
+  production-gates:
+    name: ${{ matrix.name }}
+    needs: preservation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint full application
+            command: npm run lint
+          - name: Typecheck full application
+            command: npm run typecheck
+          - name: Payment security suite
+            command: npm run test:payments
+          - name: Production hardening suite
+            command: npm run test:hardening
+          - name: Security regression suite
+            command: npm run test:security
+          - name: Integration merge suite
+            command: npm run test:integration-merge
+          - name: Final QA suite
+            command: npm run test:final-qa
+          - name: Full production build
+            command: npm run build
+          - name: Cloudflare active API coverage
+            command: node --test scripts/cloudflare-api-coverage.test.mjs
+          - name: Cloudflare runtime environment inventory
+            command: node scripts/cloudflare-runtime-env-audit.mjs
+          - name: Cloudflare Wrangler dry-run
+            command: npm run build && npx --yes wrangler@4.102.0 deploy --dry-run --outdir .wrangler-full-app-dry-run
+          - name: Cloudflare production-surface Vercel independence
+            command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc src/lib/auth-redirect.js .env.production.example"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run gate
+        shell: bash
+        run: ${{ matrix.command }}

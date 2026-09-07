@@ -1,9 +1,10 @@
 /**
- * Stripe webhook settlement policy unit tests (pure logic mirrors).
+ * Stripe webhook settlement policy unit tests.
  * Run: node --test scripts/stripe-webhook-policy.test.mjs
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { checkoutPaymentIsSettled } from "../api/functions/stripeWebhook.js";
 
 function shouldAcceptCheckoutAmount({ amountTotalCents, balanceDue, total }) {
   const paid = Number(amountTotalCents) / 100;
@@ -26,6 +27,41 @@ function ownerMismatchAction({ expectedUserId, invoiceOwnerId }) {
   }
   return "continue";
 }
+
+describe("checkout settlement authority", () => {
+  it("accepts immediate completed checkout only when Stripe reports paid", () => {
+    assert.equal(
+      checkoutPaymentIsSettled("checkout.session.completed", { payment_status: "paid" }),
+      true
+    );
+    assert.equal(
+      checkoutPaymentIsSettled("checkout.session.completed", { payment_status: "unpaid" }),
+      false
+    );
+  });
+
+  it("accepts asynchronous success only when Stripe reports paid", () => {
+    assert.equal(
+      checkoutPaymentIsSettled("checkout.session.async_payment_succeeded", { payment_status: "paid" }),
+      true
+    );
+    assert.equal(
+      checkoutPaymentIsSettled("checkout.session.async_payment_succeeded", { payment_status: "unpaid" }),
+      false
+    );
+  });
+
+  it("rejects unrelated or failed events as settlement authority", () => {
+    assert.equal(
+      checkoutPaymentIsSettled("checkout.session.async_payment_failed", { payment_status: "paid" }),
+      false
+    );
+    assert.equal(
+      checkoutPaymentIsSettled("payment_intent.payment_failed", { payment_status: "paid" }),
+      false
+    );
+  });
+});
 
 describe("checkout amount settlement", () => {
   it("accepts full payment", () => {

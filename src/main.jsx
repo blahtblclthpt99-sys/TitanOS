@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
 import "./index.css";
+import "./native-polish.css";
 
 const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
 const CURRENT_KEY_PATTERN = /^titan-attention/i;
@@ -16,6 +17,12 @@ const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();
+}
+
+function markNativeDocument() {
+  if (typeof document !== "undefined" && isNativeApp()) {
+    document.documentElement.classList.add("is-native");
+  }
 }
 
 function installNativeApiFetchBridge() {
@@ -164,6 +171,7 @@ function scheduleLegacyClientStatePurge() {
   window.setTimeout(run, 0);
 }
 
+markNativeDocument();
 installNativeApiFetchBridge();
 void installNativeAuthDeepLinkBridge();
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { Suspense, lazy, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
@@ -13,11 +13,22 @@ import FeedbackButton from "@/components/shared/FeedbackButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
 import AppUpdateGate from "@/components/shared/AppUpdateGate";
-import SupportCenter from "@/pages/SupportCenter";
-import SupportCommandCenter from "@/pages/SupportCommandCenter";
+import Spinner from "@/components/shared/Spinner";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { normalizeAppPath } from "@/lib/routing";
 import "@/styles/titan-reference.css";
+
+const SupportCenter = lazy(() => import("@/pages/SupportCenter"));
+const SupportCommandCenter = lazy(() => import("@/pages/SupportCommandCenter"));
+
+function SupportRoute({ admin = false }) {
+  const Page = admin ? SupportCommandCenter : SupportCenter;
+  return (
+    <Suspense fallback={<Spinner label="Loading support" />}>
+      <Page />
+    </Suspense>
+  );
+}
 
 export default function AppLayout() {
   const feedbackRef = useRef(null);
@@ -67,7 +78,13 @@ export default function AppLayout() {
         }}
       >
         <div className="page-enter">
-          {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
+          {isSupportCenter ? (
+            <SupportRoute />
+          ) : isSupportCommandCenter ? (
+            <SupportRoute admin />
+          ) : (
+            <TabStack />
+          )}
         </div>
       </main>
 

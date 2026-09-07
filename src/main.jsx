@@ -6,6 +6,21 @@ import "./index.css";
 const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
 const CURRENT_KEY_PATTERN = /^titan-attention/i;
 const LEGACY_PURGE_MARKER = "titan-attention:legacy-client-state-purged:v1";
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
+function installNativeApiFetchBridge() {
+  if (typeof window === "undefined" || !API_BASE_URL || typeof window.fetch !== "function") return;
+  const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
+  if (!isNative) return;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    if (typeof input === "string" && input.startsWith("/api/")) {
+      return originalFetch(`${API_BASE_URL}${input}`, init);
+    }
+    return originalFetch(input, init);
+  };
+}
 
 function removeLegacyStorageKeys(storage) {
   if (!storage) return;
@@ -57,6 +72,8 @@ function scheduleLegacyClientStatePurge() {
 
   window.setTimeout(run, 0);
 }
+
+installNativeApiFetchBridge();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

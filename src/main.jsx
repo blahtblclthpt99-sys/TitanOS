@@ -13,7 +13,6 @@ const SUPABASE_KEY = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 );
 const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
-const NATIVE_WEBVIEW_ORIGIN = "https://titanos.app";
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();
@@ -40,7 +39,11 @@ function authParam(url, name) {
 }
 
 function isSupportedNativeAuthUrl(url) {
-  return url.protocol === NATIVE_AUTH_SCHEME || url.origin === NATIVE_WEBVIEW_ORIGIN;
+  return (
+    url.protocol === NATIVE_AUTH_SCHEME &&
+    url.hostname === "auth" &&
+    url.pathname.startsWith("/callback")
+  );
 }
 
 async function installNativeAuthDeepLinkBridge() {

@@ -33,8 +33,7 @@ function markSynced(userId) {
  * Google Play keeps ownership state outside TitanOS. Querying owned
  * subscriptions after launch lets an existing subscriber recover access after
  * reinstall, cache clear, or app-data restoration without making Pricing the
- * only recovery path. The billing chunk is dynamically imported so web/iOS and
- * first paint pay no cost.
+ * only recovery path. Billing code is loaded only after confirming Android.
  */
 export default function PlayEntitlementSync() {
   const { user, checkUserAuth } = useAuth();
@@ -50,12 +49,16 @@ export default function PlayEntitlementSync() {
       if (cancelled || document.visibilityState === "hidden" || alreadySynced(userId)) return;
 
       try {
-        const billing = await import("@/lib/playBilling");
-        if (cancelled || !billing.isAndroidPlayBuild()) {
-          // Non-Android sessions will never need this native reconciliation.
-          if (!billing.isAndroidPlayBuild()) markSynced(userId);
+        const { Capacitor } = await import("@capacitor/core");
+        const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+        if (cancelled) return;
+        if (!isAndroid) {
+          markSynced(userId);
           return;
         }
+
+        const billing = await import("@/lib/playBilling");
+        if (cancelled) return;
 
         const purchases = await billing.restorePlaySubscriptions();
         if (cancelled) return;
@@ -73,13 +76,13 @@ export default function PlayEntitlementSync() {
             await billing.verifyPlayPurchase(purchase);
             verified += 1;
           } catch {
-            // Do not mark the session complete on verification/network failure;
-            // a later foreground/online session can safely retry.
+            // Leave the marker unset if no entitlement can be verified so a
+            // later app session can safely retry after network/Play recovery.
           }
         }
 
-        if (!verified) return;
-        if (!cancelled) await checkUserAuth();
+        if (!verified || cancelled) return;
+        await checkUserAuth();
         if (!cancelled) markSynced(userId);
       } catch {
         // Offline, Play Services unavailable, or billing not ready: keep the

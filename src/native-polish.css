@@ -1,0 +1,73 @@
+.is-native body,
+.is-native #root,
+.is-native .site-shell,
+.is-native .dashboard,
+.is-native .fatal {
+  min-height: 100dvh;
+}
+
+.is-native .topbar {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+  padding-right: max(1.5rem, env(safe-area-inset-right));
+  padding-left: max(1.5rem, env(safe-area-inset-left));
+}
+
+.is-native footer {
+  padding-right: max(1.5rem, env(safe-area-inset-right));
+  padding-bottom: max(3rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+  padding-left: max(1.5rem, env(safe-area-inset-left));
+}
+
+.is-native .modal-backdrop {
+  max-height: 100dvh;
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+.is-native .dashboard aside {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+}
+
+.is-native .dash-main {
+  padding-right: max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-right));
+  padding-bottom: max(5rem, calc(env(safe-area-inset-bottom) + 2rem));
+  padding-left: max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-left));
+}
+
+.is-native .close {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.is-native input,
+.is-native textarea,
+.is-native .text-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .is-native .topbar {
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .is-native .dashboard aside {
+    padding-top: max(.8rem, env(safe-area-inset-top));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .is-native .dash-main {
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(4rem, calc(env(safe-area-inset-bottom) + 2rem));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+}

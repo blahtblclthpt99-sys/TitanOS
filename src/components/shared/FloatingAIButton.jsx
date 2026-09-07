@@ -16,7 +16,6 @@ import { useNavigate } from "react-router";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAuth } from "@/lib/AuthContext";
 import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";
-import { upsertSearchDocs } from "@/lib/searchIndex";
 
 const SUGGESTIONS = [
   { icon: Calendar, label: "Schedule a job", action: "/jobs?new=1" },
@@ -77,7 +76,9 @@ export default function FloatingAIButton({ onOpenFeedback }) {
         setListening(false);
         if (text && user?.id) {
           appendVoiceTranscript(user.id, text, "ai-mic");
-          upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id));
+          void import("@/lib/searchIndex")
+            .then(({ upsertSearchDocs }) => upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id)))
+            .catch(() => {});
         }
         if (text) navigate(`/assistant?q=${encodeURIComponent(text)}`);
         else navigate("/assistant");

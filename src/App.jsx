@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const supabaseKey = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 );
+const NATIVE_AUTH_CALLBACK = "com.titanos.myapp://auth/callback";
 const configured = Boolean(supabaseUrl && supabaseKey);
 const supabase = configured
   ? createClient(supabaseUrl, supabaseKey, {
@@ -14,6 +16,11 @@ const supabase = configured
 
 const money = (cents = 0) => `$${(Number(cents || 0) / 100).toFixed(2)}`;
 const cents = (value) => Math.max(0, Math.round(Number(value || 0) * 100));
+
+function authRedirectTo() {
+  if (Capacitor.isNativePlatform()) return NATIVE_AUTH_CALLBACK;
+  return window.location.origin;
+}
 
 async function attention(action, payload = {}) {
   if (!supabase) throw new Error("Titan Attention is not configured.");
@@ -108,7 +115,7 @@ function PublicHome({ openAuth }) {
           <div className="budget-card">
             <div><span>Campaign budget</span><strong>$500.00</strong></div>
             <div><span>Viewer reward</span><strong>$0.05</strong></div>
-            <div><span>Required engagement</span><strong>20 seconds</strong></div>
+            <div><span Required engagement</span><strong>20 seconds</strong></div>
             <div><span>Traffic model</span><strong>Direct sponsored</strong></div>
           </div>
         </section>
@@ -147,7 +154,7 @@ function AuthModal({ initialMode, initialRole, close, success }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: authRedirectTo(),
             data: { full_name: name, attention_role: role },
           },
         });
@@ -304,7 +311,7 @@ function WatchModal({ watch, activeSeconds, busy, close, complete }) {
   const ready = activeSeconds >= required;
   const percent = Math.min(100, Math.round((activeSeconds / required) * 100));
   const media = String(campaign.media_url || "");
-  const video = /\.(mp4|webm|mov)(\?|$)/i.test(media);
+  const video = /\.(mp4|webm|mov)(\\?|$)/i.test(media);
   return (
     <div className="modal-backdrop dark">
       <div className="watch-modal">
@@ -316,7 +323,7 @@ function WatchModal({ watch, activeSeconds, busy, close, complete }) {
         {campaign.destination_url && <a className="sponsor-link" href={campaign.destination_url} target="_blank" rel="noreferrer">Visit sponsor site ↗</a>}
         <div className="watch-stats"><div><small>Verified active time</small><strong>{activeSeconds}s / {required}s</strong></div><div><small>Reward</small><strong>{money(campaign.reward_cents)}</strong></div></div>
         <div className="progress"><span style={{ width: `${percent}%` }} /></div>
-        <p className="fine">Keep this page visible while engaging. Background time does not count.</p>
+        <p>Keep this page visible while engaging. Background time does not count.</p>
         <button className="btn primary full" disabled={!ready || busy} onClick={complete}>{busy ? "Verifying…" : ready ? `Verify & credit ${money(campaign.reward_cents)}` : "Complete active time first"}</button>
       </div>
     </div>

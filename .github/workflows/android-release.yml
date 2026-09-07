@@ -14,13 +14,26 @@ on:
       - "vite.config.*"
       - "package.json"
       - "package-lock.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-release.yml"
+      - "android/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "capacitor.config.*"
+      - "vite.config.*"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: titan-aab-${{ github.ref }}
+  group: titan-aab-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -50,7 +63,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Install and verify web application
+      - name: Install and verify application bundle
         run: |
           npm ci
           npm audit --audit-level=high
@@ -58,7 +71,7 @@ jobs:
           npm run typecheck
           npm run build
 
-      - name: Verify Play release metadata
+      - name: Verify Android runtime invariants
         shell: bash
         run: |
           grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
@@ -67,6 +80,14 @@ jobs:
           grep -q 'targetSdkVersion = 36' android/variables.gradle
           grep -q 'compileSdkVersion = 36' android/variables.gradle
           grep -q '"appId": "com.titanos.myapp"' capacitor.config.json
+          grep -q 'minifyEnabled true' android/app/build.gradle
+          grep -q 'shrinkResources true' android/app/build.gradle
+          grep -q 'proguard-android-optimize.txt' android/app/build.gradle
+          grep -q 'android:usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'registerPlugin(TitanBillingPlugin.class)' android/app/src/main/java/com/titanos/myapp/MainActivity.java
+          grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           test ! -f android/keystore.properties
           test ! -f android/titanos-upload.jks
 

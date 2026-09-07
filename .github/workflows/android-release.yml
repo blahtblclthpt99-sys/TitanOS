@@ -94,6 +94,10 @@ jobs:
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
           grep -q 'exchangeCodeForSession' src/main.jsx
+          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
+          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'native-polish.css' src/main.jsx
+          grep -q 'safe-area-inset-top' src/native-polish.css
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
           ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
           test ! -f android/keystore.properties

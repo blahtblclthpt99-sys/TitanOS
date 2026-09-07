@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { getAuthRedirectTo } from "./lib/auth-redirect.js";
 
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const supabaseKey = String(
@@ -147,7 +148,7 @@ function AuthModal({ initialMode, initialRole, close, success }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: getAuthRedirectTo(),
             data: { full_name: name, attention_role: role },
           },
         });

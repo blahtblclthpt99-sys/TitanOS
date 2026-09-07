@@ -1,5 +1,7 @@
 package com.titanos.myapp;
 
+import android.app.Activity;
+
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingClientStateListener;
 import com.android.billingclient.api.BillingFlowParams;
@@ -18,11 +20,28 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @CapacitorPlugin(name = "TitanBilling")
 public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListener {
+    private static final String EVENT_PURCHASE_UPDATED = "purchaseUpdated";
+
+    private final Object connectionLock = new Object();
+    private final List<PendingBillingAction> pendingActions = new ArrayList<>();
     private BillingClient billingClient;
+    private boolean connectionInFlight;
+    private boolean destroyed;
+
+    private static final class PendingBillingAction {
+        final PluginCall call;
+        final Runnable action;
+
+        PendingBillingAction(PluginCall call, Runnable action) {
+            this.call = call;
+            this.action = action;
+        }
+    }
 
     @Override
     public void load() {
@@ -31,28 +50,111 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
             .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
             .enableAutoServiceReconnection()
             .build();
+
+        // Reconcile owned subscriptions when the bridge starts. The event is
+        // retained so JavaScript can consume it once its listener attaches.
+        ensureBillingReady(this::emitOwnedSubscriptions);
     }
 
     private void withBilling(PluginCall call, Runnable action) {
-        if (billingClient.isReady()) {
+        ensureBillingReady(call, action);
+    }
+
+    private void ensureBillingReady(Runnable action) {
+        ensureBillingReady(null, action);
+    }
+
+    private void ensureBillingReady(PluginCall call, Runnable action) {
+        BillingClient client = billingClient;
+        if (destroyed || client == null) {
+            rejectIfPresent(call, "Google Play Billing is unavailable", BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE);
+            return;
+        }
+        if (client.isReady()) {
             action.run();
             return;
         }
+
+        synchronized (connectionLock) {
+            if (destroyed || billingClient == null) {
+                rejectIfPresent(call, "Google Play Billing is unavailable", BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE);
+                return;
+            }
+            if (billingClient.isReady()) {
+                action.run();
+                return;
+            }
+
+            pendingActions.add(new PendingBillingAction(call, action));
+            if (connectionInFlight) return;
+            connectionInFlight = true;
+        }
+
         billingClient.startConnection(new BillingClientStateListener() {
-            @Override public void onBillingServiceDisconnected() { }
-            @Override public void onBillingSetupFinished(BillingResult result) {
-                if (result.getResponseCode() == BillingClient.BillingResponseCode.OK) action.run();
-                else call.reject("Google Play Billing unavailable: " + result.getDebugMessage(), String.valueOf(result.getResponseCode()));
+            @Override
+            public void onBillingServiceDisconnected() {
+                failPendingActions("Google Play Billing disconnected", BillingClient.BillingResponseCode.SERVICE_DISCONNECTED);
+            }
+
+            @Override
+            public void onBillingSetupFinished(BillingResult result) {
+                if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+                    failPendingActions("Google Play Billing is unavailable", result.getResponseCode());
+                    return;
+                }
+                runPendingActions();
             }
         });
+    }
+
+    private void runPendingActions() {
+        List<PendingBillingAction> ready;
+        synchronized (connectionLock) {
+            connectionInFlight = false;
+            ready = new ArrayList<>(pendingActions);
+            pendingActions.clear();
+        }
+        for (PendingBillingAction pending : ready) {
+            if (destroyed) {
+                rejectIfPresent(pending.call, "Google Play Billing stopped", BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE);
+                continue;
+            }
+            try {
+                pending.action.run();
+            } catch (RuntimeException error) {
+                if (pending.call != null) pending.call.reject("Google Play Billing operation failed", error);
+            }
+        }
+    }
+
+    private void failPendingActions(String message, int responseCode) {
+        List<PendingBillingAction> failed;
+        synchronized (connectionLock) {
+            connectionInFlight = false;
+            failed = new ArrayList<>(pendingActions);
+            pendingActions.clear();
+        }
+        for (PendingBillingAction pending : failed) {
+            rejectIfPresent(pending.call, message, responseCode);
+        }
+    }
+
+    private void rejectIfPresent(PluginCall call, String message, int responseCode) {
+        if (call != null) call.reject(message, String.valueOf(responseCode));
     }
 
     private QueryProductDetailsParams queryParams(JSArray productIds) {
         List<QueryProductDetailsParams.Product> products = new ArrayList<>();
         for (int i = 0; i < productIds.length(); i++) {
-            String id = productIds.optString(i, "");
-            if (!id.isEmpty()) products.add(QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(id).setProductType(BillingClient.ProductType.SUBS).build());
+            String id = productIds.optString(i, "").trim();
+            if (!id.isEmpty()) {
+                products.add(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId(id)
+                        .setProductType(BillingClient.ProductType.SUBS)
+                        .build()
+                );
+            }
         }
         return QueryProductDetailsParams.newBuilder().setProductList(products).build();
     }
@@ -60,13 +162,21 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
     @PluginMethod
     public void queryProducts(PluginCall call) {
         JSArray ids = call.getArray("productIds", new JSArray());
+        if (ids.length() == 0) {
+            call.reject("At least one Google Play productId is required");
+            return;
+        }
+
         withBilling(call, () -> billingClient.queryProductDetailsAsync(queryParams(ids), (result, detailsResult) -> {
             if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                call.reject("Could not load Google Play products: " + result.getDebugMessage(), String.valueOf(result.getResponseCode()));
+                rejectIfPresent(call, "Could not load Google Play products", result.getResponseCode());
                 return;
             }
             JSArray products = new JSArray();
-            for (ProductDetails detail : detailsResult.getProductDetailsList()) products.put(productJson(detail));
+            List<ProductDetails> details = detailsResult.getProductDetailsList();
+            if (details != null) {
+                for (ProductDetails detail : details) products.put(productJson(detail));
+            }
             JSObject response = new JSObject();
             response.put("products", products);
             call.resolve(response);
@@ -75,34 +185,51 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
 
     @PluginMethod
     public void purchase(PluginCall call) {
-        String productId = call.getString("productId", "");
-        String accountId = call.getString("obfuscatedAccountId", "");
+        String productId = call.getString("productId", "").trim();
+        String accountId = call.getString("obfuscatedAccountId", "").trim();
         if (productId.isEmpty() || accountId.isEmpty()) {
             call.reject("productId and obfuscatedAccountId are required");
             return;
         }
-        JSArray ids = new JSArray(); ids.put(productId);
+        if (accountId.length() > 64) {
+            call.reject("obfuscatedAccountId exceeds Google Play's 64-character limit");
+            return;
+        }
+
+        JSArray ids = new JSArray();
+        ids.put(productId);
         withBilling(call, () -> billingClient.queryProductDetailsAsync(queryParams(ids), (result, detailsResult) -> {
             List<ProductDetails> found = detailsResult.getProductDetailsList();
-            if (result.getResponseCode() != BillingClient.BillingResponseCode.OK || found.isEmpty()) {
+            if (result.getResponseCode() != BillingClient.BillingResponseCode.OK || found == null || found.isEmpty()) {
                 call.reject("Subscription is not available in Google Play");
                 return;
             }
+
             ProductDetails detail = found.get(0);
             List<ProductDetails.SubscriptionOfferDetails> offers = detail.getSubscriptionOfferDetails();
             if (offers == null || offers.isEmpty()) {
                 call.reject("No eligible Google Play offer is available for this account");
                 return;
             }
+
+            Activity activity = getActivity();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                call.reject("Google Play checkout cannot open while the app is not active");
+                return;
+            }
+
             ProductDetails.SubscriptionOfferDetails offer = offers.get(0);
             BillingFlowParams.ProductDetailsParams item = BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(detail).setOfferToken(offer.getOfferToken()).build();
+                .setProductDetails(detail)
+                .setOfferToken(offer.getOfferToken())
+                .build();
             BillingFlowParams params = BillingFlowParams.newBuilder()
-                .setProductDetailsParamsList(java.util.Collections.singletonList(item))
-                .setObfuscatedAccountId(accountId).build();
-            BillingResult launch = billingClient.launchBillingFlow(getActivity(), params);
+                .setProductDetailsParamsList(Collections.singletonList(item))
+                .setObfuscatedAccountId(accountId)
+                .build();
+            BillingResult launch = billingClient.launchBillingFlow(activity, params);
             if (launch.getResponseCode() == BillingClient.BillingResponseCode.OK) call.resolve();
-            else call.reject("Could not open Google Play checkout: " + launch.getDebugMessage(), String.valueOf(launch.getResponseCode()));
+            else rejectIfPresent(call, "Could not open Google Play checkout", launch.getResponseCode());
         }));
     }
 
@@ -112,25 +239,50 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
             (result, purchases) -> {
                 if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                    call.reject("Could not restore purchases: " + result.getDebugMessage(), String.valueOf(result.getResponseCode()));
+                    rejectIfPresent(call, "Could not restore purchases", result.getResponseCode());
                     return;
                 }
-                JSObject response = new JSObject(); response.put("purchases", purchasesJson(purchases)); call.resolve(response);
+                JSObject response = new JSObject();
+                response.put("purchases", purchasesJson(purchases));
+                call.resolve(response);
             }
         ));
+    }
+
+    private void emitOwnedSubscriptions() {
+        BillingClient client = billingClient;
+        if (destroyed || client == null || !client.isReady()) return;
+        client.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
+            (result, purchases) -> {
+                if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) return;
+                JSObject event = new JSObject();
+                event.put("responseCode", result.getResponseCode());
+                event.put("purchases", purchasesJson(purchases));
+                event.put("source", "reconcile");
+                notifyListeners(EVENT_PURCHASE_UPDATED, event, true);
+            }
+        );
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        ensureBillingReady(this::emitOwnedSubscriptions);
     }
 
     @Override
     public void onPurchasesUpdated(BillingResult result, List<Purchase> purchases) {
         JSObject event = new JSObject();
         event.put("responseCode", result.getResponseCode());
-        event.put("debugMessage", result.getDebugMessage());
-        event.put("purchases", purchasesJson(purchases == null ? new ArrayList<>() : purchases));
-        notifyListeners("purchaseUpdated", event, true);
+        event.put("purchases", purchasesJson(purchases == null ? Collections.emptyList() : purchases));
+        event.put("source", "purchase_flow");
+        notifyListeners(EVENT_PURCHASE_UPDATED, event, true);
     }
 
     private JSArray purchasesJson(List<Purchase> purchases) {
         JSArray out = new JSArray();
+        if (purchases == null) return out;
         for (Purchase purchase : purchases) {
             JSObject item = new JSObject();
             item.put("purchaseToken", purchase.getPurchaseToken());
@@ -150,20 +302,23 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
         item.put("description", detail.getDescription());
         JSArray offersJson = new JSArray();
         List<ProductDetails.SubscriptionOfferDetails> offers = detail.getSubscriptionOfferDetails();
-        if (offers != null) for (ProductDetails.SubscriptionOfferDetails offer : offers) {
-            JSObject offerJson = new JSObject();
-            offerJson.put("basePlanId", offer.getBasePlanId());
-            offerJson.put("offerId", offer.getOfferId());
-            offerJson.put("offerToken", offer.getOfferToken());
-            JSArray phases = new JSArray();
-            for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
-                JSObject p = new JSObject();
-                p.put("formattedPrice", phase.getFormattedPrice());
-                p.put("billingPeriod", phase.getBillingPeriod());
-                p.put("recurrenceMode", phase.getRecurrenceMode());
-                phases.put(p);
+        if (offers != null) {
+            for (ProductDetails.SubscriptionOfferDetails offer : offers) {
+                JSObject offerJson = new JSObject();
+                offerJson.put("basePlanId", offer.getBasePlanId());
+                offerJson.put("offerId", offer.getOfferId());
+                offerJson.put("offerToken", offer.getOfferToken());
+                JSArray phases = new JSArray();
+                for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
+                    JSObject p = new JSObject();
+                    p.put("formattedPrice", phase.getFormattedPrice());
+                    p.put("billingPeriod", phase.getBillingPeriod());
+                    p.put("recurrenceMode", phase.getRecurrenceMode());
+                    phases.put(p);
+                }
+                offerJson.put("pricingPhases", phases);
+                offersJson.put(offerJson);
             }
-            offerJson.put("pricingPhases", phases); offersJson.put(offerJson);
         }
         item.put("offers", offersJson);
         return item;
@@ -171,6 +326,11 @@ public class TitanBillingPlugin extends Plugin implements PurchasesUpdatedListen
 
     @Override
     protected void handleOnDestroy() {
-        if (billingClient != null) billingClient.endConnection();
+        destroyed = true;
+        failPendingActions("Google Play Billing stopped", BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE);
+        BillingClient client = billingClient;
+        billingClient = null;
+        if (client != null) client.endConnection();
+        super.handleOnDestroy();
     }
 }

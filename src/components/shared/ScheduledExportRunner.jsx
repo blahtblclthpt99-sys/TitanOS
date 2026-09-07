@@ -1,8 +1,9 @@
 /**
  * Runs due scheduled exports while the app is open (honest local cadence).
  */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { useVisibilityInterval } from "@/hooks/useVisibilityInterval";
 import { popDueScheduledReports } from "@/lib/export/schedule";
 import { runExport } from "@/lib/export/runExport";
 import {
@@ -61,38 +62,51 @@ async function buildSpec(moduleId) {
 
 export default function ScheduledExportRunner() {
   const { user } = useAuth();
+  const userId = user?.id || null;
   const running = useRef(false);
 
-  useEffect(() => {
-    if (!user?.id) return undefined;
+  const tick = useCallback(async () => {
+    if (!userId || running.current) return;
+    const due = popDueScheduledReports(userId);
+    if (!due.length) return;
 
-    const tick = async () => {
-      if (running.current) return;
-      const due = popDueScheduledReports(user.id);
-      if (!due.length) return;
-      running.current = true;
-      try {
-        for (const job of due) {
-          const spec = await buildSpec(job.moduleId);
-          if (!spec) continue;
-          const result = await runExport(spec, job.format || "csv", { userId: user.id });
-          toast({
-            title: result.ok ? `Scheduled: ${job.title || job.moduleId}` : "Scheduled export skipped",
-            description: result.ok
-              ? `${(job.format || "csv").toUpperCase()} ready${job.email ? ` · email not sent yet (${job.email})` : ""}`
-              : result.reason,
-            variant: result.ok ? "default" : "destructive",
-          });
-        }
-      } finally {
-        running.current = false;
+    running.current = true;
+    try {
+      for (const job of due) {
+        const spec = await buildSpec(job.moduleId);
+        if (!spec) continue;
+        const result = await runExport(spec, job.format || "csv", { userId });
+        toast({
+          title: result.ok ? `Scheduled: ${job.title || job.moduleId}` : "Scheduled export skipped",
+          description: result.ok
+            ? `${(job.format || "csv").toUpperCase()} ready${job.email ? ` · email not sent yet (${job.email})` : ""}`
+            : result.reason,
+          variant: result.ok ? "default" : "destructive",
+        });
       }
-    };
+    } finally {
+      running.current = false;
+    }
+  }, [userId]);
 
-    tick();
-    const id = setInterval(tick, 60_000);
-    return () => clearInterval(id);
-  }, [user?.id]);
+  // Run once when an authenticated shell appears.
+  useEffect(() => {
+    if (!userId) return;
+    void tick();
+  }, [userId, tick]);
+
+  // No background wakeups while the app is hidden. When it becomes visible,
+  // check immediately so overdue reports do not wait for the next minute tick.
+  useEffect(() => {
+    if (!userId || typeof document === "undefined") return undefined;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [userId, tick]);
+
+  useVisibilityInterval(tick, 60_000, { enabled: Boolean(userId) });
 
   return null;
 }

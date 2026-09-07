@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
 import "./index.css";
 
@@ -7,11 +8,20 @@ const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
 const CURRENT_KEY_PATTERN = /^titan-attention/i;
 const LEGACY_PURGE_MARKER = "titan-attention:legacy-client-state-purged:v1";
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_KEY = String(
+  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
+);
+const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
+const NATIVE_WEBVIEW_ORIGIN = "https://titanos.app";
+
+function isNativeApp() {
+  return Capacitor.isNativePlatform();
+}
 
 function installNativeApiFetchBridge() {
   if (typeof window === "undefined" || !API_BASE_URL || typeof window.fetch !== "function") return;
-  const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
-  if (!isNative) return;
+  if (!isNativeApp()) return;
 
   const originalFetch = window.fetch.bind(window);
   window.fetch = (input, init) => {
@@ -20,6 +30,88 @@ function installNativeApiFetchBridge() {
     }
     return originalFetch(input, init);
   };
+}
+
+function authParam(url, name) {
+  const queryValue = url.searchParams.get(name);
+  if (queryValue) return queryValue;
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  return hash.get(name);
+}
+
+function isSupportedNativeAuthUrl(url) {
+  return url.protocol === NATIVE_AUTH_SCHEME || url.origin === NATIVE_WEBVIEW_ORIGIN;
+}
+
+async function installNativeAuthDeepLinkBridge() {
+  if (typeof window === "undefined" || !isNativeApp() || !SUPABASE_URL || !SUPABASE_KEY) return;
+
+  try {
+    const [{ App: CapacitorApp }, { createClient }] = await Promise.all([
+      import("@capacitor/app"),
+      import("@supabase/supabase-js"),
+    ]);
+    const authClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+    let consuming = false;
+
+    const consume = async (rawUrl) => {
+      if (!rawUrl || consuming) return;
+
+      let url;
+      try {
+        url = new URL(rawUrl);
+      } catch {
+        return;
+      }
+      if (!isSupportedNativeAuthUrl(url)) return;
+
+      const errorCode = authParam(url, "error_code") || authParam(url, "error");
+      if (errorCode) return;
+
+      const accessToken = authParam(url, "access_token");
+      const refreshToken = authParam(url, "refresh_token");
+      const code = authParam(url, "code");
+      if ((!accessToken || !refreshToken) && !code) return;
+
+      consuming = true;
+      try {
+        if (accessToken && refreshToken) {
+          const { error } = await authClient.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) throw error;
+        } else {
+          const { error } = await authClient.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+        }
+
+        // Reload the packaged app at its clean internal origin. The primary
+        // Supabase client then reads the persisted session during normal boot.
+        window.location.replace(`${window.location.origin}/`);
+      } catch {
+        // Authentication remains fail-closed. The user can retry sign-in rather
+        // than retaining a partial or unverified native session.
+      } finally {
+        consuming = false;
+      }
+    };
+
+    await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      void consume(url);
+    });
+
+    const launch = await CapacitorApp.getLaunchUrl();
+    if (launch?.url) void consume(launch.url);
+  } catch {
+    // Native auth bridge is additive; app startup must not depend on it.
+  }
 }
 
 function removeLegacyStorageKeys(storage) {
@@ -74,6 +166,7 @@ function scheduleLegacyClientStatePurge() {
 }
 
 installNativeApiFetchBridge();
+void installNativeAuthDeepLinkBridge();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

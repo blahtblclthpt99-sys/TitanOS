@@ -311,7 +311,7 @@ function WatchModal({ watch, activeSeconds, busy, close, complete }) {
   const ready = activeSeconds >= required;
   const percent = Math.min(100, Math.round((activeSeconds / required) * 100));
   const media = String(campaign.media_url || "");
-  const video = /\.(mp4|webm|mov)(\\?|$)/i.test(media);
+  const video = /\.(mp4|webm|mov)(\?|$)/i.test(media);
   return (
     <div className="modal-backdrop dark">
       <div className="watch-modal">
@@ -323,7 +323,7 @@ function WatchModal({ watch, activeSeconds, busy, close, complete }) {
         {campaign.destination_url && <a className="sponsor-link" href={campaign.destination_url} target="_blank" rel="noreferrer">Visit sponsor site ↗</a>}
         <div className="watch-stats"><div><small>Verified active time</small><strong>{activeSeconds}s / {required}s</strong></div><div><small>Reward</small><strong>{money(campaign.reward_cents)}</strong></div></div>
         <div className="progress"><span style={{ width: `${percent}%` }} /></div>
-        <p>Keep this page visible while engaging. Background time does not count.</p>
+        <p className="fine">Keep this page visible while engaging. Background time does not count.</p>
         <button className="btn primary full" disabled={!ready || busy} onClick={complete}>{busy ? "Verifying…" : ready ? `Verify & credit ${money(campaign.reward_cents)}` : "Complete active time first"}</button>
       </div>
     </div>
@@ -380,7 +380,7 @@ function AdvertiserDashboard({ profile, campaigns, reload, signOut }) {
   return (
     <DashboardShell profile={profile} signOut={signOut}>
       <header className="dash-head"><div><span className="eyebrow">Advertise</span><h1>Campaign control</h1><p>Create direct sponsored campaigns and fund them before distribution.</p></div></header>
-       {notice && <div className="notice">{notice}</div>}
+      {notice && <div className="notice">{notice}</div>}
       <section className="stats">
         <article><small>Campaigns</small><strong>{campaigns.length}</strong><span>{campaigns.filter((c) => c.status === "active").length} active</span></article>
         <article><small>Committed budget</small><strong>{money(totals.budget)}</strong><span>Across all drafts and campaigns</span></article>
@@ -393,12 +393,12 @@ function AdvertiserDashboard({ profile, campaigns, reload, signOut }) {
           <label>Campaign title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} minLength={3} maxLength={120} required /></label>
           <label>Description<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} required /></label>
           <label>Media URL <small>Optional image or direct video URL</small><input type="url" value={form.media_url} onChange={(e) => setForm({ ...form, media_url: e.target.value })} /></label>
-          <label>Sponsor destination <small>Optional</small><input type="url" value={form.destination_url} onChange={(e) => setForm({ ....form, destination_url: e.target.value })} /></label>
+          <label>Sponsor destination <small>Optional</small><input type="url" value={form.destination_url} onChange={(e) => setForm({ ...form, destination_url: e.target.value })} /></label>
           <div className="form-row">
             <label>Viewer reward ($)<input type="number" min="0.01" max="100" step="0.01" value={form.reward} onChange={(e) => setForm({ ...form, reward: e.target.value })} required /></label>
-            <label>Active seconds<input type="number" min="5" max="600" step="1" value={form.duration} onChange={(e) => setForm({ ....form, duration: e.target.value })} required /></label>
+            <label>Active seconds<input type="number" min="5" max="600" step="1" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} required /></label>
           </div>
-          <label>Campaign budget ($)<input type="number" min="5" max="100000" step="0.01" value={form.budget} onChange={(e) => setForm({ ....form, budget: e.target.value })} required /></label>
+          <label>Campaign budget ($)<input type="number" min="5" max="100000" step="0.01" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} required /></label>
           <p className="fine">Titan currently applies a 25% platform fee to each viewer reward, disclosed in campaign economics before activation.</p>
           <button className="btn primary full" disabled={busy}>Create draft</button>
         </form>

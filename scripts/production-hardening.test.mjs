@@ -54,10 +54,15 @@ describe("Stripe money path guards", () => {
     assert.match(src, /assertRateLimit/);
   });
 
-  it("webhook verifies signature before processing", () => {
+  it("webhook verifies signature before claiming the attention payment event", () => {
     const src = read("api/functions/stripeWebhook.js");
+    assert.match(src, /bodyParser:\s*false/);
     assert.match(src, /constructEvent/);
-    assert.match(src, /stripe_webhook_events/);
+    assert.match(src, /attention_payment_events/);
+    assert.ok(
+      src.indexOf("constructEvent") < src.indexOf("attention_payment_events"),
+      "Stripe signature verification must happen before the idempotency ledger claim",
+    );
   });
 });
 

@@ -1,5 +1,8 @@
 import { getSupabaseAdmin } from "../_lib/supabase.js";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CAMPAIGN_CHECKOUT_FIELDS = "id,advertiser_id,title,total_budget_cents,funded_cents,status,stripe_checkout_session_id,updated_at";
+
 function json(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "application/json");
@@ -13,12 +16,12 @@ export default async function handler(req, res) {
   if (!stripeKey) return json(res, 503, { error: "Stripe is not configured for this deployment" });
 
   const authorization = String(req.headers.authorization || "");
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return json(res, 401, { error: "Authentication required" });
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const campaignId = String(body.campaign_id || "");
-  if (!campaignId) return json(res, 400, { error: "campaign_id is required" });
+  const campaignId = String(body.campaign_id || "").trim();
+  if (!UUID_RE.test(campaignId)) return json(res, 400, { error: "Valid campaign_id is required" });
 
   try {
     const admin = getSupabaseAdmin();
@@ -26,18 +29,19 @@ export default async function handler(req, res) {
     const user = authData?.user;
     if (authError || !user) return json(res, 401, { error: "Invalid session" });
 
-    const { data: profile } = await admin
+    const { data: profile, error: profileError } = await admin
       .from("attention_profiles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
+    if (profileError) throw profileError;
     if (!profile || !["advertiser", "admin"].includes(profile.role)) {
       return json(res, 403, { error: "Advertiser account required" });
     }
 
     const { data: campaign, error: campaignError } = await admin
       .from("attention_campaigns")
-      .select("*")
+      .select(CAMPAIGN_CHECKOUT_FIELDS)
       .eq("id", campaignId)
       .eq("advertiser_id", user.id)
       .maybeSingle();

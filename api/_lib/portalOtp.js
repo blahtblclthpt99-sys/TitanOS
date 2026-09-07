@@ -1,18 +1,27 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+function portalPepper() {
+  const configured = process.env.PORTAL_OTP_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (configured) return configured;
+
+  const vercelEnv = String(process.env.VERCEL_ENV || "").toLowerCase();
+  const productionLike = process.env.NODE_ENV === "production" || vercelEnv === "production" || vercelEnv === "preview";
+  if (productionLike) {
+    throw new Error("PORTAL_OTP_PEPPER or SUPABASE_SERVICE_ROLE_KEY is required outside local development");
+  }
+
+  return "titanos-portal-otp-dev-only";
+}
+
 /**
  * Hash portal OTP before storage. Never log raw codes.
  * Pepper prefers dedicated secret, then service role (server-only).
  */
 export function hashPortalOtp(email, code) {
-  const pepper =
-    process.env.PORTAL_OTP_PEPPER ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "titanos-portal-otp-dev-only";
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedCode = String(code || "").trim();
   return createHash("sha256")
-    .update(`${pepper}:${normalizedEmail}:${normalizedCode}`)
+    .update(`${portalPepper()}:${normalizedEmail}:${normalizedCode}`)
     .digest("hex");
 }
 

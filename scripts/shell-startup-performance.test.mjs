@@ -53,4 +53,30 @@ describe("authenticated shell startup performance contract", () => {
     assert.match(prefetch, /delay:\s*350/);
     assert.match(prefetch, /timeout:\s*2000/);
   });
+
+  it("keeps search indexing off entity-response and voice-control critical paths", async () => {
+    const entityQuery = await source("src/lib/entity-query.js");
+    const mobileDock = await source("src/components/layout/MobileActionDock.jsx");
+    const floatingAi = await source("src/components/shared/FloatingAIButton.jsx");
+
+    for (const code of [entityQuery, mobileDock, floatingAi]) {
+      assert.doesNotMatch(code, /from\s+["']@\/lib\/searchIndex["']/);
+      assert.match(code, /import\("@\/lib\/searchIndex"\)/);
+    }
+    assert.match(entityQuery, /requestIdleCallback/);
+  });
+
+  it("demand-loads global search from always-mounted desktop and mobile chrome", async () => {
+    const desktop = await source("src/components/layout/DesktopTopBar.jsx");
+    const mobileHeader = await source("src/components/layout/MobileHeader.jsx");
+
+    assert.doesNotMatch(desktop, /from\s+["']@\/lib\/globalSearch["']/);
+    assert.match(desktop, /import\("@\/lib\/globalSearch"\)/);
+    assert.match(desktop, /onPointerEnter=\{primeSearch\}/);
+    assert.match(desktop, /searchOpen\s*&&\s*searchTools/);
+
+    assert.doesNotMatch(mobileHeader, /import\s+MobileGlobalSearch\s+from/);
+    assert.match(mobileHeader, /lazy\(\(\)\s*=>\s*import\("@\/components\/layout\/MobileGlobalSearch"\)\)/);
+    assert.match(mobileHeader, /searchOpen\s*\?/);
+  });
 });

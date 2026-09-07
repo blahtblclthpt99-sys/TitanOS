@@ -84,13 +84,20 @@ jobs:
           grep -q 'shrinkResources true' android/app/build.gradle
           grep -q 'proguard-android-optimize.txt' android/app/build.gradle
           grep -q 'android:usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
-          grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:allowBackup="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:dataExtractionRules="@xml/data_extraction_rules"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="com.titanos.myapp" android:host="auth" android:pathPrefix="/callback"' android/app/src/main/AndroidManifest.xml
+          ! grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
           grep -q 'registerPlugin(TitanBillingPlugin.class)' android/app/src/main/java/com/titanos/myapp/MainActivity.java
           grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
           grep -q 'exchangeCodeForSession' src/main.jsx
+          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
+          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'native-polish.css' src/main.jsx
+          grep -q 'safe-area-inset-top' src/native-polish.css
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
           ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
           test ! -f android/keystore.properties

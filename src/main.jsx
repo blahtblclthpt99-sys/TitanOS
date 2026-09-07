@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
 import "./index.css";
+import "./native-polish.css";
 
 const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
 const CURRENT_KEY_PATTERN = /^titan-attention/i;
@@ -13,10 +14,15 @@ const SUPABASE_KEY = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 );
 const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
-const NATIVE_WEBVIEW_ORIGIN = "https://titanos.app";
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();
+}
+
+function markNativeDocument() {
+  if (typeof document !== "undefined" && isNativeApp()) {
+    document.documentElement.classList.add("is-native");
+  }
 }
 
 function installNativeApiFetchBridge() {
@@ -40,7 +46,7 @@ function authParam(url, name) {
 }
 
 function isSupportedNativeAuthUrl(url) {
-  return url.protocol === NATIVE_AUTH_SCHEME || url.origin === NATIVE_WEBVIEW_ORIGIN;
+  return url.protocol === NATIVE_AUTH_SCHEME && url.host === "auth" && url.pathname.startsWith("/callback");
 }
 
 async function installNativeAuthDeepLinkBridge() {
@@ -165,6 +171,7 @@ function scheduleLegacyClientStatePurge() {
   window.setTimeout(run, 0);
 }
 
+markNativeDocument();
 installNativeApiFetchBridge();
 void installNativeAuthDeepLinkBridge();
 

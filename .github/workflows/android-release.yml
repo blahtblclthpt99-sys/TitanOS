@@ -84,21 +84,26 @@ jobs:
           grep -q 'shrinkResources true' android/app/build.gradle
           grep -q 'proguard-android-optimize.txt' android/app/build.gradle
           grep -q 'android:usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
           grep -q 'registerPlugin(TitanBillingPlugin.class)' android/app/src/main/java/com/titanos/myapp/MainActivity.java
           grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
+          grep -q 'exchangeCodeForSession' src/main.jsx
+          grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
+          ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
           test ! -f android/keystore.properties
           test ! -f android/titanos-upload.jks
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
-      - name: Build unsigned release bundle
+      - name: Lint and build unsigned release bundle
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon clean bundleRelease
+          ./gradlew --no-daemon clean lintRelease bundleRelease
 
       - name: Verify AAB structure and record build identity
         shell: bash
@@ -125,5 +130,6 @@ jobs:
             android/app/build/outputs/bundle/release/app-release.aab
             TitanOS-release-aab-UNSIGNED-SHA256.txt
             TitanOS-release-build-info.txt
+            android/app/build/reports/lint-results-release.html
           if-no-files-found: error
           retention-days: 14

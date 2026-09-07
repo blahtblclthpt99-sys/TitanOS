@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../_lib/supabase.js";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CAMPAIGN_CHECKOUT_FIELDS = "id,advertiser_id,title,total_budget_cents,funded_cents,status,stripe_checkout_session_id,updated_at";
 const NATIVE_ORIGINS = new Set([
+  "https://titanos.app",
   "capacitor://localhost",
   "http://localhost",
   "https://localhost",

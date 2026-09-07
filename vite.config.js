@@ -34,7 +34,7 @@ export default defineConfig(() => {
       // Only preload the entry's critical deps — not lazy vendor islands
       modulePreload: {
         polyfill: true,
-          resolveDependencies(filename, deps) {
+        resolveDependencies(filename, deps) {
           return deps.filter((dep) => {
             const name = dep.split('/').pop() || '';
             // Never preload heavy islands on the marketing entry
@@ -88,7 +88,7 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 600,
     },
     optimizeDeps: {
-      include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+      include: ['react', 'react-dom', '@supabase/supabase-js'],
     },
   };
 });

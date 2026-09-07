@@ -6,6 +6,7 @@ import {
   Building2,
   Check,
   Download,
+  RefreshCw,
   Rocket,
   Smartphone,
   Sparkles,
@@ -33,6 +34,7 @@ import {
   isAndroidPlayBuild,
   loadPlaySubscriptions,
   onPlayPurchaseUpdated,
+  restorePlaySubscriptions,
   startPlaySubscription,
   verifyPlayPurchase,
 } from "@/lib/playBilling";
@@ -204,17 +206,27 @@ export default function Pricing() {
   const androidPlay = isAndroidPlayBuild();
   const [playProducts, setPlayProducts] = React.useState([]);
   const [purchasing, setPurchasing] = React.useState(false);
+  const [restoring, setRestoring] = React.useState(false);
   const foundingOpen = isFreeDuringBeta();
   const cards = buildCards();
   const spots = getLaunchStatus().spotsRemaining;
 
   React.useEffect(() => {
     if (!androidPlay) return undefined;
-    loadPlaySubscriptions().then(setPlayProducts).catch(() => {
-      toast({ variant: "destructive", title: "Plans are temporarily unavailable", description: "Check your connection and try again." });
-    });
+
+    let disposed = false;
     let handle;
-    onPlayPurchaseUpdated(async ({ responseCode, purchases = [] }) => {
+
+    loadPlaySubscriptions().then((products) => {
+      if (!disposed) setPlayProducts(products);
+    }).catch(() => {
+      if (!disposed) {
+        toast({ variant: "destructive", title: "Plans are temporarily unavailable", description: "Check your connection and try again." });
+      }
+    });
+
+    void onPlayPurchaseUpdated(async ({ responseCode, purchases = [] }) => {
+      if (disposed) return;
       if (responseCode !== 0) {
         setPurchasing(false);
         if (responseCode !== 1) toast({ variant: "destructive", title: "Purchase not completed", description: "Google Play did not complete the subscription." });
@@ -228,15 +240,25 @@ export default function Pricing() {
       }
       try {
         for (const purchase of purchased) await verifyPlayPurchase(purchase);
+        if (disposed) return;
         await checkUserAuth();
-        toast({ title: "Subscription active", description: "Your TitanOS plan is ready." });
+        if (!disposed) toast({ title: "Subscription active", description: "Your TitanOS plan is ready." });
       } catch (error) {
-        toast({ variant: "destructive", title: "Purchase needs verification", description: error.message || "Try Restore purchases shortly." });
+        if (!disposed) {
+          toast({ variant: "destructive", title: "Purchase needs verification", description: error.message || "Use Restore purchases and try again." });
+        }
       } finally {
-        setPurchasing(false);
+        if (!disposed) setPurchasing(false);
       }
-    }).then((listener) => { handle = listener; });
-    return () => { handle?.remove(); };
+    }).then((listener) => {
+      if (disposed) void listener?.remove?.();
+      else handle = listener;
+    }).catch(() => {});
+
+    return () => {
+      disposed = true;
+      void handle?.remove?.();
+    };
   }, [androidPlay, checkUserAuth]);
 
   const buyWithPlay = React.useCallback(async (planId) => {
@@ -254,6 +276,42 @@ export default function Pricing() {
     }
   }, [user?.id]);
 
+  const restoreWithPlay = React.useCallback(async () => {
+    if (!user?.id) {
+      toast({ title: "Sign in first", description: "Sign in to restore a Google Play subscription to this TitanOS account." });
+      window.location.assign("/login?next=/pricing");
+      return;
+    }
+
+    try {
+      setRestoring(true);
+      const purchases = await restorePlaySubscriptions();
+      const purchased = (purchases || []).filter((purchase) => purchase?.purchaseState === 1);
+      if (!purchased.length) {
+        toast({ title: "No active subscription found", description: "Google Play did not return an active TitanOS subscription for this account." });
+        return;
+      }
+
+      let verified = 0;
+      for (const purchase of purchased) {
+        try {
+          await verifyPlayPurchase(purchase);
+          verified += 1;
+        } catch {
+          /* continue so one stale purchase does not block another active one */
+        }
+      }
+
+      if (!verified) throw new Error("Google Play found a purchase, but TitanOS could not verify it yet.");
+      await checkUserAuth();
+      toast({ title: "Purchases restored", description: "Your verified Google Play subscription is active in TitanOS." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Could not restore purchases", description: error.message || "Check your connection and try again." });
+    } finally {
+      setRestoring(false);
+    }
+  }, [user?.id, checkUserAuth]);
+
   const buyWithStripe = React.useCallback(async (planId) => {
     if (!user?.id) {
       toast({ title: "Sign in first", description: "Your subscription must be linked to your TitanOS account." });
@@ -268,6 +326,7 @@ export default function Pricing() {
       toast({ variant: "destructive", title: "Checkout unavailable", description: error.message || "Try again later." });
     }
   }, [user?.id]);
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
     <div className="flex-1 flex flex-col items-center py-12 px-4 pb-16">
@@ -326,15 +385,19 @@ export default function Pricing() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground mb-0.5">TitanOS for Android</p>
             <p className="text-xs text-muted-foreground">
-              Same plans on mobile via Google Play
+              {androidPlay ? "Restore an existing Google Play subscription to this account" : "Same plans on mobile via Google Play"}
             </p>
           </div>
           <Button
-            onClick={openPlayStore}
+            onClick={androidPlay ? restoreWithPlay : openPlayStore}
+            disabled={androidPlay && restoring}
             className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 px-4 gap-1.5 flex-shrink-0"
           >
-            <Download className="w-4 h-4" />
-            Get App
+            {androidPlay ? (
+              <><RefreshCw className={`w-4 h-4 ${restoring ? "animate-spin" : ""}`} /> {restoring ? "Restoring…" : "Restore purchases"}</>
+            ) : (
+              <><Download className="w-4 h-4" /> Get App</>
+            )}
           </Button>
         </div>
       </motion.div>

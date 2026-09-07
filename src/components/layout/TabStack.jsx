@@ -206,7 +206,10 @@ function NonTabPage() {
 
 export default function TabStack() {
   const location = useLocation();
-  const recentTabs = useRef(["/"]);
+  // Do not mount Dashboard until the user actually visits it. Starting the LRU
+  // empty prevents a protected deep-link (Settings, Customers, etc.) from paying
+  // the Dashboard render/data cost invisibly in the background.
+  const recentTabs = useRef([]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
 
@@ -216,7 +219,7 @@ export default function TabStack() {
   if (activeTab) {
     recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
-  const mountedTabs = new Set(["/", ...recentTabs.current]);
+  const mountedTabs = new Set(recentTabs.current);
   if (activeTab) mountedTabs.add(activeTab);
 
   return (

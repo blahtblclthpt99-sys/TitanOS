@@ -249,3 +249,30 @@ describe("Scale / concurrent-session hardening", () => {
     assert.match(read("scripts/load-test.mjs"), /scale:/);
   });
 });
+
+describe("Android Play entitlement recovery", () => {
+  it("restores owned subscriptions off the startup critical path", () => {
+    const shell = read("src/AuthenticatedShell.jsx");
+    const sync = read("src/components/billing/PlayEntitlementSync.jsx");
+    assert.match(shell, /PlayEntitlementSync/);
+    assert.match(sync, /STARTUP_DELAY_MS\s*=\s*10_000/);
+    assert.match(sync, /runWhenIdle/);
+    assert.match(sync, /Capacitor\.isNativePlatform/);
+    assert.match(sync, /restorePlaySubscriptions/);
+    assert.match(sync, /verifyPlayPurchase/);
+    assert.match(sync, /checkUserAuth/);
+  });
+
+  it("keeps a manual restore path and a server-verified account boundary", () => {
+    const pricing = read("src/pages/Pricing.jsx");
+    const billing = read("src/lib/playBilling.js");
+    const verifier = read("api/functions/googlePlayVerifySubscription.js");
+    assert.match(pricing, /Restore purchases/);
+    assert.match(pricing, /restorePlaySubscriptions/);
+    assert.match(pricing, /disposed/);
+    assert.match(billing, /googlePlayVerifySubscription/);
+    assert.match(verifier, /requireUser/);
+    assert.match(verifier, /Purchase is linked to another account/);
+    assert.match(verifier, /obfuscatedExternalAccountId/);
+  });
+});

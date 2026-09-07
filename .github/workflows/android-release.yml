@@ -79,22 +79,48 @@ jobs:
           grep -q 'versionName "2.0.4"' android/app/build.gradle
           grep -q 'targetSdkVersion = 36' android/variables.gradle
           grep -q 'compileSdkVersion = 36' android/variables.gradle
+          grep -q "androidxActivityVersion = '1.13.0'" android/variables.gradle
+          grep -q "androidxAppCompatVersion = '1.8.0'" android/variables.gradle
+          grep -q "androidxCoreVersion = '1.19.0'" android/variables.gradle
+          grep -q 'gradle-8.14.5-all.zip' android/gradle/wrapper/gradle-wrapper.properties
           grep -q '"appId": "com.titanos.myapp"' capacitor.config.json
           grep -q 'minifyEnabled true' android/app/build.gradle
           grep -q 'shrinkResources true' android/app/build.gradle
           grep -q 'proguard-android-optimize.txt' android/app/build.gradle
           grep -q 'android:usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
-          grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:dataExtractionRules="@xml/data_extraction_rules"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:fullBackupContent="@xml/backup_rules"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="com.titanos.myapp" android:host="auth" android:pathPrefix="/callback"' android/app/src/main/AndroidManifest.xml
+          ! grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
           grep -q 'registerPlugin(TitanBillingPlugin.class)' android/app/src/main/java/com/titanos/myapp/MainActivity.java
           grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
           grep -q 'exchangeCodeForSession' src/main.jsx
+          grep -q 'url.hostname === "auth"' src/main.jsx
+          grep -q 'NATIVE_AUTH_CALLBACK = "com.titanos.myapp://auth/callback"' src/App.jsx
+          grep -q 'emailRedirectTo: authRedirectTo()' src/App.jsx
+          grep -q '<monochrome android:drawable="@mipmap/ic_launcher_foreground"' android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q '<monochrome android:drawable="@mipmap/ic_launcher_foreground"' android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
           ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
+          test -f android/app/src/main/res/xml/data_extraction_rules.xml
+          test -f android/app/src/main/res/xml/backup_rules.xml
+          test ! -f android/app/src/main/res/layout/activity_main.xml
+          test ! -f android/app/src/main/res/drawable/ic_launcher_background.xml
+          test ! -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
           test ! -f android/keystore.properties
           test ! -f android/titanos-upload.jks
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml").read_text()
+          assert manifest.index("<uses-permission") < manifest.index("<application")
+          assert "titanos.app" not in manifest
+          app = Path("src/App.jsx").read_text()
+          assert '<span>Required engagement</span>' in app
+          assert 'emailRedirectTo: authRedirectTo()' in app
+          PY
 
       - name: Sync Capacitor Android project
         run: npx cap sync android

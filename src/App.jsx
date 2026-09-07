@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const supabaseKey = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 );
+const NATIVE_AUTH_CALLBACK = "com.titanos.myapp://auth/callback";
 const configured = Boolean(supabaseUrl && supabaseKey);
 const supabase = configured
   ? createClient(supabaseUrl, supabaseKey, {
@@ -14,6 +16,11 @@ const supabase = configured
 
 const money = (cents = 0) => `$${(Number(cents || 0) / 100).toFixed(2)}`;
 const cents = (value) => Math.max(0, Math.round(Number(value || 0) * 100));
+
+function authRedirectTo() {
+  if (Capacitor.isNativePlatform()) return NATIVE_AUTH_CALLBACK;
+  return window.location.origin;
+}
 
 async function attention(action, payload = {}) {
   if (!supabase) throw new Error("Titan Attention is not configured.");
@@ -147,7 +154,7 @@ function AuthModal({ initialMode, initialRole, close, success }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: authRedirectTo(),
             data: { full_name: name, attention_role: role },
           },
         });

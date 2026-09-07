@@ -23,12 +23,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Google / OAuth return deep link -->
+            <!-- Canonical custom-scheme authentication callback. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.titanos.myapp" android:host="auth" android:pathPrefix="/callback" />
+            </intent-filter>
+
+            <!-- Current Supabase email confirmation redirects use the packaged
+                 Capacitor origin. Route that origin back to the native activity
+                 so src/main.jsx can exchange the returned session/code. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="titanos.app" />
             </intent-filter>
 
         </activity>

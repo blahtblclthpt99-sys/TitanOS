@@ -1,1 +1,0 @@
-The full-system CI workflow runs for pull requests targeting main. The recovery/full-app-20260909 branch is validated through its draft recovery PR before any integration.

@@ -27,7 +27,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Apply exact provider-budget patches
+      - name: Apply guarded provider-budget patches
         shell: bash
         run: |
           set -euo pipefail
@@ -39,8 +39,22 @@ jobs:
               text = p.read_text()
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f"{path}: expected one exact match, found {count}")
+                  raise SystemExit(f"{path}: expected one exact anchor, found {count}: {old[:80]!r}")
               p.write_text(text.replace(old, new, 1))
+
+          def replace_between(path, start, end, replacement):
+              p = Path(path)
+              text = p.read_text()
+              start_count = text.count(start)
+              if start_count != 1:
+                  raise SystemExit(f"{path}: expected one start anchor, found {start_count}: {start[:80]!r}")
+              start_at = text.index(start)
+              end_at = text.find(end, start_at + len(start))
+              if end_at < 0:
+                  raise SystemExit(f"{path}: end anchor not found after start: {end[:80]!r}")
+              if text.find(end, end_at + len(end)) >= 0:
+                  raise SystemExit(f"{path}: end anchor is not unique: {end[:80]!r}")
+              p.write_text(text[:start_at] + replacement + text[end_at:])
 
           replace_once(
               "api/functions/titanAI.js",
@@ -48,60 +62,47 @@ jobs:
               'import { logError } from "../_lib/safeLog.js";\nimport { fetchWithTimeout, isAbortError } from "../_lib/fetchTimeout.js";\n',
           )
 
-          replace_once(
+          replace_between(
               "api/functions/titanAI.js",
-              '''    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-                  temperature: 0.3,
-                  max_tokens: 450,
-                  messages: [
-                    { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
-                    ...recent,
-                  ],
-                }),
-              });
-          ''',
+              '    const response = await fetch("https://api.openai.com/v1/chat/completions", {',
+              '\n\n    if (!response.ok) {',
               '''    let response;
-              try {
-                response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-                    temperature: 0.3,
-                    max_tokens: 450,
-                    messages: [
-                      { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
-                      ...recent,
-                    ],
-                  }),
-                }, 20_000);
-              } catch (providerError) {
-                const timedOut = isAbortError(providerError);
-                logError("titanAI:openai_transport", providerError);
-                if (!timedOut) {
-                  captureApiException(providerError, { tags: { route: "titanAI", stage: "openai_transport" } });
-                }
-                return res.status(200).json({
-                  data: {
-                    type: "response",
-                    source: "local",
-                    dataBasis: "server_snapshot",
-                    generalKnowledge: false,
-                    interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
-                    message: `${timedOut ? "AI provider timed out" : "AI provider is briefly unavailable"}. **YOUR DATA:** **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. You can still use the structured 2nd Me actions.`,
-                  },
-                });
-              }
-          ''',
+          try {
+            response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+                temperature: 0.3,
+                max_tokens: 450,
+                messages: [
+                  { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
+                  ...recent,
+                ],
+              }),
+            }, 20_000);
+          } catch (providerError) {
+            const timedOut = isAbortError(providerError);
+            logError("titanAI:openai_transport", providerError);
+            if (!timedOut) {
+              captureApiException(providerError, { tags: { route: "titanAI", stage: "openai_transport" } });
+            }
+            return res.status(200).json({
+              data: {
+                type: "response",
+                source: "local",
+                dataBasis: "server_snapshot",
+                generalKnowledge: false,
+                interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
+                message: `${timedOut ? "AI provider timed out" : "AI provider is briefly unavailable"}. **YOUR DATA:** **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. You can still use the structured 2nd Me actions.`,
+              },
+            });
+          }''',
           )
 
           replace_once(
               "api/functions/createPaymentLink.js",
-              'import { assertRateLimitAsync } from "../_lib/rateLimit.js";\n\nfunction resolvePlanFromProfile',
+              'import { assertRateLimitAsync } from "../_lib/rateLimit.js";\n',
               '''import { assertRateLimitAsync } from "../_lib/rateLimit.js";
           import { fetchWithTimeout, isAbortError } from "../_lib/fetchTimeout.js";
           import { logError } from "../_lib/safeLog.js";
@@ -128,42 +129,35 @@ jobs:
             }
             throw lastError || new Error("Stripe checkout request failed");
           }
-
-          function resolvePlanFromProfile''',
+          ''',
           )
 
-          replace_once(
+          replace_between(
               "api/functions/createPaymentLink.js",
-              '''      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-                method: "POST",
-                headers: stripeHeaders,
-                body: params.toString(),
-              });
-              const session = await stripeRes.json();
-          ''',
+              '      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {',
+              '\n      if (!stripeRes.ok) {',
               '''      let stripeRes;
-              try {
-                stripeRes = await requestStripeCheckout(params, stripeHeaders);
-              } catch (providerError) {
-                const timedOut = isAbortError(providerError);
-                await admin
-                  .from("payments")
-                  .update({
-                    status: "pending",
-                    note: `${insertPayload.note} · Stripe checkout result unconfirmed (${timedOut ? "timeout" : "network error"})`,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("id", payment.id);
-                logError("createPaymentLink:stripe_transport", providerError);
-                return res.status(timedOut ? 504 : 502).json({
-                  error: timedOut
-                    ? "Checkout provider timed out. The payment remains pending for reconciliation; check Payments before trying again."
-                    : "Checkout provider could not be reached. The payment remains pending for reconciliation; check Payments before trying again.",
-                  code: timedOut ? "STRIPE_CHECKOUT_TIMEOUT" : "STRIPE_CHECKOUT_NETWORK_ERROR",
-                });
-              }
-              const session = await stripeRes.json();
-          ''',
+          try {
+            stripeRes = await requestStripeCheckout(params, stripeHeaders);
+          } catch (providerError) {
+            const timedOut = isAbortError(providerError);
+            await admin
+              .from("payments")
+              .update({
+                status: "pending",
+                note: `${insertPayload.note} · Stripe checkout result unconfirmed (${timedOut ? "timeout" : "network error"})`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", payment.id);
+            logError("createPaymentLink:stripe_transport", providerError);
+            return res.status(timedOut ? 504 : 502).json({
+              error: timedOut
+                ? "Checkout provider timed out. The payment remains pending for reconciliation; check Payments before trying again."
+                : "Checkout provider could not be reached. The payment remains pending for reconciliation; check Payments before trying again.",
+              code: timedOut ? "STRIPE_CHECKOUT_TIMEOUT" : "STRIPE_CHECKOUT_NETWORK_ERROR",
+            });
+          }
+          const session = await stripeRes.json();''',
           )
 
           replace_once(
@@ -189,46 +183,30 @@ jobs:
 
           replace_once(
               "api/functions/stripeWebhook.js",
-              '''    let event;
-              try {
-                const Stripe = (await import("stripe")).default;
-                const stripe = new Stripe(stripeKey);
-                event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-              } catch (sigErr) {
-          ''',
-              '''    let event;
-              let stripe;
-              try {
-                const Stripe = (await import("stripe")).default;
-                stripe = new Stripe(stripeKey, {
-                  timeout: STRIPE_API_TIMEOUT_MS,
-                  maxNetworkRetries: 1,
-                });
-                event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-              } catch (sigErr) {
+              '    let event;\n    try {\n',
+              '    let event;\n    let stripe;\n    try {\n',
+          )
+
+          replace_once(
+              "api/functions/stripeWebhook.js",
+              '      const stripe = new Stripe(stripeKey);\n',
+              '''      stripe = new Stripe(stripeKey, {
+            timeout: STRIPE_API_TIMEOUT_MS,
+            maxNetworkRetries: 1,
+          });
           ''',
           )
 
           replace_once(
               "api/functions/stripeWebhook.js",
-              '''      if (CHECKOUT_SUCCESS_EVENTS.has(event.type) && session.mode === "subscription") {
-                const stripe = new (await import("stripe")).default(stripeKey);
-                const subscriptionId =
-          ''',
-              '''      if (CHECKOUT_SUCCESS_EVENTS.has(event.type) && session.mode === "subscription") {
-                const subscriptionId =
-          ''',
+              '        const stripe = new (await import("stripe")).default(stripeKey);\n',
+              '',
           )
 
-          replace_once(
+          replace_between(
               "scripts/scalability.test.mjs",
-              '''  it("vercel sets maxDuration on money and AI routes", () => {
-            const cfg = JSON.parse(read("vercel.json"));
-            assert.equal(cfg.functions["api/functions/stripeWebhook.js"].maxDuration, 30);
-            assert.equal(cfg.functions["api/functions/titanAI.js"].maxDuration, 60);
-            assert.equal(cfg.functions["api/functions/createPaymentLink.js"].maxDuration, 30);
-          });
-          ''',
+              '  it("vercel sets maxDuration on money and AI routes", () => {',
+              '\n\n  it("rate limit supports durable Upstash async path", () => {',
               '''  it("bounds outbound AI and payment provider work at application level", () => {
             const timeout = read("api/_lib/fetchTimeout.js");
             const ai = read("api/functions/titanAI.js");
@@ -243,8 +221,7 @@ jobs:
             assert.match(checkout, /headers\\["Idempotency-Key"\\] \\? 2 : 1/);
             assert.match(webhook, /STRIPE_API_TIMEOUT_MS\\s*=\\s*10_000/);
             assert.match(webhook, /maxNetworkRetries:\\s*1/);
-          });
-          ''',
+          });''',
           )
           PY
 

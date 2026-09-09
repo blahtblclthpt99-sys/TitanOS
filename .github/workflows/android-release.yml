@@ -41,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      # Native builds call the canonical Cloudflare origin; keep these aligned with .env.production.example.
       VITE_CAPACITOR_BUILD: "true"
       VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"

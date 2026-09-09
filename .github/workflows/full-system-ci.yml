@@ -41,9 +41,6 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
-      - name: Reject high-severity dependency advisories
-        run: npm audit --audit-level=high
-
       - name: Lint
         run: npm run lint
 
@@ -58,6 +55,9 @@ jobs:
 
       - name: Production web build
         run: npm run build
+
+      - name: Reject high-severity dependency advisories
+        run: npm audit --audit-level=high
 
   browser-smoke:
     name: Chromium desktop smoke

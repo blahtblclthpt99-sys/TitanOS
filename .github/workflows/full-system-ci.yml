@@ -47,8 +47,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Verify database recovery classifier
-        run: node --test scripts/db-recovery-preflight.test.mjs
+      - name: Verify database recovery guards
+        run: node --test scripts/db-recovery-preflight.test.mjs scripts/db-recovery-manifest.test.mjs
 
       - name: Full unit, integration, security, and regression pack
         run: npm test

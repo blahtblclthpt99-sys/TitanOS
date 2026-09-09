@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-09",
+  "productionProjectRef": "xcfjpxcmokdfwkarwomy",
+  "preAttentionSourceCommit": "4d09fbc09dbc4e19014124cc1c687d4cc79abfac",
+  "policy": {
+    "directProductionReplay": "PROHIBITED",
+    "reconstructionTarget": "ISOLATED_STAGING_ONLY",
+    "unknownHistoricalMigration": "BLOCK",
+    "historicalRows": "DO_NOT_SYNTHESIZE",
+    "productionMutation": "REQUIRES_SEPARATE_REVIEW_AND_CERTIFICATION"
+  },
+  "neverReplay": [
+    {
+      "version": "20260814120204",
+      "name": "archive_and_remove_legacy_demo_fixture_records",
+      "reason": "Historical destructive cleanup; reconstruction must not delete recovered or staged records."
+    },
+    {
+      "version": "20260814120854",
+      "name": "archive_and_remove_explicit_test_auth_accounts",
+      "reason": "Historical destructive auth cleanup; account deletion is not a schema reconstruction step."
+    },
+    {
+      "version": "20260818220148",
+      "name": "purge_legacy_titanos_public_schema",
+      "reason": "Authoritative live ledger entry that removed the TitanOS public application schema."
+    }
+  ],
+  "manualReview": [
+    {
+      "version": "20260813223541",
+      "name": "founding_25_lifetime_and_three_day_trial",
+      "reason": "Entitlement migration can alter user launch/billing state and must be reviewed against recovered evidence."
+    },
+    {
+      "version": "20260813223639",
+      "name": "reconcile_founding_25_backfill",
+      "reason": "Backfill rewrites historical entitlement state and must not be inferred from missing rows."
+    },
+    {
+      "version": "20260815203730",
+      "name": "contract_share_token_hashing",
+      "reason": "Stateful token transformation requires staging validation against actual reconstructed contract data."
+    },
+    {
+      "version": "20260817033826",
+      "name": "private_job_match_preferences",
+      "reason": "Stateful application migration requires schema/data compatibility review in staging."
+    },
+    {
+      "version": "20260817134320",
+      "name": "private_job_match_origin",
+      "reason": "Stateful application migration requires schema/data compatibility review in staging."
+    },
+    {
+      "version": "20260818220301",
+      "name": "enable_pg_net_for_storage_cleanup",
+      "reason": "Cutover-era cleanup dependency is not part of safe TitanOS schema reconstruction."
+    }
+  ],
+  "preserveExistingAttention": [
+    {
+      "version": "20260818215755",
+      "name": "create_attention_marketplace_core"
+    },
+    {
+      "version": "20260818215820",
+      "name": "add_attention_atomic_reward_functions"
+    },
+    {
+      "version": "20260818215916",
+      "name": "add_attention_active_view_heartbeats"
+    },
+    {
+      "version": "20260818220503",
+      "name": "add_attention_campaign_funding"
+    },
+    {
+      "version": "20260818221440",
+      "name": "harden_attention_rls_and_indexes"
+    }
+  ],
+  "historicalCollisions": [
+    {
+      "prefix": "041",
+      "files": [
+        "041_titan_autopilot.sql",
+        "041_google_play_subscriptions.sql"
+      ],
+      "policy": "DO_NOT_RENAME_OR_REORDER_WITHOUT_LEDGER_RECONCILIATION"
+    }
+  ]
+}

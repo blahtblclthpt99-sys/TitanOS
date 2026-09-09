@@ -1,0 +1,142 @@
+name: TitanOS Android Release AAB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-release.yml"
+      - "android/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "capacitor.config.*"
+      - "vite.config.*"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-release.yml"
+      - "android/**"
+      - "src/**"
+      - "api/**"
+      - "public/**"
+      - "index.html"
+      - "capacitor.config.*"
+      - "vite.config.*"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titan-aab-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_CAPACITOR_BUILD: "true"
+      VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
+      VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+      VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install and verify application bundle
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run lint
+          npm run typecheck
+          npm run build
+
+      - name: Verify Android runtime invariants
+        shell: bash
+        run: |
+          grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
+          grep -q 'versionCode 37' android/app/build.gradle
+          grep -q 'versionName "2.0.4"' android/app/build.gradle
+          grep -q 'targetSdkVersion = 36' android/variables.gradle
+          grep -q 'compileSdkVersion = 36' android/variables.gradle
+          grep -q '"appId": "com.titanos.myapp"' capacitor.config.json
+          grep -q 'minifyEnabled true' android/app/build.gradle
+          grep -q 'shrinkResources true' android/app/build.gradle
+          grep -q 'proguard-android-optimize.txt' android/app/build.gradle
+          grep -q 'android:usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:allowBackup="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:dataExtractionRules="@xml/data_extraction_rules"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="com.titanos.myapp" android:host="auth" android:pathPrefix="/callback"' android/app/src/main/AndroidManifest.xml
+          ! grep -q 'android:host="titanos.app"' android/app/src/main/AndroidManifest.xml
+          grep -q 'registerPlugin(TitanBillingPlugin.class)' android/app/src/main/java/com/titanos/myapp/MainActivity.java
+          grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
+          grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
+          grep -q 'exchangeCodeForSession' src/main.jsx
+          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
+          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'native-polish.css' src/main.jsx
+          grep -q 'safe-area-inset-top' src/native-polish.css
+          grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
+          ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
+          test ! -f android/keystore.properties
+          test ! -f android/titanos-upload.jks
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Lint and build unsigned release bundle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean lintRelease bundleRelease
+
+      - name: Verify AAB structure and record build identity
+        shell: bash
+        run: |
+          AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          test -f "$AAB"
+          unzip -t "$AAB" >/dev/null
+          sha256sum "$AAB" | tee TitanOS-release-aab-UNSIGNED-SHA256.txt
+          {
+            echo "VERSION_NAME=2.0.4"
+            echo "VERSION_CODE=37"
+            echo "APPLICATION_ID=com.titanos.myapp"
+            echo "TARGET_SDK=36"
+            echo "COMMIT_SHA=$GITHUB_SHA"
+            echo "SIGNING=unsigned-ci-artifact"
+            echo "API_BASE_URL=$VITE_API_BASE_URL"
+          } > TitanOS-release-build-info.txt
+
+      - name: Upload release build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-2.0.4-code37-unsigned-AAB
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            TitanOS-release-aab-UNSIGNED-SHA256.txt
+            TitanOS-release-build-info.txt
+            android/app/build/reports/lint-results-release.html
+          if-no-files-found: error
+          retention-days: 14

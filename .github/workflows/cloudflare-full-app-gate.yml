@@ -31,11 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -92,9 +92,9 @@ jobs:
           - name: Cloudflare production-surface Vercel independence
             command: "! grep -R -n -E 'LEGACY_API_ORIGIN|titanos-web\\.vercel\\.app' cloudflare wrangler.jsonc src/lib/auth-redirect.js .env.production.example"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm

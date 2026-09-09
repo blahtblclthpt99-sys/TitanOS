@@ -2,6 +2,31 @@ import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
 import { calculateCategoryFees } from "../_lib/feeConfig.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
+import { fetchWithTimeout, isAbortError } from "../_lib/fetchTimeout.js";
+import { logError } from "../_lib/safeLog.js";
+
+const STRIPE_CHECKOUT_TIMEOUT_MS = 10_000;
+
+async function requestStripeCheckout(params, headers) {
+  const attempts = headers["Idempotency-Key"] ? 2 : 1;
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fetchWithTimeout(
+        "https://api.stripe.com/v1/checkout/sessions",
+        {
+          method: "POST",
+          headers,
+          body: params.toString(),
+        },
+        STRIPE_CHECKOUT_TIMEOUT_MS
+      );
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Stripe checkout request failed");
+}
 
 function resolvePlanFromProfile(profile, authUser) {
   if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
@@ -252,12 +277,28 @@ export default async function handler(req, res) {
       };
       if (payment?.id) stripeHeaders["Idempotency-Key"] = `checkout_${payment.id}`;
 
-      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-        method: "POST",
-        headers: stripeHeaders,
-        body: params.toString(),
-      });
-      const session = await stripeRes.json();
+      let stripeRes;
+try {
+  stripeRes = await requestStripeCheckout(params, stripeHeaders);
+} catch (providerError) {
+  const timedOut = isAbortError(providerError);
+  await admin
+    .from("payments")
+    .update({
+      status: "pending",
+      note: `${insertPayload.note} · Stripe checkout result unconfirmed (${timedOut ? "timeout" : "network error"})`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+  logError("createPaymentLink:stripe_transport", providerError);
+  return res.status(timedOut ? 504 : 502).json({
+    error: timedOut
+      ? "Checkout provider timed out. The payment remains pending for reconciliation; check Payments before trying again."
+      : "Checkout provider could not be reached. The payment remains pending for reconciliation; check Payments before trying again.",
+    code: timedOut ? "STRIPE_CHECKOUT_TIMEOUT" : "STRIPE_CHECKOUT_NETWORK_ERROR",
+  });
+}
+const session = await stripeRes.json();
       if (!stripeRes.ok) {
         await admin
           .from("payments")
@@ -267,7 +308,6 @@ export default async function handler(req, res) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", payment.id);
-        const { logError } = await import("../_lib/safeLog.js");
         logError("createPaymentLink:stripe", session.error || session);
         return res.status(502).json({
           error: "Checkout could not be created. Please try again.",

@@ -22,6 +22,7 @@ const CHECKOUT_SUCCESS_EVENTS = new Set([
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
 ]);
+const STRIPE_API_TIMEOUT_MS = 10_000;
 
 export function checkoutPaymentIsSettled(eventType, session) {
   return CHECKOUT_SUCCESS_EVENTS.has(eventType) && session?.payment_status === "paid";
@@ -150,9 +151,13 @@ export default async function handler(req, res) {
     }
 
     let event;
+    let stripe;
     try {
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(stripeKey);
+      stripe = new Stripe(stripeKey, {
+  timeout: STRIPE_API_TIMEOUT_MS,
+  maxNetworkRetries: 1,
+});
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (sigErr) {
       logError("stripeWebhook:signature", sigErr);
@@ -209,7 +214,6 @@ export default async function handler(req, res) {
         session.metadata?.platform_fee != null ? Number(session.metadata.platform_fee) : null;
 
       if (CHECKOUT_SUCCESS_EVENTS.has(event.type) && session.mode === "subscription") {
-        const stripe = new (await import("stripe")).default(stripeKey);
         const subscriptionId =
           typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
         if (subscriptionId) {

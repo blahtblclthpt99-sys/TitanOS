@@ -1,0 +1,65 @@
+name: TitanOS One-Shot Dependency Lock Refresh
+
+on:
+  push:
+    branches:
+      - recovery/full-app-20260909
+    paths:
+      - .github/workflows/one-shot-dependency-lock-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: recovery/full-app-20260909
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Refresh vulnerable transitive lock entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/package.json.before
+          npm audit fix --package-lock-only --ignore-scripts
+          cmp --silent package.json /tmp/package.json.before || {
+            echo 'package.json changed unexpectedly; refusing to commit.' >&2
+            git diff -- package.json
+            exit 1
+          }
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const xmldom = lock.packages?.['node_modules/@xmldom/xmldom']?.version;
+          const yaml = lock.packages?.['node_modules/js-yaml']?.version;
+          if (xmldom !== '0.9.12') throw new Error(`Expected @xmldom/xmldom 0.9.12, got ${xmldom}`);
+          if (yaml !== '4.3.2') throw new Error(`Expected js-yaml 4.3.2, got ${yaml}`);
+          NODE
+          npm audit --audit-level=high
+          git diff --check
+          git diff -- package-lock.json
+
+      - name: Commit repaired lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo 'No package-lock.json changes were required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'chore: refresh vulnerable transitive dependencies'
+          git push origin HEAD:recovery/full-app-20260909

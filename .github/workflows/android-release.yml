@@ -93,11 +93,14 @@ jobs:
           grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
-          grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
-          grep -q 'exchangeCodeForSession' src/main.jsx
-          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
-          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'installNativeAuthDeepLinks' src/main.jsx
+          grep -q 'App.getLaunchUrl' src/lib/capacitor-auth.js
+          grep -q 'appUrlOpen' src/lib/capacitor-auth.js
+          grep -q 'exchangeCodeForSession' src/lib/oauthBootstrap.js
+          grep -q 'emailRedirectTo: getAuthRedirectTo("/auth/callback")' src/api/auth.js
+          ! grep -q 'emailRedirectTo: window.location.origin' src/api/auth.js
           grep -q 'native-polish.css' src/main.jsx
+          grep -q 'classList.add("is-native")' src/main.jsx
           grep -q 'safe-area-inset-top' src/native-polish.css
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
           ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml

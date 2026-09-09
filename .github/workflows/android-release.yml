@@ -44,8 +44,8 @@ jobs:
       VITE_CAPACITOR_BUILD: "true"
       VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
-      VITE_API_BASE_URL: "https://titanos-web.vercel.app"
-      VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+      VITE_API_BASE_URL: "https://app.titanfieldos.com"
+      VITE_TITANOS_PUBLIC_ORIGIN: "https://app.titanfieldos.com"
 
     steps:
       - uses: actions/checkout@v4

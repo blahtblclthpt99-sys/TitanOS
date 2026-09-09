@@ -49,9 +49,9 @@ jobs:
       VITE_TITANOS_PUBLIC_ORIGIN: "https://app.titanfieldos.com"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -62,7 +62,7 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Install and verify application bundle
         run: |
@@ -134,7 +134,7 @@ jobs:
           } > TitanOS-release-build-info.txt
 
       - name: Upload release build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: TitanOS-2.0.4-code37-unsigned-AAB
           path: |

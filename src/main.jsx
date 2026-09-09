@@ -10,11 +10,24 @@ import { trackEvent } from '@/lib/productAnalytics'
 import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
 import '@/index.css'
+import '@/native-polish.css'
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
 const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 const attentionStandalone =
   typeof window !== "undefined" && window.location.pathname === "/attention";
+
+function markNativeDocument() {
+  if (typeof document === "undefined") return;
+  const nativeBuild = import.meta.env.VITE_CAPACITOR_BUILD === "true";
+  const nativeRuntime =
+    typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.() === true;
+  if (nativeBuild || nativeRuntime) {
+    document.documentElement.classList.add("is-native");
+  }
+}
+
+markNativeDocument();
 
 // Observability — crash/perf (Sentry), flags, first-party analytics
 initSentry();

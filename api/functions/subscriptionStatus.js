@@ -18,6 +18,8 @@ const PROFILE_FIELDS = [
   "app_trial_ends_at",
 ].join(",");
 
+const TERMINAL_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
 function isoOrNull(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -48,11 +50,30 @@ export default async function handler(req, res) {
       .select("stripe_customer_id,stripe_subscription_id,plan_tier,status,cancel_at_period_end,current_period_end,updated_at")
       .eq("user_id", auth.user.id)
       .order("updated_at", { ascending: false })
-      .limit(5);
+      .limit(20);
     if (stripeError) throw stripeError;
 
+    const rows = stripeRows || [];
     const activeStatuses = new Set(["active", "trialing", "past_due", "unpaid"]);
-    const stripeSubscription = (stripeRows || []).find((row) => activeStatuses.has(String(row.status || ""))) || stripeRows?.[0] || null;
+    const stripeSubscription = rows.find((row) => activeStatuses.has(String(row.status || ""))) || rows[0] || null;
+    const nonterminalRows = rows.filter(
+      (row) => !TERMINAL_SUBSCRIPTION_STATUSES.has(String(row.status || "").toLowerCase())
+    );
+    const distinctBillingIdentities = new Set(
+      nonterminalRows
+        .map((row) => String(row.stripe_customer_id || "").trim())
+        .filter(Boolean)
+    ).size;
+    const billingRequiresReview = nonterminalRows.length > 1 || distinctBillingIdentities > 1;
+
+    if (billingRequiresReview) {
+      logError("subscriptionStatus:billing_integrity_review", {
+        userId: auth.user.id,
+        nonterminalSubscriptions: nonterminalRows.length,
+        distinctBillingIdentities,
+      });
+    }
+
     const now = Date.now();
     const appTrialEndsAt = isoOrNull(profile?.app_trial_ends_at);
     const foundingTrialEndsAt = isoOrNull(profile?.founding_trial_ends_at);
@@ -83,6 +104,11 @@ export default async function handler(req, res) {
       trialEndsAt,
       trialActive,
       accessState,
+      billingIntegrity: {
+        nonterminalSubscriptionCount: nonterminalRows.length,
+        distinctBillingIdentityCount: distinctBillingIdentities,
+        requiresReview: billingRequiresReview,
+      },
       stripe: stripeSubscription
         ? {
             status: stripeSubscription.status,

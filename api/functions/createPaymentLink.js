@@ -178,7 +178,14 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const planId = resolvePlanFromProfile(profile, user);
-    const currency = String(body.currency || "usd").toLowerCase();
+    const requestedCurrency = String(body.currency || "usd").toLowerCase();
+    if (requestedCurrency !== "usd") {
+      return res.status(400).json({
+        error: "TitanOS Checkout currently supports USD only.",
+        code: "UNSUPPORTED_CURRENCY",
+      });
+    }
+    const currency = "usd";
     const origin = resolveAppOrigin(req);
     const actorIsAdmin = profile?.role === "admin" || user.app_metadata?.role === "admin";
 
@@ -254,10 +261,15 @@ export default async function handler(req, res) {
       });
     }
 
-    // Ignore any client-supplied fee / total — recalculate from Fee Engine.
-    // Legacy purpose=module used marketplace_sales (0%); new modules are subscription-included.
+    // Fee category is server-defined for invoice payments. Client purpose may
+    // select legacy marketplace behavior only when no invoice is attached.
     const purpose = String(body.purpose || "").toLowerCase();
-    const categoryId = purpose === "module" ? "marketplace_sales" : "service_requests";
+    const effectivePurpose = invoiceId ? "invoice" : purpose || "payment";
+    const categoryId = invoiceId
+      ? "service_requests"
+      : purpose === "module"
+        ? "marketplace_sales"
+        : "service_requests";
     const contextKey = categoryId === "marketplace_sales" ? "*" : planId;
     const feeResult = await calculateCategoryFees(admin, {
       categoryId,
@@ -265,7 +277,7 @@ export default async function handler(req, res) {
       grossAmount: amount,
       userId: user.id,
       currency,
-      context: { planId, endpoint: "createPaymentLink", purpose: purpose || "payment" },
+      context: { planId, endpoint: "createPaymentLink", purpose: effectivePurpose },
       persistLog: false,
     });
 
@@ -456,6 +468,13 @@ export default async function handler(req, res) {
           });
         }
         break;
+      }
+
+      if (paymentReused && payment.external_id) {
+        return res.status(409).json({
+          error: "The existing checkout could not be safely resolved. No new checkout was created.",
+          code: "PAYMENT_RECONCILIATION_REQUIRED",
+        });
       }
     } else {
       const insertPayload = {

@@ -87,7 +87,7 @@ export default function PageHeader({
           <p className="titan-page-subtitle text-sm text-muted-foreground leading-relaxed max-w-2xl">{subtitle}</p>
         )}
       </div>
-      <div className="titan-page-actions flex items-center gap-2 flex-shrink-0">
+      <div className="titan-page-actions flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
         {titanAutoContext ? <TitanAutoLink source={titanAutoContext.source} /> : null}
         {actions}
         {onAdd && (

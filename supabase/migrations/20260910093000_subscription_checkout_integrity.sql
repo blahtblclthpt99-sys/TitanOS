@@ -10,9 +10,10 @@ CREATE TABLE IF NOT EXISTS public.stripe_subscription_checkout_claims (
   plan_tier TEXT NOT NULL CHECK (plan_tier IN ('starter','worker_premium','business')),
   stripe_customer_id TEXT,
   stripe_session_id TEXT UNIQUE,
+  stripe_subscription_id TEXT UNIQUE,
   checkout_url TEXT,
   state TEXT NOT NULL DEFAULT 'pending'
-    CHECK (state IN ('pending','open','completed','expired','failed','requires_review')),
+    CHECK (state IN ('pending','open','completed','closed','expired','failed','requires_review')),
   claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -50,6 +51,7 @@ DECLARE
   v_claim public.stripe_subscription_checkout_claims%ROWTYPE;
   v_existing_plan TEXT;
   v_customer_id TEXT;
+  v_linked_status TEXT;
 BEGIN
   IF p_user_id IS NULL OR p_plan_tier NOT IN ('starter','worker_premium','business') THEN
     RAISE EXCEPTION 'subscription_checkout_identity_invalid';
@@ -71,6 +73,38 @@ BEGIN
 
   IF FOUND THEN
     RAISE EXCEPTION 'subscription_existing_nonterminal:%', v_existing_plan;
+  END IF;
+
+  -- A previous Checkout that completed but has not been linked to a terminal
+  -- local subscription remains a reconciliation boundary. Do not create a new
+  -- billable subscription while webhook state is ambiguous.
+  SELECT * INTO v_claim
+  FROM public.stripe_subscription_checkout_claims c
+  WHERE c.user_id = p_user_id
+    AND c.state IN ('completed','requires_review')
+  ORDER BY c.created_at DESC
+  LIMIT 1
+  FOR UPDATE;
+
+  IF FOUND THEN
+    IF v_claim.state = 'requires_review' OR v_claim.stripe_subscription_id IS NULL THEN
+      RAISE EXCEPTION 'subscription_checkout_reconciliation_required';
+    END IF;
+
+    SELECT LOWER(COALESCE(s.status, ''))
+    INTO v_linked_status
+    FROM public.stripe_subscriptions s
+    WHERE s.user_id = p_user_id
+      AND s.stripe_subscription_id = v_claim.stripe_subscription_id
+    LIMIT 1;
+
+    IF NOT FOUND OR v_linked_status NOT IN ('canceled','incomplete_expired') THEN
+      RAISE EXCEPTION 'subscription_checkout_reconciliation_required';
+    END IF;
+
+    UPDATE public.stripe_subscription_checkout_claims
+    SET state = 'closed', updated_at = now()
+    WHERE id = v_claim.id;
   END IF;
 
   SELECT * INTO v_claim

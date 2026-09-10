@@ -18,7 +18,6 @@ function extractQuotedPaths(src, marker) {
   const re = /["'](\/[^"']+)["']/g;
   let m;
   while ((m = re.exec(slice))) {
-    // stop at next top-level const after object if we wandered too far
     paths.push(m[1]);
   }
   return [...new Set(paths)];
@@ -30,7 +29,6 @@ describe("final-qa: nav ↔ app routing closure", () => {
     const tabSrc = read("src/components/layout/TabStack.jsx");
     const layoutSrc = read("src/components/layout/AppLayout.jsx");
 
-    // Only APP_NAV_ITEMS — ignore internal workflows and QUICK_CREATE_ACTIONS query paths.
     const navBlock = navSrc.slice(
       navSrc.indexOf("export const APP_NAV_ITEMS"),
       navSrc.indexOf("export const INTERNAL_WORKFLOW_ITEMS")
@@ -40,8 +38,6 @@ describe("final-qa: nav ↔ app routing closure", () => {
 
     const tabPaths = extractQuotedPaths(tabSrc, "TAB_COMPONENTS");
     const nonTabPaths = extractQuotedPaths(tabSrc, "NON_TAB_ROUTES");
-
-    // Support deliberately renders at the authenticated-shell layer instead of TabStack.
     const shellRoutes = [];
     if (
       /pathname\s*===\s*["']\/support["']/.test(layoutSrc) &&
@@ -57,10 +53,7 @@ describe("final-qa: nav ↔ app routing closure", () => {
     }
 
     const routed = new Set([...tabPaths, ...nonTabPaths, ...shellRoutes]);
-
-    // Detail hosts covered by startsWith checks in TabStack.
     const detailHosts = ["/customers", "/invoices", "/driver"];
-
     const missing = navPaths.filter((p) => {
       if (routed.has(p)) return false;
       if (detailHosts.some((h) => p === h || p.startsWith(`${h}/`))) return false;
@@ -101,6 +94,31 @@ describe("final-qa: Titan Auto integration closure", () => {
     assert.match(header, /source:\s*["']business["']/);
     assert.match(driver, /TitanAutoLink\s+source=["']driver["']/);
     assert.match(schedule, /TitanAutoLink\s+source=["']schedule["']/);
+  });
+});
+
+describe("final-qa: server-only table boundaries", () => {
+  const migration = "supabase/migrations/20260910033000_server_only_table_grants.sql";
+
+  it("does not expose portal sessions through the browser entity registry", () => {
+    const entitySrc = read("src/api/entityTables.js");
+    assert.doesNotMatch(entitySrc, /PortalSession\s*:/);
+    assert.doesNotMatch(entitySrc, /["']portal_sessions["']/);
+  });
+
+  it("revokes client table grants while preserving service-role access", () => {
+    assert.ok(existsSync(join(root, migration)), "missing server-only grant migration");
+    const sql = read(migration);
+    for (const table of ["portal_sessions", "titan_comms_channel_secrets"]) {
+      assert.match(
+        sql,
+        new RegExp(`REVOKE\\s+ALL\\s+PRIVILEGES\\s+ON\\s+TABLE\\s+public\\.${table}\\s+FROM\\s+anon,\\s*authenticated`, "i")
+      );
+      assert.match(
+        sql,
+        new RegExp(`GRANT\\s+ALL\\s+PRIVILEGES\\s+ON\\s+TABLE\\s+public\\.${table}\\s+TO\\s+service_role`, "i")
+      );
+    }
   });
 });
 

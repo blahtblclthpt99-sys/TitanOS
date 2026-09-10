@@ -38,20 +38,11 @@ describe("checkout return origin allowlist (cors module)", () => {
     assert.equal(allowedOrigins().includes(RETIRED_VERCEL_ORIGIN), false);
   });
   it("accepts the canonical production Origin header", () => {
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: PRODUCTION_ORIGIN } }),
-      PRODUCTION_ORIGIN
-    );
+    assert.equal(resolveAppOrigin({ headers: { origin: PRODUCTION_ORIGIN } }), PRODUCTION_ORIGIN);
   });
   it("rejects spoofed and retired Origin headers by falling back to the canonical origin", () => {
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://evil.example" } }),
-      PRODUCTION_ORIGIN
-    );
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: RETIRED_VERCEL_ORIGIN } }),
-      PRODUCTION_ORIGIN
-    );
+    assert.equal(resolveAppOrigin({ headers: { origin: "https://evil.example" } }), PRODUCTION_ORIGIN);
+    assert.equal(resolveAppOrigin({ headers: { origin: RETIRED_VERCEL_ORIGIN } }), PRODUCTION_ORIGIN);
   });
 });
 
@@ -70,13 +61,14 @@ describe("Stripe reconciliation metadata", () => {
     assert.match(source, /user_id: auth\.user\.id/);
   });
 
-  it("creates a portal payment row before Checkout and propagates the payment identity", async () => {
+  it("claims one portal payment identity and propagates it to the PaymentIntent", async () => {
     const source = await read("api/functions/portalPayInvoice.js");
-    assert.match(source, /\.from\("payments"\)\s*\.insert\(insertPayload\)/);
-    assert.match(source, /payment_id: payment\.id/);
+    assert.match(source, /admin\.rpc\("claim_portal_invoice_payment"/);
+    assert.doesNotMatch(source, /\.from\("payments"\)\s*\.insert\(insertPayload\)/);
+    assert.match(source, /payment_id: payment\.payment_id/);
     assert.match(source, /source: "portal"/);
     assert.match(source, /payment_intent_data\[metadata\]/);
-    assert.match(source, /Idempotency-Key/);
+    assert.match(source, /portal_checkout_\$\{payment\.payment_id\}/);
   });
 });
 
@@ -91,11 +83,47 @@ describe("refund reconciliation authority", () => {
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.reconcile_stripe_refund[\s\S]*TO service_role/);
   });
 
+  it("extends payment authority to the newer refund and checkout fields", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /NEW\.refunded_amount := 0/);
+    assert.match(migration, /NEW\.refunded_base_amount := 0/);
+    assert.match(migration, /NEW\.refund_updated_at := NULL/);
+    assert.match(migration, /NEW\.checkout_source := NULL/);
+    assert.match(migration, /NEW\.refunded_amount := OLD\.refunded_amount/);
+    assert.match(migration, /NEW\.refunded_base_amount := OLD\.refunded_base_amount/);
+    assert.match(migration, /NEW\.refund_updated_at := OLD\.refund_updated_at/);
+    assert.match(migration, /NEW\.checkout_source := OLD\.checkout_source/);
+  });
+
   it("keeps refunds inside the verified Stripe webhook path", async () => {
     const source = await read("api/functions/stripeWebhook.js");
     assert.match(source, /event\.type === "charge\.refunded"/);
     assert.match(source, /admin\.rpc\("reconcile_stripe_refund"/);
     assert.match(source, /partial_refund_allocation_required/);
     assert.match(source, /settlement_after_refund/);
+  });
+});
+
+describe("portal checkout concurrency authority", () => {
+  it("serializes claims on the invoice row and reuses an existing pending portal payment", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.claim_portal_invoice_payment/);
+    assert.match(migration, /FROM public\.invoices[\s\S]*FOR UPDATE/);
+    assert.match(migration, /p\.status = 'pending'[\s\S]*p\.checkout_source = 'portal'/);
+    assert.match(migration, /SELECT v_payment\.id, TRUE/);
+    assert.match(migration, /portal_checkout_pending_amount_conflict/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION public\.claim_portal_invoice_payment[\s\S]*FROM authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.claim_portal_invoice_payment[\s\S]*TO service_role/);
+  });
+
+  it("reuses active Stripe Sessions and fails closed on stale unresolved attempts", async () => {
+    const source = await read("api/functions/portalPayInvoice.js");
+    assert.match(source, /retrieveStripeCheckout/);
+    assert.match(source, /existingSession\.status === "open"/);
+    assert.match(source, /existingSession\.status === "complete"/);
+    assert.match(source, /existingSession\.status === "expired"/);
+    assert.match(source, /SAFE_IDEMPOTENCY_RETRY_MS = 23 \* 60 \* 60 \* 1000/);
+    assert.match(source, /PAYMENT_RECONCILIATION_REQUIRED/);
+    assert.match(source, /CHECKOUT_INITIALIZING/);
   });
 });

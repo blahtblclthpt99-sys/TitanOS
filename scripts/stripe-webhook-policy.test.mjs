@@ -1,10 +1,13 @@
 /**
- * Stripe webhook settlement policy unit tests.
+ * Stripe webhook settlement + refund policy unit tests.
  * Run: node --test scripts/stripe-webhook-policy.test.mjs
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checkoutPaymentIsSettled } from "../api/functions/stripeWebhook.js";
+import {
+  checkoutPaymentIsSettled,
+  deriveRefundReconciliation,
+} from "../api/functions/stripeWebhook.js";
 
 function shouldAcceptCheckoutAmount({ amountTotalCents, balanceDue, total }) {
   const paid = Number(amountTotalCents) / 100;
@@ -72,6 +75,89 @@ describe("checkout amount settlement", () => {
   });
   it("rejects zero", () => {
     assert.equal(shouldAcceptCheckoutAmount({ amountTotalCents: 0, balanceDue: 50 }), false);
+  });
+});
+
+describe("refund reconciliation math", () => {
+  it("allocates a partial zero-fee portal refund exactly to invoice principal", () => {
+    const result = deriveRefundReconciliation({
+      chargeAmountCents: 10000,
+      amountRefundedCents: 2500,
+      previousRefundedAmount: 0,
+      baseAmount: 100,
+      platformFee: 0,
+    });
+    assert.deepEqual(result, {
+      chargeAmount: 100,
+      cumulativeRefunded: 25,
+      refundDelta: 25,
+      fullRefund: false,
+      refundedBaseAmount: 25,
+      requiresPrincipalAllocation: false,
+    });
+  });
+
+  it("uses cumulative amount to make duplicate and out-of-order events monotonic", () => {
+    const duplicate = deriveRefundReconciliation({
+      chargeAmountCents: 10000,
+      amountRefundedCents: 2500,
+      previousRefundedAmount: 25,
+      baseAmount: 100,
+      platformFee: 0,
+    });
+    assert.equal(duplicate.cumulativeRefunded, 25);
+    assert.equal(duplicate.refundDelta, 0);
+
+    const olderEvent = deriveRefundReconciliation({
+      chargeAmountCents: 10000,
+      amountRefundedCents: 1000,
+      previousRefundedAmount: 25,
+      baseAmount: 100,
+      platformFee: 0,
+    });
+    assert.equal(olderEvent.cumulativeRefunded, 25);
+    assert.equal(olderEvent.refundDelta, 0);
+    assert.equal(olderEvent.refundedBaseAmount, 25);
+  });
+
+  it("marks a full fee-bearing refund as exact because all principal was returned", () => {
+    const result = deriveRefundReconciliation({
+      chargeAmountCents: 10800,
+      amountRefundedCents: 10800,
+      previousRefundedAmount: 0,
+      baseAmount: 100,
+      platformFee: 8,
+    });
+    assert.equal(result.fullRefund, true);
+    assert.equal(result.refundedBaseAmount, 100);
+    assert.equal(result.requiresPrincipalAllocation, false);
+  });
+
+  it("fails closed on partial fee-bearing refund allocation", () => {
+    const result = deriveRefundReconciliation({
+      chargeAmountCents: 10800,
+      amountRefundedCents: 1000,
+      previousRefundedAmount: 0,
+      baseAmount: 100,
+      platformFee: 8,
+    });
+    assert.equal(result.fullRefund, false);
+    assert.equal(result.refundedBaseAmount, null);
+    assert.equal(result.requiresPrincipalAllocation, true);
+  });
+
+  it("rejects impossible refund totals", () => {
+    assert.throws(
+      () =>
+        deriveRefundReconciliation({
+          chargeAmountCents: 10000,
+          amountRefundedCents: 12000,
+          previousRefundedAmount: 0,
+          baseAmount: 100,
+          platformFee: 0,
+        }),
+      /Invalid Stripe refunded amount/
+    );
   });
 });
 

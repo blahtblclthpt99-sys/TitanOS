@@ -111,7 +111,7 @@ BEGIN
   IF p_base_amount IS NULL OR p_base_amount <= 0 OR p_base_amount > 1000000
      OR p_platform_fee IS NULL OR p_platform_fee < 0
      OR p_platform_fee_rate IS NULL OR p_platform_fee_rate < 0
-     OR p_amount_total IS NULL OR p_amount_total <= 0 OR p_amount_total > 1000000 THEN
+     OR p_amount_total IS NULL OR p_amount_total <= 0 THEN
     RAISE EXCEPTION 'standard_checkout_invalid_terms';
   END IF;
   IF ABS(ROUND((p_base_amount + p_platform_fee)::NUMERIC, 2) - ROUND(p_amount_total::NUMERIC, 2)) > 0.01 THEN

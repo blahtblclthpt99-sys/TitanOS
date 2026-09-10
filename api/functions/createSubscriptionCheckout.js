@@ -34,10 +34,8 @@ async function loadSubscriptionState(admin, userId) {
   const activeCustomerIds = [
     ...new Set(nonterminal.map((row) => String(row.stripe_customer_id || "").trim()).filter(Boolean)),
   ];
-  const historicalCustomerId =
-    rows.map((row) => String(row.stripe_customer_id || "").trim()).find(Boolean) || null;
 
-  return { rows, nonterminal, activeCustomerIds, historicalCustomerId };
+  return { rows, nonterminal, activeCustomerIds };
 }
 
 async function createBillingPortal(stripe, customerId, origin) {
@@ -222,7 +220,14 @@ export default async function handler(req, res) {
         }
 
         if (existingSession.status === "complete") {
-          await updateClaim(admin, claim.claim_id, { state: "completed" });
+          const stripeSubscriptionId =
+            typeof existingSession.subscription === "string"
+              ? existingSession.subscription
+              : existingSession.subscription?.id || null;
+          await updateClaim(admin, claim.claim_id, {
+            state: "completed",
+            stripe_subscription_id: stripeSubscriptionId,
+          });
           return res.status(409).json({
             error: "This subscription Checkout already completed and is being reconciled.",
             code: "SUBSCRIPTION_SETTLEMENT_PENDING",

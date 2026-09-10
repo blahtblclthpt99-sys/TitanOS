@@ -76,3 +76,12 @@ test("billing portal refuses ambiguous active Stripe customer identities", async
   assert.match(source, /stripe\.billingPortal\.sessions\.create/);
   assert.match(source, /maxNetworkRetries: 1/);
 });
+
+test("subscription status surfaces duplicate billing risk without returning Stripe customer ids", async () => {
+  const source = await read("api/functions/subscriptionStatus.js");
+  assert.match(source, /nonterminalSubscriptionCount: nonterminalRows\.length/);
+  assert.match(source, /distinctBillingIdentityCount: distinctBillingIdentities/);
+  assert.match(source, /requiresReview: billingRequiresReview/);
+  assert.match(source, /subscriptionStatus:billing_integrity_review/);
+  assert.doesNotMatch(source, /billingIntegrity:[\s\S]*stripe_customer_id/);
+});

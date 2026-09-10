@@ -127,9 +127,9 @@ async function updateClaim(admin, claimId, patch) {
 function sessionMatchesClaim(session, claim, userId, planId) {
   const metadata = session?.metadata || {};
   return (
-    (!metadata.checkout_claim_id || String(metadata.checkout_claim_id) === String(claim.claim_id)) &&
-    (!metadata.user_id || String(metadata.user_id) === String(userId)) &&
-    (!metadata.plan_tier || String(metadata.plan_tier) === String(planId))
+    String(metadata.checkout_claim_id || "") === String(claim.claim_id) &&
+    String(metadata.user_id || "") === String(userId) &&
+    String(metadata.plan_tier || "") === String(planId)
   );
 }
 
@@ -304,6 +304,14 @@ export default async function handler(req, res) {
       return res.status(502).json({
         error: "Subscription Checkout could not be confirmed. The pending claim was preserved for safe retry.",
         code: "SUBSCRIPTION_CHECKOUT_UNCONFIRMED",
+      });
+    }
+
+    if (!session?.id || !session?.url) {
+      await updateClaim(admin, claim.claim_id, { state: "requires_review" });
+      return res.status(502).json({
+        error: "Subscription Checkout returned an incomplete provider response and requires reconciliation.",
+        code: "SUBSCRIPTION_RECONCILIATION_REQUIRED",
       });
     }
 

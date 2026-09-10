@@ -7,7 +7,7 @@ on:
       - audit/full-system-20260909
       - recovery/full-app-20260909
   pull_request:
-    branches: [main]
+    branches: [main, recovery/full-app-20260909]
   workflow_dispatch:
 
 permissions:

@@ -84,6 +84,15 @@ describe("security regression", () => {
     assert.match(tenant, /NEW\.company_id := OLD\.company_id/);
   });
 
+  it("payment-link privileged authority comes only from auth app_metadata", () => {
+    const src = read("api/functions/createPaymentLink.js");
+    assert.match(src, /app_metadata\?\.role === "admin"/);
+    assert.match(src, /invoice\.created_by_id !== user\.id && !serverAdmin/);
+    assert.doesNotMatch(src, /profile\?\.role\s*!==\s*"admin"/);
+    assert.doesNotMatch(src, /profile\?\.role\s*===\s*"admin"/);
+    assert.doesNotMatch(src, /select\("role,/);
+  });
+
   it("Invisible Interface is data-only and cannot carry direct execution", () => {
     const safe = sanitizeInvisibleInterface({
       type: "decision",

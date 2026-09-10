@@ -3,8 +3,12 @@ import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
 import { calculateCategoryFees } from "../_lib/feeConfig.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 
+function isServerAdmin(authUser) {
+  return authUser?.app_metadata?.role === "admin";
+}
+
 function resolvePlanFromProfile(profile, authUser) {
-  if (authUser?.app_metadata?.role === "admin" || profile?.role === "admin") return "business";
+  if (isServerAdmin(authUser)) return "business";
   const raw = String(profile?.plan_tier || profile?.account_type || "").toLowerCase();
   if (raw === "customer" || profile?.account_type === "customer") return "customer";
   if (raw === "business") return "business";
@@ -25,6 +29,7 @@ function resolvePlanFromProfile(profile, authUser) {
 /**
  * Creates a Stripe Checkout session when STRIPE_SECRET_KEY is configured.
  * Platform fee ALWAYS computed server-side via Fee Engine (never trusts client fee fields).
+ * Privileged invoice access trusts Supabase Auth app_metadata only, never public profile data.
  */
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -42,10 +47,11 @@ export default async function handler(req, res) {
     const { data: userData, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userData?.user) return res.status(401).json({ error: "Unauthorized" });
     const user = userData.user;
+    const serverAdmin = isServerAdmin(user);
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("role, is_pro, lifetime_premium, paying_subscriber, plan_tier, account_type")
+      .select("is_pro, lifetime_premium, paying_subscriber, plan_tier, account_type")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -66,7 +72,7 @@ export default async function handler(req, res) {
       if (invErr || !invoice) {
         return res.status(400).json({ error: "Invoice not found" });
       }
-      if (invoice.created_by_id !== user.id && profile?.role !== "admin" && user.app_metadata?.role !== "admin") {
+      if (invoice.created_by_id !== user.id && !serverAdmin) {
         return res.status(403).json({ error: "Not allowed to charge this invoice" });
       }
       if (invoice.status === "paid") {

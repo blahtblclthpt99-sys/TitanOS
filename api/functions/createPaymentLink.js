@@ -261,8 +261,12 @@ export default async function handler(req, res) {
       if (invoiceId) {
         params.set("client_reference_id", invoiceId);
         params.set("metadata[invoice_id]", invoiceId);
+        params.set("payment_intent_data[metadata][invoice_id]", invoiceId);
       }
-      if (payment?.id) params.set("metadata[payment_id]", payment.id);
+      if (payment?.id) {
+        params.set("metadata[payment_id]", payment.id);
+        params.set("payment_intent_data[metadata][payment_id]", payment.id);
+      }
       params.set("metadata[platform_fee_rate]", String(rate));
       params.set("metadata[plan]", planId);
       params.set("metadata[base_amount]", String(base));
@@ -270,6 +274,8 @@ export default async function handler(req, res) {
       params.set("metadata[fee_version]", String(feeResult.feeVersion ?? ""));
       params.set("metadata[fee_config_source]", feeResult.configSource || "seed");
       params.set("metadata[user_id]", user.id);
+      params.set("payment_intent_data[metadata][user_id]", user.id);
+      params.set("payment_intent_data[metadata][source]", "createPaymentLink");
 
       const stripeHeaders = {
         Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
@@ -278,27 +284,27 @@ export default async function handler(req, res) {
       if (payment?.id) stripeHeaders["Idempotency-Key"] = `checkout_${payment.id}`;
 
       let stripeRes;
-try {
-  stripeRes = await requestStripeCheckout(params, stripeHeaders);
-} catch (providerError) {
-  const timedOut = isAbortError(providerError);
-  await admin
-    .from("payments")
-    .update({
-      status: "pending",
-      note: `${insertPayload.note} · Stripe checkout result unconfirmed (${timedOut ? "timeout" : "network error"})`,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", payment.id);
-  logError("createPaymentLink:stripe_transport", providerError);
-  return res.status(timedOut ? 504 : 502).json({
-    error: timedOut
-      ? "Checkout provider timed out. The payment remains pending for reconciliation; check Payments before trying again."
-      : "Checkout provider could not be reached. The payment remains pending for reconciliation; check Payments before trying again.",
-    code: timedOut ? "STRIPE_CHECKOUT_TIMEOUT" : "STRIPE_CHECKOUT_NETWORK_ERROR",
-  });
-}
-const session = await stripeRes.json();
+      try {
+        stripeRes = await requestStripeCheckout(params, stripeHeaders);
+      } catch (providerError) {
+        const timedOut = isAbortError(providerError);
+        await admin
+          .from("payments")
+          .update({
+            status: "pending",
+            note: `${insertPayload.note} · Stripe checkout result unconfirmed (${timedOut ? "timeout" : "network error"})`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", payment.id);
+        logError("createPaymentLink:stripe_transport", providerError);
+        return res.status(timedOut ? 504 : 502).json({
+          error: timedOut
+            ? "Checkout provider timed out. The payment remains pending for reconciliation; check Payments before trying again."
+            : "Checkout provider could not be reached. The payment remains pending for reconciliation; check Payments before trying again.",
+          code: timedOut ? "STRIPE_CHECKOUT_TIMEOUT" : "STRIPE_CHECKOUT_NETWORK_ERROR",
+        });
+      }
+      const session = await stripeRes.json();
       if (!stripeRes.ok) {
         await admin
           .from("payments")

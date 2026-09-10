@@ -71,13 +71,19 @@ export default async function handler(req, res) {
             },
           },
         };
+    const reconciliationMetadata = {
+      payment_id: payment.id,
+      user_id: auth.user.id,
+      task_type: "invoice_recovery_sprint",
+    };
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: auth.user.email || undefined,
       line_items: [lineItem],
-      metadata: { payment_id: payment.id, user_id: auth.user.id, task_type: "invoice_recovery_sprint" },
-      success_url: `${origin}/autopilot?order=${encodeURIComponent(payment.id)}&checkout=success`,
-      cancel_url: `${origin}/autopilot?order=${encodeURIComponent(payment.id)}&checkout=canceled`,
+      metadata: reconciliationMetadata,
+      payment_intent_data: { metadata: reconciliationMetadata },
+      success_url: `${origin}/titan-auto?order=${encodeURIComponent(payment.id)}&checkout=success`,
+      cancel_url: `${origin}/titan-auto?order=${encodeURIComponent(payment.id)}&checkout=canceled`,
     }, { idempotencyKey: `autopilot_${payment.id}` });
 
     await auth.admin.from("payments").update({ external_id: session.id, checkout_url: session.url }).eq("id", payment.id);

@@ -7,7 +7,10 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 test("Autopilot checkout binds the paid order to the authenticated owner", async () => {
   const source = await read("api/functions/createAutopilotOrder.js");
   assert.match(source, /eq\("created_by_id", auth\.user\.id\)/);
-  assert.match(source, /metadata: \{ payment_id: payment\.id, user_id: auth\.user\.id/);
+  assert.match(source, /payment_id: payment\.id/);
+  assert.match(source, /user_id: auth\.user\.id/);
+  assert.match(source, /payment_intent_data: \{ metadata: reconciliationMetadata \}/);
+  assert.match(source, /\/titan-auto\?order=/);
   assert.match(source, /idempotencyKey: `autopilot_\$\{payment\.id\}`/);
 });
 

@@ -66,7 +66,7 @@ const Companies = lazy(() => import("@/pages/Companies"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
-const Autopilot = lazy(() => import("@/pages/Autopilot"));
+const TitanAuto = lazy(() => import("@/pages/TitanAuto"));
 const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
 const Leads = lazy(() => import("@/pages/Leads"));
@@ -91,6 +91,7 @@ const LEGACY_REDIRECTS = {
   "/growth-coach": "/assistant?mode=growth",
   "/marketing": "/assistant?mode=marketing",
   "/phone": "/assistant?mode=phone-script",
+  "/autopilot": "/titan-auto",
   "/community": "/",
   "/emergency": "/",
   "/deals": "/",
@@ -132,7 +133,7 @@ const NON_TAB_ROUTES = {
   "/employees": Employees,
   "/inventory": Inventory,
   "/follow-ups": FollowUps,
-  "/autopilot": Autopilot,
+  "/titan-auto": TitanAuto,
   "/reputation": Reputation,
   "/credentials": Credentials,
   "/leads": Leads,

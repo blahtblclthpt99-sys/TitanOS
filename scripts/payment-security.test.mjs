@@ -116,6 +116,14 @@ describe("portal checkout concurrency authority", () => {
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.claim_portal_invoice_payment[\s\S]*TO service_role/);
   });
 
+  it("derives payable principal from total minus amount paid and rejects balance drift", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /v_invoice\.total[\s\S]*v_invoice\.amount_paid/);
+    assert.match(migration, /v_stored_balance/);
+    assert.match(migration, /portal_invoice_balance_inconsistent/);
+    assert.match(migration, /ABS\(v_stored_balance - v_amount\) > 0\.01/);
+  });
+
   it("reuses active Stripe Sessions and fails closed on stale unresolved attempts", async () => {
     const source = await read("api/functions/portalPayInvoice.js");
     assert.match(source, /retrieveStripeCheckout/);

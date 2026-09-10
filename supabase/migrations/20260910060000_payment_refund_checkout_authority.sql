@@ -72,7 +72,7 @@ FOR EACH ROW EXECUTE FUNCTION public.protect_payment_authority();
 CREATE OR REPLACE FUNCTION public.claim_portal_invoice_payment(
   p_invoice_id UUID,
   p_owner_id UUID,
-  p_customer_id UUID,
+  p_customer_id TEXT,
   p_customer_name TEXT DEFAULT '',
   p_currency TEXT DEFAULT 'usd'
 )
@@ -93,7 +93,7 @@ DECLARE
   v_amount NUMERIC;
   v_currency TEXT;
 BEGIN
-  IF p_invoice_id IS NULL OR p_owner_id IS NULL OR p_customer_id IS NULL THEN
+  IF p_invoice_id IS NULL OR p_owner_id IS NULL OR NULLIF(BTRIM(p_customer_id), '') IS NULL THEN
     RAISE EXCEPTION 'portal_checkout_identity_required';
   END IF;
 
@@ -113,7 +113,7 @@ BEGIN
     RAISE EXCEPTION 'portal_invoice_not_found';
   END IF;
   IF v_invoice.created_by_id IS DISTINCT FROM p_owner_id
-     OR v_invoice.customer_id::TEXT IS DISTINCT FROM p_customer_id::TEXT THEN
+     OR v_invoice.customer_id IS DISTINCT FROM p_customer_id THEN
     RAISE EXCEPTION 'portal_invoice_ownership_mismatch';
   END IF;
   IF LOWER(COALESCE(v_invoice.status, '')) IN ('paid', 'void', 'cancelled', 'refunded') THEN
@@ -194,7 +194,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, UUID, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, UUID, TEXT, TEXT) FROM anon;
-REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, UUID, TEXT, TEXT) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, UUID, TEXT, TEXT) TO service_role;
+REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, TEXT, TEXT, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, TEXT, TEXT, TEXT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_portal_invoice_payment(UUID, UUID, TEXT, TEXT, TEXT) TO service_role;

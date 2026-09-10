@@ -1,9 +1,10 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useReducedMotion, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import TitanAutoLink from "@/components/shared/TitanAutoLink";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,9 +14,23 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
+const TITAN_AUTO_CONTEXTS = [
+  { prefix: "/jobs", source: "jobs" },
+  { prefix: "/follow-ups", source: "followups" },
+  { prefix: "/companies", source: "business" },
+  { prefix: "/customers", source: "business" },
+  { prefix: "/invoices", source: "business" },
+];
+
+function resolveTitanAutoContext(pathname = "") {
+  return TITAN_AUTO_CONTEXTS.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`)) || null;
+}
+
 /**
  * Page title block — clear title, optional breadcrumb, quick actions.
  * Navigation standard: title + actions; Back lives in MobileHeader on nested routes.
+ * Titan Auto is surfaced automatically on core work pages so automation stays
+ * contextual instead of becoming a separate disconnected destination.
  *
  * @param {{ label: string, to?: string }[]} [breadcrumbs] — last item is current page (no link)
  */
@@ -30,7 +45,9 @@ export default function PageHeader({
   className,
 }) {
   const reduceMotion = useReducedMotion();
+  const location = useLocation();
   const crumbs = Array.isArray(breadcrumbs) ? breadcrumbs.filter(Boolean) : [];
+  const titanAutoContext = resolveTitanAutoContext(location.pathname);
 
   return (
     <motion.header
@@ -71,6 +88,7 @@ export default function PageHeader({
         )}
       </div>
       <div className="titan-page-actions flex items-center gap-2 flex-shrink-0">
+        {titanAutoContext ? <TitanAutoLink source={titanAutoContext.source} /> : null}
         {actions}
         {onAdd && (
           <Button onClick={onAdd} className="gap-2 min-h-[44px]">

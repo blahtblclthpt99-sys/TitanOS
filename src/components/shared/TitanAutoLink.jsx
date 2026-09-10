@@ -22,10 +22,14 @@ export default function TitanAutoLink({
   className = "",
 }) {
   return (
-    <Button asChild type="button" variant={variant} size={size} className={className}>
-      <Link to={buildTitanAutoUrl({ source, workflow, contextId })}>
+    <Button asChild variant={variant} size={size} className={className}>
+      <Link
+        to={buildTitanAutoUrl({ source, workflow, contextId })}
+        aria-label={label}
+        title={label}
+      >
         <Workflow className="h-4 w-4" aria-hidden="true" />
-        {label}
+        <span className="hidden sm:inline">{label}</span>
       </Link>
     </Button>
   );

@@ -92,6 +92,7 @@ DECLARE
   v_invoice public.invoices%ROWTYPE;
   v_payment public.payments%ROWTYPE;
   v_amount NUMERIC;
+  v_stored_balance NUMERIC;
   v_currency TEXT;
 BEGIN
   IF p_invoice_id IS NULL OR p_owner_id IS NULL OR NULLIF(BTRIM(p_customer_id), '') IS NULL THEN
@@ -121,7 +122,14 @@ BEGIN
     RAISE EXCEPTION 'portal_invoice_not_payable';
   END IF;
 
-  v_amount := ROUND(COALESCE(NULLIF(v_invoice.balance_due, 0), v_invoice.total, 0)::NUMERIC, 2);
+  -- Payable principal is derived from accounting state, not from a nullable or
+  -- stale UI field. If the stored balance disagrees, fail closed rather than
+  -- risk over/under-charging a customer.
+  v_amount := ROUND(GREATEST(0, COALESCE(v_invoice.total, 0) - COALESCE(v_invoice.amount_paid, 0))::NUMERIC, 2);
+  v_stored_balance := ROUND(COALESCE(v_invoice.balance_due, 0)::NUMERIC, 2);
+  IF ABS(v_stored_balance - v_amount) > 0.01 THEN
+    RAISE EXCEPTION 'portal_invoice_balance_inconsistent';
+  END IF;
   IF v_amount <= 0 OR v_amount > 1000000 THEN
     RAISE EXCEPTION 'portal_invoice_invalid_balance';
   END IF;

@@ -24,7 +24,6 @@ import { readSession } from "@/lib/driverHubApi";
 import { DD_EVENT, readActiveDelivery } from "@/lib/driverActivity";
 import { DRIVER_SESSION_EVENT } from "@/lib/driverOs";
 import { appendVoiceTranscript, listVoiceTranscriptDocs } from "@/lib/voiceTranscriptStore";
-import { upsertSearchDocs } from "@/lib/searchIndex";
 
 const AI_SUGGESTIONS = [
   { icon: Calendar, label: "Schedule a job", action: "/jobs?new=1" },
@@ -146,7 +145,9 @@ export default function MobileActionDock({ onOpenFeedback }) {
       const transcript = event.results?.[0]?.[0]?.transcript || "";
       if (user?.id && transcript.trim()) {
         appendVoiceTranscript(user.id, transcript, "dock");
-        upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id));
+        void import("@/lib/searchIndex")
+          .then(({ upsertSearchDocs }) => upsertSearchDocs(user.id, listVoiceTranscriptDocs(user.id)))
+          .catch(() => {});
       }
       const match = matchVoiceCommand(transcript);
       if (match?.path) {

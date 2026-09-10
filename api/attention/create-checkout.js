@@ -1,38 +1,5 @@
 import { getSupabaseAdmin } from "../_lib/supabase.js";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const CAMPAIGN_CHECKOUT_FIELDS = "id,advertiser_id,title,total_budget_cents,funded_cents,status,stripe_checkout_session_id,updated_at";
-const NATIVE_ORIGINS = new Set([
-  "https://titanos.app",
-  "capacitor://localhost",
-  "http://localhost",
-  "https://localhost",
-]);
-
-function normalizeOrigin(value) {
-  return String(value || "").trim().replace(/\/$/, "");
-}
-
-function applyCors(req, res) {
-  const requestOrigin = normalizeOrigin(req.headers.origin);
-  const configuredOrigin = normalizeOrigin(process.env.APP_ORIGIN);
-  const allowedOrigins = new Set([
-    ...NATIVE_ORIGINS,
-    "https://titanfieldos.com",
-    "https://www.titanfieldos.com",
-    "https://titanos-web.vercel.app",
-  ]);
-  if (configuredOrigin) allowedOrigins.add(configuredOrigin);
-
-  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
-    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
-    res.setHeader("Vary", "Origin");
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  res.setHeader("Access-Control-Max-Age", "86400");
-}
-
 function json(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "application/json");
@@ -40,20 +7,18 @@ function json(res, status, body) {
 }
 
 export default async function handler(req, res) {
-  applyCors(req, res);
-  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json(res, 503, { error: "Stripe is not configured for this deployment" });
 
   const authorization = String(req.headers.authorization || "");
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
   if (!token) return json(res, 401, { error: "Authentication required" });
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const campaignId = String(body.campaign_id || "").trim();
-  if (!UUID_RE.test(campaignId)) return json(res, 400, { error: "Valid campaign_id is required" });
+  const campaignId = String(body.campaign_id || "");
+  if (!campaignId) return json(res, 400, { error: "campaign_id is required" });
 
   try {
     const admin = getSupabaseAdmin();
@@ -61,19 +26,18 @@ export default async function handler(req, res) {
     const user = authData?.user;
     if (authError || !user) return json(res, 401, { error: "Invalid session" });
 
-    const { data: profile, error: profileError } = await admin
+    const { data: profile } = await admin
       .from("attention_profiles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (profileError) throw profileError;
     if (!profile || !["advertiser", "admin"].includes(profile.role)) {
       return json(res, 403, { error: "Advertiser account required" });
     }
 
     const { data: campaign, error: campaignError } = await admin
       .from("attention_campaigns")
-      .select(CAMPAIGN_CHECKOUT_FIELDS)
+      .select("*")
       .eq("id", campaignId)
       .eq("advertiser_id", user.id)
       .maybeSingle();
@@ -100,7 +64,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const origin = normalizeOrigin(process.env.APP_ORIGIN || "https://titanfieldos.com");
+    const origin = String(process.env.APP_ORIGIN || "https://titanfieldos.com").replace(/\/$/, "");
     const campaignVersion = Number.isFinite(Date.parse(campaign.updated_at)) ? Date.parse(campaign.updated_at) : 0;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",

@@ -1,70 +1,95 @@
-import React, { useEffect } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePrefetchDashboard } from "@/hooks/usePrefetchDashboard";
-import DriverSessionKeepAlive from "@/components/driver/activity/DriverSessionKeepAlive";
-import DoorDashKeepAlive from "@/components/driver/activity/DoorDashKeepAlive";
 import { useAuth } from "@/lib/AuthContext";
-import { setSearchIndexUser, warmSearchIndex } from "@/lib/searchIndex";
-import { trackEvent } from "@/lib/productAnalytics";
-import { refreshFeatureFlagsFromServer } from "@/lib/featureFlags";
-import { runWhenIdle } from "@/lib/perf";
-import ScheduledExportRunner from "@/components/shared/ScheduledExportRunner";
+import { normalizeAppPath } from "@/lib/routing";
+import { scheduleIdleWork } from "@/lib/idleWork";
 
-function allowsBackgroundWarmup() {
-  if (typeof window === "undefined" || typeof document === "undefined") return false;
-  if (document.visibilityState === "hidden") return false;
-
-  const connection =
-    navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
-  if (connection?.saveData) return false;
-
-  const effectiveType = String(connection?.effectiveType || "").toLowerCase();
-  return effectiveType !== "slow-2g" && effectiveType !== "2g";
-}
+// Background services stay out of the initial shell parse/execute path. Driver
+// telemetry begins loading immediately after the shell commits; non-critical
+// export work is additionally held until an idle window.
+const ScheduledExportRunner = lazy(() => import("@/components/shared/ScheduledExportRunner"));
+const DriverSessionKeepAlive = lazy(() => import("@/components/driver/activity/DriverSessionKeepAlive"));
+const DoorDashKeepAlive = lazy(() => import("@/components/driver/activity/DoorDashKeepAlive"));
 
 function PrefetchOnMount() {
+  const location = useLocation();
   const { user } = useAuth();
-  const path = typeof window !== "undefined" ? window.location.pathname : "";
-  const shouldPrefetchDashboard = Boolean(user?.id) && (path === "/" || path === "/dashboard");
-  usePrefetchDashboard(shouldPrefetchDashboard);
+  const isDashboard = normalizeAppPath(location.pathname) === "/";
+
+  // Deep links should never pay for unrelated Dashboard traffic. On Dashboard,
+  // warming is still delayed so the visible route gets first claim on startup.
+  usePrefetchDashboard(isDashboard);
 
   useEffect(() => {
     if (!user?.id) return undefined;
 
-    const userId = user.id;
-    setSearchIndexUser(userId);
-    trackEvent("session_start");
-
-    // Flags are useful globally, but they are not allowed to compete with
-    // authentication, route code, or the first data paint.
-    const cancelFlags = runWhenIdle(() => {
-      if (document.visibilityState !== "hidden") {
-        refreshFeatureFlagsFromServer().catch(() => {});
-      }
-    }, 2500);
-
-    // The search index previously duplicated dashboard Jobs/Customers/Invoices
-    // requests during startup. Give the active route time to populate the index
-    // first, and skip remote warming entirely on data-saver / very slow links.
-    let cancelSearchIdle = () => {};
-    const searchTimer = window.setTimeout(() => {
-      cancelSearchIdle = runWhenIdle(() => {
-        if (allowsBackgroundWarmup()) {
-          warmSearchIndex(userId).catch(() => {});
-        }
-      }, 5000);
-    }, 6000);
+    let active = true;
+    const cancel = scheduleIdleWork(
+      () => {
+        // Search warming can read hundreds of records and analytics/feature flag
+        // refreshes also create startup requests. Load and run them after paint.
+        void Promise.all([
+          import("@/lib/searchIndex"),
+          import("@/lib/productAnalytics"),
+          import("@/lib/featureFlags"),
+        ])
+          .then(([search, analytics, featureFlags]) => {
+            if (!active) return;
+            analytics.trackEvent("session_start");
+            void featureFlags.refreshFeatureFlagsFromServer().catch(() => {});
+            void search.warmSearchIndex(user.id).catch(() => {});
+          })
+          .catch(() => {});
+      },
+      { delay: 700, timeout: 2500 }
+    );
 
     return () => {
-      cancelFlags?.();
-      window.clearTimeout(searchTimer);
-      cancelSearchIdle?.();
+      active = false;
+      cancel();
     };
   }, [user?.id]);
 
   return null;
+}
+
+function DeferredScheduledExports() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(
+    () =>
+      scheduleIdleWork(() => setReady(true), {
+        delay: 1250,
+        timeout: 4000,
+      }),
+    []
+  );
+
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <ScheduledExportRunner />
+    </Suspense>
+  );
+}
+
+function BackgroundServices() {
+  return (
+    <>
+      {/* Driver telemetry is not idle-deferred: active sessions resume promptly. */}
+      <Suspense fallback={null}>
+        <DriverSessionKeepAlive />
+      </Suspense>
+      <Suspense fallback={null}>
+        <DoorDashKeepAlive />
+      </Suspense>
+      <DeferredScheduledExports />
+    </>
+  );
 }
 
 /** Authenticated app shell — keeps react-query out of the marketing bundle. */
@@ -72,10 +97,8 @@ export default function AuthenticatedShell() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <PrefetchOnMount />
-      <ScheduledExportRunner />
-      <DriverSessionKeepAlive />
-      <DoorDashKeepAlive />
       <AppLayout />
+      <BackgroundServices />
     </QueryClientProvider>
   );
 }

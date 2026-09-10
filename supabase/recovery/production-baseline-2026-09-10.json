@@ -1,0 +1,50 @@
+{
+  "captured_at": "2026-09-10",
+  "project_role": "production-current",
+  "mutation_performed": false,
+  "public_schema": {
+    "tables": 5,
+    "policies": 6,
+    "indexes": 12,
+    "public_functions": 4,
+    "private_functions": 0,
+    "application_triggers": 0,
+    "views": 0,
+    "table_names": [
+      "attention_campaigns",
+      "attention_payment_events",
+      "attention_profiles",
+      "attention_views",
+      "attention_withdrawals"
+    ],
+    "table_row_counts": {
+      "attention_campaigns": 0,
+      "attention_payment_events": 0,
+      "attention_profiles": 0,
+      "attention_views": 0,
+      "attention_withdrawals": 0
+    },
+    "functions": [
+      "activate_attention_campaign_funding_service(p_campaign_id uuid, p_checkout_session_id text, p_amount_cents bigint)",
+      "attention_view_heartbeat_service(p_view_id uuid, p_viewer_id uuid, p_session_token uuid)",
+      "complete_attention_view_service(p_view_id uuid, p_viewer_id uuid, p_session_token uuid)",
+      "request_attention_withdrawal_service(p_user_id uuid, p_amount_cents bigint)"
+    ]
+  },
+  "auth": {
+    "user_count": 1,
+    "preserve": true
+  },
+  "storage": {
+    "buckets": [
+      {"id":"titanos-uploads","public":false,"file_size_limit":null,"allowed_mime_types":null}
+    ],
+    "preserve_existing_bucket": true
+  },
+  "recovery_rules": [
+    "PRESERVE_EXISTING_ATTENTION",
+    "PRESERVE_AUTH_STATE",
+    "NO_HISTORICAL_ROW_SYNTHESIS",
+    "NO_DESTRUCTIVE_HISTORICAL_REPLAY"
+  ]
+}

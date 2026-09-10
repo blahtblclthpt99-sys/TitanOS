@@ -1,0 +1,38 @@
+DROP POLICY IF EXISTS hire_apps_read ON public.hire_applications;
+DROP POLICY IF EXISTS hire_apps_write ON public.hire_applications;
+DROP POLICY IF EXISTS hire_apps_select ON public.hire_applications;
+DROP POLICY IF EXISTS hire_apps_insert ON public.hire_applications;
+DROP POLICY IF EXISTS hire_apps_update ON public.hire_applications;
+DROP POLICY IF EXISTS hire_apps_delete ON public.hire_applications;
+CREATE POLICY hire_apps_select ON public.hire_applications FOR SELECT TO authenticated USING (public.is_admin() OR created_by_id=auth.uid() OR worker_id=auth.uid()::text OR EXISTS (SELECT 1 FROM public.hire_jobs j WHERE j.id::text=hire_applications.hire_job_id AND (j.created_by_id=auth.uid() OR j.customer_id=auth.uid()::text)));
+CREATE POLICY hire_apps_insert ON public.hire_applications FOR INSERT TO authenticated WITH CHECK (created_by_id=auth.uid() AND worker_id=auth.uid()::text);
+CREATE POLICY hire_apps_update ON public.hire_applications FOR UPDATE TO authenticated USING (public.is_admin() OR created_by_id=auth.uid() OR worker_id=auth.uid()::text OR EXISTS (SELECT 1 FROM public.hire_jobs j WHERE j.id::text=hire_applications.hire_job_id AND (j.created_by_id=auth.uid() OR j.customer_id=auth.uid()::text))) WITH CHECK (public.is_admin() OR created_by_id=auth.uid() OR worker_id=auth.uid()::text OR EXISTS (SELECT 1 FROM public.hire_jobs j WHERE j.id::text=hire_applications.hire_job_id AND (j.created_by_id=auth.uid() OR j.customer_id=auth.uid()::text)));
+CREATE POLICY hire_apps_delete ON public.hire_applications FOR DELETE TO authenticated USING (public.is_admin() OR created_by_id=auth.uid());
+
+CREATE TABLE IF NOT EXISTS public.fee_categories (id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT,enabled BOOLEAN NOT NULL DEFAULT true,sort_order INTEGER NOT NULL DEFAULT 100,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.fee_rules (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),category_id TEXT NOT NULL REFERENCES public.fee_categories(id) ON DELETE CASCADE,context_key TEXT NOT NULL DEFAULT '*',version INTEGER NOT NULL DEFAULT 1,label TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT true,effective_from TIMESTAMPTZ NOT NULL DEFAULT now(),effective_until TIMESTAMPTZ,rule_type TEXT NOT NULL DEFAULT 'percentage',percentage_rate NUMERIC NOT NULL DEFAULT 0,flat_amount NUMERIC NOT NULL DEFAULT 0,min_fee NUMERIC,max_fee NUMERIC,fee_bearer TEXT NOT NULL DEFAULT 'buyer',processing_fee_rate NUMERIC NOT NULL DEFAULT 0,processing_fee_flat NUMERIC NOT NULL DEFAULT 0,tax_enabled BOOLEAN NOT NULL DEFAULT false,tax_rate NUMERIC NOT NULL DEFAULT 0,tiers JSONB NOT NULL DEFAULT '[]'::jsonb,promo JSONB,notes TEXT,created_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),superseded_by UUID REFERENCES public.fee_rules(id) ON DELETE SET NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS fee_rules_cat_ctx_version_uidx ON public.fee_rules(category_id,context_key,version);
+CREATE INDEX IF NOT EXISTS fee_rules_active_idx ON public.fee_rules(category_id,context_key,enabled,effective_from DESC);
+CREATE TABLE IF NOT EXISTS public.fee_rule_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),fee_rule_id UUID NOT NULL REFERENCES public.fee_rules(id) ON DELETE CASCADE,action TEXT NOT NULL,snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.fee_calculation_logs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),transaction_id TEXT,payment_id UUID,category_id TEXT NOT NULL,fee_rule_id UUID,fee_version INTEGER,context_key TEXT,calculated_at TIMESTAMPTZ NOT NULL DEFAULT now(),applied_rules JSONB NOT NULL DEFAULT '[]'::jsonb,gross_amount NUMERIC NOT NULL DEFAULT 0,platform_fee NUMERIC NOT NULL DEFAULT 0,processing_fee NUMERIC NOT NULL DEFAULT 0,tax_amount NUMERIC NOT NULL DEFAULT 0,net_amount NUMERIC NOT NULL DEFAULT 0,final_total NUMERIC NOT NULL DEFAULT 0,currency TEXT NOT NULL DEFAULT 'usd',context JSONB NOT NULL DEFAULT '{}'::jsonb,created_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL);
+CREATE INDEX IF NOT EXISTS fee_calc_logs_tx_idx ON public.fee_calculation_logs(transaction_id);
+CREATE INDEX IF NOT EXISTS fee_calc_logs_payment_idx ON public.fee_calculation_logs(payment_id);
+CREATE INDEX IF NOT EXISTS fee_calc_logs_time_idx ON public.fee_calculation_logs(calculated_at DESC);
+ALTER TABLE public.fee_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fee_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fee_rule_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fee_calculation_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY fee_categories_select ON public.fee_categories FOR SELECT TO authenticated USING (true);
+CREATE POLICY fee_rules_select ON public.fee_rules FOR SELECT TO authenticated USING (enabled=true);
+CREATE POLICY fee_categories_admin ON public.fee_categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY fee_rules_admin ON public.fee_rules FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY fee_history_admin ON public.fee_rule_history FOR SELECT TO authenticated USING (public.is_admin());
+CREATE POLICY fee_history_admin_write ON public.fee_rule_history FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY fee_logs_own ON public.fee_calculation_logs FOR SELECT TO authenticated USING (public.is_admin() OR created_by_id=auth.uid());
+COMMENT ON TABLE public.fee_categories IS 'Recovery staging: configuration structure restored; historical pricing seed rows intentionally not synthesized.';
+
+CREATE TABLE IF NOT EXISTS public.stripe_webhook_events (event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),payment_id UUID,payload_summary JSONB NOT NULL DEFAULT '{}'::jsonb);
+CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_processed ON public.stripe_webhook_events(processed_at DESC);
+ALTER TABLE public.stripe_webhook_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY stripe_webhook_events_admin ON public.stripe_webhook_events FOR SELECT TO authenticated USING (public.is_admin());
+COMMENT ON TABLE public.stripe_webhook_events IS 'Idempotency ledger for Stripe webhooks — insert event_id before side effects.';

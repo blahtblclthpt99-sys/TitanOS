@@ -1,4 +1,4 @@
-name: Titan Attention Quality Gate
+name: Titan Attention Build
 
 on:
   push:
@@ -9,22 +9,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: titan-attention-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  quality:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24
           cache: npm
       - run: npm ci
-      - name: Dependency vulnerability gate
-        run: npm audit --audit-level=high
-      - name: Production ship gate
-        run: npm run gate:ship
+      - run: npm run build

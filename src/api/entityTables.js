@@ -14,7 +14,6 @@ export const ENTITY_TABLES = {
   Referral: "referrals",
   BetaSignup: "beta_signups",
   BetaFeedback: "beta_feedbacks",
-  PortalSession: "portal_sessions",
   MarketplaceListing: "marketplace_listings",
   MarketplaceFavorite: "marketplace_favorites",
   MarketplaceReport: "marketplace_reports",

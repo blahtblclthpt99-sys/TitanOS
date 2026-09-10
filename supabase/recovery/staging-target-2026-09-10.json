@@ -1,0 +1,210 @@
+{
+  "captured_at": "2026-09-10",
+  "project_role": "recovery-staging-target",
+  "project_name": "TitanOS Recovery Staging",
+  "mutation_performed_on_production": false,
+  "public_schema": {
+    "tables": 79,
+    "policies": 142,
+    "indexes": 219,
+    "public_functions": 16,
+    "private_functions": 7,
+    "application_triggers": 25,
+    "views": 0,
+    "table_names": [
+      "activity_events",
+      "availability_slots",
+      "beta_feedbacks",
+      "beta_signups",
+      "booking_pages",
+      "booking_requests",
+      "community_comments",
+      "community_likes",
+      "community_posts",
+      "companies",
+      "company_members",
+      "contracts",
+      "credentials",
+      "customer_communications",
+      "customer_files",
+      "customers",
+      "developer_applications",
+      "emergency_jobs",
+      "employees",
+      "equipment",
+      "escrow_holds",
+      "estimates",
+      "expenses",
+      "fee_calculation_logs",
+      "fee_categories",
+      "fee_rule_history",
+      "fee_rules",
+      "follow_up_queue",
+      "follow_up_rules",
+      "hire_applications",
+      "hire_jobs",
+      "hire_saves",
+      "insurance_docs",
+      "inventory_items",
+      "invoices",
+      "job_checkins",
+      "job_photos",
+      "job_reviews",
+      "jobs",
+      "leads",
+      "loyalty_events",
+      "loyalty_members",
+      "marketing_assets",
+      "marketplace_favorites",
+      "marketplace_listings",
+      "marketplace_messages",
+      "marketplace_modules",
+      "marketplace_reports",
+      "marketplace_reviews",
+      "mileage_trips",
+      "module_installs",
+      "module_waitlists",
+      "notifications",
+      "payment_accounts",
+      "payments",
+      "phone_scripts",
+      "portal_actions",
+      "portal_sessions",
+      "price_estimates",
+      "profiles",
+      "receipt_scans",
+      "referrals",
+      "stripe_webhook_events",
+      "support_agent_assignments",
+      "support_article_versions",
+      "support_articles",
+      "support_attachments",
+      "support_audit_logs",
+      "support_case_events",
+      "support_cases",
+      "support_csat",
+      "support_diagnostics",
+      "support_incident_cases",
+      "support_incidents",
+      "support_messages",
+      "titan_comms_channel_secrets",
+      "titan_comms_channels",
+      "titan_comms_members",
+      "titan_comms_messages"
+    ]
+  },
+  "functions": {
+    "private": [
+      "is_admin_internal()",
+      "is_company_member_internal(target_company_id text)",
+      "is_company_owner_internal(target_company_id text)",
+      "is_titan_comms_creator(target_channel_id uuid)",
+      "is_titan_comms_member(target_channel_id uuid)",
+      "is_titan_comms_public(target_channel_id uuid)",
+      "is_titan_comms_public_unprotected(target_channel_id uuid)"
+    ],
+    "public": [
+      "grant_lifetime_premium_if_eligible(p_referrer_id uuid)",
+      "handle_new_user()",
+      "is_admin()",
+      "is_company_member(target_company_id text)",
+      "is_company_owner(target_company_id text)",
+      "is_support_admin()",
+      "is_support_staff()",
+      "protect_escrow_settlement()",
+      "protect_invoice_paid_status()",
+      "protect_message_body()",
+      "protect_payment_authority()",
+      "protect_profile_privileges()",
+      "protect_referral_paying_flags()",
+      "set_updated_at()",
+      "titan_comms_prevent_admin_transfer()",
+      "titan_comms_protect_membership_identity()"
+    ]
+  },
+  "security": {
+    "rls_enabled_on_all_public_tables": true,
+    "intentional_zero_policy_server_only_tables": [
+      "portal_sessions",
+      "titan_comms_channel_secrets"
+    ],
+    "server_only_client_table_grants_revoked": true,
+    "security_definer_client_execute_revoked": true,
+    "untrusted_public_schema_create": false,
+    "security_advisor": {
+      "warnings": 0,
+      "info": 2,
+      "info_classification": "INTENTIONAL_SERVER_ONLY_RLS_NO_POLICY"
+    },
+    "two_account_runtime_idor_test": "PENDING_AUTH_TEST_IDENTITIES"
+  },
+  "performance": {
+    "unindexed_public_foreign_keys": 0,
+    "foreign_key_index_coverage": "COMPLETE",
+    "multiple_permissive_policy_findings": 26,
+    "policy_consolidation_status": "DEFERRED_UNTIL_TWO_ACCOUNT_RUNTIME_IDOR_TEST",
+    "unused_index_findings": "NOT_ACTIONABLE_WITH_ZERO_WORKLOAD"
+  },
+  "auth": {
+    "user_count": 0,
+    "manual_auth_table_insertion_allowed": false
+  },
+  "storage": {
+    "buckets": [
+      {
+        "id": "support-attachments",
+        "public": false,
+        "file_size_limit": 10485760,
+        "allowed_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "application/pdf",
+          "text/plain",
+          "text/csv",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "video/mp4"
+        ]
+      },
+      {
+        "id": "titanos-uploads",
+        "public": false,
+        "file_size_limit": null,
+        "allowed_mime_types": null
+      }
+    ]
+  },
+  "reconstruction_evidence": {
+    "statement_count": 22,
+    "evidence_directory": "supabase/recovery/staging-applied",
+    "manifest": "supabase/recovery/staging-applied/manifest.json",
+    "byte_for_byte_verified": true,
+    "verification_method": "Git blob SHA-1 independently recomputed from original Supabase migration ledger bytes",
+    "merged_via_pr": 74,
+    "recovery_head_commit": "8499bbf271740273e31eb41a888a86e83da07ab8"
+  },
+  "post_reconstruction_hardening": [
+    {
+      "version": "20260910032306",
+      "name": "server_only_table_grants",
+      "source": "supabase/migrations/20260910033000_server_only_table_grants.sql",
+      "result": "anon/authenticated privileges removed from portal_sessions and titan_comms_channel_secrets"
+    },
+    {
+      "version": "20260910040142",
+      "name": "recovery_24_cover_public_foreign_keys",
+      "evidence": "supabase/recovery/staging-post/20260910040142_recovery_24_cover_public_foreign_keys.sql",
+      "git_blob_sha": "452f56f9cfb60dd62e2c1b5385fbb15ab43d8d4c",
+      "result": "58 covering indexes added; zero unindexed public foreign keys remain"
+    }
+  ],
+  "production_recovery_constraints": [
+    "PRESERVE_EXISTING_ATTENTION",
+    "PRESERVE_AUTH_STATE",
+    "NO_HISTORICAL_ROW_SYNTHESIS",
+    "NO_DESTRUCTIVE_HISTORICAL_REPLAY",
+    "FORWARD_ONLY_DELTA_FROM_VERIFIED_TARGET",
+    "PRODUCTION_NO_GO_UNTIL_REMAINING_GATES_PASS"
+  ]
+}

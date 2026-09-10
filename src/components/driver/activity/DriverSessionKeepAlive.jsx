@@ -63,13 +63,10 @@ export default function DriverSessionKeepAlive() {
     };
   }, [user?.id, refresh]);
 
+  useVisibilityInterval(refresh, 5000, { enabled: Boolean(user?.id) });
+
   const active = Boolean(session?.active);
   const paused = Boolean(session?.paused);
-
-  // Session and preference changes already emit DRIVER_SESSION_EVENT. Poll only
-  // during an active shift, where the five-second cadence backs up telemetry and
-  // idle-prompt timing. Off-shift users now incur zero session polling wakeups.
-  useVisibilityInterval(refresh, 5000, { enabled: Boolean(user?.id) && active });
 
   useEffect(() => {
     if (!active) {

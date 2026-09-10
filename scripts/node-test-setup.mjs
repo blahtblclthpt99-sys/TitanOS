@@ -6,7 +6,7 @@ import { register } from "node:module";
 
 register("./node-alias-hooks.mjs", import.meta.url);
 
-  globalThis.__VITE_ENV__ = {
+globalThis.__VITE_ENV__ = {
   MODE: "test",
   DEV: false,
   PROD: true,
@@ -14,8 +14,8 @@ register("./node-alias-hooks.mjs", import.meta.url);
   BASE_URL: "/",
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "https://example.supabase.co",
   VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || "public-anon-placeholder-for-tests",
-  VITE_TITANOS_PUBLIC_ORIGIN: process.env.VITE_TITANOS_PUBLIC_ORIGIN || "https://titanos-web.vercel.app",
-  VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || "https://titanos-web.vercel.app",
+  VITE_TITANOS_PUBLIC_ORIGIN: process.env.VITE_TITANOS_PUBLIC_ORIGIN || "https://app.titanfieldos.com",
+  VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || "https://app.titanfieldos.com",
 };
 
 for (const [k, v] of Object.entries(globalThis.__VITE_ENV__)) {

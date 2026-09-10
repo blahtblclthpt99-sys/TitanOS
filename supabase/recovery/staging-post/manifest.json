@@ -1,0 +1,16 @@
+{
+  "captured_from": "TitanOS Recovery Staging Supabase migration ledger",
+  "purpose": "Post-reconstruction staging hardening evidence only; not executable production migration input",
+  "entries": [
+    {
+      "version": "20260910040142",
+      "name": "recovery_24_cover_public_foreign_keys",
+      "file": "20260910040142_recovery_24_cover_public_foreign_keys.sql",
+      "characters": 2974,
+      "bytes": 2974,
+      "md5": "1a13f9288fa40e9453071048b1db80f5",
+      "git_blob_sha": "452f56f9cfb60dd62e2c1b5385fbb15ab43d8d4c",
+      "verified_result": "zero unindexed public foreign keys"
+    }
+  ]
+}

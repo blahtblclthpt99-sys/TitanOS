@@ -1,13 +1,17 @@
 /**
- * Payment security unit tests — client status + origin allowlist (live cors module).
+ * Payment security unit tests — client status + origin allowlist + Stripe reconciliation metadata.
  * Run: node --test scripts/payment-security.test.mjs
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { resolveAppOrigin, allowedOrigins } from "../api/_lib/cors.js";
 
+const PRODUCTION_ORIGIN = "https://app.titanfieldos.com";
+const RETIRED_VERCEL_ORIGIN = "https://titanos-web.vercel.app";
 const WEBHOOK_ONLY = new Set(["succeeded", "refunded", "paid"]);
 const CLIENT_ALLOWED = new Set(["pending", "canceled", "failed", "cancelled"]);
+const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 function clientMaySetStatus(status) {
   const normalized = String(status || "").toLowerCase();
@@ -29,19 +33,176 @@ describe("payment status client policy", () => {
 });
 
 describe("checkout return origin allowlist (cors module)", () => {
-  it("includes production origin", () => {
-    assert.ok(allowedOrigins().includes("https://titanos-web.vercel.app"));
+  it("includes only the canonical production origin, not the retired Vercel host", () => {
+    assert.ok(allowedOrigins().includes(PRODUCTION_ORIGIN));
+    assert.equal(allowedOrigins().includes(RETIRED_VERCEL_ORIGIN), false);
   });
-  it("accepts allowlisted Origin header", () => {
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://titanos-web.vercel.app" } }),
-      "https://titanos-web.vercel.app"
-    );
+  it("accepts the canonical production Origin header", () => {
+    assert.equal(resolveAppOrigin({ headers: { origin: PRODUCTION_ORIGIN } }), PRODUCTION_ORIGIN);
   });
-  it("rejects spoofed Origin header", () => {
-    assert.equal(
-      resolveAppOrigin({ headers: { origin: "https://evil.example" } }),
-      "https://titanos-web.vercel.app"
-    );
+  it("rejects spoofed and retired Origin headers by falling back to the canonical origin", () => {
+    assert.equal(resolveAppOrigin({ headers: { origin: "https://evil.example" } }), PRODUCTION_ORIGIN);
+    assert.equal(resolveAppOrigin({ headers: { origin: RETIRED_VERCEL_ORIGIN } }), PRODUCTION_ORIGIN);
+  });
+});
+
+describe("Stripe reconciliation metadata", () => {
+  it("propagates standard payment, owner, and initiating-actor identifiers to PaymentIntent metadata", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /payment_id: String\(payment\.id\)/);
+    assert.match(source, /user_id: String\(paymentOwnerId\)/);
+    assert.match(source, /initiated_by_id: String\(user\.id\)/);
+    assert.match(source, /reconciliationMetadata\.invoice_id = String\(invoiceId\)/);
+    assert.match(source, /reconciliationMetadata\.invoice_owner_id = String\(invoiceOwnerId\)/);
+    assert.match(source, /payment_intent_data\[metadata\]\[\$\{key\}\]/);
+  });
+
+  it("propagates Titan Auto claimed payment and order identifiers to the underlying PaymentIntent", async () => {
+    const source = await read("api/functions/createAutopilotOrder.js");
+    assert.match(source, /payment_intent_data: \{ metadata: reconciliationMetadata \}/);
+    assert.match(source, /payment_id: String\(claim\.payment_id\)/);
+    assert.match(source, /order_id: String\(claim\.order_id\)/);
+    assert.match(source, /user_id: String\(auth\.user\.id\)/);
+  });
+
+  it("claims one portal payment identity and propagates it to the PaymentIntent", async () => {
+    const source = await read("api/functions/portalPayInvoice.js");
+    assert.match(source, /admin\.rpc\("claim_portal_invoice_payment"/);
+    assert.doesNotMatch(source, /\.from\("payments"\)\s*\.insert\(insertPayload\)/);
+    assert.match(source, /payment_id: payment\.payment_id/);
+    assert.match(source, /source: "portal"/);
+    assert.match(source, /payment_intent_data\[metadata\]/);
+    assert.match(source, /portal_checkout_\$\{payment\.payment_id\}/);
+  });
+});
+
+describe("refund reconciliation authority", () => {
+  it("uses an additive refund ledger and an atomic server-only RPC", async () => {
+    const migration = await read("supabase/migrations/20260910033000_stripe_refund_reconciliation.sql");
+    assert.match(migration, /refunded_amount NUMERIC\(12,2\)/);
+    assert.match(migration, /refunded_base_amount NUMERIC\(12,2\)/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.reconcile_stripe_refund/);
+    assert.match(migration, /FOR UPDATE/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION public\.reconcile_stripe_refund[\s\S]*FROM authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.reconcile_stripe_refund[\s\S]*TO service_role/);
+  });
+
+  it("extends payment authority to the newer refund and checkout fields", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /NEW\.refunded_amount := 0/);
+    assert.match(migration, /NEW\.refunded_base_amount := 0/);
+    assert.match(migration, /NEW\.refund_updated_at := NULL/);
+    assert.match(migration, /NEW\.checkout_source := NULL/);
+    assert.match(migration, /NEW\.refunded_amount := OLD\.refunded_amount/);
+    assert.match(migration, /NEW\.refunded_base_amount := OLD\.refunded_base_amount/);
+    assert.match(migration, /NEW\.refund_updated_at := OLD\.refund_updated_at/);
+    assert.match(migration, /NEW\.checkout_source := OLD\.checkout_source/);
+  });
+
+  it("keeps refunds inside the verified Stripe webhook path", async () => {
+    const source = await read("api/functions/stripeWebhook.js");
+    assert.match(source, /event\.type === "charge\.refunded"/);
+    assert.match(source, /admin\.rpc\("reconcile_stripe_refund"/);
+    assert.match(source, /partial_refund_allocation_required/);
+    assert.match(source, /settlement_after_refund/);
+  });
+});
+
+describe("portal checkout concurrency authority", () => {
+  it("serializes claims on the invoice row and reuses an existing pending portal payment", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.claim_portal_invoice_payment/);
+    assert.match(migration, /FROM public\.invoices[\s\S]*FOR UPDATE/);
+    assert.match(migration, /p\.status = 'pending'[\s\S]*p\.checkout_source = 'portal'/);
+    assert.match(migration, /SELECT v_payment\.id, TRUE/);
+    assert.match(migration, /portal_checkout_pending_amount_conflict/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION public\.claim_portal_invoice_payment[\s\S]*FROM authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.claim_portal_invoice_payment[\s\S]*TO service_role/);
+  });
+
+  it("derives payable principal from total minus amount paid and rejects balance drift", async () => {
+    const migration = await read("supabase/migrations/20260910060000_payment_refund_checkout_authority.sql");
+    assert.match(migration, /v_invoice\.total[\s\S]*v_invoice\.amount_paid/);
+    assert.match(migration, /v_stored_balance/);
+    assert.match(migration, /portal_invoice_balance_inconsistent/);
+    assert.match(migration, /ABS\(v_stored_balance - v_amount\) > 0\.01/);
+  });
+
+  it("reuses active Stripe Sessions and fails closed on stale unresolved attempts", async () => {
+    const source = await read("api/functions/portalPayInvoice.js");
+    assert.match(source, /retrieveStripeCheckout/);
+    assert.match(source, /existingSession\.status === "open"/);
+    assert.match(source, /existingSession\.status === "complete"/);
+    assert.match(source, /existingSession\.status === "expired"/);
+    assert.match(source, /SAFE_IDEMPOTENCY_RETRY_MS = 23 \* 60 \* 60 \* 1000/);
+    assert.match(source, /PAYMENT_RECONCILIATION_REQUIRED/);
+    assert.match(source, /CHECKOUT_INITIALIZING/);
+  });
+});
+
+describe("standard invoice checkout concurrency authority", () => {
+  it("adds a service-role-only invoice claim and preserves initiating actor separately from owner", async () => {
+    const migration = await read("supabase/migrations/20260910073000_standard_invoice_checkout_claim.sql");
+    assert.match(migration, /ADD COLUMN IF NOT EXISTS initiated_by_id UUID/);
+    assert.match(migration, /NEW\.initiated_by_id := NULL/);
+    assert.match(migration, /NEW\.initiated_by_id := OLD\.initiated_by_id/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.claim_standard_invoice_payment/);
+    assert.match(migration, /FROM public\.invoices[\s\S]*FOR UPDATE/);
+    assert.match(migration, /checkout_source = 'standard_invoice'/);
+    assert.match(migration, /p_owner_id::TEXT,[\s\S]*p_owner_id,[\s\S]*p_actor_id/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION public\.claim_standard_invoice_payment[\s\S]*FROM authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.claim_standard_invoice_payment[\s\S]*TO service_role/);
+  });
+
+  it("rejects balance drift, amount drift, and concurrent fee-term conflicts", async () => {
+    const migration = await read("supabase/migrations/20260910073000_standard_invoice_checkout_claim.sql");
+    assert.match(migration, /v_invoice\.total[\s\S]*v_invoice\.amount_paid/);
+    assert.match(migration, /standard_invoice_balance_inconsistent/);
+    assert.match(migration, /standard_invoice_amount_changed/);
+    assert.match(migration, /standard_checkout_pending_terms_conflict/);
+    assert.match(migration, /p_platform_fee/);
+    assert.match(migration, /p_platform_fee_rate/);
+  });
+
+  it("uses the claim only for invoice-backed payments and keeps generic payments independent", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /if \(invoiceId\) \{[\s\S]*claimStandardInvoicePayment/);
+    assert.match(source, /else \{[\s\S]*\.from\("payments"\)[\s\S]*\.insert\(insertPayload\)/);
+    assert.match(source, /invoiceOwnerId = String\(invoiceRow\.created_by_id\)/);
+    assert.match(source, /paymentOwnerId = invoiceId \? invoiceOwnerId : user\.id/);
+  });
+
+  it("forces USD until accounting has explicit currency semantics", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /requestedCurrency !== "usd"/);
+    assert.match(source, /code: "UNSUPPORTED_CURRENCY"/);
+    assert.match(source, /const currency = "usd"/);
+  });
+
+  it("prevents client purpose from selecting the marketplace fee category for an invoice", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /const effectivePurpose = invoiceId \? "invoice" : purpose \|\| "payment"/);
+    assert.match(source, /const categoryId = invoiceId[\s\S]*\? "service_requests"[\s\S]*purpose === "module"[\s\S]*\? "marketplace_sales"/);
+    assert.match(source, /context: \{ planId, endpoint: "createPaymentLink", purpose: effectivePurpose \}/);
+  });
+
+  it("reuses provider sessions and fails closed on stale or conflicting retries", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /retrieveStripeCheckout/);
+    assert.match(source, /existingSession\.status === "open"/);
+    assert.match(source, /existingSession\.status === "complete"/);
+    assert.match(source, /existingSession\.status === "expired"/);
+    assert.match(source, /stripe_session_linkage_mismatch/);
+    assert.match(source, /SAFE_IDEMPOTENCY_RETRY_MS = 23 \* 60 \* 60 \* 1000/);
+    assert.match(source, /Idempotency-Key": `checkout_\$\{payment\.id\}`/);
+    assert.match(source, /CHECKOUT_INITIALIZING/);
+    assert.match(source, /PAYMENT_RECONCILIATION_REQUIRED/);
+  });
+
+  it("prevents duplicate fee audit rows when a claimed invoice payment is reused", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /if \(!paymentReused\) \{[\s\S]*fee_calculation_logs/);
+    assert.match(source, /category_id: categoryId/);
+    assert.match(source, /context_key: contextKey/);
   });
 });

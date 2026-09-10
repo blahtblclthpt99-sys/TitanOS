@@ -71,6 +71,39 @@ describe("final-qa: nav ↔ app routing closure", () => {
   });
 });
 
+describe("final-qa: Titan Auto integration closure", () => {
+  it("keeps one canonical route with the legacy Autopilot redirect", () => {
+    const tabSrc = read("src/components/layout/TabStack.jsx");
+    const navSrc = read("src/lib/nav-items.js");
+    assert.match(tabSrc, /["']\/titan-auto["']\s*:\s*TitanAuto/);
+    assert.match(tabSrc, /["']\/autopilot["']\s*:\s*["']\/titan-auto["']/);
+    assert.match(navSrc, /label:\s*["']Titan Auto["']/);
+    assert.match(navSrc, /path:\s*["']\/titan-auto["']/);
+  });
+
+  it("reuses proven Driver Auto and invoice recovery engines", () => {
+    const src = read("src/pages/TitanAuto.jsx");
+    assert.match(src, /SetForgetOfferPanel/);
+    assert.match(src, /createAutopilotOrder/);
+    assert.match(src, /runAutopilotOrder/);
+    assert.match(src, /runAutopilotMembership/);
+    assert.match(src, /decision aid/i);
+    assert.match(src, /final action/i);
+  });
+
+  it("core TitanOS work surfaces launch Titan Auto with context", () => {
+    const header = read("src/components/shared/PageHeader.jsx");
+    const driver = read("src/pages/DriverHub.jsx");
+    const schedule = read("src/pages/Schedule.jsx");
+    assert.match(header, /TitanAutoLink/);
+    assert.match(header, /source:\s*["']jobs["']/);
+    assert.match(header, /source:\s*["']followups["']/);
+    assert.match(header, /source:\s*["']business["']/);
+    assert.match(driver, /TitanAutoLink\s+source=["']driver["']/);
+    assert.match(schedule, /TitanAutoLink\s+source=["']schedule["']/);
+  });
+});
+
 describe("final-qa: export coverage on history/reports money lists", () => {
   const pages = [
     ["src/pages/Estimates.jsx", "estimatesExportSpec"],

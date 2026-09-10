@@ -81,7 +81,8 @@ RETURNS TABLE (
   reused BOOLEAN,
   amount NUMERIC,
   external_id TEXT,
-  checkout_url TEXT
+  checkout_url TEXT,
+  claimed_at TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY INVOKER
@@ -148,7 +149,7 @@ BEGIN
     END IF;
 
     RETURN QUERY
-    SELECT v_payment.id, TRUE, v_amount, v_payment.external_id, v_payment.checkout_url;
+    SELECT v_payment.id, TRUE, v_amount, v_payment.external_id, v_payment.checkout_url, v_payment.created_at;
     RETURN;
   END IF;
 
@@ -190,7 +191,7 @@ BEGIN
   RETURNING * INTO v_payment;
 
   RETURN QUERY
-  SELECT v_payment.id, FALSE, v_amount, v_payment.external_id, v_payment.checkout_url;
+  SELECT v_payment.id, FALSE, v_amount, v_payment.external_id, v_payment.checkout_url, v_payment.created_at;
 END;
 $$;
 

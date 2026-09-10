@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import { RefreshCw, WifiOff } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
+import TitanAutoLink from "@/components/shared/TitanAutoLink";
 import MissionControl from "@/components/driver/os/MissionControl";
 import DriverExplorer from "@/components/driver/os/DriverExplorer";
 import { useAuth } from "@/lib/AuthContext";
@@ -183,6 +184,7 @@ export default function DriverHub() {
             Driver Hub
           </h1>
           <div className="flex items-center gap-1.5 shrink-0">
+            <TitanAutoLink source="driver" workflow="driver-offers" label="Titan Auto" />
             <Button
               type="button"
               size="icon"

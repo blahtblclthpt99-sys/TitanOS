@@ -57,11 +57,12 @@ describe("Stripe reconciliation metadata", () => {
     assert.match(source, /payment_intent_data\[metadata\]\[\$\{key\}\]/);
   });
 
-  it("propagates Titan Auto order identifiers to the underlying PaymentIntent", async () => {
+  it("propagates Titan Auto claimed payment and order identifiers to the underlying PaymentIntent", async () => {
     const source = await read("api/functions/createAutopilotOrder.js");
     assert.match(source, /payment_intent_data: \{ metadata: reconciliationMetadata \}/);
-    assert.match(source, /payment_id: payment\.id/);
-    assert.match(source, /user_id: auth\.user\.id/);
+    assert.match(source, /payment_id: String\(claim\.payment_id\)/);
+    assert.match(source, /order_id: String\(claim\.order_id\)/);
+    assert.match(source, /user_id: String\(auth\.user\.id\)/);
   });
 
   it("claims one portal payment identity and propagates it to the PaymentIntent", async () => {

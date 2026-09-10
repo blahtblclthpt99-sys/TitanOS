@@ -53,7 +53,9 @@ DECLARE
   v_customer_id TEXT;
   v_linked_status TEXT;
 BEGIN
-  IF p_user_id IS NULL OR p_plan_tier NOT IN ('starter','worker_premium','business') THEN
+  IF p_user_id IS NULL
+     OR p_plan_tier IS NULL
+     OR p_plan_tier NOT IN ('starter','worker_premium','business') THEN
     RAISE EXCEPTION 'subscription_checkout_identity_invalid';
   END IF;
 

@@ -1,0 +1,28 @@
+{
+  "source": "TitanOS Recovery Staging / supabase_migrations.schema_migrations",
+  "purpose": "evidence-only; not an executable production migration sequence",
+  "entries": [
+    {"version":"20260910000653","name":"recovery_01_titanos_foundation","file":"20260910000653_recovery_01_titanos_foundation.sql","characters":15755,"md5":"c23c155f48bb7a786c3390085810a70b"},
+    {"version":"20260910000754","name":"recovery_02_platform_expansion","file":"20260910000754_recovery_02_platform_expansion.sql","characters":16327,"md5":"9ea571a647a092517fad67551e2f1628"},
+    {"version":"20260910000818","name":"recovery_03_platform_followup","file":"20260910000818_recovery_03_platform_followup.sql","characters":2681,"md5":"7a8b6a4fed6de9689f9cca7a3a193d5f"},
+    {"version":"20260910000845","name":"recovery_04_ops_structure_fail_closed","file":"20260910000845_recovery_04_ops_structure_fail_closed.sql","characters":4690,"md5":"0a70af7550a555010072434c5f30bf64"},
+    {"version":"20260910000904","name":"recovery_05_payments_companies_structure_fail_closed","file":"20260910000904_recovery_05_payments_companies_structure_fail_closed.sql","characters":3392,"md5":"6d24d0581792d74dd46ce047c276b418"},
+    {"version":"20260910000924","name":"recovery_06_fee_and_plan_columns","file":"20260910000924_recovery_06_fee_and_plan_columns.sql","characters":1061,"md5":"6b957829188adbc0b1b4a530ce70d203"},
+    {"version":"20260910000958","name":"recovery_07_ops_growth_structure_fail_closed","file":"20260910000958_recovery_07_ops_growth_structure_fail_closed.sql","characters":8680,"md5":"ffcf963702f1e6418e2b55af296afcc1"},
+    {"version":"20260910001043","name":"recovery_08_insurance_portal_geofence_job_summary","file":"20260910001043_recovery_08_insurance_portal_geofence_job_summary.sql","characters":2484,"md5":"0ea14538dd2444aa6c8120a47653602e"},
+    {"version":"20260910001128","name":"recovery_09_security_preconditions","file":"20260910001128_recovery_09_security_preconditions.sql","characters":6462,"md5":"7ee93c4bb7f1fe4f850d492a2f5fc71b"},
+    {"version":"20260910001141","name":"recovery_10_production_security_lockdown","file":"20260910001141_recovery_10_production_security_lockdown.sql","characters":4242,"md5":"5094d50fff2579f91145622db8f44416"},
+    {"version":"20260910001159","name":"recovery_11_private_uploads_and_hot_indexes","file":"20260910001159_recovery_11_private_uploads_and_hot_indexes.sql","characters":2156,"md5":"6b0ef9894bd27cccfaba9c0cff9a025a"},
+    {"version":"20260910001223","name":"recovery_12_privilege_money_integrity","file":"20260910001223_recovery_12_privilege_money_integrity.sql","characters":2451,"md5":"58568ea32cf67f46a2de83c75ec826e0"},
+    {"version":"20260910001413","name":"recovery_13_titan_comms_structure_fail_closed","file":"20260910001413_recovery_13_titan_comms_structure_fail_closed.sql","characters":3141,"md5":"283d6a25497a2c7367fe8f3acbea915b"},
+    {"version":"20260910001457","name":"recovery_14_database_integrity_without_clear_contract_tokens","file":"20260910001457_recovery_14_database_integrity_without_clear_contract_tokens.sql","characters":15589,"md5":"1cf0f2a0d582495ac91978dc2d41ba68"},
+    {"version":"20260910001604","name":"recovery_15_titan_support_core_security","file":"20260910001604_recovery_15_titan_support_core_security.sql","characters":18129,"md5":"f10af43e97008928b4b1064584993ece"},
+    {"version":"20260910001624","name":"recovery_16_titan_support_realtime","file":"20260910001624_recovery_16_titan_support_realtime.sql","characters":706,"md5":"ba24c615913a0a438865d76182fd3fee"},
+    {"version":"20260910001808","name":"recovery_17_payment_company_contract_hardening","file":"20260910001808_recovery_17_payment_company_contract_hardening.sql","characters":5305,"md5":"d808d4521c87fda2309732bbdbe6cf68"},
+    {"version":"20260910001903","name":"recovery_18_security_advisor_function_hardening","file":"20260910001903_recovery_18_security_advisor_function_hardening.sql","characters":4430,"md5":"d0f2a7fe8fbd7c4b0a5996ff02cf9ed1"},
+    {"version":"20260910001956","name":"recovery_19_owner_policies_for_operational_surfaces","file":"20260910001956_recovery_19_owner_policies_for_operational_surfaces.sql","characters":2759,"md5":"cde30caac4235e6ab842f6fbd20a7cc5"},
+    {"version":"20260910002112","name":"recovery_20_fix_titan_comms_rls_recursion","file":"20260910002112_recovery_20_fix_titan_comms_rls_recursion.sql","characters":4253,"md5":"b3a8d6ec233203b85580b25341989f7b"},
+    {"version":"20260910002435","name":"recovery_21_optimize_rls_initplans_and_duplicate_index","file":"20260910002435_recovery_21_optimize_rls_initplans_and_duplicate_index.sql","characters":846,"md5":"7a3ce97f1c6e50033a91d7b4d727a67a"},
+    {"version":"20260910002530","name":"recovery_22_optimize_constant_rls_helpers","file":"20260910002530_recovery_22_optimize_constant_rls_helpers.sql","characters":964,"md5":"d8af138c8a70a6f31aa41672b24dfc66"}
+  ]
+}

@@ -6,7 +6,7 @@ on:
     branches:
       - "infra/cloudflare-full-app-candidate"
   pull_request:
-    branches: [main, infra/cloudflare-full-app-candidate]
+    branches: [main, recovery/full-app-20260909, infra/cloudflare-full-app-candidate]
     paths:
       - "cloudflare/**"
       - "wrangler.jsonc"

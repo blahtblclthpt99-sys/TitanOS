@@ -6,7 +6,7 @@
   "public_schema": {
     "tables": 79,
     "policies": 142,
-    "indexes": 161,
+    "indexes": 219,
     "public_functions": 16,
     "private_functions": 7,
     "application_triggers": 25,
@@ -131,7 +131,19 @@
     "server_only_client_table_grants_revoked": true,
     "security_definer_client_execute_revoked": true,
     "untrusted_public_schema_create": false,
+    "security_advisor": {
+      "warnings": 0,
+      "info": 2,
+      "info_classification": "INTENTIONAL_SERVER_ONLY_RLS_NO_POLICY"
+    },
     "two_account_runtime_idor_test": "PENDING_AUTH_TEST_IDENTITIES"
+  },
+  "performance": {
+    "unindexed_public_foreign_keys": 0,
+    "foreign_key_index_coverage": "COMPLETE",
+    "multiple_permissive_policy_findings": 26,
+    "policy_consolidation_status": "DEFERRED_UNTIL_TWO_ACCOUNT_RUNTIME_IDOR_TEST",
+    "unused_index_findings": "NOT_ACTIONABLE_WITH_ZERO_WORKLOAD"
   },
   "auth": {
     "user_count": 0,
@@ -172,6 +184,21 @@
     "merged_via_pr": 74,
     "recovery_head_commit": "8499bbf271740273e31eb41a888a86e83da07ab8"
   },
+  "post_reconstruction_hardening": [
+    {
+      "version": "20260910032306",
+      "name": "server_only_table_grants",
+      "source": "supabase/migrations/20260910033000_server_only_table_grants.sql",
+      "result": "anon/authenticated privileges removed from portal_sessions and titan_comms_channel_secrets"
+    },
+    {
+      "version": "20260910040142",
+      "name": "recovery_24_cover_public_foreign_keys",
+      "evidence": "supabase/recovery/staging-post/20260910040142_recovery_24_cover_public_foreign_keys.sql",
+      "git_blob_sha": "452f56f9cfb60dd62e2c1b5385fbb15ab43d8d4c",
+      "result": "58 covering indexes added; zero unindexed public foreign keys remain"
+    }
+  ],
   "production_recovery_constraints": [
     "PRESERVE_EXISTING_ATTENTION",
     "PRESERVE_AUTH_STATE",

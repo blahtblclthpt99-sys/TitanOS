@@ -171,6 +171,20 @@ describe("standard invoice checkout concurrency authority", () => {
     assert.match(source, /paymentOwnerId = invoiceId \? invoiceOwnerId : user\.id/);
   });
 
+  it("forces USD until accounting has explicit currency semantics", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /requestedCurrency !== "usd"/);
+    assert.match(source, /code: "UNSUPPORTED_CURRENCY"/);
+    assert.match(source, /const currency = "usd"/);
+  });
+
+  it("prevents client purpose from selecting the marketplace fee category for an invoice", async () => {
+    const source = await read("api/functions/createPaymentLink.js");
+    assert.match(source, /const effectivePurpose = invoiceId \? "invoice" : purpose \|\| "payment"/);
+    assert.match(source, /const categoryId = invoiceId[\s\S]*\? "service_requests"[\s\S]*purpose === "module"[\s\S]*\? "marketplace_sales"/);
+    assert.match(source, /context: \{ planId, endpoint: "createPaymentLink", purpose: effectivePurpose \}/);
+  });
+
   it("reuses provider sessions and fails closed on stale or conflicting retries", async () => {
     const source = await read("api/functions/createPaymentLink.js");
     assert.match(source, /retrieveStripeCheckout/);

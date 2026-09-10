@@ -39,11 +39,12 @@ function validInvoiceForSprint(invoice, today) {
   );
 }
 
-async function claimOrder(auth, { checkoutKey, invoiceIds, note }) {
+async function claimOrder(auth, { checkoutKey, invoiceIds, approvedRecipients, note }) {
   const { data, error } = await auth.admin.rpc("claim_titan_auto_order", {
     p_user_id: auth.user.id,
     p_checkout_key: checkoutKey,
     p_invoice_ids: invoiceIds,
+    p_approved_recipients: approvedRecipients,
     p_note: note,
   });
   if (error) return { error };
@@ -161,6 +162,10 @@ export default async function handler(req, res) {
       });
     }
 
+    const approvedRecipients = Object.fromEntries(
+      (invoices || []).map((invoice) => [String(invoice.id), String(invoice.customer_email || "").trim()])
+    );
+
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       timeout: STRIPE_TIMEOUT_MS,
       maxNetworkRetries: 1,
@@ -189,6 +194,7 @@ export default async function handler(req, res) {
     let claimResult = await claimOrder(auth, {
       checkoutKey,
       invoiceIds,
+      approvedRecipients,
       note: legacyOrderNote,
     });
     if (claimResult.error) throw claimResult.error;
@@ -241,7 +247,12 @@ export default async function handler(req, res) {
         }
         if (existingSession.status === "expired") {
           await cancelUnstartedClaim(auth, claim, "Stripe checkout expired before payment");
-          claimResult = await claimOrder(auth, { checkoutKey, invoiceIds, note: legacyOrderNote });
+          claimResult = await claimOrder(auth, {
+            checkoutKey,
+            invoiceIds,
+            approvedRecipients,
+            note: legacyOrderNote,
+          });
           if (claimResult.error) throw claimResult.error;
           claim = claimResult.claim;
           continue;

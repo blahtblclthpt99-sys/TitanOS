@@ -4,8 +4,9 @@
  *
  * This launcher is the recovery-safe entry point for mutation-based DB security
  * probes. It performs a read-only TitanOS schema preflight first and refuses to
- * run against the canonical production Supabase project unless two independent
- * production acknowledgements are supplied.
+ * run against the canonical production Supabase project unless two independent,
+ * per-process production acknowledgements are supplied. The acknowledgements are
+ * intentionally not loaded from .env files so they cannot become sticky config.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -76,9 +77,10 @@ async function main() {
   const mutationTarget = classifyDatabaseMutationTarget({
     url,
     productionProjectRef: manifest.productionProjectRef,
-    productionConfirmation: env.TITANOS_ALLOW_PRODUCTION_DB_MUTATION_PROBES,
+    productionConfirmation:
+      process.env.TITANOS_ALLOW_PRODUCTION_DB_MUTATION_PROBES,
     approvedProductionProjectRef:
-      env.TITANOS_APPROVED_PRODUCTION_PROJECT_REF,
+      process.env.TITANOS_APPROVED_PRODUCTION_PROJECT_REF,
   });
 
   if (!mutationTarget.allowed) {
@@ -92,6 +94,7 @@ async function main() {
           target: mutationTarget.target,
           reason: mutationTarget.reason,
           productionAuthorizationRequired: {
+            source: "process_environment_only",
             TITANOS_ALLOW_PRODUCTION_DB_MUTATION_PROBES:
               PRODUCTION_MUTATION_CONFIRMATION,
             TITANOS_APPROVED_PRODUCTION_PROJECT_REF:

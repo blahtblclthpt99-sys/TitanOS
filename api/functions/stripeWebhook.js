@@ -210,6 +210,23 @@ async function readValidatedAutopilotPayment(admin, session) {
   return { payment, order, expectedUserId };
 }
 
+function guardAutopilotPaymentMutation(query, payment) {
+  let guarded = query
+    .eq("id", payment.id)
+    .eq("user_id", payment.user_id)
+    .eq("amount", payment.amount)
+    .eq("currency", payment.currency)
+    .eq("provider", payment.provider)
+    .eq("note", payment.note);
+  guarded = payment.created_by_id
+    ? guarded.eq("created_by_id", payment.created_by_id)
+    : guarded.is("created_by_id", null);
+  guarded = payment.external_id
+    ? guarded.eq("external_id", payment.external_id)
+    : guarded.is("external_id", null);
+  return guarded;
+}
+
 async function settleAutopilotCheckout(admin, session) {
   const { payment } = await readValidatedAutopilotPayment(admin, session);
 
@@ -220,15 +237,17 @@ async function settleAutopilotCheckout(admin, session) {
     return { received: true, duplicate: true, product: "titan_autopilot" };
   }
 
-  const { data: settled, error: updateError } = await admin
+  let settleMutation = admin
     .from("payments")
     .update({
       status: "succeeded",
       external_id: session.id || payment.external_id || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", payment.id)
-    .neq("status", "succeeded")
+    .neq("status", "succeeded");
+  settleMutation = guardAutopilotPaymentMutation(settleMutation, payment);
+
+  const { data: settled, error: updateError } = await settleMutation
     .select("id,status")
     .maybeSingle();
   if (updateError) throw updateError;
@@ -254,11 +273,13 @@ async function cancelAutopilotCheckout(admin, session, status = "canceled") {
     return { received: true, ignored: true, product: "titan_autopilot" };
   }
 
-  const { data: canceled, error: updateError } = await admin
+  let cancelMutation = admin
     .from("payments")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", payment.id)
-    .neq("status", "succeeded")
+    .neq("status", "succeeded");
+  cancelMutation = guardAutopilotPaymentMutation(cancelMutation, payment);
+
+  const { data: canceled, error: updateError } = await cancelMutation
     .select("id,status")
     .maybeSingle();
   if (updateError) throw updateError;

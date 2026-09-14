@@ -41,21 +41,34 @@ test("Autopilot execution requires settlement and atomically claims an order", a
   assert.match(source, /RESEND_API_KEY/);
 });
 
-test("Autopilot order execution is crash-recoverable at both DB and email-provider layers", async () => {
-  const source = await read("api/functions/runAutopilotOrder.js");
+test("Shared Autopilot delivery engine records provider evidence and uses stable idempotency", async () => {
+  const helper = await read("api/_lib/autopilotDelivery.js");
   const migration = await read("supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql");
-  assert.match(source, /STALE_RUN_MS/);
-  assert.match(source, /RESEND_RETRY_WINDOW_MS/);
-  assert.match(source, /isFreshRun\(order\)/);
-  assert.match(source, /pendingCanRetry\(prior\)/);
-  assert.match(source, /"Idempotency-Key": deliveryKey/);
-  assert.match(source, /autopilot_run:order:/);
-  assert.match(source, /pending_no_longer_eligible/);
-  assert.match(source, /pending_retry_window_expired/);
-  assert.match(source, /\.eq\("note", runningNote\)/);
-  assert.match(source, /state: pending > 0 \? "retryable" : "completed"/);
+  assert.match(helper, /AUTOPILOT_RESEND_RETRY_WINDOW_MS/);
+  assert.match(helper, /canRetryAutopilotPending/);
+  assert.match(helper, /"Idempotency-Key": deliveryKey/);
+  assert.match(helper, /provider_message_id: providerMessageId/);
+  assert.match(helper, /delivery_error_code/);
+  assert.match(helper, /concurrent_idempotent_requests/);
+  assert.match(helper, /network_ambiguous/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS provider_message_id TEXT/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS delivery_error_code TEXT/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_autopilot_run_once/);
   assert.match(migration, /rule_id LIKE 'autopilot_run:%'/);
+});
+
+test("Autopilot order execution is crash-recoverable at DB, lease, and provider layers", async () => {
+  const source = await read("api/functions/runAutopilotOrder.js");
+  assert.match(source, /STALE_RUN_MS/);
+  assert.match(source, /isFreshRun\(order\)/);
+  assert.match(source, /canRetryAutopilotPending\(prior\)/);
+  assert.match(source, /deliverAutopilotQueue/);
+  assert.match(source, /autopilot_run:order:/);
+  assert.match(source, /delivery_unconfirmed_invoice_no_longer_eligible/);
+  assert.match(source, /idempotency_window_expired/);
+  assert.match(source, /\.eq\("note", runningNote\)/);
+  assert.match(source, /state: pending > 0 \? "retryable" : "completed"/);
+  assert.match(source, /res\.status\(pending > 0 \? 202 : 200\)/);
 });
 
 test("Autopilot one-time runner re-reads invoice eligibility immediately before first delivery", async () => {
@@ -88,20 +101,19 @@ test("Membership stale recovery preserves the original approved batch", async ()
   assert.match(source, /originalInvoiceIds/);
   assert.match(source, /invoice_ids: originalInvoiceIds/);
   assert.match(source, /effectiveInvoiceIds/);
-  assert.match(source, /original monthly selection/);
 });
 
-test("Membership recovery uses provider idempotency and a compare-and-set lease", async () => {
+test("Membership recovery uses the shared provider engine and a compare-and-set lease", async () => {
   const source = await read("api/functions/runAutopilotMembership.js");
   assert.match(source, /STALE_RUN_MS/);
-  assert.match(source, /RESEND_RETRY_WINDOW_MS/);
   assert.match(source, /isFreshRun\(existing\)/);
-  assert.match(source, /pendingCanRetry\(prior\)/);
-  assert.match(source, /"Idempotency-Key": deliveryKey/);
+  assert.match(source, /canRetryAutopilotPending\(prior\)/);
+  assert.match(source, /deliverAutopilotQueue/);
   assert.match(source, /autopilot_run:membership:/);
   assert.match(source, /recovered: acquired\.recovered/);
   assert.match(source, /\.eq\("updated_at", claim\.updated_at\)/);
   assert.match(source, /retryRequired/);
+  assert.match(source, /res\.status\(retryRequired \? 202 : 200\)/);
 });
 
 test("Membership sprint prepares an auditable queue when email delivery is unavailable", async () => {

@@ -4,9 +4,27 @@ import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 
+const STALE_RUN_MS = 15 * 60 * 1000;
+
 function parseOrder(note = "") {
   if (!String(note).startsWith("AUTOPILOT:")) return null;
   try { return JSON.parse(String(note).slice(10)); } catch { return null; }
+}
+
+function isStillEligible(invoice, today) {
+  return Boolean(
+    invoice?.customer_email &&
+    invoice.status !== "paid" &&
+    invoice.due_date &&
+    invoice.due_date < today &&
+    Number(invoice.balance_due ?? invoice.total) > 0
+  );
+}
+
+function isFreshRun(order) {
+  if (order?.state !== "running" || !order.started_at) return false;
+  const started = new Date(order.started_at).getTime();
+  return Number.isFinite(started) && Date.now() - started < STALE_RUN_MS;
 }
 
 export default async function handler(req, res) {
@@ -20,55 +38,186 @@ export default async function handler(req, res) {
   try {
     const { order_id: orderId } = readJson(req);
     if (!orderId) return res.status(400).json({ error: "order_id is required" });
-    const { data: payment } = await auth.admin.from("payments").select("id,user_id,status,note").eq("id", orderId).eq("user_id", auth.user.id).maybeSingle();
+
+    const { data: payment, error: paymentError } = await auth.admin
+      .from("payments")
+      .select("id,user_id,status,note")
+      .eq("id", orderId)
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (paymentError) throw paymentError;
+
     const order = parseOrder(payment?.note);
-    if (!payment || !order || order.type !== "invoice_recovery_sprint") return res.status(404).json({ error: "Autopilot order not found" });
-    if (payment.status !== "succeeded") return res.status(409).json({ error: "Payment is still processing. Try again in a moment.", payment_status: payment.status });
-    if (order.state === "completed") return res.status(200).json({ success: true, duplicate: true, sent: order.sent || 0, failed: order.failed || 0 });
-    if (order.state === "running") return res.status(409).json({ error: "This recovery sprint is already running." });
-
-    // Atomic claim: only one request can move this exact order note into running state.
-    const running = { ...order, state: "running", started_at: new Date().toISOString() };
-    const { data: claimed, error: claimError } = await auth.admin.from("payments")
-      .update({ note: `AUTOPILOT:${JSON.stringify(running)}`, updated_at: new Date().toISOString() })
-      .eq("id", payment.id).eq("status", "succeeded").eq("note", payment.note).select("id").maybeSingle();
-    if (claimError) throw claimError;
-    if (!claimed) return res.status(409).json({ error: "This recovery sprint has already been claimed." });
-
-    const { data: invoices, error: invoiceError } = await auth.admin.from("invoices")
-      .select("id,invoice_number,customer_name,customer_email,balance_due,total,due_date,created_by_id")
-      .in("id", order.invoice_ids || []).eq("created_by_id", auth.user.id);
-    if (invoiceError) throw invoiceError;
+    if (!payment || !order || order.type !== "invoice_recovery_sprint") {
+      return res.status(404).json({ error: "Autopilot order not found" });
+    }
+    if (payment.status !== "succeeded") {
+      return res.status(409).json({ error: "Payment is still processing. Try again in a moment.", payment_status: payment.status });
+    }
+    if (order.state === "completed") {
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        sent: order.sent || 0,
+        failed: order.failed || 0,
+        skipped: order.skipped || 0,
+      });
+    }
+    if (isFreshRun(order)) {
+      return res.status(409).json({ error: "This recovery sprint is already running." });
+    }
 
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) return res.status(503).json({ error: "Email delivery is not configured" });
+
+    // Atomic claim. Stale runs may be reclaimed; per-invoice delivery keys prevent
+    // already-sent recipients from being emailed a second time during recovery.
+    const running = {
+      ...order,
+      state: "running",
+      started_at: new Date().toISOString(),
+      recovered_from_stale_run: order.state === "running" || undefined,
+    };
+    const { data: claimed, error: claimError } = await auth.admin
+      .from("payments")
+      .update({ note: `AUTOPILOT:${JSON.stringify(running)}`, updated_at: new Date().toISOString() })
+      .eq("id", payment.id)
+      .eq("status", "succeeded")
+      .eq("note", payment.note)
+      .select("id")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) return res.status(409).json({ error: "This recovery sprint has already been claimed." });
+
+    const { data: invoices, error: invoiceError } = await auth.admin
+      .from("invoices")
+      .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
+      .in("id", order.invoice_ids || [])
+      .eq("created_by_id", auth.user.id);
+    if (invoiceError) throw invoiceError;
+
+    const today = new Date().toISOString().slice(0, 10);
     let sent = 0;
     let failed = 0;
+    let skipped = 0;
+
     for (const invoice of invoices || []) {
+      const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
+
+      const { data: prior } = await auth.admin
+        .from("follow_up_queue")
+        .select("id,status")
+        .eq("created_by_id", auth.user.id)
+        .eq("rule_id", deliveryKey)
+        .maybeSingle();
+      if (prior) {
+        if (prior.status === "sent") sent += 1;
+        else if (prior.status === "failed") failed += 1;
+        else skipped += 1;
+        continue;
+      }
+
+      if (!isStillEligible(invoice, today)) {
+        skipped += 1;
+        const message = `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
+        await auth.admin.from("follow_up_queue").insert({
+          created_by_id: auth.user.id,
+          user_id: auth.user.id,
+          customer_id: null,
+          customer_name: invoice.customer_name || "",
+          customer_email: invoice.customer_email || null,
+          job_id: null,
+          rule_id: deliveryKey,
+          scheduled_for: new Date().toISOString(),
+          status: "skipped",
+          channel: "email",
+          message,
+        });
+        continue;
+      }
+
       const balance = Number(invoice.balance_due ?? invoice.total ?? 0).toFixed(2);
       const message = `Hi ${invoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${invoice.invoice_number || invoice.id} for $${balance} was due ${invoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;
       const { data: queue, error: queueError } = await auth.admin.from("follow_up_queue").insert({
-        created_by_id: auth.user.id, user_id: auth.user.id, customer_id: null, customer_name: invoice.customer_name || "",
-        customer_email: invoice.customer_email, job_id: null, rule_id: null, scheduled_for: new Date().toISOString(), status: "pending", channel: "email", message,
+        created_by_id: auth.user.id,
+        user_id: auth.user.id,
+        customer_id: null,
+        customer_name: invoice.customer_name || "",
+        customer_email: invoice.customer_email,
+        job_id: null,
+        rule_id: deliveryKey,
+        scheduled_for: new Date().toISOString(),
+        status: "pending",
+        channel: "email",
+        message,
       }).select("id").single();
-      if (queueError) { failed += 1; continue; }
-      const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" }, body: JSON.stringify({
-        from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>", to: [invoice.customer_email], subject: `Payment reminder — invoice ${invoice.invoice_number || "due"}`, text: message,
-      }) });
-      if (response.ok) {
-        sent += 1;
-        await auth.admin.from("follow_up_queue").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", queue.id);
-      } else {
+
+      if (queueError) {
+        if (queueError.code === "23505") {
+          skipped += 1;
+          continue;
+        }
+        failed += 1;
+        logError("runAutopilotOrder:queue", { orderId, invoiceId: invoice.id, error: queueError.message });
+        continue;
+      }
+
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>",
+            to: [invoice.customer_email],
+            subject: `Payment reminder — invoice ${invoice.invoice_number || "due"}`,
+            text: message,
+          }),
+        });
+
+        if (response.ok) {
+          sent += 1;
+          await auth.admin
+            .from("follow_up_queue")
+            .update({ status: "sent", sent_at: new Date().toISOString() })
+            .eq("id", queue.id);
+        } else {
+          failed += 1;
+          await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", queue.id);
+          logError("runAutopilotOrder:resend", { orderId, invoiceId: invoice.id, status: response.status });
+        }
+      } catch (error) {
         failed += 1;
         await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", queue.id);
-        logError("runAutopilotOrder:resend", { orderId, invoiceId: invoice.id, status: response.status });
+        logError("runAutopilotOrder:resend_network", { orderId, invoiceId: invoice.id, error: error?.message });
       }
     }
-    const completed = { ...running, state: "completed", completed_at: new Date().toISOString(), sent, failed };
-    await auth.admin.from("payments").update({ note: `AUTOPILOT:${JSON.stringify(completed)}`, updated_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "succeeded");
-    return res.status(200).json({ success: true, sent, failed });
+
+    const knownInvoiceIds = new Set((invoices || []).map((invoice) => String(invoice.id)));
+    skipped += (order.invoice_ids || []).filter((id) => !knownInvoiceIds.has(String(id))).length;
+
+    const completed = {
+      ...running,
+      state: "completed",
+      completed_at: new Date().toISOString(),
+      sent,
+      failed,
+      skipped,
+    };
+    const { error: completeError } = await auth.admin
+      .from("payments")
+      .update({ note: `AUTOPILOT:${JSON.stringify(completed)}`, updated_at: new Date().toISOString() })
+      .eq("id", payment.id)
+      .eq("status", "succeeded");
+    if (completeError) throw completeError;
+
+    return res.status(200).json({ success: true, sent, failed, skipped });
   } catch (error) {
     const { sendApiError } = await import("../_lib/apiError.js");
-    return sendApiError(res, error, { route: "runAutopilotOrder", category: "automation", publicMessage: "The recovery sprint could not finish", publicCode: "AUTOPILOT_RUN_FAILED" });
+    return sendApiError(res, error, {
+      route: "runAutopilotOrder",
+      category: "automation",
+      publicMessage: "The recovery sprint could not finish",
+      publicCode: "AUTOPILOT_RUN_FAILED",
+    });
   }
 }

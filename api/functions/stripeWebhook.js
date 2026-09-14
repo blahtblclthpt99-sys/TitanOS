@@ -11,6 +11,79 @@ async function readRawBody(req) {
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
+function sameId(a, b) {
+  return String(a || "") === String(b || "");
+}
+
+async function settleAutopilotCheckout(admin, session) {
+  const metadata = session?.metadata || {};
+  const paymentId = String(metadata.payment_id || "").trim();
+  const expectedUserId = String(metadata.user_id || "").trim();
+  if (!paymentId || !expectedUserId) throw new Error("Autopilot checkout metadata is incomplete");
+
+  if (session.payment_status !== "paid") {
+    return { received: true, waiting_for_payment: true, product: "titan_autopilot" };
+  }
+
+  const { data: payment, error: paymentError } = await admin
+    .from("payments")
+    .select("id,user_id,created_by_id,amount,status,external_id")
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (paymentError) throw paymentError;
+  if (!payment) throw new Error("Autopilot payment record was not found");
+
+  const ownerMatches = sameId(payment.user_id, expectedUserId) || sameId(payment.created_by_id, expectedUserId);
+  if (!ownerMatches) throw new Error("Autopilot payment owner mismatch");
+  if (payment.external_id && !sameId(payment.external_id, session.id)) {
+    throw new Error("Autopilot checkout session mismatch");
+  }
+
+  const expectedCents = Math.round(Number(payment.amount || 0) * 100);
+  const paidCents = Number(session.amount_total || 0);
+  if (!expectedCents || expectedCents !== paidCents) {
+    throw new Error("Autopilot checkout amount mismatch");
+  }
+
+  if (payment.status === "succeeded") {
+    return { received: true, duplicate: true, product: "titan_autopilot" };
+  }
+
+  const { error: updateError } = await admin
+    .from("payments")
+    .update({
+      status: "succeeded",
+      external_id: session.id || payment.external_id || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+  if (updateError) throw updateError;
+
+  return { received: true, settled: true, product: "titan_autopilot" };
+}
+
+async function cancelAutopilotCheckout(admin, session, status = "canceled") {
+  const paymentId = String(session?.metadata?.payment_id || "").trim();
+  if (!paymentId) return { received: true, ignored: true, product: "titan_autopilot" };
+
+  const { data: payment, error } = await admin
+    .from("payments")
+    .select("id,status")
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!payment || payment.status === "succeeded") {
+    return { received: true, ignored: true, product: "titan_autopilot" };
+  }
+
+  const { error: updateError } = await admin
+    .from("payments")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", payment.id);
+  if (updateError) throw updateError;
+  return { received: true, status, product: "titan_autopilot" };
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -30,7 +103,7 @@ export default async function handler(req, res) {
     const stripe = new Stripe(stripeKey);
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (error) {
-    console.error("attention:stripe-signature", error);
+    console.error("stripe:signature", error);
     return res.status(400).json({ error: "Invalid Stripe signature" });
   }
 
@@ -56,7 +129,14 @@ export default async function handler(req, res) {
     }
     claimed = true;
 
+    const isAutopilot = metadata.task_type === "invoice_recovery_sprint";
+
     if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) {
+      if (isAutopilot) {
+        const result = await settleAutopilotCheckout(admin, object);
+        return res.status(200).json({ ...result, type: event.type });
+      }
+
       if (metadata.kind !== "attention_campaign_funding") {
         return res.status(200).json({ received: true, ignored: true });
       }
@@ -84,6 +164,12 @@ export default async function handler(req, res) {
         p_amount_cents: paid,
       });
       if (activateError) throw activateError;
+    } else if (event.type === "checkout.session.expired" && isAutopilot) {
+      const result = await cancelAutopilotCheckout(admin, object, "canceled");
+      return res.status(200).json({ ...result, type: event.type });
+    } else if (event.type === "checkout.session.async_payment_failed" && isAutopilot) {
+      const result = await cancelAutopilotCheckout(admin, object, "failed");
+      return res.status(200).json({ ...result, type: event.type });
     } else if (event.type === "checkout.session.expired" && metadata.kind === "attention_campaign_funding" && campaignId) {
       await admin
         .from("attention_campaigns")
@@ -100,7 +186,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ received: true, type: event.type });
   } catch (error) {
-    console.error("attention:stripe-webhook", error);
+    console.error("stripe:webhook", error);
     if (claimed && event?.id) {
       try { await admin.from("attention_payment_events").delete().eq("event_id", event.id); } catch { /* Stripe can retry */ }
     }

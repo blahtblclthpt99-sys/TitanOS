@@ -73,6 +73,7 @@ export default async function handler(req, res) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const configuredPriceId = String(process.env.STRIPE_AUTOPILOT_PRICE_ID || "").trim();
     const lineItem = await resolveLineItem(stripe, configuredPriceId, invoiceIds.length);
+    const source = classifyAutopilotSource(req);
 
     const orderData = {
       type: "invoice_recovery_sprint",
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
       invoice_ids: invoiceIds,
       approved_at: new Date().toISOString(),
       price_cents: SPRINT_PRICE_CENTS,
+      source,
     };
     const { data: payment, error: paymentError } = await auth.admin.from("payments").insert({
       created_by_id: auth.user.id,
@@ -117,7 +119,7 @@ export default async function handler(req, res) {
     await recordAutopilotFunnel(auth.admin, {
       userId: auth.user.id,
       eventName: "checkout_started",
-      source: classifyAutopilotSource(req),
+      source,
       mode: "one_time",
       invoiceCount: invoiceIds.length,
       outcome: "pending",

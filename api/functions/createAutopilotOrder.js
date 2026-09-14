@@ -3,6 +3,7 @@ import { applyCors, handleOptions, resolveAppOrigin } from "../_lib/cors.js";
 import { requireUser } from "../_lib/auth.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
+import { classifyAutopilotSource, recordAutopilotFunnel } from "../_lib/autopilotFunnel.js";
 
 const SPRINT_PRICE_CENTS = 900;
 const MAX_INVOICES = 10;
@@ -113,10 +114,17 @@ export default async function handler(req, res) {
     if (bindError) throw bindError;
     if (!boundPayment) throw new Error("Autopilot payment changed before Checkout could be bound");
 
+    await recordAutopilotFunnel(auth.admin, {
+      userId: auth.user.id,
+      eventName: "checkout_started",
+      source: classifyAutopilotSource(req),
+      mode: "one_time",
+      invoiceCount: invoiceIds.length,
+      outcome: "pending",
+    });
+
     return res.status(200).json({ order_id: payment.id, checkout_url: session.url, amount: 9, invoice_count: invoiceIds.length });
   } catch (error) {
-    // A local payment record must never remain looking actionable if checkout
-    // setup failed before the user could reach a valid Stripe session.
     if (paymentId) {
       try {
         await auth.admin
@@ -126,8 +134,7 @@ export default async function handler(req, res) {
           .eq("status", "pending")
           .is("external_id", null);
       } catch {
-        // The webhook remains authoritative if Stripe created a session and the
-        // local bind failed; do not mask the original checkout error.
+        // Stripe/webhook state remains authoritative when a local bind failed.
       }
     }
 

@@ -56,6 +56,21 @@ test("Autopilot validates the configured Stripe price before creating a payable 
   assert.match(source, /AUTOPILOT_PRICE_MISCONFIGURED/);
 });
 
+test("Autopilot enforces one normalized customer email per new sprint", async () => {
+  const checkout = await read("api/functions/createAutopilotOrder.js");
+  const membership = await read("api/functions/runAutopilotMembership.js");
+  const ui = await read("src/pages/Autopilot.jsx");
+
+  assert.match(checkout, /hasDuplicateRecipients\(invoices\)/);
+  assert.match(checkout, /one overdue invoice per customer email/);
+  assert.match(membership, /hasDuplicateRecipients\(requestedInvoices\)/);
+  assert.match(membership, /one overdue invoice per customer email/);
+  assert.match(ui, /uniqueEligibleCount/);
+  assert.match(ui, /Customer already selected/);
+  assert.match(ui, /one invoice per customer email in each sprint/);
+  assert.match(ui, /Select oldest .* customers/);
+});
+
 test("Stripe webhook settles Autopilot only after verified paid checkout", async () => {
   const source = await read("api/functions/stripeWebhook.js");
   assert.match(source, /constructEvent/);
@@ -188,14 +203,29 @@ test("Autopilot queue rows are protected from generic follow-up send, mutation, 
   assert.match(page, /normalPending/);
 });
 
-test("Autopilot funnel telemetry is allow-listed, coarse, and client-write protected", async () => {
+test("Autopilot funnel telemetry is allow-listed, coarse, client-write protected, and non-blocking", async () => {
   const helper = await read("api/_lib/autopilotFunnel.js");
   const endpoint = await read("api/functions/trackAutopilotEvent.js");
+  const client = await read("src/lib/autopilotTelemetry.js");
+  const page = await read("src/pages/Autopilot.jsx");
+  const order = await read("api/functions/runAutopilotOrder.js");
+  const membership = await read("api/functions/runAutopilotMembership.js");
   const migration = await read("supabase/migrations/20260914193000_autopilot_funnel_events.sql");
 
   assert.match(helper, /product_hunt/);
   assert.match(helper, /safeInvoiceCount/);
   assert.match(endpoint, /requireDurable: true/);
+  assert.match(client, /titan_autopilot_source/);
+  assert.match(client, /stored === "product_hunt"/);
+  assert.match(page, /preview_view/);
+  assert.match(page, /signed_in_view/);
+  assert.match(page, /eligible_loaded/);
+  assert.match(page, /batch_approved/);
+  assert.match(page, /checkout_returned/);
+  assert.match(order, /one_time_run_started/);
+  assert.match(order, /eventName: pending > 0 \? "run_retryable" : "run_completed"/);
+  assert.match(membership, /membership_run_started/);
+  assert.match(membership, /eventName: retryRequired \? "run_retryable"/);
   assert.match(migration, /REVOKE ALL ON public\.autopilot_funnel_events FROM anon, authenticated/);
   assert.match(migration, /invoice_count INTEGER/);
   assert.doesNotMatch(migration, /customer_email/);
@@ -204,7 +234,7 @@ test("Autopilot funnel telemetry is allow-listed, coarse, and client-write prote
   assert.doesNotMatch(migration, /raw_referrer/);
 });
 
-test("Autopilot UI is explicit about settlement, safe retries, and paid tier compatibility", async () => {
+test("Autopilot UI is explicit about settlement, safe retries, Recovery Receipts, and paid tier compatibility", async () => {
   const source = await read("src/pages/Autopilot.jsx");
   assert.match(source, /Recovery Command Center/);
   assert.match(source, /Example preview · sample data/);
@@ -215,5 +245,6 @@ test("Autopilot UI is explicit about settlement, safe retries, and paid tier com
   assert.match(source, /Checkout complete — verifying payment/);
   assert.match(source, /Returning from Stripe does not unlock delivery by itself/);
   assert.match(source, /Safe retry required/);
+  assert.match(source, /View Recovery Receipts/);
   assert.match(source, /"worker_premium", "pro", "business"/);
 });

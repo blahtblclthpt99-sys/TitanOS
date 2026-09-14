@@ -6,6 +6,7 @@ import {
   autopilotQueueOutcome,
   canRetryAutopilotPending,
 } from "../api/_lib/autopilotDelivery.js";
+import { classifyAutopilotSource } from "../api/_lib/autopilotFunnel.js";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -29,12 +30,20 @@ test("Autopilot queue outcome reconciliation is deterministic", () => {
   assert.equal(autopilotQueueOutcome(null), "missing");
 });
 
+test("Autopilot Product Hunt attribution is coarse and does not expose the referrer", () => {
+  assert.equal(classifyAutopilotSource({ headers: { referer: "https://www.producthunt.com/products/titan-autopilot" } }), "product_hunt");
+  assert.equal(classifyAutopilotSource({ headers: { referer: "https://titanos.app/autopilot?utm_source=producthunt" } }), "product_hunt");
+  assert.equal(classifyAutopilotSource({ headers: { referer: "https://example.com/post" } }), "other");
+  assert.equal(classifyAutopilotSource({ headers: {} }), "direct");
+});
+
 test("Autopilot checkout binds the paid order to the authenticated owner", async () => {
   const source = await read("api/functions/createAutopilotOrder.js");
   assert.match(source, /eq\("created_by_id", auth\.user\.id\)/);
   assert.match(source, /metadata: \{ payment_id: payment\.id, user_id: auth\.user\.id/);
   assert.match(source, /task_type: "invoice_recovery_sprint"/);
   assert.match(source, /idempotencyKey: `autopilot_\$\{payment\.id\}`/);
+  assert.match(source, /eventName: "checkout_started"/);
 });
 
 test("Autopilot validates the configured Stripe price before creating a payable order", async () => {
@@ -157,6 +166,42 @@ test("Membership sprint prepares an auditable queue when email delivery is unava
   assert.match(source, /prepared \+= 1/);
   assert.match(source, /if \(!resendKey\)/);
   assert.match(source, /delivery_mode: resendKey \? "email" : "review_queue"/);
+});
+
+test("Autopilot queue rows are protected from generic follow-up send, mutation, and deletion", async () => {
+  const sender = await read("api/functions/sendFollowUp.js");
+  const client = await read("src/lib/followUpApi.js");
+  const rls = await read("supabase/migrations/20260914194500_autopilot_queue_rls.sql");
+  const page = await read("src/pages/FollowUps.jsx");
+
+  assert.match(sender, /AUTOPILOT_QUEUE_PROTECTED/);
+  assert.match(sender, /startsWith\("autopilot_run:"\)/);
+  assert.match(client, /isAutopilotFollowUp/);
+  assert.match(client, /managed by Titan Autopilot/);
+  assert.doesNotMatch(client, /catch \{\s*return markQueueSent/);
+  assert.match(rls, /DROP POLICY IF EXISTS follow_queue_own/);
+  assert.match(rls, /FOR UPDATE/);
+  assert.match(rls, /FOR DELETE/);
+  assert.match(rls, /NOT LIKE 'autopilot_run:%'/);
+  assert.match(page, /Autopilot Recovery Receipts/);
+  assert.match(page, /read-only evidence/);
+  assert.match(page, /normalPending/);
+});
+
+test("Autopilot funnel telemetry is allow-listed, coarse, and client-write protected", async () => {
+  const helper = await read("api/_lib/autopilotFunnel.js");
+  const endpoint = await read("api/functions/trackAutopilotEvent.js");
+  const migration = await read("supabase/migrations/20260914193000_autopilot_funnel_events.sql");
+
+  assert.match(helper, /product_hunt/);
+  assert.match(helper, /safeInvoiceCount/);
+  assert.match(endpoint, /requireDurable: true/);
+  assert.match(migration, /REVOKE ALL ON public\.autopilot_funnel_events FROM anon, authenticated/);
+  assert.match(migration, /invoice_count INTEGER/);
+  assert.doesNotMatch(migration, /customer_email/);
+  assert.doesNotMatch(migration, /invoice_number/);
+  assert.doesNotMatch(migration, /message_body/);
+  assert.doesNotMatch(migration, /raw_referrer/);
 });
 
 test("Autopilot UI is explicit about settlement, safe retries, and paid tier compatibility", async () => {

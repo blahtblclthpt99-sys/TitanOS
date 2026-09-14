@@ -93,6 +93,13 @@ test("Stripe webhook binds Autopilot settlement to a genuine local order and ret
   assert.match(source, /failAutopilotEvent/);
   assert.match(source, /AUTOPILOT_EVENT_LEASE_MS/);
   assert.match(source, /processing_status/);
+  assert.match(source, /guardAutopilotPaymentMutation/);
+  assert.match(source, /\.eq\("user_id", payment\.user_id\)/);
+  assert.match(source, /\.eq\("amount", payment\.amount\)/);
+  assert.match(source, /\.eq\("currency", payment\.currency\)/);
+  assert.match(source, /\.eq\("provider", payment\.provider\)/);
+  assert.match(source, /\.eq\("note", payment\.note\)/);
+  assert.match(source, /\.is\("external_id", null\)/);
   assert.match(source, /status: "succeeded"/);
 
   assert.match(migration, /processing_status TEXT NOT NULL DEFAULT 'processed'/);

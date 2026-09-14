@@ -3,6 +3,7 @@ import { requireUser } from "../_lib/auth.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
+import { classifyAutopilotSource, recordAutopilotFunnel } from "../_lib/autopilotFunnel.js";
 import {
   autopilotQueueOutcome,
   canRetryAutopilotPending,
@@ -42,6 +43,10 @@ export default async function handler(req, res) {
   const auth = await requireUser(req, res);
   if (!auth) return;
 
+  let executionClaimed = false;
+  let funnelInvoiceCount = 0;
+  let funnelSource = classifyAutopilotSource(req);
+
   try {
     const { order_id: orderId } = readJson(req);
     if (!orderId) return res.status(400).json({ error: "order_id is required" });
@@ -58,6 +63,9 @@ export default async function handler(req, res) {
     if (!payment || !order || order.type !== "invoice_recovery_sprint") {
       return res.status(404).json({ error: "Autopilot order not found" });
     }
+    funnelInvoiceCount = Math.min(10, Array.isArray(order.invoice_ids) ? order.invoice_ids.length : 0);
+    funnelSource = ["product_hunt", "direct", "other"].includes(order.source) ? order.source : funnelSource;
+
     if (payment.status !== "succeeded") {
       return res.status(409).json({ error: "Payment is still processing. Try again in a moment.", payment_status: payment.status });
     }
@@ -95,6 +103,16 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (claimError) throw claimError;
     if (!claimed) return res.status(409).json({ error: "This recovery sprint has already been claimed." });
+    executionClaimed = true;
+
+    await recordAutopilotFunnel(auth.admin, {
+      userId: auth.user.id,
+      eventName: "one_time_run_started",
+      source: funnelSource,
+      mode: "one_time",
+      invoiceCount: funnelInvoiceCount,
+      outcome: "pending",
+    });
 
     const { data: invoices, error: invoiceError } = await auth.admin
       .from("invoices")
@@ -286,6 +304,15 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "This sprint lease changed while it was finishing. Retry to reconcile the recorded deliveries." });
     }
 
+    await recordAutopilotFunnel(auth.admin, {
+      userId: auth.user.id,
+      eventName: pending > 0 ? "run_retryable" : "run_completed",
+      source: funnelSource,
+      mode: "one_time",
+      invoiceCount: funnelInvoiceCount,
+      outcome: pending > 0 ? "retryable" : "completed",
+    });
+
     return res.status(pending > 0 ? 202 : 200).json({
       success: pending === 0,
       retryable: pending > 0,
@@ -296,6 +323,20 @@ export default async function handler(req, res) {
       error: pending > 0 ? "One or more deliveries are awaiting safe retry." : undefined,
     });
   } catch (error) {
+    if (executionClaimed) {
+      try {
+        await recordAutopilotFunnel(auth.admin, {
+          userId: auth.user.id,
+          eventName: "run_failed",
+          source: funnelSource,
+          mode: "one_time",
+          invoiceCount: funnelInvoiceCount,
+          outcome: "failed",
+        });
+      } catch {
+        // Metrics never override the execution error.
+      }
+    }
     const { sendApiError } = await import("../_lib/apiError.js");
     return sendApiError(res, error, {
       route: "runAutopilotOrder",

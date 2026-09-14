@@ -19,6 +19,10 @@ function parseOrder(note = "") {
   try { return JSON.parse(String(note).slice(10)); } catch { return null; }
 }
 
+function recipientKey(invoice) {
+  return String(invoice?.customer_email || "").trim().toLowerCase();
+}
+
 function isStillEligible(invoice, today) {
   return Boolean(
     invoice?.customer_email &&
@@ -114,12 +118,19 @@ export default async function handler(req, res) {
       outcome: "pending",
     });
 
+    const approvedInvoiceIds = Array.isArray(order.invoice_ids) ? order.invoice_ids.map(String) : [];
     const { data: invoices, error: invoiceError } = await auth.admin
       .from("invoices")
       .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
-      .in("id", order.invoice_ids || [])
+      .in("id", approvedInvoiceIds)
       .eq("created_by_id", auth.user.id);
     if (invoiceError) throw invoiceError;
+
+    // Supabase does not guarantee the order of rows returned by an IN filter.
+    // Restore the exact approved order so legacy duplicate-recipient batches are
+    // handled deterministically and the earliest approved eligible invoice wins.
+    const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
+    const orderedInvoices = approvedInvoiceIds.map((id) => invoiceById.get(id)).filter(Boolean);
 
     const today = new Date().toISOString().slice(0, 10);
     let sent = 0;
@@ -144,13 +155,29 @@ export default async function handler(req, res) {
       return row;
     };
 
-    for (const invoice of invoices || []) {
+    // Pre-read every historical queue row before creating anything new. This
+    // protects legacy orders that contained multiple invoices for one customer:
+    // a previously sent/failed/pending attempt reserves that recipient even if
+    // database row ordering differs on recovery. A purely skipped row does not.
+    const priorByInvoiceId = new Map();
+    const reservedRecipients = new Set();
+    for (const invoice of orderedInvoices) {
       const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
-
       const prior = await readAutopilotQueue(auth.admin, {
         ownerId: auth.user.id,
         deliveryKey,
       });
+      if (!prior) continue;
+      priorByInvoiceId.set(String(invoice.id), prior);
+      if (autopilotQueueOutcome(prior) !== "skipped") {
+        const key = recipientKey(invoice);
+        if (key) reservedRecipients.add(key);
+      }
+    }
+
+    for (const invoice of orderedInvoices) {
+      const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
+      const prior = priorByInvoiceId.get(String(invoice.id)) || null;
 
       if (prior) {
         const priorOutcome = autopilotQueueOutcome(prior);
@@ -237,6 +264,33 @@ export default async function handler(req, res) {
         continue;
       }
 
+      const key = recipientKey(freshInvoice);
+      if (key && reservedRecipients.has(key)) {
+        const duplicateMessage = `Skipped invoice ${freshInvoice.invoice_number || freshInvoice.id}: another approved invoice for this customer is already assigned to this recovery sprint.`;
+        const { error: duplicateError } = await auth.admin.from("follow_up_queue").insert({
+          created_by_id: auth.user.id,
+          user_id: auth.user.id,
+          customer_id: null,
+          customer_name: freshInvoice.customer_name || "",
+          customer_email: freshInvoice.customer_email,
+          job_id: null,
+          rule_id: deliveryKey,
+          scheduled_for: new Date().toISOString(),
+          status: "skipped",
+          channel: "email",
+          message: duplicateMessage,
+        });
+        if (duplicateError?.code === "23505") {
+          await reconcileDelivery(deliveryKey);
+        } else if (duplicateError) {
+          throw duplicateError;
+        } else {
+          skipped += 1;
+        }
+        continue;
+      }
+      if (key) reservedRecipients.add(key);
+
       const balance = Number(freshInvoice.balance_due ?? freshInvoice.total ?? 0).toFixed(2);
       const message = `Hi ${freshInvoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${freshInvoice.invoice_number || freshInvoice.id} for $${balance} was due ${freshInvoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;
       const { data: queue, error: queueError } = await auth.admin.from("follow_up_queue").insert({
@@ -279,7 +333,7 @@ export default async function handler(req, res) {
     }
 
     const knownInvoiceIds = new Set((invoices || []).map((invoice) => String(invoice.id)));
-    skipped += (order.invoice_ids || []).filter((id) => !knownInvoiceIds.has(String(id))).length;
+    skipped += approvedInvoiceIds.filter((id) => !knownInvoiceIds.has(String(id))).length;
 
     const finished = {
       ...running,

@@ -3,6 +3,7 @@ import { requireUser } from "../_lib/auth.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
+import { classifyAutopilotSource, recordAutopilotFunnel } from "../_lib/autopilotFunnel.js";
 import {
   autopilotQueueOutcome,
   canRetryAutopilotPending,
@@ -82,9 +83,7 @@ async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingC
     return { claim: reclaimed, period, recovered: true, invoiceIds: originalInvoiceIds };
   }
 
-  if (!requestedInvoiceIds.length) {
-    return { conflict: "Select at least one overdue invoice." };
-  }
+  if (!requestedInvoiceIds.length) return { conflict: "Select at least one overdue invoice." };
 
   const { data: claim, error: claimError } = await admin
     .from("autopilot_membership_claims")
@@ -105,6 +104,10 @@ export default async function handler(req, res) {
   if (!(await assertRateLimitAsync(req, res, { limit: 4, windowMs: 60_000, key: "runAutopilotMembership" }))) return;
   const auth = await requireUser(req, res);
   if (!auth) return;
+
+  let executionClaimed = false;
+  let funnelInvoiceCount = 0;
+  const funnelSource = classifyAutopilotSource(req);
 
   try {
     const { data: profile } = await auth.admin
@@ -148,10 +151,21 @@ export default async function handler(req, res) {
     const acquired = await acquireMonthlyClaim(auth.admin, auth.user.id, requestedInvoiceIds, existingClaim);
     if (acquired.conflict) return res.status(409).json({ error: acquired.conflict });
     const claim = acquired.claim;
+    executionClaimed = true;
     const effectiveInvoiceIds = (acquired.invoiceIds || []).map(String).filter(Boolean);
+    funnelInvoiceCount = Math.min(10, effectiveInvoiceIds.length);
     if (!effectiveInvoiceIds.length) {
       return res.status(409).json({ error: "The original approved monthly recovery batch is unavailable." });
     }
+
+    await recordAutopilotFunnel(auth.admin, {
+      userId: auth.user.id,
+      eventName: "membership_run_started",
+      source: funnelSource,
+      mode: "membership",
+      invoiceCount: funnelInvoiceCount,
+      outcome: "pending",
+    });
 
     const { data: invoices, error: invoiceError } = await auth.admin
       .from("invoices")
@@ -356,6 +370,15 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "This monthly sprint lease changed while it was finishing. Retry to reconcile the recorded deliveries." });
     }
 
+    await recordAutopilotFunnel(auth.admin, {
+      userId: auth.user.id,
+      eventName: retryRequired ? "run_retryable" : completed ? "run_completed" : "run_failed",
+      source: funnelSource,
+      mode: "membership",
+      invoiceCount: funnelInvoiceCount,
+      outcome: retryRequired ? "retryable" : completed ? "completed" : "failed",
+    });
+
     return res.status(retryRequired ? 202 : 200).json({
       success: completed && !retryRequired,
       retryable: retryRequired,
@@ -370,6 +393,20 @@ export default async function handler(req, res) {
       error: retryRequired ? "One or more deliveries are awaiting safe retry." : undefined,
     });
   } catch (error) {
+    if (executionClaimed) {
+      try {
+        await recordAutopilotFunnel(auth.admin, {
+          userId: auth.user.id,
+          eventName: "run_failed",
+          source: funnelSource,
+          mode: "membership",
+          invoiceCount: funnelInvoiceCount,
+          outcome: "failed",
+        });
+      } catch {
+        // Metrics never override the execution error.
+      }
+    }
     const { sendApiError } = await import("../_lib/apiError.js");
     return sendApiError(res, error, {
       route: "runAutopilotMembership",

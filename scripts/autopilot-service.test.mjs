@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   AUTOPILOT_RESEND_RETRY_WINDOW_MS,
+  autopilotQueueOutcome,
   canRetryAutopilotPending,
 } from "../api/_lib/autopilotDelivery.js";
 
@@ -18,6 +19,14 @@ test("Autopilot provider retry window is fail-closed at the boundary", () => {
   assert.equal(canRetryAutopilotPending({ status: "sent", created_at: inside }, now), false);
   assert.equal(canRetryAutopilotPending({ status: "pending", created_at: "not-a-date" }, now), false);
   assert.equal(canRetryAutopilotPending(null, now), false);
+});
+
+test("Autopilot queue outcome reconciliation is deterministic", () => {
+  assert.equal(autopilotQueueOutcome({ status: "sent" }), "sent");
+  assert.equal(autopilotQueueOutcome({ status: "failed" }), "failed");
+  assert.equal(autopilotQueueOutcome({ status: "skipped" }), "skipped");
+  assert.equal(autopilotQueueOutcome({ status: "pending" }), "pending");
+  assert.equal(autopilotQueueOutcome(null), "missing");
 });
 
 test("Autopilot checkout binds the paid order to the authenticated owner", async () => {
@@ -62,6 +71,8 @@ test("Shared Autopilot delivery engine records provider evidence and uses stable
   const migration = await read("supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql");
   assert.match(helper, /AUTOPILOT_RESEND_RETRY_WINDOW_MS/);
   assert.match(helper, /canRetryAutopilotPending/);
+  assert.match(helper, /autopilotQueueOutcome/);
+  assert.match(helper, /readAutopilotQueue/);
   assert.match(helper, /"Idempotency-Key": deliveryKey/);
   assert.match(helper, /provider_message_id: providerMessageId/);
   assert.match(helper, /delivery_error_code/);
@@ -80,6 +91,8 @@ test("Autopilot order execution is crash-recoverable at DB, lease, and provider 
   assert.match(source, /isFreshRun\(order\)/);
   assert.match(source, /canRetryAutopilotPending\(prior\)/);
   assert.match(source, /deliverAutopilotQueue/);
+  assert.match(source, /readAutopilotQueue/);
+  assert.match(source, /autopilotQueueOutcome/);
   assert.match(source, /autopilot_run:order:/);
   assert.match(source, /delivery_unconfirmed_invoice_no_longer_eligible/);
   assert.match(source, /idempotency_window_expired/);
@@ -112,18 +125,24 @@ test("Membership sprint enforces paid entitlement, ownership, and monthly replay
   assert.match(migration, /REVOKE ALL .* FROM anon, authenticated/);
 });
 
-test("Membership stale recovery preserves the original approved batch", async () => {
+test("Membership stale recovery preserves and reconciles the original approved batch", async () => {
   const source = await read("api/functions/runAutopilotMembership.js");
+  assert.match(source, /readMonthlyClaim/);
   assert.match(source, /existing\.invoice_ids/);
   assert.match(source, /originalInvoiceIds/);
   assert.match(source, /invoice_ids: originalInvoiceIds/);
+  assert.match(source, /if \(!existingClaim\)/);
+  assert.match(source, /Recovery always uses the original approved monthly batch/);
   assert.match(source, /effectiveInvoiceIds/);
+  assert.match(source, /readAutopilotQueue/);
+  assert.match(source, /autopilotQueueOutcome/);
+  assert.match(source, /queue_reconcile_missing/);
 });
 
 test("Membership recovery uses the shared provider engine and a compare-and-set lease", async () => {
   const source = await read("api/functions/runAutopilotMembership.js");
   assert.match(source, /STALE_RUN_MS/);
-  assert.match(source, /isFreshRun\(existing\)/);
+  assert.match(source, /isFreshRun\(existingClaim\)/);
   assert.match(source, /canRetryAutopilotPending\(prior\)/);
   assert.match(source, /deliverAutopilotQueue/);
   assert.match(source, /autopilot_run:membership:/);

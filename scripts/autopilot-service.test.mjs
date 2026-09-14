@@ -12,6 +12,16 @@ test("Autopilot checkout binds the paid order to the authenticated owner", async
   assert.match(source, /idempotencyKey: `autopilot_\$\{payment\.id\}`/);
 });
 
+test("Autopilot validates the configured Stripe price before creating a payable order", async () => {
+  const source = await read("api/functions/createAutopilotOrder.js");
+  assert.match(source, /stripe\.prices\.retrieve\(configuredPriceId\)/);
+  assert.match(source, /price\?\.active === true/);
+  assert.match(source, /price\?\.type === "one_time"/);
+  assert.match(source, /String\(price\?\.currency \|\| ""\)\.toLowerCase\(\) === "usd"/);
+  assert.match(source, /Number\(price\?\.unit_amount\) === SPRINT_PRICE_CENTS/);
+  assert.match(source, /AUTOPILOT_PRICE_MISCONFIGURED/);
+});
+
 test("Stripe webhook settles Autopilot only after verified paid checkout", async () => {
   const source = await read("api/functions/stripeWebhook.js");
   assert.match(source, /constructEvent/);
@@ -31,16 +41,29 @@ test("Autopilot execution requires settlement and atomically claims an order", a
   assert.match(source, /RESEND_API_KEY/);
 });
 
-test("Autopilot order execution is crash-recoverable and recipient-idempotent", async () => {
+test("Autopilot order execution is crash-recoverable at both DB and email-provider layers", async () => {
   const source = await read("api/functions/runAutopilotOrder.js");
   const migration = await read("supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql");
   assert.match(source, /STALE_RUN_MS/);
+  assert.match(source, /RESEND_RETRY_WINDOW_MS/);
   assert.match(source, /isFreshRun\(order\)/);
+  assert.match(source, /pendingCanRetry\(prior\)/);
+  assert.match(source, /"Idempotency-Key": deliveryKey/);
   assert.match(source, /autopilot_run:order:/);
-  assert.match(source, /isStillEligible\(invoice, today\)/);
-  assert.match(source, /status: "skipped"/);
+  assert.match(source, /pending_no_longer_eligible/);
+  assert.match(source, /pending_retry_window_expired/);
+  assert.match(source, /\.eq\("note", runningNote\)/);
+  assert.match(source, /state: pending > 0 \? "retryable" : "completed"/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_autopilot_run_once/);
   assert.match(migration, /rule_id LIKE 'autopilot_run:%'/);
+});
+
+test("Autopilot one-time runner re-reads invoice eligibility immediately before first delivery", async () => {
+  const source = await read("api/functions/runAutopilotOrder.js");
+  assert.match(source, /Re-read immediately before creating the delivery/);
+  assert.match(source, /freshInvoice/);
+  assert.match(source, /isStillEligible\(freshInvoice, today\)/);
+  assert.match(source, /status: "skipped"/);
 });
 
 test("Autopilot recipient storage is owner-scoped through the existing queue", async () => {
@@ -59,24 +82,36 @@ test("Membership sprint enforces paid entitlement, ownership, and monthly replay
   assert.match(migration, /REVOKE ALL .* FROM anon, authenticated/);
 });
 
-test("Membership recovery can reclaim a stale run without duplicate recipients", async () => {
+test("Membership stale recovery preserves the original approved batch", async () => {
+  const source = await read("api/functions/runAutopilotMembership.js");
+  assert.match(source, /existing\.invoice_ids/);
+  assert.match(source, /originalInvoiceIds/);
+  assert.match(source, /invoice_ids: originalInvoiceIds/);
+  assert.match(source, /effectiveInvoiceIds/);
+  assert.match(source, /original monthly selection/);
+});
+
+test("Membership recovery uses provider idempotency and a compare-and-set lease", async () => {
   const source = await read("api/functions/runAutopilotMembership.js");
   assert.match(source, /STALE_RUN_MS/);
+  assert.match(source, /RESEND_RETRY_WINDOW_MS/);
   assert.match(source, /isFreshRun\(existing\)/);
+  assert.match(source, /pendingCanRetry\(prior\)/);
+  assert.match(source, /"Idempotency-Key": deliveryKey/);
   assert.match(source, /autopilot_run:membership:/);
   assert.match(source, /recovered: acquired\.recovered/);
-  assert.match(source, /Re-read just before creating a delivery/);
-  assert.match(source, /status: "skipped"/);
+  assert.match(source, /\.eq\("updated_at", claim\.updated_at\)/);
+  assert.match(source, /retryRequired/);
 });
 
 test("Membership sprint prepares an auditable queue when email delivery is unavailable", async () => {
   const source = await read("api/functions/runAutopilotMembership.js");
   assert.match(source, /prepared \+= 1/);
-  assert.match(source, /if \(!resendKey\) continue/);
+  assert.match(source, /if \(!resendKey\)/);
   assert.match(source, /delivery_mode: resendKey \? "email" : "review_queue"/);
 });
 
-test("Autopilot UI exposes public product story and recovery controls", async () => {
+test("Autopilot UI is explicit about settlement, safe retries, and paid tier compatibility", async () => {
   const source = await read("src/pages/Autopilot.jsx");
   assert.match(source, /Recovery Command Center/);
   assert.match(source, /Example preview · sample data/);
@@ -84,4 +119,8 @@ test("Autopilot UI exposes public product story and recovery controls", async ()
   assert.match(source, /Reminder preview/);
   assert.match(source, /Select oldest/);
   assert.match(source, /not guaranteed recovered revenue/);
+  assert.match(source, /Checkout complete — verifying payment/);
+  assert.match(source, /Returning from Stripe does not unlock delivery by itself/);
+  assert.match(source, /Safe retry required/);
+  assert.match(source, /"worker_premium", "pro", "business"/);
 });

@@ -313,7 +313,7 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "This sprint lease changed while it was finishing. Retry to reconcile the recorded deliveries." });
     }
 
-    return res.status(pending > 0 ? 503 : 200).json({
+    return res.status(pending > 0 ? 202 : 200).json({
       success: pending === 0,
       retryable: pending > 0,
       sent,

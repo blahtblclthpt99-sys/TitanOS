@@ -7,6 +7,13 @@ function normalizeSource(value) {
   return SOURCES.has(value) ? value : "direct";
 }
 
+function safeInvoiceCount(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return null;
+  return Math.max(0, Math.min(10, parsed));
+}
+
 export function getAutopilotSource() {
   if (typeof window === "undefined") return "direct";
 
@@ -14,11 +21,14 @@ export function getAutopilotSource() {
     const params = new URLSearchParams(window.location.search);
     const utm = String(params.get("utm_source") || "").toLowerCase();
     const referrer = String(document.referrer || "").toLowerCase();
+    const stored = normalizeSource(sessionStorage.getItem(SOURCE_KEY));
     const detected = utm === "producthunt" || utm === "product_hunt" || referrer.includes("producthunt.com")
       ? "product_hunt"
-      : referrer
-        ? "other"
-        : normalizeSource(sessionStorage.getItem(SOURCE_KEY));
+      : stored === "product_hunt"
+        ? "product_hunt"
+        : referrer
+          ? "other"
+          : stored;
     sessionStorage.setItem(SOURCE_KEY, detected);
     return detected;
   } catch {
@@ -36,7 +46,7 @@ export async function trackAutopilotEvent(eventName, {
       event_name: eventName,
       source: getAutopilotSource(),
       mode,
-      invoice_count: Number.isInteger(Number(invoiceCount)) ? Math.max(0, Math.min(10, Number(invoiceCount))) : null,
+      invoice_count: safeInvoiceCount(invoiceCount),
       outcome,
     });
   } catch {

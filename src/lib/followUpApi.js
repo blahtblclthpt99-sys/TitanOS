@@ -10,6 +10,10 @@ const defaults = [
 const read = (userId, key) => readLocal(PREFIX, userId, key, []);
 const write = (userId, key, rows) => writeLocal(PREFIX, userId, key, rows);
 
+export function isAutopilotFollowUp(row) {
+  return String(row?.rule_id || "").startsWith("autopilot_run:");
+}
+
 export async function listRules(userId) {
   try { return await api.entities.FollowUpRule.filter({ user_id: userId }, "delay_days"); } catch { return read(userId, "rules"); }
 }
@@ -37,10 +41,17 @@ export async function enqueueFollowUpsForJob(user, job, customer = {}) {
   try { return await Promise.all(rows.map((row) => api.entities.FollowUpQueue.create(row))); }
   catch { const items = rows.map((row) => ({ id: uid(), status: "pending", created_at: new Date().toISOString(), ...row })); write(user.id, "queue", [...read(user.id, "queue"), ...items]); return items; }
 }
-export async function markQueueSent(userId, id) {
+export async function markQueueSent(userId, id, row = null) {
+  if (row && isAutopilotFollowUp(row)) throw new Error("Autopilot recovery records are managed by Titan Autopilot");
   const patch = { status: "sent", sent_at: new Date().toISOString() };
   try { return await api.entities.FollowUpQueue.update(id, patch); }
-  catch { const item = { ...read(userId, "queue").find((row) => row.id === id), ...patch }; write(userId, "queue", read(userId, "queue").map((row) => row.id === id ? item : row)); return item; }
+  catch (error) {
+    const existing = read(userId, "queue").find((item) => item.id === id);
+    if (isAutopilotFollowUp(existing)) throw error;
+    const item = { ...existing, ...patch };
+    write(userId, "queue", read(userId, "queue").map((itemRow) => itemRow.id === id ? item : itemRow));
+    return item;
+  }
 }
 
 export async function deleteRule(userId, id) {
@@ -48,30 +59,38 @@ export async function deleteRule(userId, id) {
   catch { write(userId, "rules", read(userId, "rules").filter((row) => row.id !== id)); }
 }
 
-export async function deleteQueueItem(userId, id) {
+export async function deleteQueueItem(userId, id, row = null) {
+  if (row && isAutopilotFollowUp(row)) throw new Error("Autopilot recovery records are immutable audit evidence");
   try { await api.entities.FollowUpQueue.delete(id); }
-  catch { write(userId, "queue", read(userId, "queue").filter((row) => row.id !== id)); }
+  catch (error) {
+    const existing = read(userId, "queue").find((item) => item.id === id);
+    if (isAutopilotFollowUp(existing)) throw error;
+    write(userId, "queue", read(userId, "queue").filter((item) => item.id !== id));
+  }
 }
 
-/** Email the follow-up (Resend when configured) and mark queue item sent. */
+/** Email a normal follow-up and mark it sent only after live delivery succeeds. */
 export async function sendFollowUpNow(user, row, customerEmail = "") {
+  if (isAutopilotFollowUp(row)) {
+    throw new Error("Retry Autopilot deliveries from the Recovery Command Center so duplicate protection remains intact");
+  }
+
+  const res = await api.functions.invoke("sendFollowUp", {
+    queue_id: row.id,
+    user_id: user.id,
+    to: customerEmail || row.customer_email || "",
+    subject: `Follow-up from ${user.full_name || "your service provider"}`,
+    body: row.message,
+  });
+  const patch = { status: "sent", sent_at: new Date().toISOString(), channel: "email" };
+
   try {
-    const res = await api.functions.invoke("sendFollowUp", {
-      queue_id: row.id,
-      user_id: user.id,
-      to: customerEmail || row.customer_email || "",
-      subject: `Follow-up from ${user.full_name || "your service provider"}`,
-      body: row.message,
-    });
-    const patch = { status: "sent", sent_at: new Date().toISOString(), channel: "email" };
-    try {
-      return { ...(await api.entities.FollowUpQueue.update(row.id, patch)), send: res };
-    } catch {
-      const item = { ...row, ...patch };
-      write(user.id, "queue", read(user.id, "queue").map((q) => (q.id === row.id ? item : q)));
-      return { ...item, send: res };
-    }
+    return { ...(await api.entities.FollowUpQueue.update(row.id, patch)), send: res };
   } catch {
-    return markQueueSent(user.id, row.id);
+    // The server has already confirmed delivery. If the UI-side entity refresh
+    // fails, preserve that fact only in local cache instead of re-sending.
+    const item = { ...row, ...patch };
+    write(user.id, "queue", read(user.id, "queue").map((q) => (q.id === row.id ? item : q)));
+    return { ...item, send: res };
   }
 }

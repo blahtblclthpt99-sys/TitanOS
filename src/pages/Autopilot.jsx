@@ -27,6 +27,7 @@ import { trackAutopilotEvent } from "@/lib/autopilotTelemetry";
 const DAY_MS = 86_400_000;
 const today = () => new Date().toISOString().slice(0, 10);
 const balanceOf = (invoice) => Math.max(0, Number(invoice?.balance_due ?? invoice?.total ?? 0) || 0);
+const recipientKey = (invoice) => String(invoice?.customer_email || "").trim().toLowerCase();
 
 function daysOverdue(invoice) {
   if (!invoice?.due_date) return 0;
@@ -182,6 +183,7 @@ export default function Autopilot() {
       return ageDiff || balanceOf(b) - balanceOf(a);
     }), [invoices]);
 
+  const uniqueEligibleCount = useMemo(() => new Set(eligible.map(recipientKey).filter(Boolean)).size, [eligible]);
   const selectedRows = useMemo(
     () => selected.map((id) => eligible.find((invoice) => invoice.id === id)).filter(Boolean),
     [eligible, selected]
@@ -201,9 +203,9 @@ export default function Autopilot() {
     eligibleTracked.current = true;
     void trackAutopilotEvent("eligible_loaded", {
       mode: paidMembership ? "membership" : "unknown",
-      invoiceCount: Math.min(10, eligible.length),
+      invoiceCount: Math.min(10, uniqueEligibleCount),
     });
-  }, [eligible.length, error, loading, paidMembership, user?.id]);
+  }, [error, loading, paidMembership, uniqueEligibleCount, user?.id]);
 
   useEffect(() => {
     if (!user?.id || selected.length === 0 || batchTracked.current) return;
@@ -223,15 +225,38 @@ export default function Autopilot() {
     });
   }, [checkout, user?.id]);
 
-  const toggle = (id) => setSelected((current) =>
-    current.includes(id)
-      ? current.filter((item) => item !== id)
-      : current.length < 10
-        ? [...current, id]
-        : current
-  );
+  const toggle = (id) => setSelected((current) => {
+    if (current.includes(id)) return current.filter((item) => item !== id);
+    if (current.length >= 10) return current;
 
-  const selectPriorityBatch = () => setSelected(eligible.slice(0, 10).map((invoice) => invoice.id));
+    const candidate = eligible.find((invoice) => invoice.id === id);
+    const candidateRecipient = recipientKey(candidate);
+    const duplicate = current.some((selectedId) => {
+      const selectedInvoice = eligible.find((invoice) => invoice.id === selectedId);
+      return candidateRecipient && recipientKey(selectedInvoice) === candidateRecipient;
+    });
+    if (duplicate) {
+      toast({
+        title: "Customer already selected",
+        description: "Titan sends at most one invoice reminder per customer email in each recovery sprint.",
+      });
+      return current;
+    }
+    return [...current, id];
+  });
+
+  const selectPriorityBatch = () => {
+    const seen = new Set();
+    const ids = [];
+    for (const invoice of eligible) {
+      const key = recipientKey(invoice);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      ids.push(invoice.id);
+      if (ids.length === 10) break;
+    }
+    setSelected(ids);
+  };
 
   const checkoutNow = async () => {
     setWorking(true);
@@ -331,7 +356,7 @@ export default function Autopilot() {
         </div>
 
         <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
-          <div className="rounded-lg bg-muted/50 p-3"><Mail className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />One factual reminder per invoice</div>
+          <div className="rounded-lg bg-muted/50 p-3"><Mail className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />One factual reminder per customer</div>
           <div className="rounded-lg bg-muted/50 p-3"><ShieldCheck className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Paid-after-approval safety stop</div>
           <div className="rounded-lg bg-muted/50 p-3"><CheckCircle2 className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Provider-idempotent audited execution</div>
         </div>
@@ -398,13 +423,13 @@ export default function Autopilot() {
       <section className="titan-surface p-5">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Approve overdue invoices <span className="text-muted-foreground font-normal">({selected.length}/10)</span></h2>
-            <p className="text-sm text-muted-foreground mt-1">Oldest overdue invoices appear first; balance breaks ties. Titan never selects recipients without your approval.</p>
+            <h2 className="font-semibold">Approve overdue invoices <span className="text-muted-foreground font-normal">({selected.length}/10 customers)</span></h2>
+            <p className="text-sm text-muted-foreground mt-1">Oldest overdue invoices appear first. Titan allows one invoice per customer email in each sprint so a customer cannot receive several reminders at once.</p>
           </div>
           {eligible.length > 0 && (
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="min-h-10" onClick={selectPriorityBatch} disabled={working}>
-                Select oldest {Math.min(10, eligible.length)}
+                Select oldest {Math.min(10, uniqueEligibleCount)} customers
               </Button>
               {selected.length > 0 && (
                 <Button type="button" variant="ghost" className="min-h-10" onClick={() => setSelected([])} disabled={working}>
@@ -420,17 +445,18 @@ export default function Autopilot() {
             {eligible.map((invoice) => {
               const overdue = daysOverdue(invoice);
               const checked = selected.includes(invoice.id);
+              const duplicateRecipientSelected = !checked && selectedRows.some((row) => recipientKey(row) === recipientKey(invoice));
               return (
                 <label
                   key={invoice.id}
-                  className="flex items-center gap-3 py-3.5 border-b border-border cursor-pointer min-h-16"
+                  className={`flex items-center gap-3 py-3.5 border-b border-border min-h-16 ${duplicateRecipientSelected ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 >
                   <input
                     type="checkbox"
                     className="w-5 h-5 shrink-0"
                     checked={checked}
                     onChange={() => toggle(invoice.id)}
-                    disabled={!checked && selected.length >= 10}
+                    disabled={duplicateRecipientSelected || (!checked && selected.length >= 10)}
                     aria-label={`Approve ${invoice.invoice_number || "invoice"} for ${invoice.customer_name || "customer"}`}
                   />
                   <span className="flex-1 min-w-0">
@@ -439,6 +465,9 @@ export default function Autopilot() {
                       <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                         <Clock className="w-3 h-3" aria-hidden /> {overdue}d overdue
                       </span>
+                      {duplicateRecipientSelected && (
+                        <span className="text-[11px] text-muted-foreground">Customer already selected</span>
+                      )}
                     </span>
                     <span className="text-xs text-muted-foreground mt-1 block truncate">
                       {invoice.invoice_number || "Invoice"} · {invoice.customer_email} · due {invoice.due_date}
@@ -480,7 +509,7 @@ export default function Autopilot() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-titan-cyan" aria-hidden />
-                <p className="font-semibold">{money(selectedBalance)} selected across {selected.length} invoice{selected.length === 1 ? "" : "s"}</p>
+                <p className="font-semibold">{money(selectedBalance)} selected across {selected.length} customer{selected.length === 1 ? "" : "s"}</p>
               </div>
               <p className="text-xs text-muted-foreground mt-1">This is the overdue balance being followed up on — not guaranteed recovered revenue.</p>
             </div>

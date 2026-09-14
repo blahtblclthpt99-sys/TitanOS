@@ -1,8 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import {
+  AUTOPILOT_RESEND_RETRY_WINDOW_MS,
+  canRetryAutopilotPending,
+} from "../api/_lib/autopilotDelivery.js";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+test("Autopilot provider retry window is fail-closed at the boundary", () => {
+  const now = Date.parse("2026-09-14T12:00:00.000Z");
+  const inside = new Date(now - AUTOPILOT_RESEND_RETRY_WINDOW_MS + 1).toISOString();
+  const boundary = new Date(now - AUTOPILOT_RESEND_RETRY_WINDOW_MS).toISOString();
+
+  assert.equal(canRetryAutopilotPending({ status: "pending", created_at: inside }, now), true);
+  assert.equal(canRetryAutopilotPending({ status: "pending", created_at: boundary }, now), false);
+  assert.equal(canRetryAutopilotPending({ status: "sent", created_at: inside }, now), false);
+  assert.equal(canRetryAutopilotPending({ status: "pending", created_at: "not-a-date" }, now), false);
+  assert.equal(canRetryAutopilotPending(null, now), false);
+});
 
 test("Autopilot checkout binds the paid order to the authenticated owner", async () => {
   const source = await read("api/functions/createAutopilotOrder.js");
@@ -51,6 +67,7 @@ test("Shared Autopilot delivery engine records provider evidence and uses stable
   assert.match(helper, /delivery_error_code/);
   assert.match(helper, /concurrent_idempotent_requests/);
   assert.match(helper, /network_ambiguous/);
+  assert.match(helper, /provider_accepted_receipt_persist_ambiguous/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS provider_message_id TEXT/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS delivery_error_code TEXT/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_autopilot_run_once/);

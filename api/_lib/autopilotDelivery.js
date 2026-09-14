@@ -2,6 +2,7 @@ import { logError } from "./safeLog.js";
 
 export const AUTOPILOT_RESEND_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 const RESEND_SUBJECT = "Payment reminder — overdue invoice";
+const QUEUE_SELECT = "id,status,created_at,customer_email,message,provider_message_id,delivery_error_code";
 
 export function canRetryAutopilotPending(queue, now = Date.now()) {
   if (queue?.status !== "pending" || !queue.created_at) return false;
@@ -20,7 +21,7 @@ export function autopilotQueueOutcome(row) {
 export async function readAutopilotQueue(admin, { queueId, ownerId, deliveryKey } = {}) {
   let query = admin
     .from("follow_up_queue")
-    .select("id,status,created_at,customer_email,message,provider_message_id,delivery_error_code");
+    .select(QUEUE_SELECT);
 
   if (queueId) query = query.eq("id", queueId);
   if (ownerId) query = query.eq("created_by_id", ownerId);
@@ -37,11 +38,12 @@ function providerErrorCode(body, status) {
 
 async function markAmbiguous(admin, queueId, code) {
   try {
-    await admin
+    const { error } = await admin
       .from("follow_up_queue")
       .update({ delivery_error_code: code })
       .eq("id", queueId)
       .eq("status", "pending");
+    if (error) throw error;
   } catch {
     // The queue status itself remains the source of truth and will be re-read.
   }
@@ -54,11 +56,31 @@ export async function failAutopilotPending(admin, queueId, code) {
     .update({ status: "failed", delivery_error_code: code })
     .eq("id", queueId)
     .eq("status", "pending")
-    .select("id,status,created_at,customer_email,message,provider_message_id,delivery_error_code")
+    .select(QUEUE_SELECT)
     .maybeSingle();
   if (error) throw error;
   if (failedRow) return failedRow;
   return readAutopilotQueue(admin, { queueId });
+}
+
+async function persistProviderAccepted(admin, queueId, providerMessageId) {
+  const sentAt = new Date().toISOString();
+  const { data: sentRow, error } = await admin
+    .from("follow_up_queue")
+    .update({
+      status: "sent",
+      sent_at: sentAt,
+      provider_message_id: providerMessageId,
+      delivery_error_code: providerMessageId ? null : "provider_receipt_missing",
+    })
+    .eq("id", queueId)
+    .in("status", ["pending", "failed"])
+    .select(QUEUE_SELECT)
+    .maybeSingle();
+
+  if (error) return { row: null, error };
+  if (sentRow) return { row: sentRow, error: null };
+  return { row: await readAutopilotQueue(admin, { queueId }), error: null };
 }
 
 export async function deliverAutopilotQueue({
@@ -100,39 +122,35 @@ export async function deliverAutopilotQueue({
 
   if (response.ok) {
     const providerMessageId = String(body?.id || "").trim() || null;
-    const { data: sentRow, error: sentError } = await admin
-      .from("follow_up_queue")
-      .update({
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        provider_message_id: providerMessageId,
-        delivery_error_code: providerMessageId ? null : "provider_receipt_missing",
-      })
-      .eq("id", queue.id)
-      .eq("status", "pending")
-      .select("id,status,created_at,customer_email,message,provider_message_id,delivery_error_code")
-      .maybeSingle();
+    const { row: persisted, error: persistError } = await persistProviderAccepted(
+      admin,
+      queue.id,
+      providerMessageId
+    );
+    const reconciled = autopilotQueueOutcome(persisted);
 
-    if (sentError || !sentRow) {
-      const current = await readAutopilotQueue(admin, { queueId: queue.id });
-      const reconciled = autopilotQueueOutcome(current);
+    if (persistError || reconciled !== "sent") {
       if (reconciled !== "sent") {
         await markAmbiguous(admin, queue.id, "provider_accepted_receipt_persist_ambiguous");
       }
       logError(
         `${route}:receipt_persist`,
-        sentError || new Error("Provider accepted email but queue receipt update lost its lease"),
+        persistError || new Error("Provider accepted email but queue receipt could not reconcile to sent"),
         { ...context, providerMessageId, reconciled }
       );
       return {
         outcome: reconciled === "missing" ? "pending" : reconciled,
         errorCode: reconciled === "sent" ? null : "provider_accepted_receipt_persist_ambiguous",
-        providerMessageId: current?.provider_message_id || providerMessageId,
-        row: current,
+        providerMessageId: persisted?.provider_message_id || providerMessageId,
+        row: persisted,
       };
     }
 
-    return { outcome: "sent", providerMessageId, row: sentRow };
+    return {
+      outcome: "sent",
+      providerMessageId: persisted?.provider_message_id || providerMessageId,
+      row: persisted,
+    };
   }
 
   const code = providerErrorCode(body, response.status);

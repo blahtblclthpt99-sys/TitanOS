@@ -203,6 +203,20 @@ test("Autopilot queue rows are protected from generic follow-up send, mutation, 
   assert.match(page, /normalPending/);
 });
 
+test("Autopilot live DB verifier proves the Recovery Receipt boundary and fails closed", async () => {
+  const verifier = await read("scripts/verify-autopilot-db-security.mjs");
+
+  assert.match(verifier, /receiptReadable/);
+  assert.match(verifier, /receiptUpdateBlocked/);
+  assert.match(verifier, /receiptDeleteBlocked/);
+  assert.match(verifier, /autopilotInsertBlocked/);
+  assert.match(verifier, /manualFollowUpStillWritable/);
+  assert.match(verifier, /telemetrySchemaPresent/);
+  assert.match(verifier, /telemetryClientWriteBlocked/);
+  assert.match(verifier, /required\.every\(Boolean\)/);
+  assert.match(verifier, /process\.exit\(report\.ok \? 0 : 3\)/);
+});
+
 test("Autopilot funnel telemetry is allow-listed, coarse, client-write protected, and non-blocking", async () => {
   const helper = await read("api/_lib/autopilotFunnel.js");
   const endpoint = await read("api/functions/trackAutopilotEvent.js");

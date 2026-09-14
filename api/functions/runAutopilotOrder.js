@@ -142,14 +142,22 @@ export default async function handler(req, res) {
         if (!isStillEligible(freshForRetry, today)) {
           await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
           failed += 1;
-          logError("runAutopilotOrder:pending_no_longer_eligible", { orderId, invoiceId: invoice.id });
+          logError(
+            "runAutopilotOrder:pending_no_longer_eligible",
+            new Error("Pending Autopilot delivery became ineligible before safe retry"),
+            { orderId, invoiceId: invoice.id }
+          );
           continue;
         }
 
         if (!canRetryAutopilotPending(prior)) {
           await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
           failed += 1;
-          logError("runAutopilotOrder:pending_retry_window_expired", { orderId, invoiceId: invoice.id });
+          logError(
+            "runAutopilotOrder:pending_retry_window_expired",
+            new Error("Pending Autopilot delivery exceeded the provider idempotency window"),
+            { orderId, invoiceId: invoice.id }
+          );
           continue;
         }
 
@@ -219,7 +227,11 @@ export default async function handler(req, res) {
           continue;
         }
         failed += 1;
-        logError("runAutopilotOrder:queue", { orderId, invoiceId: invoice.id, error: queueError.message });
+        logError(
+          "runAutopilotOrder:queue",
+          new Error(queueError.message || "Autopilot queue insert failed"),
+          { orderId, invoiceId: invoice.id, dbCode: queueError.code }
+        );
         continue;
       }
 

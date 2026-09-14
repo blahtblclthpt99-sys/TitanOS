@@ -73,14 +73,27 @@ export default async function handler(req, res) {
     if (invoiceError) throw invoiceError;
     if ((invoices || []).length !== invoiceIds.length) return res.status(403).json({ error: "One or more invoices are unavailable" });
 
+    const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
+    const orderedInvoices = invoiceIds.map((id) => invoiceById.get(String(id))).filter(Boolean);
+    if (orderedInvoices.length !== invoiceIds.length) return res.status(403).json({ error: "One or more invoices are unavailable" });
+
     const today = new Date().toISOString().slice(0, 10);
-    const eligible = invoices.every((invoice) =>
-      invoice.customer_email && invoice.status !== "paid" && invoice.due_date && invoice.due_date < today && Number(invoice.balance_due ?? invoice.total) > 0
+    const eligible = orderedInvoices.every((invoice) =>
+      recipientKey(invoice.customer_email) &&
+      invoice.status !== "paid" &&
+      invoice.due_date &&
+      invoice.due_date < today &&
+      Number(invoice.balance_due ?? invoice.total) > 0
     );
     if (!eligible) return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
-    if (hasDuplicateRecipients(invoices)) {
+    if (hasDuplicateRecipients(orderedInvoices)) {
       return res.status(400).json({ error: "Select only one overdue invoice per customer email in each recovery sprint" });
     }
+
+    const approvedRecipients = orderedInvoices.map((invoice) => ({
+      invoice_id: String(invoice.id),
+      customer_email: recipientKey(invoice.customer_email),
+    }));
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const configuredPriceId = String(process.env.STRIPE_AUTOPILOT_PRICE_ID || "").trim();
@@ -91,6 +104,8 @@ export default async function handler(req, res) {
       type: "invoice_recovery_sprint",
       state: "awaiting_payment",
       invoice_ids: invoiceIds,
+      approved_recipients: approvedRecipients,
+      recipient_snapshot_version: 1,
       approved_at: new Date().toISOString(),
       price_cents: SPRINT_PRICE_CENTS,
       source,
@@ -123,6 +138,7 @@ export default async function handler(req, res) {
       .update({ external_id: session.id, checkout_url: session.url, updated_at: new Date().toISOString() })
       .eq("id", payment.id)
       .eq("status", "pending")
+      .eq("note", `AUTOPILOT:${JSON.stringify(orderData)}`)
       .select("id")
       .maybeSingle();
     if (bindError) throw bindError;
@@ -141,12 +157,13 @@ export default async function handler(req, res) {
   } catch (error) {
     if (paymentId) {
       try {
-        await auth.admin
+        const { error: failError } = await auth.admin
           .from("payments")
           .update({ status: "failed", updated_at: new Date().toISOString() })
           .eq("id", paymentId)
           .eq("status", "pending")
           .is("external_id", null);
+        if (failError) throw failError;
       } catch {
         // Stripe/webhook state remains authoritative when a local bind failed.
       }

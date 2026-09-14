@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Bot,
@@ -22,6 +22,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { toast } from "@/components/ui/use-toast";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
 import { getPlanCheckoutUrl, resolvePlan } from "@/lib/plan";
+import { trackAutopilotEvent } from "@/lib/autopilotTelemetry";
 
 const DAY_MS = 86_400_000;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -89,6 +90,10 @@ function ExamplePreview() {
 }
 
 function PublicAutopilot() {
+  useEffect(() => {
+    void trackAutopilotEvent("preview_view", { mode: "public" });
+  }, []);
+
   return (
     <div className="page-pad max-w-5xl mx-auto pb-24">
       <PageHeader
@@ -152,6 +157,10 @@ export default function Autopilot() {
   const [selected, setSelected] = useState([]);
   const [working, setWorking] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const signedViewTracked = useRef(false);
+  const eligibleTracked = useRef(false);
+  const batchTracked = useRef(false);
+  const checkoutReturnTracked = useRef(false);
   const paidMembership = user?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(resolvePlan(user));
   const showOneTime = import.meta.env.VITE_AUTOPILOT_ONETIME_CHECKOUT === "true";
   const { data: invoices = [], loading, error, reload } = useSafeAsync(
@@ -180,6 +189,39 @@ export default function Autopilot() {
   const eligibleBalance = useMemo(() => eligible.reduce((sum, invoice) => sum + balanceOf(invoice), 0), [eligible]);
   const selectedBalance = useMemo(() => selectedRows.reduce((sum, invoice) => sum + balanceOf(invoice), 0), [selectedRows]);
   const previewInvoice = selectedRows[0] || null;
+
+  useEffect(() => {
+    if (!user?.id || !authChecked || isLoadingAuth || signedViewTracked.current) return;
+    signedViewTracked.current = true;
+    void trackAutopilotEvent("signed_in_view", { mode: paidMembership ? "membership" : "unknown" });
+  }, [authChecked, isLoadingAuth, paidMembership, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || loading || error || eligibleTracked.current) return;
+    eligibleTracked.current = true;
+    void trackAutopilotEvent("eligible_loaded", {
+      mode: paidMembership ? "membership" : "unknown",
+      invoiceCount: Math.min(10, eligible.length),
+    });
+  }, [eligible.length, error, loading, paidMembership, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || selected.length === 0 || batchTracked.current) return;
+    batchTracked.current = true;
+    void trackAutopilotEvent("batch_approved", {
+      mode: paidMembership ? "membership" : showOneTime ? "one_time" : "unknown",
+      invoiceCount: selected.length,
+    });
+  }, [paidMembership, selected.length, showOneTime, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !checkout || checkoutReturnTracked.current) return;
+    checkoutReturnTracked.current = true;
+    void trackAutopilotEvent("checkout_returned", {
+      mode: "one_time",
+      outcome: checkout === "canceled" ? "canceled" : "pending",
+    });
+  }, [checkout, user?.id]);
 
   const toggle = (id) => setSelected((current) =>
     current.includes(id)
@@ -335,7 +377,7 @@ export default function Autopilot() {
         <section className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 mb-5" aria-live="polite">
           <div className="flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden />
-            <div>
+            <div className="flex-1">
               <p className="font-semibold">{lastResult.retryable ? "Autopilot needs a safe retry" : "Autopilot run recorded"}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {lastResult.sent || 0} sent · {lastResult.prepared || 0} prepared · {lastResult.failed || 0} failed · {lastResult.skipped || 0} skipped · {lastResult.pending || 0} pending
@@ -345,6 +387,9 @@ export default function Autopilot() {
                   ? "A provider response was ambiguous. Titan kept that delivery pending so retrying can reuse the same idempotency key instead of risking a duplicate."
                   : "Skipped invoices include balances that were no longer eligible when Titan rechecked them."}
               </p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => { window.location.href = "/follow-ups"; }}>
+                View Recovery Receipts
+              </Button>
             </div>
           </div>
         </section>

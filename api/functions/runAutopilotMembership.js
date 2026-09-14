@@ -3,11 +3,14 @@ import { requireUser } from "../_lib/auth.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
+import {
+  canRetryAutopilotPending,
+  deliverAutopilotQueue,
+  failAutopilotPending,
+} from "../_lib/autopilotDelivery.js";
 
 const MAX_INVOICES = 10;
 const STALE_RUN_MS = 15 * 60 * 1000;
-const RESEND_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
-const RESEND_SUBJECT = "Payment reminder — overdue invoice";
 const periodKey = () => `${new Date().toISOString().slice(0, 7)}-01`;
 
 function isStillEligible(invoice, today) {
@@ -24,53 +27,6 @@ function isFreshRun(claim) {
   if (claim?.status !== "running" || !claim.updated_at) return false;
   const updated = new Date(claim.updated_at).getTime();
   return Number.isFinite(updated) && Date.now() - updated < STALE_RUN_MS;
-}
-
-function pendingCanRetry(queue) {
-  if (queue?.status !== "pending" || !queue.created_at) return false;
-  const created = new Date(queue.created_at).getTime();
-  return Number.isFinite(created) && Date.now() - created < RESEND_RETRY_WINDOW_MS;
-}
-
-async function deliverQueuedReminder({ admin, queue, resendKey, deliveryKey, logContext }) {
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": deliveryKey,
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>",
-        to: [queue.customer_email],
-        subject: RESEND_SUBJECT,
-        text: queue.message,
-      }),
-    });
-
-    if (response.ok) {
-      const { error: sentError } = await admin
-        .from("follow_up_queue")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", queue.id)
-        .eq("status", "pending");
-      if (sentError) throw sentError;
-      return "sent";
-    }
-
-    if (response.status === 409) {
-      logError("runAutopilotMembership:resend_retryable", { ...logContext, status: response.status });
-      return "pending";
-    }
-
-    await admin.from("follow_up_queue").update({ status: "failed" }).eq("id", queue.id).eq("status", "pending");
-    logError("runAutopilotMembership:resend", { ...logContext, status: response.status });
-    return "failed";
-  } catch (error) {
-    logError("runAutopilotMembership:resend_network", { ...logContext, error: error?.message });
-    return "pending";
-  }
 }
 
 async function acquireMonthlyClaim(admin, userId, invoiceIds) {
@@ -91,8 +47,6 @@ async function acquireMonthlyClaim(admin, userId, invoiceIds) {
   }
 
   if (existing) {
-    // A stale/failed claim resumes the exact originally approved invoice set.
-    // Do not let a retry silently substitute a different monthly sprint.
     const originalInvoiceIds = Array.isArray(existing.invoice_ids) && existing.invoice_ids.length
       ? existing.invoice_ids.map(String)
       : invoiceIds;
@@ -151,7 +105,6 @@ export default async function handler(req, res) {
     const invoiceIds = [...new Set(Array.isArray(body.invoice_ids) ? body.invoice_ids.map(String) : [])].slice(0, MAX_INVOICES);
     if (!invoiceIds.length) return res.status(400).json({ error: "Select at least one overdue invoice" });
 
-    // Validate the current request before consuming or reclaiming the monthly claim.
     const { data: requestedInvoices, error: requestedError } = await auth.admin
       .from("invoices")
       .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
@@ -169,9 +122,6 @@ export default async function handler(req, res) {
     const claim = acquired.claim;
     const effectiveInvoiceIds = (acquired.invoiceIds || invoiceIds).map(String);
 
-    // Always re-read the claim's approved set after acquiring the lease. This
-    // closes the approval-to-send race and ensures stale recovery uses the
-    // original monthly selection rather than a new client payload.
     const { data: invoices, error: invoiceError } = await auth.admin
       .from("invoices")
       .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
@@ -224,14 +174,14 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (retryReadError) throw retryReadError;
         if (!isStillEligible(freshForRetry, today)) {
-          await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", prior.id).eq("status", "pending");
+          await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
           prepared += 1;
           failed += 1;
           logError("runAutopilotMembership:pending_no_longer_eligible", { claimId: claim.id, invoiceId: invoice.id });
           continue;
         }
-        if (!pendingCanRetry(prior)) {
-          await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", prior.id).eq("status", "pending");
+        if (!canRetryAutopilotPending(prior)) {
+          await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
           prepared += 1;
           failed += 1;
           logError("runAutopilotMembership:pending_retry_window_expired", { claimId: claim.id, invoiceId: invoice.id });
@@ -239,12 +189,13 @@ export default async function handler(req, res) {
         }
 
         prepared += 1;
-        const outcome = await deliverQueuedReminder({
+        const { outcome } = await deliverAutopilotQueue({
           admin: auth.admin,
           queue: prior,
           resendKey,
           deliveryKey,
-          logContext: { claimId: claim.id, invoiceId: invoice.id },
+          route: "runAutopilotMembership",
+          context: { claimId: claim.id, invoiceId: invoice.id },
         });
         if (outcome === "sent") sent += 1;
         else if (outcome === "failed") failed += 1;
@@ -304,12 +255,13 @@ export default async function handler(req, res) {
       prepared += 1;
       if (!resendKey) continue;
 
-      const outcome = await deliverQueuedReminder({
+      const { outcome } = await deliverAutopilotQueue({
         admin: auth.admin,
         queue,
         resendKey,
         deliveryKey,
-        logContext: { claimId: claim.id, invoiceId: invoice.id },
+        route: "runAutopilotMembership",
+        context: { claimId: claim.id, invoiceId: invoice.id },
       });
       if (outcome === "sent") sent += 1;
       else if (outcome === "failed") failed += 1;

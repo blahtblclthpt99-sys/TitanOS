@@ -4,9 +4,11 @@ import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 import {
+  autopilotQueueOutcome,
   canRetryAutopilotPending,
   deliverAutopilotQueue,
   failAutopilotPending,
+  readAutopilotQueue,
 } from "../_lib/autopilotDelivery.js";
 
 const STALE_RUN_MS = 15 * 60 * 1000;
@@ -107,28 +109,35 @@ export default async function handler(req, res) {
     let skipped = 0;
     let pending = 0;
 
+    const countOutcome = (outcome) => {
+      if (outcome === "sent") sent += 1;
+      else if (outcome === "failed") failed += 1;
+      else if (outcome === "skipped") skipped += 1;
+      else pending += 1;
+    };
+
+    const reconcileDelivery = async (deliveryKey) => {
+      const row = await readAutopilotQueue(auth.admin, {
+        ownerId: auth.user.id,
+        deliveryKey,
+      });
+      const outcome = autopilotQueueOutcome(row);
+      countOutcome(outcome === "missing" ? "pending" : outcome);
+      return row;
+    };
+
     for (const invoice of invoices || []) {
       const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
 
-      const { data: prior, error: priorError } = await auth.admin
-        .from("follow_up_queue")
-        .select("id,status,created_at,customer_email,message")
-        .eq("created_by_id", auth.user.id)
-        .eq("rule_id", deliveryKey)
-        .maybeSingle();
-      if (priorError) throw priorError;
+      const prior = await readAutopilotQueue(auth.admin, {
+        ownerId: auth.user.id,
+        deliveryKey,
+      });
 
       if (prior) {
-        if (prior.status === "sent") {
-          sent += 1;
-          continue;
-        }
-        if (prior.status === "failed") {
-          failed += 1;
-          continue;
-        }
-        if (prior.status === "skipped") {
-          skipped += 1;
+        const priorOutcome = autopilotQueueOutcome(prior);
+        if (priorOutcome !== "pending") {
+          countOutcome(priorOutcome);
           continue;
         }
 
@@ -140,23 +149,25 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (retryReadError) throw retryReadError;
         if (!isStillEligible(freshForRetry, today)) {
-          await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
-          failed += 1;
+          const current = await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
           logError(
             "runAutopilotOrder:pending_no_longer_eligible",
             new Error("Pending Autopilot delivery became ineligible before safe retry"),
-            { orderId, invoiceId: invoice.id }
+            { orderId, invoiceId: invoice.id, reconciled: outcome }
           );
           continue;
         }
 
         if (!canRetryAutopilotPending(prior)) {
-          await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
-          failed += 1;
+          const current = await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
           logError(
             "runAutopilotOrder:pending_retry_window_expired",
             new Error("Pending Autopilot delivery exceeded the provider idempotency window"),
-            { orderId, invoiceId: invoice.id }
+            { orderId, invoiceId: invoice.id, reconciled: outcome }
           );
           continue;
         }
@@ -169,9 +180,7 @@ export default async function handler(req, res) {
           route: "runAutopilotOrder",
           context: { orderId, invoiceId: invoice.id },
         });
-        if (outcome === "sent") sent += 1;
-        else if (outcome === "failed") failed += 1;
-        else pending += 1;
+        countOutcome(outcome);
         continue;
       }
 
@@ -186,7 +195,6 @@ export default async function handler(req, res) {
       if (freshError) throw freshError;
 
       if (!isStillEligible(freshInvoice, today)) {
-        skipped += 1;
         const message = `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
         const { error: skipError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
@@ -201,7 +209,13 @@ export default async function handler(req, res) {
           channel: "email",
           message,
         });
-        if (skipError && skipError.code !== "23505") throw skipError;
+        if (skipError?.code === "23505") {
+          await reconcileDelivery(deliveryKey);
+        } else if (skipError) {
+          throw skipError;
+        } else {
+          skipped += 1;
+        }
         continue;
       }
 
@@ -223,7 +237,7 @@ export default async function handler(req, res) {
 
       if (queueError) {
         if (queueError.code === "23505") {
-          pending += 1;
+          await reconcileDelivery(deliveryKey);
           continue;
         }
         failed += 1;
@@ -243,9 +257,7 @@ export default async function handler(req, res) {
         route: "runAutopilotOrder",
         context: { orderId, invoiceId: invoice.id },
       });
-      if (outcome === "sent") sent += 1;
-      else if (outcome === "failed") failed += 1;
-      else pending += 1;
+      countOutcome(outcome);
     }
 
     const knownInvoiceIds = new Set((invoices || []).map((invoice) => String(invoice.id)));

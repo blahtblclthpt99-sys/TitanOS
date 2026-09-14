@@ -16,6 +16,15 @@ const MAX_INVOICES = 10;
 const STALE_RUN_MS = 15 * 60 * 1000;
 const periodKey = () => `${new Date().toISOString().slice(0, 7)}-01`;
 
+function recipientKey(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function hasDuplicateRecipients(invoices) {
+  const recipients = (invoices || []).map((invoice) => recipientKey(invoice.customer_email)).filter(Boolean);
+  return new Set(recipients).size !== recipients.length;
+}
+
 function isStillEligible(invoice, today) {
   return Boolean(
     invoice?.customer_email &&
@@ -145,6 +154,9 @@ export default async function handler(req, res) {
       if (requestedError) throw requestedError;
       if ((requestedInvoices || []).length !== requestedInvoiceIds.length || !requestedInvoices.every((invoice) => isStillEligible(invoice, today))) {
         return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
+      }
+      if (hasDuplicateRecipients(requestedInvoices)) {
+        return res.status(400).json({ error: "Select only one overdue invoice per customer email in each recovery sprint" });
       }
     }
 

@@ -19,8 +19,28 @@ function parseOrder(note = "") {
   try { return JSON.parse(String(note).slice(10)); } catch { return null; }
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function recipientKey(invoice) {
-  return String(invoice?.customer_email || "").trim().toLowerCase();
+  return normalizeEmail(invoice?.customer_email);
+}
+
+function approvedRecipientMap(order) {
+  const invoiceIds = Array.isArray(order?.invoice_ids) ? order.invoice_ids.map(String) : [];
+  const snapshot = Array.isArray(order?.approved_recipients) ? order.approved_recipients : [];
+  if (order?.recipient_snapshot_version !== 1 || !invoiceIds.length || snapshot.length !== invoiceIds.length) return null;
+
+  const allowedIds = new Set(invoiceIds);
+  const map = new Map();
+  for (const row of snapshot) {
+    const invoiceId = String(row?.invoice_id || "");
+    const email = normalizeEmail(row?.customer_email);
+    if (!invoiceId || !allowedIds.has(invoiceId) || !email || map.has(invoiceId)) return null;
+    map.set(invoiceId, email);
+  }
+  return map.size === invoiceIds.length ? map : null;
 }
 
 function isStillEligible(invoice, today) {
@@ -87,6 +107,14 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "This recovery sprint is already running." });
     }
 
+    const approvedRecipients = approvedRecipientMap(order);
+    if (!approvedRecipients) {
+      return res.status(409).json({
+        error: "This recovery sprint cannot run safely because its exact approved recipients are unavailable. Create a new sprint so the recipients can be approved again.",
+        code: "AUTOPILOT_RECIPIENT_SNAPSHOT_REQUIRED",
+      });
+    }
+
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) return res.status(503).json({ error: "Email delivery is not configured" });
 
@@ -126,9 +154,6 @@ export default async function handler(req, res) {
       .eq("created_by_id", auth.user.id);
     if (invoiceError) throw invoiceError;
 
-    // Supabase does not guarantee the order of rows returned by an IN filter.
-    // Restore the exact approved order so legacy duplicate-recipient batches are
-    // handled deterministically and the earliest approved eligible invoice wins.
     const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
     const orderedInvoices = approvedInvoiceIds.map((id) => invoiceById.get(id)).filter(Boolean);
 
@@ -155,34 +180,44 @@ export default async function handler(req, res) {
       return row;
     };
 
-    // Pre-read every historical queue row before creating anything new. This
-    // protects legacy orders that contained multiple invoices for one customer:
-    // a previously sent/failed/pending attempt reserves that recipient even if
-    // database row ordering differs on recovery. A purely skipped row does not.
     const priorByInvoiceId = new Map();
     const reservedRecipients = new Set();
     for (const invoice of orderedInvoices) {
+      const invoiceId = String(invoice.id);
+      const approvedEmail = approvedRecipients.get(invoiceId);
       const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
       const prior = await readAutopilotQueue(auth.admin, {
         ownerId: auth.user.id,
         deliveryKey,
       });
       if (!prior) continue;
-      priorByInvoiceId.set(String(invoice.id), prior);
-      if (autopilotQueueOutcome(prior) !== "skipped") {
-        const key = recipientKey(invoice);
-        if (key) reservedRecipients.add(key);
+      priorByInvoiceId.set(invoiceId, prior);
+      if (autopilotQueueOutcome(prior) !== "skipped" && approvedEmail) {
+        reservedRecipients.add(approvedEmail);
       }
     }
 
     for (const invoice of orderedInvoices) {
+      const invoiceId = String(invoice.id);
+      const approvedEmail = approvedRecipients.get(invoiceId);
       const deliveryKey = `autopilot_run:order:${payment.id}:${invoice.id}`;
-      const prior = priorByInvoiceId.get(String(invoice.id)) || null;
+      const prior = priorByInvoiceId.get(invoiceId) || null;
+
+      if (!approvedEmail) {
+        throw new Error("Approved Autopilot recipient disappeared from the order snapshot");
+      }
 
       if (prior) {
         const priorOutcome = autopilotQueueOutcome(prior);
         if (priorOutcome !== "pending") {
           countOutcome(priorOutcome);
+          continue;
+        }
+
+        if (normalizeEmail(prior.customer_email) !== approvedEmail) {
+          const current = await failAutopilotPending(auth.admin, prior.id, "approved_recipient_mismatch");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
           continue;
         }
 
@@ -193,14 +228,17 @@ export default async function handler(req, res) {
           .eq("created_by_id", auth.user.id)
           .maybeSingle();
         if (retryReadError) throw retryReadError;
-        if (!isStillEligible(freshForRetry, today)) {
-          const current = await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
+        if (!isStillEligible(freshForRetry, today) || normalizeEmail(freshForRetry?.customer_email) !== approvedEmail) {
+          const code = normalizeEmail(freshForRetry?.customer_email) !== approvedEmail
+            ? "approved_recipient_changed"
+            : "delivery_unconfirmed_invoice_no_longer_eligible";
+          const current = await failAutopilotPending(auth.admin, prior.id, code);
           const outcome = autopilotQueueOutcome(current);
           countOutcome(outcome === "missing" ? "pending" : outcome);
           logError(
-            "runAutopilotOrder:pending_no_longer_eligible",
-            new Error("Pending Autopilot delivery became ineligible before safe retry"),
-            { orderId, invoiceId: invoice.id, reconciled: outcome }
+            "runAutopilotOrder:pending_stopped",
+            new Error("Pending Autopilot delivery no longer matches the approved recipient/eligibility state"),
+            { orderId, invoiceId: invoice.id, code, reconciled: outcome }
           );
           continue;
         }
@@ -229,8 +267,6 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Re-read immediately before creating the delivery so invoices paid or
-      // edited after approval are stopped before any provider request is made.
       const { data: freshInvoice, error: freshError } = await auth.admin
         .from("invoices")
         .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
@@ -239,20 +275,24 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (freshError) throw freshError;
 
-      if (!isStillEligible(freshInvoice, today)) {
-        const message = `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
+      const recipientChanged = normalizeEmail(freshInvoice?.customer_email) !== approvedEmail;
+      if (!isStillEligible(freshInvoice, today) || recipientChanged) {
+        const message = recipientChanged
+          ? `Skipped invoice ${invoice.invoice_number || invoice.id}: the customer email changed after approval and requires a new recovery approval.`
+          : `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
         const { error: skipError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
           user_id: auth.user.id,
           customer_id: null,
           customer_name: invoice.customer_name || "",
-          customer_email: invoice.customer_email || null,
+          customer_email: approvedEmail,
           job_id: null,
           rule_id: deliveryKey,
           scheduled_for: new Date().toISOString(),
           status: "skipped",
           channel: "email",
           message,
+          delivery_error_code: recipientChanged ? "approved_recipient_changed" : null,
         });
         if (skipError?.code === "23505") {
           await reconcileDelivery(deliveryKey);
@@ -264,21 +304,21 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const key = recipientKey(freshInvoice);
-      if (key && reservedRecipients.has(key)) {
+      if (reservedRecipients.has(approvedEmail)) {
         const duplicateMessage = `Skipped invoice ${freshInvoice.invoice_number || freshInvoice.id}: another approved invoice for this customer is already assigned to this recovery sprint.`;
         const { error: duplicateError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
           user_id: auth.user.id,
           customer_id: null,
           customer_name: freshInvoice.customer_name || "",
-          customer_email: freshInvoice.customer_email,
+          customer_email: approvedEmail,
           job_id: null,
           rule_id: deliveryKey,
           scheduled_for: new Date().toISOString(),
           status: "skipped",
           channel: "email",
           message: duplicateMessage,
+          delivery_error_code: "duplicate_recipient_in_sprint",
         });
         if (duplicateError?.code === "23505") {
           await reconcileDelivery(deliveryKey);
@@ -289,7 +329,7 @@ export default async function handler(req, res) {
         }
         continue;
       }
-      if (key) reservedRecipients.add(key);
+      reservedRecipients.add(approvedEmail);
 
       const balance = Number(freshInvoice.balance_due ?? freshInvoice.total ?? 0).toFixed(2);
       const message = `Hi ${freshInvoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${freshInvoice.invoice_number || freshInvoice.id} for $${balance} was due ${freshInvoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;
@@ -298,7 +338,7 @@ export default async function handler(req, res) {
         user_id: auth.user.id,
         customer_id: null,
         customer_name: freshInvoice.customer_name || "",
-        customer_email: freshInvoice.customer_email,
+        customer_email: approvedEmail,
         job_id: null,
         rule_id: deliveryKey,
         scheduled_for: new Date().toISOString(),

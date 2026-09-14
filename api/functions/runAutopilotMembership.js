@@ -177,14 +177,22 @@ export default async function handler(req, res) {
           await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
           prepared += 1;
           failed += 1;
-          logError("runAutopilotMembership:pending_no_longer_eligible", { claimId: claim.id, invoiceId: invoice.id });
+          logError(
+            "runAutopilotMembership:pending_no_longer_eligible",
+            new Error("Pending membership delivery became ineligible before safe retry"),
+            { claimId: claim.id, invoiceId: invoice.id }
+          );
           continue;
         }
         if (!canRetryAutopilotPending(prior)) {
           await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
           prepared += 1;
           failed += 1;
-          logError("runAutopilotMembership:pending_retry_window_expired", { claimId: claim.id, invoiceId: invoice.id });
+          logError(
+            "runAutopilotMembership:pending_retry_window_expired",
+            new Error("Pending membership delivery exceeded the provider idempotency window"),
+            { claimId: claim.id, invoiceId: invoice.id }
+          );
           continue;
         }
 
@@ -248,7 +256,11 @@ export default async function handler(req, res) {
           continue;
         }
         failed += 1;
-        logError("runAutopilotMembership:queue", { claimId: claim.id, invoiceId: invoice.id, error: queueError.message });
+        logError(
+          "runAutopilotMembership:queue",
+          new Error(queueError.message || "Membership Autopilot queue insert failed"),
+          { claimId: claim.id, invoiceId: invoice.id, dbCode: queueError.code }
+        );
         continue;
       }
 

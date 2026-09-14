@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js";
  * - authenticated client cannot update/delete that receipt;
  * - authenticated client cannot forge an autopilot_run:* queue row;
  * - ordinary non-Autopilot follow-ups remain writable;
- * - authenticated client cannot write launch telemetry directly.
+ * - launch telemetry schema exists and authenticated clients cannot write it directly.
  *
  * Required env (.env or .env.local):
  *   SUPABASE_URL or VITE_SUPABASE_URL
@@ -208,6 +208,15 @@ async function main() {
       updateError: errorSummary(manualUpdateError),
     };
 
+    const { error: telemetrySchemaError } = await admin
+      .from("autopilot_funnel_events")
+      .select("id", { head: true, count: "exact" });
+    const telemetrySchemaPresent = !telemetrySchemaError;
+    report.probes.telemetrySchemaPresent = {
+      pass: telemetrySchemaPresent,
+      error: errorSummary(telemetrySchemaError),
+    };
+
     const { data: telemetryWrite, error: telemetryError } = await client
       .from("autopilot_funnel_events")
       .insert({
@@ -218,10 +227,11 @@ async function main() {
       })
       .select("id")
       .maybeSingle();
-    const telemetryBlocked = Boolean(telemetryError) || !telemetryWrite?.id;
+    const telemetryBlocked = telemetrySchemaPresent && (Boolean(telemetryError) || !telemetryWrite?.id);
     if (telemetryWrite?.id) await admin.from("autopilot_funnel_events").delete().eq("id", telemetryWrite.id);
     report.probes.telemetryClientWriteBlocked = {
       pass: telemetryBlocked,
+      schemaPresent: telemetrySchemaPresent,
       clientError: errorSummary(telemetryError),
     };
 
@@ -231,6 +241,7 @@ async function main() {
       deleteBlocked,
       forgedBlocked,
       manualWritable,
+      telemetrySchemaPresent,
       telemetryBlocked,
     ];
     report.ok = required.every(Boolean);

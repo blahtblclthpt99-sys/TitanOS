@@ -2,35 +2,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { getSupabaseAdmin, readJson } from "../_lib/supabase.js";
 import { logError } from "../_lib/safeLog.js";
-
-const EVENTS = new Set([
-  "preview_view",
-  "signed_in_view",
-  "eligible_loaded",
-  "batch_approved",
-  "checkout_started",
-  "checkout_returned",
-  "membership_run_started",
-  "one_time_run_started",
-  "run_completed",
-  "run_retryable",
-  "run_failed",
-]);
-const SOURCES = new Set(["product_hunt", "direct", "other"]);
-const MODES = new Set(["public", "one_time", "membership", "unknown"]);
-const OUTCOMES = new Set(["completed", "retryable", "failed", "canceled", "pending", "prepared"]);
-
-function pick(value, allowed, fallback) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return allowed.has(normalized) ? normalized : fallback;
-}
-
-function safeCount(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) return null;
-  return Math.max(0, Math.min(10, parsed));
-}
+import { recordAutopilotFunnel } from "../_lib/autopilotFunnel.js";
 
 async function optionalUserId(admin, req) {
   const header = String(req.headers?.authorization || "");
@@ -46,8 +18,6 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  // Telemetry is non-critical to the workflow, but the public endpoint still
-  // uses Titan's durable production rate limiter to keep spam out of the table.
   if (!(await assertRateLimitAsync(req, res, {
     limit: 30,
     windowMs: 60_000,
@@ -57,9 +27,6 @@ export default async function handler(req, res) {
 
   try {
     const body = readJson(req);
-    const eventName = String(body.event_name || "").trim().toLowerCase();
-    if (!EVENTS.has(eventName)) return res.status(400).json({ error: "Unsupported Autopilot event" });
-
     const admin = getSupabaseAdmin();
     let userId = null;
     try {
@@ -68,25 +35,19 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Session expired. Please sign in again." });
     }
 
-    const source = pick(body.source, SOURCES, "direct");
-    const mode = pick(body.mode, MODES, "unknown");
-    const outcome = body.outcome == null ? null : pick(body.outcome, OUTCOMES, null);
-    const invoiceCount = safeCount(body.invoice_count);
-
-    const { error } = await admin.from("autopilot_funnel_events").insert({
-      user_id: userId,
-      event_name: eventName,
-      source,
-      mode,
-      invoice_count: invoiceCount,
-      outcome,
+    const tracked = await recordAutopilotFunnel(admin, {
+      userId,
+      eventName: body.event_name,
+      source: body.source,
+      mode: body.mode,
+      invoiceCount: body.invoice_count,
+      outcome: body.outcome,
     });
-    if (error) throw error;
+    if (!tracked) return res.status(400).json({ error: "Unsupported or unavailable Autopilot event" });
 
     return res.status(202).json({ tracked: true });
   } catch (error) {
     logError("trackAutopilotEvent", error);
-    // Never expose storage/schema internals to a public analytics caller.
     return res.status(503).json({ error: "Autopilot telemetry is temporarily unavailable" });
   }
 }

@@ -16,12 +16,13 @@ const MAX_INVOICES = 10;
 const STALE_RUN_MS = 15 * 60 * 1000;
 const periodKey = () => `${new Date().toISOString().slice(0, 7)}-01`;
 
-function recipientKey(email) {
+function recipientKey(emailOrInvoice) {
+  const email = typeof emailOrInvoice === "string" ? emailOrInvoice : emailOrInvoice?.customer_email;
   return String(email || "").trim().toLowerCase();
 }
 
 function hasDuplicateRecipients(invoices) {
-  const recipients = (invoices || []).map((invoice) => recipientKey(invoice.customer_email)).filter(Boolean);
+  const recipients = (invoices || []).map(recipientKey).filter(Boolean);
   return new Set(recipients).size !== recipients.length;
 }
 
@@ -186,6 +187,11 @@ export default async function handler(req, res) {
       .eq("created_by_id", auth.user.id);
     if (invoiceError) throw invoiceError;
 
+    // Restore the stored approval order; IN-query ordering is not a recovery
+    // contract. This makes legacy duplicate-recipient claims deterministic.
+    const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
+    const orderedInvoices = effectiveInvoiceIds.map((id) => invoiceById.get(id)).filter(Boolean);
+
     const resendKey = process.env.RESEND_API_KEY;
     let prepared = 0;
     let sent = 0;
@@ -223,12 +229,28 @@ export default async function handler(req, res) {
       return row;
     };
 
-    for (const invoice of invoices || []) {
+    // Historical non-skipped records reserve their recipient before this worker
+    // creates any new rows. This prevents an old multi-invoice claim from sending
+    // another reminder to the same customer after stale-run recovery.
+    const priorByInvoiceId = new Map();
+    const reservedRecipients = new Set();
+    for (const invoice of orderedInvoices) {
       const deliveryKey = `autopilot_run:membership:${claim.id}:${invoice.id}`;
       const prior = await readAutopilotQueue(auth.admin, {
         ownerId: auth.user.id,
         deliveryKey,
       });
+      if (!prior) continue;
+      priorByInvoiceId.set(String(invoice.id), prior);
+      if (autopilotQueueOutcome(prior) !== "skipped") {
+        const key = recipientKey(invoice);
+        if (key) reservedRecipients.add(key);
+      }
+    }
+
+    for (const invoice of orderedInvoices) {
+      const deliveryKey = `autopilot_run:membership:${claim.id}:${invoice.id}`;
+      const prior = priorByInvoiceId.get(String(invoice.id)) || null;
 
       if (prior) {
         const priorOutcome = autopilotQueueOutcome(prior);
@@ -315,6 +337,31 @@ export default async function handler(req, res) {
         }
         continue;
       }
+
+      const key = recipientKey(freshInvoice);
+      if (key && reservedRecipients.has(key)) {
+        const duplicateMessage = `Skipped invoice ${freshInvoice.invoice_number || freshInvoice.id}: another approved invoice for this customer is already assigned to this recovery sprint.`;
+        const { error: duplicateError } = await auth.admin.from("follow_up_queue").insert({
+          created_by_id: auth.user.id,
+          user_id: auth.user.id,
+          customer_name: freshInvoice.customer_name || "",
+          customer_email: freshInvoice.customer_email,
+          scheduled_for: new Date().toISOString(),
+          status: "skipped",
+          channel: "email",
+          message: duplicateMessage,
+          rule_id: deliveryKey,
+        });
+        if (duplicateError?.code === "23505") {
+          await reconcileDelivery(deliveryKey, { claimId: claim.id, invoiceId: invoice.id });
+        } else if (duplicateError) {
+          throw duplicateError;
+        } else {
+          skipped += 1;
+        }
+        continue;
+      }
+      if (key) reservedRecipients.add(key);
 
       const balance = Number(freshInvoice.balance_due ?? freshInvoice.total ?? 0).toFixed(2);
       const message = `Hi ${freshInvoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${freshInvoice.invoice_number || freshInvoice.id} for $${balance} was due ${freshInvoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;

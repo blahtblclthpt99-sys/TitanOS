@@ -8,6 +8,15 @@ import { classifyAutopilotSource, recordAutopilotFunnel } from "../_lib/autopilo
 const SPRINT_PRICE_CENTS = 900;
 const MAX_INVOICES = 10;
 
+function recipientKey(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function hasDuplicateRecipients(invoices) {
+  const recipients = (invoices || []).map((invoice) => recipientKey(invoice.customer_email)).filter(Boolean);
+  return new Set(recipients).size !== recipients.length;
+}
+
 async function resolveLineItem(stripe, configuredPriceId, invoiceCount) {
   if (!configuredPriceId) {
     return {
@@ -69,6 +78,9 @@ export default async function handler(req, res) {
       invoice.customer_email && invoice.status !== "paid" && invoice.due_date && invoice.due_date < today && Number(invoice.balance_due ?? invoice.total) > 0
     );
     if (!eligible) return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
+    if (hasDuplicateRecipients(invoices)) {
+      return res.status(400).json({ error: "Select only one overdue invoice per customer email in each recovery sprint" });
+    }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const configuredPriceId = String(process.env.STRIPE_AUTOPILOT_PRICE_ID || "").trim();

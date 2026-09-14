@@ -8,6 +8,12 @@ function isAutopilotQueueRow(row) {
   return String(row?.rule_id || "").startsWith("autopilot_run:");
 }
 
+function isOwnedQueueRow(row, userId) {
+  const owner = String(userId || "");
+  if (!owner) return false;
+  return String(row?.user_id || "") === owner || String(row?.created_by_id || "") === owner;
+}
+
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
       if (rowError) throw rowError;
       row = data;
       if (!row) return res.status(404).json({ error: "Follow-up not found" });
-      if (row.user_id && row.user_id !== auth.user.id && row.created_by_id !== auth.user.id) {
+      if (!isOwnedQueueRow(row, auth.user.id)) {
         return res.status(403).json({ error: "Not allowed" });
       }
       if (isAutopilotQueueRow(row)) {
@@ -93,7 +99,7 @@ export default async function handler(req, res) {
           channel: emailed ? "email" : row?.channel || "in_app",
         })
         .eq("id", queueId)
-        .eq("user_id", auth.user.id)
+        .eq("created_by_id", auth.user.id)
         .not("rule_id", "like", "autopilot_run:%")
         .select("id")
         .maybeSingle();

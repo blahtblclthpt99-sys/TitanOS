@@ -3,10 +3,13 @@ import { requireUser } from "../_lib/auth.js";
 import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
+import {
+  canRetryAutopilotPending,
+  deliverAutopilotQueue,
+  failAutopilotPending,
+} from "../_lib/autopilotDelivery.js";
 
 const STALE_RUN_MS = 15 * 60 * 1000;
-const RESEND_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
-const RESEND_SUBJECT = "Payment reminder — overdue invoice";
 
 function parseOrder(note = "") {
   if (!String(note).startsWith("AUTOPILOT:")) return null;
@@ -27,59 +30,6 @@ function isFreshRun(order) {
   if (order?.state !== "running" || !order.started_at) return false;
   const started = new Date(order.started_at).getTime();
   return Number.isFinite(started) && Date.now() - started < STALE_RUN_MS;
-}
-
-function pendingCanRetry(queue) {
-  if (queue?.status !== "pending" || !queue.created_at) return false;
-  const created = new Date(queue.created_at).getTime();
-  return Number.isFinite(created) && Date.now() - created < RESEND_RETRY_WINDOW_MS;
-}
-
-async function deliverQueuedReminder({ admin, queue, resendKey, deliveryKey, logContext }) {
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": deliveryKey,
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>",
-        to: [queue.customer_email],
-        subject: RESEND_SUBJECT,
-        text: queue.message,
-      }),
-    });
-
-    if (response.ok) {
-      const { error: sentError } = await admin
-        .from("follow_up_queue")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", queue.id)
-        .eq("status", "pending");
-      if (sentError) throw sentError;
-      return "sent";
-    }
-
-    // A 409 can mean another request using the same Resend idempotency key is
-    // still in flight. Leave the row pending so a later retry can safely ask
-    // Resend for the same operation again inside its idempotency window.
-    if (response.status === 409) {
-      logError("runAutopilotOrder:resend_retryable", { ...logContext, status: response.status });
-      return "pending";
-    }
-
-    await admin.from("follow_up_queue").update({ status: "failed" }).eq("id", queue.id).eq("status", "pending");
-    logError("runAutopilotOrder:resend", { ...logContext, status: response.status });
-    return "failed";
-  } catch (error) {
-    // Network failures are ambiguous: Resend may have accepted the email even
-    // if this process never received the response. Keep the row pending and
-    // retry with the same provider idempotency key instead of risking a duplicate.
-    logError("runAutopilotOrder:resend_network", { ...logContext, error: error?.message });
-    return "pending";
-  }
 }
 
 export default async function handler(req, res) {
@@ -182,9 +132,6 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // Before retrying an ambiguous pending send, stop if the invoice is no
-        // longer eligible. We cannot prove whether the first network attempt was
-        // delivered, so record it as failed/unconfirmed rather than claim skipped.
         const { data: freshForRetry, error: retryReadError } = await auth.admin
           .from("invoices")
           .select("id,customer_email,status,balance_due,total,due_date,created_by_id")
@@ -193,25 +140,26 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (retryReadError) throw retryReadError;
         if (!isStillEligible(freshForRetry, today)) {
-          await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", prior.id).eq("status", "pending");
+          await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
           failed += 1;
           logError("runAutopilotOrder:pending_no_longer_eligible", { orderId, invoiceId: invoice.id });
           continue;
         }
 
-        if (!pendingCanRetry(prior)) {
-          await auth.admin.from("follow_up_queue").update({ status: "failed" }).eq("id", prior.id).eq("status", "pending");
+        if (!canRetryAutopilotPending(prior)) {
+          await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
           failed += 1;
           logError("runAutopilotOrder:pending_retry_window_expired", { orderId, invoiceId: invoice.id });
           continue;
         }
 
-        const outcome = await deliverQueuedReminder({
+        const { outcome } = await deliverAutopilotQueue({
           admin: auth.admin,
           queue: prior,
           resendKey,
           deliveryKey,
-          logContext: { orderId, invoiceId: invoice.id },
+          route: "runAutopilotOrder",
+          context: { orderId, invoiceId: invoice.id },
         });
         if (outcome === "sent") sent += 1;
         else if (outcome === "failed") failed += 1;
@@ -275,12 +223,13 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const outcome = await deliverQueuedReminder({
+      const { outcome } = await deliverAutopilotQueue({
         admin: auth.admin,
         queue,
         resendKey,
         deliveryKey,
-        logContext: { orderId, invoiceId: invoice.id },
+        route: "runAutopilotOrder",
+        context: { orderId, invoiceId: invoice.id },
       });
       if (outcome === "sent") sent += 1;
       else if (outcome === "failed") failed += 1;

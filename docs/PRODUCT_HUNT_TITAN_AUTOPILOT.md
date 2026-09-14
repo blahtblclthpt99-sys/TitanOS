@@ -27,13 +27,16 @@ The trust model is part of the product:
 
 - no cold lists;
 - no hidden recipients;
+- at most one invoice per normalized customer email in a sprint;
 - no automatic claim that money was recovered;
 - no reminder to an invoice that became paid before execution;
 - deterministic provider idempotency during safe retries;
 - provider message receipt IDs retained after acceptance;
 - ambiguous network outcomes remain `pending` instead of being falsely called sent;
+- confirmed provider acceptance reconciles stale local failure state back to `sent` without another provider request;
 - Autopilot queue evidence cannot be manually resent/deleted through generic Follow-ups;
-- no one-time order execution until Stripe verifies settlement.
+- no one-time order execution until Stripe verifies settlement;
+- Autopilot Stripe webhook events use recoverable processing leases so a crash cannot become a permanent false duplicate.
 
 Product Hunt's current featuring guidance emphasizes products that are useful, novel, high-craft, and creative. Titan's strongest angle is **usefulness + high craft + an unusually explicit trust/reliability model** rather than novelty theater.
 
@@ -47,17 +50,19 @@ This branch is therefore a functional product upgrade:
 
 1. repaired Stripe settlement for paid Autopilot orders;
 2. fail-closed Stripe price validation before a payable order exists;
-3. provider-level recipient idempotency;
-4. stale-run and concurrent-worker reconciliation;
-5. paid-after-approval safety stop;
-6. provider receipt/error evidence;
-7. immutable Autopilot audit records across generic Follow-ups;
-8. original-batch preservation for monthly recovery;
-9. sent / failed / stopped / retry-needed outcome reporting;
-10. public Product Hunt-friendly preview and Recovery Command Center;
-11. privacy-minimized first-party funnel telemetry.
+3. retry-safe canonical Stripe webhook claim leases and exact-order compare-and-set settlement;
+4. provider-level recipient idempotency;
+5. stale-run and concurrent-worker reconciliation;
+6. one-customer-per-sprint recipient protection, including legacy batch recovery;
+7. paid-after-approval safety stop;
+8. provider receipt/error evidence and provider-acceptance truth reconciliation;
+9. immutable Autopilot audit records across generic Follow-ups;
+10. original-batch preservation for monthly recovery;
+11. sent / failed / stopped / retry-needed outcome reporting;
+12. public Product Hunt-friendly preview and Recovery Command Center;
+13. privacy-minimized first-party funnel telemetry.
 
-**Relaunch request framing:** explain that Titan Autopilot moved from a basic one-shot reminder flow into a controlled Recovery Command Center with verified settlement, provider-level duplicate protection, live eligibility safety stops, interruption recovery, immutable Recovery Receipts, and measurable first-party activation telemetry.
+**Relaunch request framing:** explain that Titan Autopilot moved from a basic one-shot reminder flow into a controlled Recovery Command Center with verified settlement, replay-safe webhook processing, provider-level duplicate protection, live eligibility safety stops, interruption recovery, immutable Recovery Receipts, and measurable first-party activation telemetry.
 
 Official references:
 
@@ -87,7 +92,7 @@ Alternative:
 
 ### Short description
 
-Titan Autopilot turns overdue invoices into an owner-approved recovery workflow. Select up to 10 eligible invoices, preview the exact reminder, approve the recipients, and let Titan execute the repetitive follow-up. Titan rechecks every invoice before delivery, protects retries from duplicate sends, and preserves a Recovery Receipt for every outcome.
+Titan Autopilot turns overdue invoices into an owner-approved recovery workflow. Select up to 10 eligible customers, preview the exact reminder, approve the recipients, and let Titan execute the repetitive follow-up. Titan rechecks every invoice before delivery, protects retries from duplicate sends, and preserves a Recovery Receipt for every outcome.
 
 ### Maker first-comment policy
 
@@ -109,9 +114,9 @@ Keep the comment personal, specific, and conversational. Do not copy these bulle
 Every Product Hunt image should answer one question. Avoid generic dashboards and unreadable full-app screenshots.
 
 1. **The problem / queue** — “These invoices are overdue.” Show Recovery Command Center, overdue age, and balance.
-2. **The control** — “You choose exactly who Titan can contact.” Show checkboxes, selected count, and approved balance.
+2. **The control** — “You choose exactly who Titan can contact.” Show checkboxes, selected count, unique-customer rule, and approved balance.
 3. **The preview** — “See the actual reminder before execution.” Show exact reminder preview and owner-approval language.
-4. **The safety layer** — “Paid invoices stop. Safe retries do not double-send.” Show live eligibility recheck and provider idempotency in plain language.
+4. **The safety layer** — “Paid invoices stop. Safe retries do not double-send.” Show live eligibility recheck, one-customer-per-sprint protection, and provider idempotency in plain language.
 5. **The proof** — “Every action leaves a Recovery Receipt.” Show provider acceptance, stopped invoice, and retry-needed evidence without exposing sensitive customer data.
 
 Do **not** manufacture customer logos, testimonials, recovery percentages, dollars recovered, or activity counts. Use clearly marked sample data until there are real, permissioned metrics.
@@ -122,7 +127,7 @@ Keep the demo centered on one recovery job:
 
 1. Land on the public Titan Autopilot preview.
 2. Sign into a seeded demo environment.
-3. Show three overdue sample invoices.
+3. Show three overdue sample invoices belonging to three distinct demo customers.
 4. Tap **Select oldest 3**.
 5. Point out the selected overdue balance.
 6. Read the exact reminder preview.
@@ -142,13 +147,19 @@ Before a new Product Hunt launch or relaunch request:
 - no dead CTA and no environment-dependent blank state;
 - mobile layout works at iPhone widths;
 - one-time Checkout works end-to-end with the live $9 Stripe price;
-- Stripe webhook promotes the exact Autopilot payment only when `payment_status=paid`;
-- delayed-payment success/failure and Checkout expiry are verified;
-- Resend sender domain is verified;
+- migration `018_stripe_webhook_idempotency.sql` is already applied as the canonical Stripe ledger prerequisite;
 - migration `20260914130000_autopilot_delivery_idempotency.sql` is applied;
 - migration `20260914193000_autopilot_funnel_events.sql` is applied;
 - migration `20260914194500_autopilot_queue_rls.sql` is applied;
-- repeat-click, concurrent-run, stale-run, paid-after-approval, ambiguous-network, provider-receipt, generic-Follow-ups isolation, and Stripe-cancel scenarios are tested;
+- migration `20260914203000_stripe_webhook_claim_state.sql` is applied before the hardened Autopilot webhook is enabled;
+- Stripe webhook promotes the exact Autopilot payment only when `payment_status=paid`;
+- webhook replay tests prove processed duplicates stay terminal, failed/stale claims are reclaimable, and fresh concurrent claims are not falsely acknowledged as processed;
+- local payment/order compare-and-set guards are verified under a forced stale-write scenario;
+- delayed-payment success/failure and Checkout expiry are verified;
+- Resend sender domain is verified;
+- one-customer-per-sprint enforcement is verified in UI and backend;
+- repeat-click, concurrent-run, stale-run, paid-after-approval, ambiguous-network, provider-receipt, provider-acceptance reconciliation, generic-Follow-ups isolation, and Stripe-cancel scenarios are tested;
+- `node scripts/verify-autopilot-db-security.mjs` passes against the target Supabase project;
 - sample/demo information is explicitly labeled;
 - pricing is visible and consistent with production;
 - Maker writes their own first comment in their own voice;
@@ -192,13 +203,17 @@ Use those metrics to improve the product. Do not turn them into public claims un
 
 Do not submit/relaunch if any of these are true:
 
-- webhook settlement is unverified in production;
-- any required Autopilot migration is unapplied;
+- migration 018 or any required Autopilot migration is unapplied;
+- webhook settlement/replay behavior is unverified in production-like conditions;
+- a claimed-but-failed or stale Stripe event can become a permanent false duplicate;
+- a fresh concurrent Stripe event claim can receive a success acknowledgement without processing;
 - the public preview or authenticated flow errors on mobile;
 - checkout can return paid while Titan reports pending indefinitely;
 - an interrupted/ambiguous run can resend a customer outside the provider-idempotent path;
+- a batch can contact the same normalized customer email more than once;
 - generic Follow-ups can edit/delete/send an Autopilot recovery row;
 - a paid invoice can still receive a reminder after the final eligibility check;
+- confirmed provider acceptance can remain falsely recorded as failed;
 - provider acceptance is reported as sent without preserved evidence/reconciliation;
 - the Product Hunt listing promises recovery rates or money results Titan has not verified;
 - the only meaningful change since the previous launch is visual styling or pricing;

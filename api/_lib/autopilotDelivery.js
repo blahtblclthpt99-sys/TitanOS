@@ -13,6 +13,18 @@ function providerErrorCode(body, status) {
   return String(body?.name || body?.error?.name || `http_${status}`);
 }
 
+async function markAmbiguous(admin, queueId, code) {
+  try {
+    await admin
+      .from("follow_up_queue")
+      .update({ delivery_error_code: code })
+      .eq("id", queueId)
+      .eq("status", "pending");
+  } catch {
+    // The queue status itself remains pending, which is the fail-closed state.
+  }
+}
+
 export async function failAutopilotPending(admin, queueId, code) {
   const { error } = await admin
     .from("follow_up_queue")
@@ -30,8 +42,9 @@ export async function deliverAutopilotQueue({
   route,
   context = {},
 }) {
+  let response;
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${resendKey}`,
@@ -45,52 +58,63 @@ export async function deliverAutopilotQueue({
         text: queue.message,
       }),
     });
-
-    const body = await response.json().catch(() => ({}));
-
-    if (response.ok) {
-      const providerMessageId = String(body?.id || "").trim() || null;
-      const { error: sentError } = await admin
-        .from("follow_up_queue")
-        .update({
-          status: "sent",
-          sent_at: new Date().toISOString(),
-          provider_message_id: providerMessageId,
-          delivery_error_code: providerMessageId ? null : "provider_receipt_missing",
-        })
-        .eq("id", queue.id)
-        .eq("status", "pending");
-      if (sentError) throw sentError;
-      return { outcome: "sent", providerMessageId };
-    }
-
-    const code = providerErrorCode(body, response.status);
-    if (response.status === 409 && code === "concurrent_idempotent_requests") {
-      await admin
-        .from("follow_up_queue")
-        .update({ delivery_error_code: code })
-        .eq("id", queue.id)
-        .eq("status", "pending");
-      logError(`${route}:resend_retryable`, { ...context, status: response.status, code });
-      return { outcome: "pending", errorCode: code };
-    }
-
-    await failAutopilotPending(admin, queue.id, code);
-    logError(`${route}:resend`, { ...context, status: response.status, code });
-    return { outcome: "failed", errorCode: code };
   } catch (error) {
     // The provider may have accepted the message even if the response was lost.
-    // Preserve pending state and retry with the same provider idempotency key.
-    try {
-      await admin
-        .from("follow_up_queue")
-        .update({ delivery_error_code: "network_ambiguous" })
-        .eq("id", queue.id)
-        .eq("status", "pending");
-    } catch {
-      // Do not convert an ambiguous provider outcome into a local hard failure.
-    }
-    logError(`${route}:resend_network`, { ...context, error: error?.message });
+    await markAmbiguous(admin, queue.id, "network_ambiguous");
+    logError(`${route}:resend_network`, error, context);
     return { outcome: "pending", errorCode: "network_ambiguous" };
   }
+
+  const body = await response.json().catch(() => ({}));
+
+  if (response.ok) {
+    const providerMessageId = String(body?.id || "").trim() || null;
+    const { data: sentRow, error: sentError } = await admin
+      .from("follow_up_queue")
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        provider_message_id: providerMessageId,
+        delivery_error_code: providerMessageId ? null : "provider_receipt_missing",
+      })
+      .eq("id", queue.id)
+      .eq("status", "pending")
+      .select("id,status")
+      .maybeSingle();
+
+    if (sentError || !sentRow) {
+      await markAmbiguous(admin, queue.id, "provider_accepted_receipt_persist_ambiguous");
+      logError(
+        `${route}:receipt_persist`,
+        sentError || new Error("Provider accepted email but queue receipt update lost its lease"),
+        { ...context, providerMessageId }
+      );
+      return {
+        outcome: "pending",
+        errorCode: "provider_accepted_receipt_persist_ambiguous",
+        providerMessageId,
+      };
+    }
+
+    return { outcome: "sent", providerMessageId };
+  }
+
+  const code = providerErrorCode(body, response.status);
+  if (response.status === 409 && code === "concurrent_idempotent_requests") {
+    await markAmbiguous(admin, queue.id, code);
+    logError(
+      `${route}:resend_retryable`,
+      new Error("Resend idempotent request is still in progress"),
+      { ...context, status: response.status, code }
+    );
+    return { outcome: "pending", errorCode: code };
+  }
+
+  await failAutopilotPending(admin, queue.id, code);
+  logError(
+    `${route}:resend`,
+    new Error(`Resend rejected Autopilot delivery (${code})`),
+    { ...context, status: response.status, code }
+  );
+  return { outcome: "failed", errorCode: code };
 }

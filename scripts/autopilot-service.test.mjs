@@ -71,15 +71,36 @@ test("Autopilot enforces one normalized customer email per new sprint", async ()
   assert.match(ui, /Select oldest .* customers/);
 });
 
-test("Stripe webhook settles Autopilot only after verified paid checkout", async () => {
+test("Stripe webhook binds Autopilot settlement to a genuine local order and retry-safe ledger", async () => {
   const source = await read("api/functions/stripeWebhook.js");
+  const migration = await read("supabase/migrations/20260914203000_stripe_webhook_claim_state.sql");
+
   assert.match(source, /constructEvent/);
-  assert.match(source, /metadata\.task_type === "invoice_recovery_sprint"/);
+  assert.match(source, /metadata\.task_type === AUTOPILOT_TASK/);
   assert.match(source, /session\.payment_status !== "paid"/);
-  assert.match(source, /Autopilot payment owner mismatch/);
+  assert.match(source, /readValidatedAutopilotPayment/);
+  assert.match(source, /Autopilot payment user mismatch/);
+  assert.match(source, /Autopilot payment creator mismatch/);
+  assert.match(source, /Autopilot payment provider mismatch/);
+  assert.match(source, /Autopilot payment currency mismatch/);
   assert.match(source, /Autopilot checkout session mismatch/);
+  assert.match(source, /Autopilot local order contract mismatch/);
   assert.match(source, /Autopilot checkout amount mismatch/);
+  assert.match(source, /AUTOPILOT_PRICE_CENTS/);
+  assert.match(source, /stripe_webhook_events/);
+  assert.match(source, /claimAutopilotEvent/);
+  assert.match(source, /completeAutopilotEvent/);
+  assert.match(source, /failAutopilotEvent/);
+  assert.match(source, /AUTOPILOT_EVENT_LEASE_MS/);
+  assert.match(source, /processing_status/);
   assert.match(source, /status: "succeeded"/);
+
+  assert.match(migration, /processing_status TEXT NOT NULL DEFAULT 'processed'/);
+  assert.match(migration, /claimed_at TIMESTAMPTZ NOT NULL DEFAULT now\(\)/);
+  assert.match(migration, /attempt_count INTEGER NOT NULL DEFAULT 1/);
+  assert.match(migration, /last_error TEXT/);
+  assert.match(migration, /'processing','processed','failed'/);
+  assert.match(migration, /idx_stripe_webhook_events_claim_state/);
 });
 
 test("Autopilot execution requires settlement and atomically claims an order", async () => {
@@ -97,6 +118,8 @@ test("Shared Autopilot delivery engine records provider evidence and uses stable
   assert.match(helper, /canRetryAutopilotPending/);
   assert.match(helper, /autopilotQueueOutcome/);
   assert.match(helper, /readAutopilotQueue/);
+  assert.match(helper, /persistProviderAccepted/);
+  assert.match(helper, /\.in\("status", \["pending", "failed"\]\)/);
   assert.match(helper, /"Idempotency-Key": deliveryKey/);
   assert.match(helper, /provider_message_id: providerMessageId/);
   assert.match(helper, /delivery_error_code/);
@@ -191,6 +214,13 @@ test("Autopilot queue rows are protected from generic follow-up send, mutation, 
 
   assert.match(sender, /AUTOPILOT_QUEUE_PROTECTED/);
   assert.match(sender, /startsWith\("autopilot_run:"\)/);
+  assert.match(sender, /isOwnedQueueRow/);
+  assert.match(sender, /assertRateLimitAsync/);
+  assert.match(sender, /requireDurable: true/);
+  assert.match(sender, /"Idempotency-Key"/);
+  assert.match(sender, /followup_queue_/);
+  assert.match(sender, /provider_message_id/);
+  assert.match(sender, /duplicate: true/);
   assert.match(client, /isAutopilotFollowUp/);
   assert.match(client, /managed by Titan Autopilot/);
   assert.doesNotMatch(client, /catch \{\s*return markQueueSent/);

@@ -26,6 +26,34 @@ function hasDuplicateRecipients(invoices) {
   return new Set(recipients).size !== recipients.length;
 }
 
+function buildRecipientSnapshot(invoiceIds, invoices) {
+  const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
+  const snapshot = [];
+  for (const invoiceId of invoiceIds) {
+    const invoice = invoiceById.get(String(invoiceId));
+    const email = recipientKey(invoice);
+    if (!invoice || !email) return null;
+    snapshot.push({ invoice_id: String(invoiceId), customer_email: email });
+  }
+  return snapshot;
+}
+
+function approvedRecipientMap(invoiceIds, snapshot) {
+  const ids = (invoiceIds || []).map(String).filter(Boolean);
+  const rows = Array.isArray(snapshot) ? snapshot : [];
+  if (!ids.length || rows.length !== ids.length) return null;
+
+  const allowedIds = new Set(ids);
+  const map = new Map();
+  for (const row of rows) {
+    const invoiceId = String(row?.invoice_id || "");
+    const email = recipientKey(row?.customer_email || "");
+    if (!invoiceId || !allowedIds.has(invoiceId) || !email || map.has(invoiceId)) return null;
+    map.set(invoiceId, email);
+  }
+  return map.size === ids.length ? map : null;
+}
+
 function isStillEligible(invoice, today) {
   return Boolean(
     invoice?.customer_email &&
@@ -45,7 +73,7 @@ function isFreshRun(claim) {
 async function readMonthlyClaim(admin, userId, period = periodKey()) {
   const { data, error } = await admin
     .from("autopilot_membership_claims")
-    .select("id,status,updated_at,invoice_ids,prepared_count,sent_count,failed_count")
+    .select("id,status,updated_at,invoice_ids,recipient_snapshot,prepared_count,sent_count,failed_count")
     .eq("user_id", userId)
     .eq("period_key", period)
     .maybeSingle();
@@ -53,7 +81,13 @@ async function readMonthlyClaim(admin, userId, period = periodKey()) {
   return data || null;
 }
 
-async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingClaim = null) {
+async function acquireMonthlyClaim(
+  admin,
+  userId,
+  requestedInvoiceIds,
+  requestedRecipientSnapshot,
+  existingClaim = null
+) {
   const period = periodKey();
   const existing = existingClaim || await readMonthlyClaim(admin, userId, period);
 
@@ -68,8 +102,11 @@ async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingC
     const originalInvoiceIds = Array.isArray(existing.invoice_ids)
       ? existing.invoice_ids.map(String).filter(Boolean)
       : [];
-    if (!originalInvoiceIds.length) {
-      return { conflict: "This month's recovery sprint cannot be safely recovered because its original approved batch is unavailable." };
+    const originalRecipients = approvedRecipientMap(originalInvoiceIds, existing.recipient_snapshot);
+    if (!originalInvoiceIds.length || !originalRecipients) {
+      return {
+        conflict: "This month's recovery sprint cannot be safely recovered because its exact original approved recipients are unavailable. Start a new sprint next billing period.",
+      };
     }
 
     const updatedAt = new Date().toISOString();
@@ -77,6 +114,7 @@ async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingC
       .from("autopilot_membership_claims")
       .update({
         invoice_ids: originalInvoiceIds,
+        recipient_snapshot: existing.recipient_snapshot,
         status: "running",
         prepared_count: 0,
         sent_count: 0,
@@ -86,25 +124,45 @@ async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingC
       .eq("id", existing.id)
       .eq("status", existing.status)
       .eq("updated_at", existing.updated_at)
-      .select("id,status,updated_at,invoice_ids")
+      .select("id,status,updated_at,invoice_ids,recipient_snapshot")
       .maybeSingle();
     if (reclaimError) throw reclaimError;
     if (!reclaimed) return { conflict: "This month's recovery sprint changed while it was starting. Try again." };
-    return { claim: reclaimed, period, recovered: true, invoiceIds: originalInvoiceIds };
+    return {
+      claim: reclaimed,
+      period,
+      recovered: true,
+      invoiceIds: originalInvoiceIds,
+      recipientSnapshot: existing.recipient_snapshot,
+    };
   }
 
-  if (!requestedInvoiceIds.length) return { conflict: "Select at least one overdue invoice." };
+  if (!requestedInvoiceIds.length || !approvedRecipientMap(requestedInvoiceIds, requestedRecipientSnapshot)) {
+    return { conflict: "Select at least one overdue invoice with an approved customer email." };
+  }
 
   const { data: claim, error: claimError } = await admin
     .from("autopilot_membership_claims")
-    .insert({ user_id: userId, period_key: period, invoice_ids: requestedInvoiceIds, status: "running" })
-    .select("id,status,updated_at,invoice_ids")
+    .insert({
+      user_id: userId,
+      period_key: period,
+      invoice_ids: requestedInvoiceIds,
+      recipient_snapshot: requestedRecipientSnapshot,
+      status: "running",
+    })
+    .select("id,status,updated_at,invoice_ids,recipient_snapshot")
     .single();
   if (claimError?.code === "23505") {
     return { conflict: "This month's included recovery sprint has already been claimed." };
   }
   if (claimError) throw claimError;
-  return { claim, period, recovered: false, invoiceIds: requestedInvoiceIds };
+  return {
+    claim,
+    period,
+    recovered: false,
+    invoiceIds: requestedInvoiceIds,
+    recipientSnapshot: requestedRecipientSnapshot,
+  };
 }
 
 export default async function handler(req, res) {
@@ -135,8 +193,8 @@ export default async function handler(req, res) {
       .slice(0, MAX_INVOICES);
     const today = new Date().toISOString().slice(0, 10);
 
-    // Recovery always uses the original approved monthly batch. A new UI
-    // selection must never replace invoice IDs from an interrupted/failed run.
+    // Recovery always uses both the original approved invoice IDs and the exact
+    // approved recipient snapshot. A later UI selection/email edit cannot redirect it.
     const existingClaim = await readMonthlyClaim(auth.admin, auth.user.id);
     if (existingClaim?.status === "completed") {
       return res.status(409).json({ error: "This month's included recovery sprint has already been used." });
@@ -145,6 +203,7 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "This month's recovery sprint is already running." });
     }
 
+    let requestedRecipientSnapshot = null;
     if (!existingClaim) {
       if (!requestedInvoiceIds.length) return res.status(400).json({ error: "Select at least one overdue invoice" });
       const { data: requestedInvoices, error: requestedError } = await auth.admin
@@ -153,24 +212,51 @@ export default async function handler(req, res) {
         .in("id", requestedInvoiceIds)
         .eq("created_by_id", auth.user.id);
       if (requestedError) throw requestedError;
-      if ((requestedInvoices || []).length !== requestedInvoiceIds.length || !requestedInvoices.every((invoice) => isStillEligible(invoice, today))) {
+      if ((requestedInvoices || []).length !== requestedInvoiceIds.length) {
+        return res.status(400).json({ error: "Every selected invoice must belong to your account" });
+      }
+
+      const requestedById = new Map((requestedInvoices || []).map((invoice) => [String(invoice.id), invoice]));
+      const orderedRequestedInvoices = requestedInvoiceIds.map((id) => requestedById.get(String(id))).filter(Boolean);
+      if (
+        orderedRequestedInvoices.length !== requestedInvoiceIds.length ||
+        !orderedRequestedInvoices.every((invoice) => isStillEligible(invoice, today))
+      ) {
         return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
       }
-      if (hasDuplicateRecipients(requestedInvoices)) {
+      if (hasDuplicateRecipients(orderedRequestedInvoices)) {
         return res.status(400).json({ error: "Select only one overdue invoice per customer email in each recovery sprint" });
+      }
+      requestedRecipientSnapshot = buildRecipientSnapshot(requestedInvoiceIds, orderedRequestedInvoices);
+      if (!requestedRecipientSnapshot) {
+        return res.status(400).json({ error: "The approved recipient list could not be created safely" });
       }
     }
 
-    const acquired = await acquireMonthlyClaim(auth.admin, auth.user.id, requestedInvoiceIds, existingClaim);
+    const acquired = await acquireMonthlyClaim(
+      auth.admin,
+      auth.user.id,
+      requestedInvoiceIds,
+      requestedRecipientSnapshot,
+      existingClaim
+    );
     if (acquired.conflict) return res.status(409).json({ error: acquired.conflict });
     const claim = acquired.claim;
     executionClaimed = true;
+
     const effectiveInvoiceIds = (acquired.invoiceIds || []).map(String).filter(Boolean);
-    funnelInvoiceCount = Math.min(10, effectiveInvoiceIds.length);
-    if (!effectiveInvoiceIds.length) {
-      return res.status(409).json({ error: "The original approved monthly recovery batch is unavailable." });
+    const approvedRecipients = approvedRecipientMap(
+      effectiveInvoiceIds,
+      acquired.recipientSnapshot || claim.recipient_snapshot
+    );
+    if (!effectiveInvoiceIds.length || !approvedRecipients) {
+      return res.status(409).json({
+        error: "The original approved monthly recovery recipients are unavailable. Titan will not infer replacement recipients.",
+        code: "AUTOPILOT_RECIPIENT_SNAPSHOT_REQUIRED",
+      });
     }
 
+    funnelInvoiceCount = Math.min(10, effectiveInvoiceIds.length);
     await recordAutopilotFunnel(auth.admin, {
       userId: auth.user.id,
       eventName: "membership_run_started",
@@ -187,8 +273,6 @@ export default async function handler(req, res) {
       .eq("created_by_id", auth.user.id);
     if (invoiceError) throw invoiceError;
 
-    // Restore the stored approval order; IN-query ordering is not a recovery
-    // contract. This makes legacy duplicate-recipient claims deterministic.
     const invoiceById = new Map((invoices || []).map((invoice) => [String(invoice.id), invoice]));
     const orderedInvoices = effectiveInvoiceIds.map((id) => invoiceById.get(id)).filter(Boolean);
 
@@ -229,28 +313,32 @@ export default async function handler(req, res) {
       return row;
     };
 
-    // Historical non-skipped records reserve their recipient before this worker
-    // creates any new rows. This prevents an old multi-invoice claim from sending
-    // another reminder to the same customer after stale-run recovery.
     const priorByInvoiceId = new Map();
     const reservedRecipients = new Set();
     for (const invoice of orderedInvoices) {
+      const invoiceId = String(invoice.id);
+      const approvedEmail = approvedRecipients.get(invoiceId);
       const deliveryKey = `autopilot_run:membership:${claim.id}:${invoice.id}`;
       const prior = await readAutopilotQueue(auth.admin, {
         ownerId: auth.user.id,
         deliveryKey,
       });
       if (!prior) continue;
-      priorByInvoiceId.set(String(invoice.id), prior);
-      if (autopilotQueueOutcome(prior) !== "skipped") {
-        const key = recipientKey(invoice);
-        if (key) reservedRecipients.add(key);
+      priorByInvoiceId.set(invoiceId, prior);
+      if (autopilotQueueOutcome(prior) !== "skipped" && approvedEmail) {
+        reservedRecipients.add(approvedEmail);
       }
     }
 
     for (const invoice of orderedInvoices) {
+      const invoiceId = String(invoice.id);
+      const approvedEmail = approvedRecipients.get(invoiceId);
       const deliveryKey = `autopilot_run:membership:${claim.id}:${invoice.id}`;
-      const prior = priorByInvoiceId.get(String(invoice.id)) || null;
+      const prior = priorByInvoiceId.get(invoiceId) || null;
+
+      if (!approvedEmail) {
+        throw new Error("Approved monthly Autopilot recipient disappeared from the claim snapshot");
+      }
 
       if (prior) {
         const priorOutcome = autopilotQueueOutcome(prior);
@@ -258,6 +346,14 @@ export default async function handler(req, res) {
           countOutcome(priorOutcome);
           continue;
         }
+
+        if (recipientKey(prior.customer_email) !== approvedEmail) {
+          const current = await failAutopilotPending(auth.admin, prior.id, "approved_recipient_mismatch");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
+          continue;
+        }
+
         if (!resendKey) {
           countOutcome("pending");
           continue;
@@ -271,14 +367,18 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (retryReadError) throw retryReadError;
 
-        if (!isStillEligible(freshForRetry, today)) {
-          const current = await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
+        const recipientChanged = recipientKey(freshForRetry) !== approvedEmail;
+        if (!isStillEligible(freshForRetry, today) || recipientChanged) {
+          const code = recipientChanged
+            ? "approved_recipient_changed"
+            : "delivery_unconfirmed_invoice_no_longer_eligible";
+          const current = await failAutopilotPending(auth.admin, prior.id, code);
           const outcome = autopilotQueueOutcome(current);
           countOutcome(outcome === "missing" ? "pending" : outcome);
           logError(
-            "runAutopilotMembership:pending_no_longer_eligible",
-            new Error("Pending membership delivery became ineligible before safe retry"),
-            { claimId: claim.id, invoiceId: invoice.id, reconciled: outcome }
+            "runAutopilotMembership:pending_stopped",
+            new Error("Pending membership delivery no longer matches the approved recipient/eligibility state"),
+            { claimId: claim.id, invoiceId: invoice.id, code, reconciled: outcome }
           );
           continue;
         }
@@ -315,18 +415,22 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (freshError) throw freshError;
 
-      if (!isStillEligible(freshInvoice, today)) {
-        const message = `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
+      const recipientChanged = recipientKey(freshInvoice) !== approvedEmail;
+      if (!isStillEligible(freshInvoice, today) || recipientChanged) {
+        const message = recipientChanged
+          ? `Skipped invoice ${invoice.invoice_number || invoice.id}: the customer email changed after approval and requires a new recovery approval.`
+          : `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
         const { error: skipError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
           user_id: auth.user.id,
           customer_name: invoice.customer_name || "",
-          customer_email: invoice.customer_email || null,
+          customer_email: approvedEmail,
           scheduled_for: new Date().toISOString(),
           status: "skipped",
           channel: "email",
           message,
           rule_id: deliveryKey,
+          delivery_error_code: recipientChanged ? "approved_recipient_changed" : null,
         });
         if (skipError?.code === "23505") {
           await reconcileDelivery(deliveryKey, { claimId: claim.id, invoiceId: invoice.id });
@@ -338,19 +442,19 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const key = recipientKey(freshInvoice);
-      if (key && reservedRecipients.has(key)) {
+      if (reservedRecipients.has(approvedEmail)) {
         const duplicateMessage = `Skipped invoice ${freshInvoice.invoice_number || freshInvoice.id}: another approved invoice for this customer is already assigned to this recovery sprint.`;
         const { error: duplicateError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
           user_id: auth.user.id,
           customer_name: freshInvoice.customer_name || "",
-          customer_email: freshInvoice.customer_email,
+          customer_email: approvedEmail,
           scheduled_for: new Date().toISOString(),
           status: "skipped",
           channel: "email",
           message: duplicateMessage,
           rule_id: deliveryKey,
+          delivery_error_code: "duplicate_recipient_in_sprint",
         });
         if (duplicateError?.code === "23505") {
           await reconcileDelivery(deliveryKey, { claimId: claim.id, invoiceId: invoice.id });
@@ -361,7 +465,7 @@ export default async function handler(req, res) {
         }
         continue;
       }
-      if (key) reservedRecipients.add(key);
+      reservedRecipients.add(approvedEmail);
 
       const balance = Number(freshInvoice.balance_due ?? freshInvoice.total ?? 0).toFixed(2);
       const message = `Hi ${freshInvoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${freshInvoice.invoice_number || freshInvoice.id} for $${balance} was due ${freshInvoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;
@@ -369,7 +473,7 @@ export default async function handler(req, res) {
         created_by_id: auth.user.id,
         user_id: auth.user.id,
         customer_name: freshInvoice.customer_name || "",
-        customer_email: freshInvoice.customer_email,
+        customer_email: approvedEmail,
         scheduled_for: new Date().toISOString(),
         status: "pending",
         channel: "email",

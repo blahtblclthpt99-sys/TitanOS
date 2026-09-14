@@ -120,7 +120,7 @@ function PublicAutopilot() {
           <div className="rounded-xl border border-border bg-card/70 p-4">
             <CheckCircle2 className="w-5 h-5 text-titan-cyan" aria-hidden />
             <p className="font-medium mt-3">Auditable execution</p>
-            <p className="text-xs text-muted-foreground mt-1">Sent, failed, and skipped outcomes stay visible instead of disappearing.</p>
+            <p className="text-xs text-muted-foreground mt-1">Sent, failed, skipped, and retry-needed outcomes stay visible instead of disappearing.</p>
           </div>
         </div>
       </section>
@@ -152,7 +152,7 @@ export default function Autopilot() {
   const [selected, setSelected] = useState([]);
   const [working, setWorking] = useState(false);
   const [lastResult, setLastResult] = useState(null);
-  const paidMembership = user?.paying_subscriber === true && ["worker_premium", "business"].includes(resolvePlan(user));
+  const paidMembership = user?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(resolvePlan(user));
   const showOneTime = import.meta.env.VITE_AUTOPILOT_ONETIME_CHECKOUT === "true";
   const { data: invoices = [], loading, error, reload } = useSafeAsync(
     () => api.entities.Invoice.list("due_date", 200),
@@ -208,9 +208,14 @@ export default function Autopilot() {
     try {
       const result = await api.functions.invoke("runAutopilotOrder", { order_id: returnedOrder });
       setLastResult(result);
+      const retryable = result.retryable === true || Number(result.pending || 0) > 0;
       toast({
-        title: result.duplicate ? "Sprint already completed" : "Recovery sprint completed",
-        description: `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped`,
+        title: retryable
+          ? "Safe retry required"
+          : result.duplicate
+            ? "Sprint already completed"
+            : "Recovery sprint completed",
+        description: `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped · ${result.pending || 0} pending`,
       });
     } catch (err) {
       toast({ title: "Sprint isn't ready", description: err?.message, variant: "destructive" });
@@ -225,11 +230,16 @@ export default function Autopilot() {
       const result = await api.functions.invoke("runAutopilotMembership", { invoice_ids: selected });
       setLastResult(result);
       const queued = result.delivery_mode === "review_queue";
+      const retryable = result.retryable === true || Number(result.pending || 0) > 0;
       toast({
-        title: queued ? "Reminders prepared for review" : "Included recovery sprint completed",
+        title: retryable
+          ? "Safe retry required"
+          : queued
+            ? "Reminders prepared for review"
+            : "Included recovery sprint completed",
         description: queued
           ? `${result.prepared || 0} ready in Follow-ups · ${result.skipped || 0} skipped`
-          : `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped`,
+          : `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped · ${result.pending || 0} pending`,
       });
     } catch (err) {
       toast({ title: "Sprint couldn't run", description: err?.message, variant: "destructive" });
@@ -281,7 +291,7 @@ export default function Autopilot() {
         <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
           <div className="rounded-lg bg-muted/50 p-3"><Mail className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />One factual reminder per invoice</div>
           <div className="rounded-lg bg-muted/50 p-3"><ShieldCheck className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Paid-after-approval safety stop</div>
-          <div className="rounded-lg bg-muted/50 p-3"><CheckCircle2 className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Duplicate-safe audited execution</div>
+          <div className="rounded-lg bg-muted/50 p-3"><CheckCircle2 className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Provider-idempotent audited execution</div>
         </div>
 
         {!paidMembership && (
@@ -304,12 +314,12 @@ export default function Autopilot() {
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" aria-hidden />
             <div className="flex-1">
-              <h2 className="font-semibold">Payment received</h2>
-              <p className="text-sm text-muted-foreground mt-1">Titan verifies Stripe settlement before sending. Repeated clicks cannot create a second delivery for the same approved invoice.</p>
+              <h2 className="font-semibold">Checkout complete — verifying payment</h2>
+              <p className="text-sm text-muted-foreground mt-1">Returning from Stripe does not unlock delivery by itself. Titan verifies a signed Stripe webhook and settled payment before sending anything.</p>
             </div>
           </div>
           <Button className="mt-4 min-h-11" onClick={runOrder} disabled={working}>
-            {working ? "Verifying and running…" : "Run approved recovery sprint"}
+            {working ? "Verifying and running…" : "Verify payment and run approved sprint"}
           </Button>
         </section>
       )}
@@ -326,11 +336,15 @@ export default function Autopilot() {
           <div className="flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden />
             <div>
-              <p className="font-semibold">Autopilot run recorded</p>
+              <p className="font-semibold">{lastResult.retryable ? "Autopilot needs a safe retry" : "Autopilot run recorded"}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {lastResult.sent || 0} sent · {lastResult.prepared || 0} prepared · {lastResult.failed || 0} failed · {lastResult.skipped || 0} skipped
+                {lastResult.sent || 0} sent · {lastResult.prepared || 0} prepared · {lastResult.failed || 0} failed · {lastResult.skipped || 0} skipped · {lastResult.pending || 0} pending
               </p>
-              <p className="text-xs text-muted-foreground mt-2">Skipped invoices include balances that were no longer eligible when Titan rechecked them.</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {lastResult.retryable
+                  ? "A provider response was ambiguous. Titan kept that delivery pending so retrying can reuse the same idempotency key instead of risking a duplicate."
+                  : "Skipped invoices include balances that were no longer eligible when Titan rechecked them."}
+              </p>
             </div>
           </div>
         </section>
@@ -450,7 +464,7 @@ export default function Autopilot() {
         <div className="rounded-xl border border-border bg-card/60 p-4">
           <p className="text-xs text-muted-foreground">Recovery</p>
           <p className="font-medium mt-1">Crash-safe execution</p>
-          <p className="text-xs text-muted-foreground mt-2">Interrupted runs can recover without resending reminders already recorded for that invoice.</p>
+          <p className="text-xs text-muted-foreground mt-2">Interrupted sends recover with the same provider idempotency key instead of blindly sending a second email.</p>
         </div>
         <div className="rounded-xl border border-border bg-card/60 p-4">
           <p className="text-xs text-muted-foreground">Truth</p>

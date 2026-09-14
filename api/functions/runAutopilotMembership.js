@@ -4,9 +4,11 @@ import { readJson } from "../_lib/supabase.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { logError } from "../_lib/safeLog.js";
 import {
+  autopilotQueueOutcome,
   canRetryAutopilotPending,
   deliverAutopilotQueue,
   failAutopilotPending,
+  readAutopilotQueue,
 } from "../_lib/autopilotDelivery.js";
 
 const MAX_INVOICES = 10;
@@ -29,15 +31,20 @@ function isFreshRun(claim) {
   return Number.isFinite(updated) && Date.now() - updated < STALE_RUN_MS;
 }
 
-async function acquireMonthlyClaim(admin, userId, invoiceIds) {
-  const period = periodKey();
-  const { data: existing, error: existingError } = await admin
+async function readMonthlyClaim(admin, userId, period = periodKey()) {
+  const { data, error } = await admin
     .from("autopilot_membership_claims")
     .select("id,status,updated_at,invoice_ids,prepared_count,sent_count,failed_count")
     .eq("user_id", userId)
     .eq("period_key", period)
     .maybeSingle();
-  if (existingError) throw existingError;
+  if (error) throw error;
+  return data || null;
+}
+
+async function acquireMonthlyClaim(admin, userId, requestedInvoiceIds, existingClaim = null) {
+  const period = periodKey();
+  const existing = existingClaim || await readMonthlyClaim(admin, userId, period);
 
   if (existing?.status === "completed") {
     return { conflict: "This month's included recovery sprint has already been used." };
@@ -47,9 +54,13 @@ async function acquireMonthlyClaim(admin, userId, invoiceIds) {
   }
 
   if (existing) {
-    const originalInvoiceIds = Array.isArray(existing.invoice_ids) && existing.invoice_ids.length
-      ? existing.invoice_ids.map(String)
-      : invoiceIds;
+    const originalInvoiceIds = Array.isArray(existing.invoice_ids)
+      ? existing.invoice_ids.map(String).filter(Boolean)
+      : [];
+    if (!originalInvoiceIds.length) {
+      return { conflict: "This month's recovery sprint cannot be safely recovered because its original approved batch is unavailable." };
+    }
+
     const updatedAt = new Date().toISOString();
     const { data: reclaimed, error: reclaimError } = await admin
       .from("autopilot_membership_claims")
@@ -71,16 +82,20 @@ async function acquireMonthlyClaim(admin, userId, invoiceIds) {
     return { claim: reclaimed, period, recovered: true, invoiceIds: originalInvoiceIds };
   }
 
+  if (!requestedInvoiceIds.length) {
+    return { conflict: "Select at least one overdue invoice." };
+  }
+
   const { data: claim, error: claimError } = await admin
     .from("autopilot_membership_claims")
-    .insert({ user_id: userId, period_key: period, invoice_ids: invoiceIds, status: "running" })
+    .insert({ user_id: userId, period_key: period, invoice_ids: requestedInvoiceIds, status: "running" })
     .select("id,status,updated_at,invoice_ids")
     .single();
   if (claimError?.code === "23505") {
     return { conflict: "This month's included recovery sprint has already been claimed." };
   }
   if (claimError) throw claimError;
-  return { claim, period, recovered: false, invoiceIds };
+  return { claim, period, recovered: false, invoiceIds: requestedInvoiceIds };
 }
 
 export default async function handler(req, res) {
@@ -102,25 +117,41 @@ export default async function handler(req, res) {
     if (!entitled) return res.status(402).json({ error: "A paid Pro or Business membership is required." });
 
     const body = readJson(req);
-    const invoiceIds = [...new Set(Array.isArray(body.invoice_ids) ? body.invoice_ids.map(String) : [])].slice(0, MAX_INVOICES);
-    if (!invoiceIds.length) return res.status(400).json({ error: "Select at least one overdue invoice" });
-
-    const { data: requestedInvoices, error: requestedError } = await auth.admin
-      .from("invoices")
-      .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
-      .in("id", invoiceIds)
-      .eq("created_by_id", auth.user.id);
-    if (requestedError) throw requestedError;
-
+    const requestedInvoiceIds = [...new Set(Array.isArray(body.invoice_ids) ? body.invoice_ids.map(String) : [])]
+      .filter(Boolean)
+      .slice(0, MAX_INVOICES);
     const today = new Date().toISOString().slice(0, 10);
-    if ((requestedInvoices || []).length !== invoiceIds.length || !requestedInvoices.every((invoice) => isStillEligible(invoice, today))) {
-      return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
+
+    // Recovery always uses the original approved monthly batch. A new UI
+    // selection must never replace invoice IDs from an interrupted/failed run.
+    const existingClaim = await readMonthlyClaim(auth.admin, auth.user.id);
+    if (existingClaim?.status === "completed") {
+      return res.status(409).json({ error: "This month's included recovery sprint has already been used." });
+    }
+    if (existingClaim && isFreshRun(existingClaim)) {
+      return res.status(409).json({ error: "This month's recovery sprint is already running." });
     }
 
-    const acquired = await acquireMonthlyClaim(auth.admin, auth.user.id, invoiceIds);
+    if (!existingClaim) {
+      if (!requestedInvoiceIds.length) return res.status(400).json({ error: "Select at least one overdue invoice" });
+      const { data: requestedInvoices, error: requestedError } = await auth.admin
+        .from("invoices")
+        .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
+        .in("id", requestedInvoiceIds)
+        .eq("created_by_id", auth.user.id);
+      if (requestedError) throw requestedError;
+      if ((requestedInvoices || []).length !== requestedInvoiceIds.length || !requestedInvoices.every((invoice) => isStillEligible(invoice, today))) {
+        return res.status(400).json({ error: "Every selection must be overdue, unpaid, and have a customer email" });
+      }
+    }
+
+    const acquired = await acquireMonthlyClaim(auth.admin, auth.user.id, requestedInvoiceIds, existingClaim);
     if (acquired.conflict) return res.status(409).json({ error: acquired.conflict });
     const claim = acquired.claim;
-    const effectiveInvoiceIds = (acquired.invoiceIds || invoiceIds).map(String);
+    const effectiveInvoiceIds = (acquired.invoiceIds || []).map(String).filter(Boolean);
+    if (!effectiveInvoiceIds.length) {
+      return res.status(409).json({ error: "The original approved monthly recovery batch is unavailable." });
+    }
 
     const { data: invoices, error: invoiceError } = await auth.admin
       .from("invoices")
@@ -136,33 +167,51 @@ export default async function handler(req, res) {
     let skipped = 0;
     let pending = 0;
 
+    const countOutcome = (outcome, { addPrepared = true } = {}) => {
+      if (outcome === "skipped") {
+        skipped += 1;
+        return;
+      }
+      if (addPrepared) prepared += 1;
+      if (outcome === "sent") sent += 1;
+      else if (outcome === "failed") failed += 1;
+      else if (outcome === "pending" && resendKey) pending += 1;
+    };
+
+    const reconcileDelivery = async (deliveryKey, context) => {
+      const row = await readAutopilotQueue(auth.admin, {
+        ownerId: auth.user.id,
+        deliveryKey,
+      });
+      const outcome = autopilotQueueOutcome(row);
+      if (outcome === "missing") {
+        failed += 1;
+        logError(
+          "runAutopilotMembership:queue_reconcile_missing",
+          new Error("Autopilot queue row was not visible after a uniqueness collision"),
+          context
+        );
+        return null;
+      }
+      countOutcome(outcome);
+      return row;
+    };
+
     for (const invoice of invoices || []) {
       const deliveryKey = `autopilot_run:membership:${claim.id}:${invoice.id}`;
-      const { data: prior, error: priorError } = await auth.admin
-        .from("follow_up_queue")
-        .select("id,status,created_at,customer_email,message")
-        .eq("created_by_id", auth.user.id)
-        .eq("rule_id", deliveryKey)
-        .maybeSingle();
-      if (priorError) throw priorError;
+      const prior = await readAutopilotQueue(auth.admin, {
+        ownerId: auth.user.id,
+        deliveryKey,
+      });
 
       if (prior) {
-        if (prior.status === "sent") {
-          prepared += 1;
-          sent += 1;
-          continue;
-        }
-        if (prior.status === "failed") {
-          prepared += 1;
-          failed += 1;
-          continue;
-        }
-        if (prior.status === "skipped") {
-          skipped += 1;
+        const priorOutcome = autopilotQueueOutcome(prior);
+        if (priorOutcome !== "pending") {
+          countOutcome(priorOutcome);
           continue;
         }
         if (!resendKey) {
-          prepared += 1;
+          countOutcome("pending");
           continue;
         }
 
@@ -173,30 +222,31 @@ export default async function handler(req, res) {
           .eq("created_by_id", auth.user.id)
           .maybeSingle();
         if (retryReadError) throw retryReadError;
+
         if (!isStillEligible(freshForRetry, today)) {
-          await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
-          prepared += 1;
-          failed += 1;
+          const current = await failAutopilotPending(auth.admin, prior.id, "delivery_unconfirmed_invoice_no_longer_eligible");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
           logError(
             "runAutopilotMembership:pending_no_longer_eligible",
             new Error("Pending membership delivery became ineligible before safe retry"),
-            { claimId: claim.id, invoiceId: invoice.id }
-          );
-          continue;
-        }
-        if (!canRetryAutopilotPending(prior)) {
-          await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
-          prepared += 1;
-          failed += 1;
-          logError(
-            "runAutopilotMembership:pending_retry_window_expired",
-            new Error("Pending membership delivery exceeded the provider idempotency window"),
-            { claimId: claim.id, invoiceId: invoice.id }
+            { claimId: claim.id, invoiceId: invoice.id, reconciled: outcome }
           );
           continue;
         }
 
-        prepared += 1;
+        if (!canRetryAutopilotPending(prior)) {
+          const current = await failAutopilotPending(auth.admin, prior.id, "idempotency_window_expired");
+          const outcome = autopilotQueueOutcome(current);
+          countOutcome(outcome === "missing" ? "pending" : outcome);
+          logError(
+            "runAutopilotMembership:pending_retry_window_expired",
+            new Error("Pending membership delivery exceeded the provider idempotency window"),
+            { claimId: claim.id, invoiceId: invoice.id, reconciled: outcome }
+          );
+          continue;
+        }
+
         const { outcome } = await deliverAutopilotQueue({
           admin: auth.admin,
           queue: prior,
@@ -205,9 +255,7 @@ export default async function handler(req, res) {
           route: "runAutopilotMembership",
           context: { claimId: claim.id, invoiceId: invoice.id },
         });
-        if (outcome === "sent") sent += 1;
-        else if (outcome === "failed") failed += 1;
-        else pending += 1;
+        countOutcome(outcome);
         continue;
       }
 
@@ -218,8 +266,8 @@ export default async function handler(req, res) {
         .eq("created_by_id", auth.user.id)
         .maybeSingle();
       if (freshError) throw freshError;
+
       if (!isStillEligible(freshInvoice, today)) {
-        skipped += 1;
         const message = `Skipped invoice ${invoice.invoice_number || invoice.id}: it is no longer an eligible overdue balance.`;
         const { error: skipError } = await auth.admin.from("follow_up_queue").insert({
           created_by_id: auth.user.id,
@@ -232,7 +280,13 @@ export default async function handler(req, res) {
           message,
           rule_id: deliveryKey,
         });
-        if (skipError && skipError.code !== "23505") throw skipError;
+        if (skipError?.code === "23505") {
+          await reconcileDelivery(deliveryKey, { claimId: claim.id, invoiceId: invoice.id });
+        } else if (skipError) {
+          throw skipError;
+        } else {
+          skipped += 1;
+        }
         continue;
       }
 
@@ -249,10 +303,10 @@ export default async function handler(req, res) {
         message,
         rule_id: deliveryKey,
       }).select("id,status,created_at,customer_email,message").single();
+
       if (queueError) {
         if (queueError.code === "23505") {
-          pending += resendKey ? 1 : 0;
-          prepared += resendKey ? 0 : 1;
+          await reconcileDelivery(deliveryKey, { claimId: claim.id, invoiceId: invoice.id });
           continue;
         }
         failed += 1;
@@ -275,9 +329,7 @@ export default async function handler(req, res) {
         route: "runAutopilotMembership",
         context: { claimId: claim.id, invoiceId: invoice.id },
       });
-      if (outcome === "sent") sent += 1;
-      else if (outcome === "failed") failed += 1;
-      else pending += 1;
+      countOutcome(outcome, { addPrepared: false });
     }
 
     const knownInvoiceIds = new Set((invoices || []).map((invoice) => String(invoice.id)));

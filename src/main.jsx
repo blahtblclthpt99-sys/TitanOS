@@ -1,22 +1,41 @@
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
-import App from "./App.jsx";
-import "./index.css";
-import "./native-polish.css";
 
-const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
-const CURRENT_KEY_PATTERN = /^titan-attention/i;
-const LEGACY_PURGE_MARKER = "titan-attention:legacy-client-state-purged:v1";
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_KEY = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
 );
 const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
+const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
+const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();
+}
+
+function resolveSurface() {
+  if (isNativeApp()) return "titanos";
+
+  const explicit = String(import.meta.env.VITE_APP_SURFACE || "").trim().toLowerCase();
+  if (explicit === "attention" || explicit === "titanos") return explicit;
+
+  if (typeof window !== "undefined") {
+    const host = String(window.location.hostname || "").toLowerCase();
+    if (
+      host === "titan-os-six.vercel.app" ||
+      host.startsWith("titan-os-git-") ||
+      host.includes("titan-attention")
+    ) {
+      return "attention";
+    }
+  }
+
+  // TitanOS is the safe default for Product Hunt, native builds, localhost, and
+  // unknown preview aliases. The Attention Vercel project should set
+  // VITE_APP_SURFACE=attention so random preview hostnames are deterministic.
+  return "titanos";
 }
 
 function markNativeDocument() {
@@ -98,12 +117,9 @@ async function installNativeAuthDeepLinkBridge() {
           if (error) throw error;
         }
 
-        // Reload the packaged app at its clean internal origin. The primary
-        // Supabase client then reads the persisted session during normal boot.
         window.location.replace(`${window.location.origin}/`);
       } catch {
-        // Authentication remains fail-closed. The user can retry sign-in rather
-        // than retaining a partial or unverified native session.
+        // Authentication remains fail-closed. The user can retry sign-in.
       } finally {
         consuming = false;
       }
@@ -116,69 +132,184 @@ async function installNativeAuthDeepLinkBridge() {
     const launch = await CapacitorApp.getLaunchUrl();
     if (launch?.url) void consume(launch.url);
   } catch {
-    // Native auth bridge is additive; app startup must not depend on it.
+    // Native auth is additive; startup remains available for retry/recovery.
   }
 }
 
-function removeLegacyStorageKeys(storage) {
-  if (!storage) return;
-  const keys = [];
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key && LEGACY_KEY_PATTERN.test(key) && !CURRENT_KEY_PATTERN.test(key)) keys.push(key);
-  }
-  for (const key of keys) storage.removeItem(key);
-}
-
-async function purgeLegacyClientStateOnce() {
-  if (typeof window === "undefined") return;
-
+function markChunkReloadAttempt() {
   try {
-    if (localStorage.getItem(LEGACY_PURGE_MARKER) === "1") return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    sessionStorage.setItem(CHUNK_RELOAD_TS, String(Date.now()));
   } catch {
-    // Storage can be unavailable in privacy-restricted contexts; continue best-effort.
-  }
-
-  try {
-    // Render first. Legacy cache/service-worker cleanup is maintenance work and
-    // should not compete with the critical path on every application startup.
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.allSettled(registrations.map((registration) => registration.unregister()));
-    }
-    if (window.caches?.keys) {
-      const keys = await caches.keys();
-      await Promise.allSettled(keys.map((key) => caches.delete(key)));
-    }
-
-    removeLegacyStorageKeys(localStorage);
-    removeLegacyStorageKeys(sessionStorage);
-    localStorage.setItem(LEGACY_PURGE_MARKER, "1");
-  } catch {
-    // Cleanup is best-effort; rendering must never depend on it.
+    // ignore unavailable storage
   }
 }
 
-function scheduleLegacyClientStatePurge() {
-  if (typeof window === "undefined") return;
-  const run = () => void purgeLegacyClientStateOnce();
+function canAttemptChunkReload() {
+  try {
+    return sessionStorage.getItem(CHUNK_RELOAD_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
 
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(run, { timeout: 2000 });
+function clearChunkReloadFlagWhenHealthy() {
+  try {
+    const at = Number(sessionStorage.getItem(CHUNK_RELOAD_TS) || 0);
+    if (!at || Date.now() - at > 4000) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      sessionStorage.removeItem(CHUNK_RELOAD_TS);
+    }
+  } catch {
+    // ignore unavailable storage
+  }
+}
+
+function BootProbe({ children }) {
+  useEffect(() => {
+    const id = window.setTimeout(clearChunkReloadFlagWhenHealthy, 3500);
+    return () => window.clearTimeout(id);
+  }, []);
+  return children;
+}
+
+async function bootAttention(root) {
+  const [{ default: AttentionSurface }] = await Promise.all([
+    import("./AttentionSurface.jsx"),
+  ]);
+
+  root.render(
+    <React.StrictMode>
+      <AttentionSurface />
+    </React.StrictMode>
+  );
+}
+
+async function bootTitanOS(root) {
+  await Promise.all([import("./index.css"), import("./native-polish.css")]);
+
+  const [
+    { default: App },
+    { default: ErrorBoundary },
+    sentry,
+    featureFlags,
+    launchStatus,
+    analytics,
+    theme,
+    perf,
+  ] = await Promise.all([
+    import("./App.jsx"),
+    import("./components/ErrorBoundary.jsx"),
+    import("./lib/sentry.js"),
+    import("./lib/featureFlags.js"),
+    import("./lib/launchStatus.js"),
+    import("./lib/productAnalytics.js"),
+    import("./lib/theme.js"),
+    import("./lib/perf.js"),
+  ]);
+
+  const { initSentry, captureException } = sentry;
+  const { hydrateFeatureFlags, refreshFeatureFlagsFromServer } = featureFlags;
+  const { hydrateLaunchStatus } = launchStatus;
+  const { trackEvent } = analytics;
+  const { applyTheme, getStoredTheme, watchSystemContrast } = theme;
+  const { prefetchHotRoutes, runWhenIdle } = perf;
+
+  initSentry();
+  hydrateFeatureFlags();
+  hydrateLaunchStatus();
+  trackEvent("app_boot");
+  runWhenIdle(() => {
+    refreshFeatureFlagsFromServer().catch(() => {});
+  });
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event.reason;
+      const message = reason?.message || String(reason || "Unhandled promise rejection");
+      console.error("[titanos:unhandledrejection]", message, reason);
+      captureException(reason instanceof Error ? reason : new Error(message));
+    });
+    window.addEventListener("error", (event) => {
+      if (!event.message) return;
+      console.error("[titanos:window.error]", event.message, event.error || event.filename);
+      if (event.error) captureException(event.error);
+    });
+
+    window.addEventListener("vite:preloadError", (event) => {
+      event.preventDefault?.();
+      if (!canAttemptChunkReload()) return;
+      markChunkReloadAttempt();
+      window.location.reload();
+    });
+
+    window.addEventListener("load", () => {
+      window.setTimeout(clearChunkReloadFlagWhenHealthy, 5000);
+    });
+  }
+
+  applyTheme(getStoredTheme());
+  watchSystemContrast();
+
+  if (isNativeApp()) {
+    void installNativeAuthDeepLinkBridge();
+  }
+
+  root.render(
+    <ErrorBoundary message="The app failed to load." fullScreen showHome>
+      <BootProbe>
+        <App />
+      </BootProbe>
+    </ErrorBoundary>
+  );
+
+  if (typeof window !== "undefined" && "serviceWorker" in navigator && !isNativeApp()) {
+    window.addEventListener("load", () => {
+      runWhenIdle(async () => {
+        try {
+          if (!localStorage.getItem("titanos-sw-v8-purge")) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((registration) => registration.unregister()));
+            if (window.caches?.keys) {
+              const keys = await caches.keys();
+              await Promise.all(
+                keys
+                  .filter((key) => key.startsWith("titanos-shell"))
+                  .map((key) => caches.delete(key))
+              );
+            }
+            localStorage.setItem("titanos-sw-v8-purge", "1");
+          }
+        } catch {
+          // PWA cleanup is best-effort.
+        }
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+        prefetchHotRoutes();
+      }, 2500);
+    });
+  }
+}
+
+async function boot() {
+  markNativeDocument();
+  installNativeApiFetchBridge();
+
+  const rootElement = document.getElementById("root");
+  if (!rootElement) throw new Error("Titan root element was not found");
+  const root = ReactDOM.createRoot(rootElement);
+
+  if (resolveSurface() === "attention") {
+    await bootAttention(root);
     return;
   }
 
-  window.setTimeout(run, 0);
+  await bootTitanOS(root);
 }
 
-markNativeDocument();
-installNativeApiFetchBridge();
-void installNativeAuthDeepLinkBridge();
-
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-
-scheduleLegacyClientStatePurge();
+void boot().catch((error) => {
+  console.error("[titan:boot]", error);
+  const rootElement = document.getElementById("root");
+  if (rootElement) {
+    rootElement.innerHTML = '<main style="font-family:system-ui;padding:2rem"><h1>Titan could not start</h1><p>Please refresh and try again.</p></main>';
+  }
+});

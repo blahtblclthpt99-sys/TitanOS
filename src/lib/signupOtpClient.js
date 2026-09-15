@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/api/supabaseClient";
 import { standardSupabaseProjectRef } from "@/lib/supabaseUrl";
 
@@ -8,14 +9,18 @@ function apiError(message, status = 400) {
 }
 
 function apiBase() {
-  const configured = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) return configured;
-  if (typeof window !== "undefined") {
+  // Resend deliberately uses exactly one API host so an ambiguous first request
+  // cannot automatically generate a second OTP elsewhere. On web previews, that
+  // one host must be the current deployment; native uses configured production.
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     const { hostname, origin } = window.location;
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
       return origin;
     }
   }
+
+  const configured = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (configured) return configured;
   return "https://titanos-web.vercel.app";
 }
 

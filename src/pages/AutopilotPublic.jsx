@@ -63,12 +63,15 @@ export default function AutopilotPublic() {
   return (
     <main className="page-pad max-w-5xl mx-auto pb-24">
       <header className="mb-6 pt-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-titan-cyan">Titan Autopilot</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-titan-cyan">Titan Autopilot</p>
+          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Free to use</span>
+        </div>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mt-2 text-foreground">
           Recover overdue revenue without chasing customers manually.
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mt-3 max-w-3xl">
-          Turn overdue invoices into approved, trackable follow-ups while keeping every recipient, safety stop, and delivery result visible.
+          Turn overdue invoices into approved, trackable follow-ups while keeping every recipient, safety stop, and delivery result visible. No checkout or paid plan is required.
         </p>
       </header>
 
@@ -106,7 +109,7 @@ export default function AutopilotPublic() {
 
       <section className="mt-5 rounded-2xl border border-border bg-card/60 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <p className="font-semibold">Try it with your real invoice data</p>
+          <p className="font-semibold">Try it with your real invoice data — free</p>
           <p className="text-sm text-muted-foreground mt-1">Create a TitanOS account or sign in, then come straight back to the Recovery Command Center.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 shrink-0">

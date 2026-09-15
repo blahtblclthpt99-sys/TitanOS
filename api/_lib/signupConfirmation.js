@@ -51,7 +51,7 @@ async function sendOtpEmail({ apiKey, from, email, otp, deliveryKey }) {
       error.code = "SIGNUP_MAIL_REJECTED";
       error.status = response.status;
       error.providerBody = body.slice(0, 240);
-      return { accepted: false, definitive: true, error };
+      return { accepted: false, error };
     } catch (error) {
       lastError = error;
       // Retry once with the same provider idempotency key. If the first request
@@ -62,7 +62,7 @@ async function sendOtpEmail({ apiKey, from, email, otp, deliveryKey }) {
   const error = new Error("Signup confirmation delivery could not be verified");
   error.code = "SIGNUP_MAIL_AMBIGUOUS";
   error.cause = lastError;
-  return { accepted: false, definitive: false, error };
+  return { accepted: false, error };
 }
 
 /**
@@ -99,11 +99,12 @@ export async function createSignupWithConfirmation(admin, { email, password, ful
   });
 
   if (!delivery.accepted) {
-    // A definite provider rejection means no email left the provider, so remove
-    // the generated user and let a clean retry recreate the signup. Ambiguous
-    // network outcomes keep the user intact because deleting it could invalidate
-    // an OTP that the provider actually accepted.
-    if (delivery.definitive) await deleteGeneratedUser(admin, user.id);
+    // If mail delivery cannot be proven, remove the generated unconfirmed user
+    // so the person can retry registration cleanly. A provider-accepted but
+    // response-lost email may arrive with a now-invalid code, but the next clean
+    // attempt produces the authoritative replacement code instead of trapping
+    // the email address behind an unreachable account.
+    await deleteGeneratedUser(admin, user.id);
     throw delivery.error;
   }
 

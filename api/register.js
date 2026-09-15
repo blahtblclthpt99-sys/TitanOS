@@ -81,8 +81,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Verify the calling browser's canonical hosted Supabase project before the
-  // durable limiter or any other service-role path can touch persistence.
   const body = readJson(req);
   const clientProjectRef = String(body.clientProjectRef || "").trim().toLowerCase();
   const serverProjectRef = standardSupabaseProjectRef(
@@ -133,6 +131,7 @@ export default async function handler(req, res) {
     const admin = getSupabaseAdmin();
     let createdUser = null;
     let verificationType = null;
+    let verificationDelivery = null;
     let signInClient = null;
 
     if (requireConfirm) {
@@ -144,6 +143,7 @@ export default async function handler(req, res) {
         });
         createdUser = generated.user;
         verificationType = generated.verificationType;
+        verificationDelivery = generated.delivery;
       } catch (createError) {
         if (isDuplicateSignupError(createError)) {
           try {
@@ -151,6 +151,7 @@ export default async function handler(req, res) {
             if (recovered?.user?.id) {
               createdUser = recovered.user;
               verificationType = recovered.verificationType;
+              verificationDelivery = recovered.delivery;
             } else {
               return registrationErrorResponse(res, createError);
             }
@@ -201,6 +202,7 @@ export default async function handler(req, res) {
         session: null,
         needsEmailVerification: true,
         verificationMode: verificationType === "magiclink" ? "otp_magiclink" : "otp",
+        verificationDelivery: verificationDelivery === "uncertain" ? "uncertain" : "accepted",
       });
     }
 
@@ -219,6 +221,7 @@ export default async function handler(req, res) {
         session: null,
         needsEmailVerification: false,
         verificationMode: null,
+        verificationDelivery: null,
         userId: createdUser?.id,
       });
     }
@@ -235,6 +238,7 @@ export default async function handler(req, res) {
       },
       needsEmailVerification: false,
       verificationMode: null,
+      verificationDelivery: null,
     });
   } catch (err) {
     logError("api/register", { message: err?.message || String(err) });

@@ -59,6 +59,16 @@ test("monthly recovery preserves the exact approved invoice-email snapshot", asy
   assert.match(membership, /customer_email: approvedEmail/);
 });
 
+test("Autopilot service-only tables are explicit client deny-by-default", async () => {
+  const claims = await read("supabase/migrations/042_autopilot_membership_claims.sql");
+  const funnel = await read("supabase/migrations/20260914193000_autopilot_funnel_events.sql");
+
+  assert.match(claims, /CREATE POLICY autopilot_membership_claims_no_client/);
+  assert.match(claims, /FOR ALL[\s\S]*TO anon, authenticated[\s\S]*USING \(false\)[\s\S]*WITH CHECK \(false\)/);
+  assert.match(funnel, /CREATE POLICY autopilot_funnel_events_no_client/);
+  assert.match(funnel, /FOR ALL[\s\S]*TO anon, authenticated[\s\S]*USING \(false\)[\s\S]*WITH CHECK \(false\)/);
+});
+
 test("recipient contract never infers a replacement address during recovery", async () => {
   const order = await read("api/functions/runAutopilotOrder.js");
   const membership = await read("api/functions/runAutopilotMembership.js");

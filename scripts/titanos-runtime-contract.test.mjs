@@ -84,7 +84,7 @@ test("signup code resend stays product-owned and bound to the pending user", asy
   assert.match(client, /\/api\/resendSignupOtp/);
   assert.match(client, /body\.verificationType !== "magiclink"/);
   assert.match(client, /verificationType === "magiclink" \? "magiclink" : "signup"/);
-  assert.match(client, /\^\\d\{6\}\$/.test ? /\^\\d\{6\}\$/ : /six-digit verification code/);
+  assert.match(client, /if \(!\/\^\\d\{6\}\$\/\.test\(token\)\)/);
   assert.match(client, /supabase\.auth\.verifyOtp/);
 
   assert.match(registerPage, /resendSignupOtp\(\{ email, userId: pendingUserId \}\)/);

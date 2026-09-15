@@ -154,15 +154,24 @@ test("production env template documents every free Autopilot runtime dependency"
   assert.doesNotMatch(env, /^VITE_AUTOPILOT_.*(?:PRICE|CHECKOUT|PAID)/m);
 });
 
-test("Autopilot readiness probe is secret-safe and fails closed on missing runtime dependencies", async () => {
+test("Autopilot readiness probe is secret-safe and verifies live schema connectivity", async () => {
   const health = await read("api/functions/autopilotHealth.js");
   assert.match(health, /req\.method !== "GET"/);
   assert.match(health, /assertSupabaseProjectConsistency/);
+  assert.match(health, /getSupabaseAdmin/);
+  assert.match(health, /async function probeTable/);
+  assert.match(health, /"autopilot_runs"/);
+  assert.match(health, /"follow_up_queue"/);
+  assert.match(health, /"invoices"/);
+  assert.match(health, /"autopilot_invoice_delivery_guards"/);
+  assert.match(health, /databaseReachable/);
   assert.match(health, /supabaseServiceRole/);
   assert.match(health, /resendApiKey/);
   assert.match(health, /resendFrom/);
+  assert.match(health, /Object\.values\(checks\)\.every\(Boolean\)/);
   assert.match(health, /status\(ready \? 200 : 503\)/);
   assert.match(health, /mode: "free"/);
+  assert.match(health, /Cache-Control", "no-store"/);
   assert.doesNotMatch(health, /SUPABASE_SERVICE_ROLE_KEY\s*:/);
   assert.doesNotMatch(health, /RESEND_API_KEY\s*:/);
 });

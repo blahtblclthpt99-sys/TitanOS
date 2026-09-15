@@ -36,6 +36,14 @@ function providerErrorCode(body, status) {
   return String(body?.name || body?.error?.name || `http_${status}`);
 }
 
+function providerRetryableResponse(status, code) {
+  const numericStatus = Number(status);
+  if (numericStatus === 408 || numericStatus === 425 || numericStatus === 429 || numericStatus >= 500) {
+    return true;
+  }
+  return numericStatus === 409 && code === "concurrent_idempotent_requests";
+}
+
 async function markAmbiguous(admin, queueId, code) {
   try {
     const { error } = await admin
@@ -154,12 +162,12 @@ export async function deliverAutopilotQueue({
   }
 
   const code = providerErrorCode(body, response.status);
-  if (response.status === 409 && code === "concurrent_idempotent_requests") {
+  if (providerRetryableResponse(response.status, code)) {
     const current = await markAmbiguous(admin, queue.id, code);
     const reconciled = autopilotQueueOutcome(current);
     logError(
       `${route}:resend_retryable`,
-      new Error("Resend idempotent request is still in progress"),
+      new Error(`Resend delivery is not yet authoritative (${code})`),
       { ...context, status: response.status, code, reconciled }
     );
     return {

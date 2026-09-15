@@ -49,9 +49,12 @@ async function recoverUnconfirmedSignup(admin, { email, password }) {
 function registrationErrorResponse(res, error) {
   const message = String(error?.message || "");
   if (isDuplicateSignupError(error)) {
+    // Do not positively disclose whether an email is already registered. A
+    // legitimate returning user has clear recovery actions without turning the
+    // registration endpoint into a high-signal account-enumeration oracle.
     return res.status(409).json({
-      error: "An account with this email already exists",
-      code: "EMAIL_TAKEN",
+      error: "Could not create or resume this account. Try signing in or resetting your password.",
+      code: "ACCOUNT_UNAVAILABLE",
     });
   }
   if (/password|weak|least/i.test(message)) {
@@ -176,12 +179,14 @@ export default async function handler(req, res) {
 
     await recordSignupEmail(admin, { email, fullName, source: "register" });
 
-    // Founding 100 claim (also runs from profiles AFTER INSERT trigger — best-effort here)
-    if (createdUser?.id) {
+    // Confirm-required users are claimed only by the verified-auth database
+    // transition. This direct best-effort claim is reserved for environments
+    // that explicitly create already-confirmed users.
+    if (createdUser?.id && !requireConfirm) {
       try {
         await admin.rpc("claim_founding_slot", { p_user_id: createdUser.id });
       } catch {
-        /* trigger may already have claimed; ignore */
+        /* optional Founding schema may not exist; ignore */
       }
     }
 

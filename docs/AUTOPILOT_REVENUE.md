@@ -4,154 +4,203 @@
 
 **Invoice Recovery Sprint — $9 one-time**
 
-- The signed-in business selects 1–10 overdue, unpaid invoices with customer email addresses.
-- A sprint allows only **one invoice per normalized customer email**, so one customer cannot receive several reminders from one approved batch.
-- Checkout records the exact approved invoice IDs before payment.
+- A signed-in business selects up to 10 overdue, unpaid invoices with server-derived customer email snapshots.
+- A sprint allows only **one invoice per normalized customer email**.
+- Checkout persists the exact approved `invoice_id + customer_email` recipient snapshot before payment.
 - The configured Stripe Price is verified server-side as active, one-time, USD, and exactly $9.00 before Checkout is created.
-- Stripe Checkout collects payment; only a verified, settled webhook unlocks execution.
-- The buyer explicitly starts delivery after returning from Checkout.
-- TitanOS rechecks each invoice immediately before delivery and stops invoices that are no longer eligible.
-- TitanOS sends one factual payment reminder per approved customer through Resend.
-- Each provider request uses a deterministic Resend idempotency key so ambiguous network retries do not blindly send a second email.
-- Every Autopilot attempt is stored in `follow_up_queue`, including provider message ID or normalized delivery error code when available.
-- Autopilot queue rows are read-only to ordinary signed-in clients; the service-role runner owns mutation/reconciliation.
-- The paid order and monthly sprint use compare-and-set execution leases so stale workers cannot overwrite a newer recovery attempt.
-- Monthly recovery preserves the original approved invoice batch instead of replacing it with a later UI selection.
-- Legacy paid orders/monthly claims are normalized deterministically during recovery: an existing non-skipped recovery record reserves that customer and later duplicate-customer invoices are stopped rather than contacted again.
-- Autopilot Stripe events use Titan's canonical webhook ledger with retryable `processing → processed/failed` leases; a crash does not become a permanent false duplicate.
+- Stripe Checkout collects payment; only a verified settled webhook unlocks execution.
+- Returning from Stripe is not settlement evidence by itself.
+- Titan rechecks invoice eligibility and approved-recipient consistency immediately before delivery.
+- An invoice that became paid/no-longer-due is stopped.
+- A recipient that changed after approval is stopped and requires fresh approval; Titan never invents a replacement address.
+- Titan sends one factual payment reminder per approved customer through Resend.
+- Provider requests use deterministic Resend idempotency keys.
+- Ambiguous provider/network outcomes remain `pending` and retryable only inside the provider-safe window.
+- Provider message IDs and normalized delivery errors are preserved in `follow_up_queue`.
+- Autopilot Recovery Receipts are read-only to ordinary authenticated clients; service-role runners own mutation/reconciliation.
+- Paid orders and monthly sprints use compare-and-set execution leases.
+- Monthly recovery preserves its original approved invoice/recipient snapshot.
+- Legacy batches reserve customers already represented by non-skipped recovery evidence and stop later duplicate-customer invoices.
+- Autopilot Stripe events use Titan's canonical webhook ledger with retryable `processing → processed/failed` leases.
+- Stripe product routing isolates TitanOS/Autopilot from Titan Attention before either product database is opened.
 
-This is a real service deliverable, not advertising revenue or a claim that payment is guaranteed.
+This is a concrete follow-up service deliverable, not advertising revenue and not a guarantee of collection.
 
 ## Sandbox catalog
 
 - Product: `prod_UzvOMcH0CcJcIK`
 - Price: `price_1TzvXZIMo997dzoAgcgt4Br1` ($9 USD)
 - Account: `titanos sandbox`
-- Set `STRIPE_AUTOPILOT_PRICE_ID` to the sandbox price on preview deployments.
+- Set `STRIPE_AUTOPILOT_PRICE_ID` to the sandbox price only on sandbox/preview environments that use the matching Stripe account.
 
-Never use the sandbox price ID with a live secret key. Create a matching live product after owner review and use its live `price_...` ID.
+Never combine a sandbox price ID with a live secret key. The live deployment must use a matching live product/price reviewed for the intended account.
 
-## Required migration order
+## Recovery-compatible database order
 
-**Prerequisite:** `supabase/migrations/018_stripe_webhook_idempotency.sql` must already be applied. It creates Titan's canonical `stripe_webhook_events` table used by the hardened Autopilot webhook.
+**Prerequisite:** the canonical `public.stripe_webhook_events` base schema exists with its event primary key and required base columns. Do not replay a historical migration merely because migration `018` is absent from recovered migration history when the canonical schema is already present.
 
-Then apply the Autopilot migrations before enabling the upgraded product paths:
+Apply in this order for a recovered TitanOS environment:
 
 1. `supabase/migrations/041_titan_autopilot.sql`
-2. `supabase/migrations/042_autopilot_membership_claims.sql` when the monthly included sprint is enabled
+2. `supabase/migrations/042_autopilot_membership_claims.sql`
 3. `supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql`
    - provider receipt/error fields
-   - one queue record per Autopilot recipient target
+   - one queue record per deterministic Autopilot delivery target
 4. `supabase/migrations/20260914193000_autopilot_funnel_events.sql`
    - privacy-minimized first-party activation telemetry
+   - explicit client-deny policy
 5. `supabase/migrations/20260914194500_autopilot_queue_rls.sql`
-   - signed-in users retain read access to their Recovery Receipts
-   - generic client insert/update/delete is blocked for `autopilot_run:*` rows
-   - service-role Autopilot execution continues to reconcile those rows
+   - owners retain Recovery Receipt read access
+   - generic client insert/update/delete is blocked for `autopilot_run:*`
 6. `supabase/migrations/20260914203000_stripe_webhook_claim_state.sql`
-   - adds `processing`, `processed`, and `failed` lifecycle state to the canonical Stripe event ledger
-   - adds claimed-at leases, attempt counters, and last-error evidence
-   - preserves historical migration-018 rows as already `processed`
+   - processing/processed/failed lifecycle, leases, attempts, last-error evidence
+7. `supabase/migrations/20260914210000_autopilot_recipient_snapshot.sql`
+   - server-derived `invoices.customer_email`
+   - owner-matched historical backfill
+   - direct customer-email override re-derivation
+   - monthly exact recipient snapshot
+8. `supabase/migrations/20260914211500_restore_durable_rate_limit_backend.sql`
+   - service-role-only durable fallback for recovered environments missing the historical limiter
 
-The queue-protection and Stripe claim-state migrations are release requirements, not optional hardening. The generic Follow-ups sender also persists provider receipt fields, so `20260914130000_autopilot_delivery_idempotency.sql` must be applied **before** this branch is enabled.
+Recovery Staging (`wbymywwrpbljfbsemung`) has already passed these database/RLS/runtime probes. That PASS is not a substitute for production host/Stripe/Resend certification.
+
+## Required runtime product mapping
+
+TitanOS and Titan Attention are separate products sharing one repository. They must not share an operational database accidentally.
+
+### TitanOS / Autopilot
+
+- intended host/project: `titanos-web`;
+- `VITE_APP_SURFACE=titanos` preferred;
+- `VITE_SUPABASE_URL` + publishable key must point at the intended TitanOS database;
+- `TITAN_STRIPE_WEBHOOK_PRODUCT=autopilot` preferred;
+- `SUPABASE_URL` + service-role key used by server functions must point at the same intended TitanOS server database;
+- `VITE_AUTOPILOT_ONETIME_CHECKOUT=true` only when the one-time $9 offer is intentionally enabled.
+
+### Titan Attention
+
+- intended host/project: `titan-os`;
+- `VITE_APP_SURFACE=attention` preferred;
+- its Supabase environment must remain on the Attention schema;
+- `TITAN_STRIPE_WEBHOOK_PRODUCT=attention` preferred.
+
+Do not launch if these mappings are inferred only from old deployment history; verify the active deployment environment.
+
+## Stripe webhook boundary
+
+`api/functions/stripeWebhook.js` is the only public shared Stripe webhook route.
+
+Required behavior:
+
+1. verify the Stripe signature before product classification;
+2. classify Autopilot only from `task_type=invoice_recovery_sprint`;
+3. classify Attention only from `kind=attention_campaign_funding`;
+4. acknowledge unclassified signed events without touching Supabase;
+5. acknowledge cross-product events as scope mismatches without touching the wrong database;
+6. delegate matching events to the private `api/_lib/stripeWebhookProductHandler.js` implementation.
+
+Never place the private product handler under `api/functions/`, because that would expose a second public route capable of bypassing the product router.
 
 ## Required production configuration
 
-1. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOPILOT_PRICE_ID` on the production host.
-2. Set `RESEND_API_KEY` and a verified `RESEND_FROM` domain.
-3. Keep Titan's durable rate-limit backend available (`UPSTASH_REDIS_REST_*` or the service-role-only `consume_rate_limit` Supabase RPC). Outbound generic Follow-ups now fail closed in production when durable protection is unavailable.
-4. Subscribe the Stripe webhook endpoint to:
+1. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOPILOT_PRICE_ID` on the TitanOS host.
+2. Set `TITAN_STRIPE_WEBHOOK_PRODUCT=autopilot` on TitanOS server functions.
+3. Set `RESEND_API_KEY` and a verified `RESEND_FROM` sender/domain.
+4. Keep a durable rate-limit backend available. Recovery Staging includes the service-role-only `consume_rate_limit` fallback; Upstash can also satisfy this contract. Do not weaken `requireDurable: true`.
+5. Subscribe the intended Autopilot Stripe endpoint to:
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
    - `checkout.session.async_payment_failed`
    - `checkout.session.expired`
-5. Confirm the configured live Autopilot Price is active, one-time, USD, and exactly $9.00. The server deliberately fails closed if it is not.
+6. Confirm the live Autopilot Price is active, one-time, USD, exactly $9.00, and belongs to the same Stripe account as the secret key/webhook.
+7. Configure the Attention deployment separately if Attention is enabled; do not reuse TitanOS database credentials.
 
 ## Live database security certification
 
-After applying the migrations, run this against the target Supabase project:
+Run against the exact target TitanOS project:
 
 ```bash
 node scripts/verify-autopilot-db-security.mjs
 ```
 
-The command must exit `0` with `"conclusion": "PASS"`. It creates a temporary confirmed user, exercises the real RLS boundary, cleans up its probe rows/user, and fails closed unless all of these are demonstrated:
+Require exit `0` / `PASS`. The verifier must demonstrate:
 
-- the owner can read an Autopilot Recovery Receipt;
-- the authenticated client cannot update that receipt;
-- the authenticated client cannot delete that receipt;
-- the authenticated client cannot forge an `autopilot_run:*` queue row;
-- an ordinary non-Autopilot follow-up still remains writable;
-- the `autopilot_funnel_events` schema exists;
-- authenticated clients cannot write funnel events directly.
+- owner Recovery Receipt read access;
+- Recovery Receipt update/delete denial;
+- forged `autopilot_run:*` insertion denial;
+- ordinary non-Autopilot Follow-up compatibility;
+- telemetry schema presence;
+- direct client telemetry writes blocked.
 
-A missing telemetry table is a failure, not a passing access-denied result.
+The Recovery Staging manual probes additionally demonstrated recipient re-derivation, service-table client denial, durable limiter behavior/client denial, and auth-user → profile creation.
 
 ## End-to-end certification sequence
 
-1. Confirm migration 018 exists and `stripe_webhook_events` is readable through the service role, then apply `20260914203000_stripe_webhook_claim_state.sql`.
+1. Verify the canonical `stripe_webhook_events` base schema on the target database and all eight recovery migrations/capabilities.
 2. Run `node scripts/verify-autopilot-db-security.mjs` and require `PASS`.
-3. Run a live-mode controlled checkout and confirm `payments.status = succeeded` only after Stripe reports `payment_status = paid`.
-4. Confirm returning from Checkout before webhook settlement cannot execute the order.
-5. Verify an already-`processed` Stripe event is treated as a duplicate without repeating its side effect.
-6. Force an Autopilot Stripe event into `failed`, replay it, and confirm Titan reclaims the event, increments `attempt_count`, re-validates the local order, and reaches `processed` only after successful handling.
-7. Seed a stale `processing` claim older than the lease and confirm it is reclaimable; a fresh `processing` claim must return non-success with `Retry-After` rather than being acknowledged as processed.
-8. Change a local Autopilot payment/order field between webhook validation and settlement and confirm the compare-and-set mutation refuses the stale write so Stripe can retry from a fresh read.
-9. Attempt to approve two invoices with the same normalized customer email and confirm both UI and backend prevent that batch.
-10. Run one recovery sprint and confirm a successful queue row stores `status = sent`, `sent_at`, and the Resend `provider_message_id`.
-11. Force an ambiguous provider/network failure and confirm the row remains `pending`, gets a delivery error code, and the API returns retryable HTTP `202` instead of reporting success.
-12. Retry the same pending delivery inside the provider idempotency window and confirm the deterministic idempotency key is reused.
-13. Confirm retrying after the safe provider window fails closed rather than risking a blind duplicate.
-14. Start the same sprint concurrently and confirm one execution lease wins while the other reconciles persisted queue truth.
-15. Create a queue uniqueness collision and confirm the runner re-reads the authoritative row instead of guessing its outcome.
-16. Force a provider-accepted response while a stale worker has moved the queue row to `failed`; confirm Titan reconciles the confirmed provider acceptance back to `sent` without another provider request.
-17. Mark an approved invoice paid before execution and confirm Titan records a stop/skip and does not send it.
-18. Interrupt a monthly sprint, change the current UI selection, then recover it and confirm the original stored batch remains authoritative.
-19. Mark one original monthly invoice paid before recovery and confirm recovery reconciles/stops that invoice instead of rejecting the entire stale sprint before recovery.
-20. Exercise a legacy order/claim containing duplicate customer emails and confirm an existing recovery record reserves that customer while later duplicate-customer invoices are skipped.
-21. Open **Follow-ups** and confirm Autopilot rows appear only under **Autopilot Recovery Receipts**, never in the manual pending queue.
-22. Attempt the generic `sendFollowUp` endpoint against an Autopilot queue ID and confirm `AUTOPILOT_QUEUE_PROTECTED` is returned before any Resend call.
-23. Double-trigger the same ordinary pending Follow-up and confirm Resend receives the same deterministic `followup_queue_<queue_id>` idempotency key and Titan reconciles the row as already sent rather than producing a second delivery.
-24. Confirm first-party funnel events contain only allow-listed coarse fields and no customer/invoice/message content.
+3. Verify `/autopilot` anonymous traffic loads the lightweight public preview without private invoice/API imports.
+4. Verify signed-in `/autopilot` enters `AuthenticatedShell`/`TabStack` and the private Recovery Command Center.
+5. Verify the current TitanOS deployment points at the intended TitanOS database and not the Attention-only project.
+6. Send an unclassified signed Stripe test event and prove neither product ledger is touched.
+7. Send an Attention-marked event to the TitanOS deployment and prove it is ignored as a scope mismatch without Attention-table access.
+8. Send an Autopilot-marked event to the Attention deployment and prove the symmetrical scope mismatch.
+9. Run a controlled Autopilot Checkout and confirm `payments.status = succeeded` only after Stripe reports `payment_status = paid`.
+10. Confirm returning from Checkout before webhook settlement cannot execute the order.
+11. Verify processed Stripe replay has no duplicate side effect.
+12. Force an Autopilot Stripe event to `failed`, replay it, and confirm reclaim increments `attempt_count`, revalidates local state, and commits `processed` only after success.
+13. Seed a stale `processing` claim older than the lease and confirm reclaim works; a fresh claim must not receive a false processed acknowledgement.
+14. Force a stale local payment/order mutation between validation and settlement and confirm the compare-and-set guard refuses it.
+15. Attempt a batch containing two invoices with the same normalized customer email and confirm UI + backend rejection.
+16. Run a sprint and confirm successful Recovery Receipt fields include `status=sent`, `sent_at`, and provider message ID.
+17. Force an ambiguous provider/network outcome and confirm `pending` + delivery error evidence + retryable HTTP `202`.
+18. Retry inside the provider-safe idempotency window and confirm the same deterministic key is reused.
+19. Retry after that window and confirm fail-closed behavior.
+20. Start the same sprint concurrently and confirm one lease wins while the other reconciles persisted queue truth.
+21. Force queue uniqueness contention and confirm the runner re-reads authoritative state.
+22. Force provider acceptance while stale local state says failed and confirm reconciliation to `sent` without another provider request.
+23. Mark an approved invoice paid before delivery and confirm stop/skip with no provider request.
+24. Change an approved customer's email before delivery and confirm `approved_recipient_changed`, no replacement inference, and no provider request.
+25. Recover an interrupted monthly sprint after changing current UI selection and confirm the original invoice + recipient snapshot remains authoritative.
+26. Exercise a legacy duplicate-customer order/claim and confirm existing recovery evidence reserves the customer while later duplicates stop.
+27. Open Follow-ups and confirm Autopilot rows appear only as read-only Recovery Receipts.
+28. Call generic `sendFollowUp` with an Autopilot queue ID and confirm `AUTOPILOT_QUEUE_PROTECTED` before Resend.
+29. Double-trigger an ordinary pending Follow-up and confirm its deterministic provider key prevents duplicate delivery.
+30. Confirm funnel telemetry contains only allow-listed coarse metadata.
+31. Perform mobile + desktop walkthroughs on the **current branch deployment**, not a stale deployment from another branch.
 
 ## Honest operating rules
 
 - No purchased email lists or cold bulk email.
 - Only the authenticated invoice owner can select recipients.
-- One recovery sprint contacts each normalized customer email at most once.
-- Recipient, amount, invoice number, and due date come from the user's own records.
-- A successful provider response is not called auditable unless its receipt/status is persisted or reconciled.
-- Ambiguous network delivery remains pending/retryable; it is never falsely reported as sent or failed with certainty.
-- Confirmed provider acceptance is authoritative over a stale local failure state and must reconcile to `sent` without another provider request.
-- A paid order cannot create duplicate recipient deliveries through retries, duplicate invoice selection, legacy batch recovery, or stale-run recovery.
-- Autopilot Recovery Receipts cannot be manually resent, marked sent, or deleted through generic Follow-ups.
-- Generic queued email sends also use deterministic provider idempotency and durable production rate limiting.
-- Autopilot Stripe events are not acknowledged as processed until their exact webhook lease is committed to `processed`.
-- Failed or stale Autopilot webhook claims may be reclaimed; a fresh concurrent claim must not be falsely acknowledged as complete.
-- Failed delivery remains visible and is never reported as sent.
-- Funnel telemetry is diagnostic only and must never block checkout or execution.
+- One sprint contacts each normalized customer email at most once.
+- Recipient authorization is snapshotted and cannot silently follow a later email change.
+- Amount, invoice number, and due date come from the user's owned records.
+- Provider acceptance is not called auditable unless receipt/status is persisted or reconciled.
+- Ambiguous delivery remains pending/retryable; it is never falsely reported as sent or conclusively failed.
+- Confirmed provider acceptance is authoritative over stale local failure and must reconcile without another send.
+- Recovery Receipts cannot be manually resent, marked sent, or deleted through generic Follow-ups.
+- Generic queued email uses deterministic provider idempotency and durable production rate limiting.
+- Autopilot Stripe events are not processed outside their deployment product scope.
+- Autopilot Stripe events are not acknowledged as processed until their exact claim lease commits.
+- Failed/stale claims may be reclaimed; fresh concurrent claims must not be falsely acknowledged as complete.
+- Funnel telemetry is diagnostic only and must never block checkout/execution.
 - Refunds and customer disputes remain owner-controlled in Stripe.
 
 ## Release gate
 
-Do **not** enable the one-time paid flow or promote the Product Hunt relaunch until all of the following are true:
+Do **not** enable the one-time paid flow or promote a Product Hunt relaunch until all are true:
 
-- GitHub quality checks have actually executed and passed; a workflow failure with zero runner steps is not a test result.
-- A preview/production build has completed successfully on the active hosting account.
-- Migration 018 and every required Autopilot migration above are applied before the corresponding code is enabled.
-- `node scripts/verify-autopilot-db-security.mjs` passes against the target Supabase project.
-- Stripe claim-state replay/recovery tests pass against the target database.
-- Stripe and Resend live credentials are present and belong to the intended production accounts.
-- The end-to-end certification sequence passes with controlled test recipients.
-- Public `/autopilot`, signed-in Recovery Command Center, and Follow-ups Recovery Receipts are visually checked on mobile and desktop.
+- GitHub quality checks have **actually executed steps** and `gate:ship` passed; `steps: null` is not test evidence.
+- The current branch has a successful preview/production build on the intended host.
+- The current `titanos-web` environment/database/product-scope mapping is verified.
+- The current `titan-os` Attention mapping is verified separately if Attention remains deployed.
+- All eight Recovery-compatible migrations/capabilities are present on the TitanOS database.
+- `verify-autopilot-db-security.mjs` passes against the exact target.
+- Stripe product-scope, claim-state replay/recovery, and Checkout settlement tests pass.
+- Stripe + Resend live credentials belong to the intended production accounts.
+- Controlled provider-idempotency/receipt tests pass.
+- Public preview, private Recovery Command Center, Checkout return, and Recovery Receipts pass mobile + desktop walkthroughs.
 
-## Titan family path
+## Titan family pattern
 
-Reuse the same order → approval → settlement → atomic execution → provider-idempotent delivery → immutable receipt/audit pattern for future programs:
-
-- Titan Office: estimate follow-up and weekly reporting
-- Titan Driver: mileage and earnings summaries
-- Titan Fleet: maintenance reminders
-- Titan Home: household scheduling and document reminders
-
-Each program should launch with one measurable outcome and verifiable execution evidence before adding more automation types.
+Reuse the same **approval → verified settlement/entitlement → atomic execution → provider-idempotent action → immutable evidence** pattern for future Titan programs. Each program should launch with one measurable outcome and verifiable execution evidence before adding more automation types.

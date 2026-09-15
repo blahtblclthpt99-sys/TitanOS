@@ -33,10 +33,10 @@ export async function resendSignupOtp({ email, userId }) {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw apiError(body.error || "Verification code could not be resent", response.status);
-      return {
-        sent: body.sent === true,
-        verificationType: body.verificationType === "magiclink" ? "magiclink" : "magiclink",
-      };
+      if (body.sent !== true || body.verificationType !== "magiclink") {
+        throw apiError("Verification service returned an unexpected response", 502);
+      }
+      return { sent: true, verificationType: "magiclink" };
     } catch (error) {
       lastError = error;
       if (error?.status && ![404, 502, 503].includes(error.status)) throw error;
@@ -48,9 +48,12 @@ export async function resendSignupOtp({ email, userId }) {
 
 export async function verifySignupOtp({ email, otpCode, verificationType = "signup" }) {
   const type = verificationType === "magiclink" ? "magiclink" : "signup";
+  const token = String(otpCode || "").trim();
+  if (!/^\d{6}$/.test(token)) throw apiError("Enter the six-digit verification code", 400);
+
   const { data, error } = await supabase.auth.verifyOtp({
     email,
-    token: String(otpCode || "").trim(),
+    token,
     type,
   });
   if (error) throw apiError(error.message || "Invalid verification code", 400);

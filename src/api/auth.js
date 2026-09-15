@@ -151,7 +151,6 @@ async function assertOAuthProviderEnabled(provider) {
     }
   } catch (err) {
     if (err?.status) throw err;
-    // Network hiccup — let OAuth attempt proceed
   }
 }
 
@@ -164,7 +163,6 @@ async function registerViaServer({ email, password, fullName }) {
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
       bases.push(origin);
     }
-    // Always allow production API as last resort (Capacitor / IONOS)
     bases.push("https://titanos-web.vercel.app");
   }
 
@@ -195,7 +193,6 @@ async function registerViaServer({ email, password, fullName }) {
       };
     } catch (err) {
       lastError = err;
-      // Only fall through on network / unavailable host
       if (err?.status && err.status !== 404 && err.status !== 502 && err.status !== 503) {
         throw err;
       }
@@ -207,8 +204,6 @@ async function registerViaServer({ email, password, fullName }) {
 export function createAuthModule() {
   return {
     async me() {
-      // Prefer getUser (validates JWT). Fall back to local session so slow/flaky
-      // network never locks the user out of the shell.
       let authUser = null;
       const { data, error } = await supabase.auth.getUser();
       if (!error && data?.user) {
@@ -225,7 +220,7 @@ export function createAuthModule() {
       try {
         profile = await fetchProfile(authUser.id);
       } catch {
-        // Profile is optional for boot — missing/RLS errors must not force logout.
+        /* profile is optional for boot */
       }
       return buildUser(authUser, profile);
     },
@@ -236,13 +231,16 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      // Product Hunt / production registration has one authoritative path: the
-      // Titan server endpoint with durable throttling and product-owned OTP
-      // delivery. Direct Supabase signup remains a development-only escape hatch.
       try {
         return await registerViaServer({ email, password, fullName });
       } catch (serverError) {
-        if (!import.meta.env.DEV) throw serverError;
+        if (!import.meta.env.DEV) {
+          if (serverError?.status) throw serverError;
+          throw apiError(
+            "Signup service is temporarily unavailable. Please try again shortly.",
+            503
+          );
+        }
 
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -262,7 +260,6 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
-        // Development fallback telemetry is best-effort only.
         try {
           const bases = [];
           const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -278,7 +275,7 @@ export function createAuthModule() {
             if (res.ok) break;
           }
         } catch {
-          /* ignore logging failures */
+          /* ignore */
         }
         return {
           session: data.session,
@@ -311,13 +308,9 @@ export function createAuthModule() {
     },
 
     async loginWithProvider(provider) {
-      // Always absolute callback URL so Supabase does not fall back to Site URL `/`.
       const redirectTo = getAuthRedirectTo("/auth/callback");
       const isNative = Capacitor.isNativePlatform();
 
-      // Supabase provider availability is already enforced by the OAuth
-      // endpoint. Avoid blocking Android Custom Tab launch on an extra
-      // settings request, which can hang indefinitely on some WebViews.
       if (!isNative) {
         await withTimeout(
           assertOAuthProviderEnabled(provider),
@@ -341,7 +334,6 @@ export function createAuthModule() {
       throwIfError(error);
       if (!data?.url) throw apiError("Could not start sign-in. Try again.", 400);
 
-      // Confirm redirect_to survived allow-list; if stripped to `/`, warn in console for debugging.
       try {
         const authUrl = new URL(data.url);
         const returned = authUrl.searchParams.get("redirect_to") || "";
@@ -403,8 +395,6 @@ export function createAuthModule() {
         "referral_code",
         "referred_by_code",
         "active_company_id",
-        // Intentionally excluded (server/admin only): role, is_pro, lifetime_premium,
-        // paying_subscriber, plan_tier, account_type, verified_worker, verification_notes
       ];
 
       const payload = {};
@@ -418,7 +408,6 @@ export function createAuthModule() {
           .update(payload)
           .eq("id", userId);
 
-        // Older DBs may lack marketing_prefs / professional_profile — retry without them
         if (profileError && (payload.marketing_prefs !== undefined || payload.professional_profile !== undefined)) {
           const retry = { ...payload };
           delete retry.marketing_prefs;

@@ -80,6 +80,24 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // Verify the calling browser's canonical hosted Supabase project before the
+  // durable limiter or any other service-role path can touch persistence.
+  const body = readJson(req);
+  const clientProjectRef = String(body.clientProjectRef || "").trim().toLowerCase();
+  const serverProjectRef = standardSupabaseProjectRef(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  );
+  if (clientProjectRef && !/^[a-z0-9]+$/.test(clientProjectRef)) {
+    return res.status(400).json({ error: "Invalid registration environment" });
+  }
+  if (clientProjectRef && serverProjectRef && clientProjectRef !== serverProjectRef) {
+    return res.status(409).json({
+      error: "Signup environment changed. Reload TitanOS and try again.",
+      code: "AUTH_ENVIRONMENT_MISMATCH",
+    });
+  }
+
   if (!(await assertRateLimitAsync(req, res, {
     limit: 8,
     windowMs: 60 * 60 * 1000,
@@ -91,27 +109,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = readJson(req);
     const email = String(body.email || "")
       .trim()
       .toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
-    const clientProjectRef = String(body.clientProjectRef || "").trim().toLowerCase();
-    const serverProjectRef = standardSupabaseProjectRef(
-      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    );
-
-    if (clientProjectRef && !/^[a-z0-9]+$/.test(clientProjectRef)) {
-      return res.status(400).json({ error: "Invalid registration environment" });
-    }
-    if (clientProjectRef && serverProjectRef && clientProjectRef !== serverProjectRef) {
-      return res.status(409).json({
-        error: "Signup environment changed. Reload TitanOS and try again.",
-        code: "AUTH_ENVIRONMENT_MISMATCH",
-      });
-    }
-
     const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
     const requireConfirm =
       flag != null && String(flag).trim() !== ""

@@ -45,6 +45,21 @@ test("free run ledger and telemetry are explicit client deny-by-default", async 
   assert.match(funnel, /CREATE POLICY autopilot_funnel_events_no_client/);
 });
 
+test("atomic invoice delivery guard is service-only and fail-closed", async () => {
+  const migration = await read("supabase/migrations/20260915043000_autopilot_invoice_delivery_guard.sql");
+  const runner = await read("api/functions/runAutopilotFree.js");
+  assert.match(migration, /autopilot_invoice_delivery_guards_no_client/);
+  assert.match(migration, /REVOKE ALL ON public\.autopilot_invoice_delivery_guards FROM anon, authenticated/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.claim_autopilot_invoice_delivery/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.release_autopilot_invoice_delivery/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.claim_autopilot_invoice_delivery[\s\S]*TO service_role/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.release_autopilot_invoice_delivery[\s\S]*TO service_role/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /created_by_id = p_user_id/);
+  assert.match(runner, /claimInvoiceDelivery/);
+  assert.match(runner, /releaseInvoiceDelivery/);
+});
+
 test("Recovery Receipts are owner-readable but protected from client mutation", async () => {
   const rls = await read("supabase/migrations/20260914194500_autopilot_queue_rls.sql");
   assert.match(rls, /FOR SELECT/);

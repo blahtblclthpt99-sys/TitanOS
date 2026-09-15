@@ -14,7 +14,7 @@ test("invoice recipient snapshot is derived only from an owner-matched customer"
   assert.match(migration, /SECURITY DEFINER/);
   assert.match(migration, /c\.created_by_id = NEW\.created_by_id/);
   assert.match(migration, /NEW\.customer_email := NULL/);
-  assert.match(migration, /BEFORE INSERT OR UPDATE OF customer_id, created_by_id/);
+  assert.match(migration, /BEFORE INSERT OR UPDATE OF customer_id, created_by_id, customer_email/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.snapshot_invoice_customer_email\(\) FROM PUBLIC, anon, authenticated/);
 });
 

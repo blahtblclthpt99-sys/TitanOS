@@ -67,10 +67,12 @@ export default async function handler(req, res) {
       email,
       expectedUserId: userId,
     });
+    const deliveryStatus = generated.delivery === "uncertain" ? "uncertain" : "accepted";
 
     return res.status(202).json({
       projectRef: serverProjectRef || null,
-      sent: true,
+      sent: deliveryStatus === "accepted",
+      deliveryStatus,
       verificationType: generated.verificationType,
     });
   } catch (error) {

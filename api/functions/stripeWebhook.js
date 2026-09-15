@@ -1,5 +1,3 @@
-import legacyProductHandler from "../_lib/stripeWebhookProductHandler.js";
-
 export const config = { api: { bodyParser: false } };
 
 const ATTENTION_KIND = "attention_campaign_funding";
@@ -40,8 +38,8 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // Titan Autopilot is free. Its deployment has no Stripe execution or pricing
-  // dependency; acknowledge stale webhook deliveries without opening Stripe or
-  // Supabase. Titan Attention remains an isolated product surface below.
+  // dependency; acknowledge stale webhook deliveries without loading Stripe,
+  // its private payment handler, or Supabase. Titan Attention remains isolated.
   if (!isAttentionDeployment()) {
     return res.status(200).json({
       received: true,
@@ -84,5 +82,6 @@ export default async function handler(req, res) {
   }
 
   req.rawBody = rawBody;
-  return legacyProductHandler(req, res);
+  const { default: attentionProductHandler } = await import("../_lib/stripeWebhookProductHandler.js");
+  return attentionProductHandler(req, res);
 }

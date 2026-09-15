@@ -78,11 +78,20 @@ test("signup OTP delivery preserves ambiguity instead of invalidating a possibly
   assert.match(confirmation, /delivery: "uncertain"/);
   assert.match(confirmation, /delivery: "rejected"/);
   assert.match(confirmation, /if \(!delivery\.accepted && delivery\.definitive\)/);
-  assert.match(confirmation, /deleteGeneratedUser\(admin, user\.id\)/);
   assert.match(confirmation, /delivery: delivery\.accepted \? "accepted" : "uncertain"/);
+
+  // Cleanup is allowed only inside the definitive-rejection branch. Ambiguous
+  // provider outcomes must preserve the generated user/code because the email
+  // may already have been accepted despite a lost response.
+  const definitiveBranch = confirmation.indexOf("if (!delivery.accepted && delivery.definitive)");
+  const cleanup = confirmation.indexOf("deleteGeneratedUser(admin, user.id)");
+  const deliveryReturn = confirmation.indexOf('delivery: delivery.accepted ? "accepted" : "uncertain"');
+  assert.ok(definitiveBranch >= 0 && cleanup > definitiveBranch && cleanup < deliveryReturn);
+
   assert.match(registration, /verificationDelivery/);
-  assert.match(page, /setOtpDelivery/);
-  assert.match(page, /couldn't confirm delivery/i);
+  assert.match(page, /setOtpDeliveryStatus/);
+  assert.match(page, /couldn't confirm whether the verification email was delivered/i);
+  assert.match(page, /If a code arrives, it is still valid/i);
 });
 
 test("abandoned unconfirmed signup is recoverable only after password proof", async () => {
@@ -97,6 +106,7 @@ test("abandoned unconfirmed signup is recoverable only after password proof", as
 test("signup resend is product-owned, project-bound, and ambiguity-safe", async () => {
   const endpoint = await read("api/resendSignupOtp.js");
   const client = await read("src/lib/signupOtpClient.js");
+  const page = await read("src/pages/Register.jsx");
   assert.match(endpoint, /requireDurable: true/);
   assert.match(endpoint, /durableUnavailableStatus: 424/);
   assert.match(endpoint, /AUTH_ENVIRONMENT_MISMATCH/);
@@ -105,6 +115,10 @@ test("signup resend is product-owned, project-bound, and ambiguity-safe", async 
   assert.match(client, /clientProjectRef && body\.projectRef !== clientProjectRef/);
   assert.match(client, /\["accepted", "uncertain"\]\.includes\(body\.delivery\)/);
   assert.doesNotMatch(client, /for \(const base of/);
+  assert.match(page, /setOtpType\(result\.verificationType\)/);
+  assert.match(page, /setOtpDeliveryStatus\(result\.deliveryStatus\)/);
+  assert.match(page, /setOtpCode\(""\)/);
+  assert.match(page, /couldn't confirm provider delivery/i);
 });
 
 test("Product Hunt auth CTAs safely return users to Autopilot", async () => {

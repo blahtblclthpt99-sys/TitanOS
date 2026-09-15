@@ -151,15 +151,20 @@ export default function Autopilot() {
       const result = await api.functions.invoke("runAutopilotFree", payload);
       setLastResult(result);
       const retryable = result.retryable === true || Number(result.pending || 0) > 0;
+      const terminalFailure = !retryable && result.success === false && Number(result.failed || 0) > 0;
       toast({
         title: retryable
           ? "Safe retry available"
-          : result.duplicate
-            ? "Sprint already completed"
-            : "Recovery sprint completed",
+          : terminalFailure
+            ? "Recovery sprint finished with failed deliveries"
+            : result.duplicate
+              ? "Sprint already completed"
+              : "Recovery sprint completed",
         description: `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} stopped · ${result.pending || 0} pending`,
+        variant: terminalFailure ? "destructive" : undefined,
       });
       if (!retryable) {
+        setSelected([]);
         batchTracked.current = false;
         await reload();
       }
@@ -246,7 +251,7 @@ export default function Autopilot() {
               <p className="text-xs text-muted-foreground mt-2">
                 {lastResult.retryable
                   ? "A provider result is still uncertain. Safe retry reuses this run's exact approved recipients and provider idempotency keys."
-                  : "Stopped invoices include balances that became ineligible or whose approved recipient changed before delivery."}
+                  : "Stopped invoices include balances that became ineligible, were already being handled, or whose approved recipient changed before delivery."}
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {lastResult.retryable && (

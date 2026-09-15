@@ -97,10 +97,10 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const result = await api.auth.verifyOtp({ email, otpCode });
-      if (result?.access_token) {
-        await api.auth.setToken(result.access_token);
-      }
+      // verifyOtp runs on Titan's persistent Supabase browser client and stores
+      // the returned access + refresh session. Do not overwrite it with an
+      // access-token-only setSession call.
+      await api.auth.verifyOtp({ email, otpCode });
       const me = await api.auth.me().catch(() => null);
       await finishSignup(me?.id);
     } catch (err) {

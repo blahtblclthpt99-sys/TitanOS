@@ -1,6 +1,7 @@
 -- 20260915024500: Founding slots are scarce entitlements. Do not let an
 -- unverified auth record consume one merely because a profile was created.
--- Existing confirmed founders are unchanged.
+-- Existing confirmed founders are unchanged. Environments recovered without
+-- the optional Founding schema must remain fully usable.
 
 BEGIN;
 
@@ -16,9 +17,24 @@ DECLARE
   slot int;
   already boolean;
   trial_end timestamptz;
+  founding_columns int;
 BEGIN
   IF p_user_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'error', 'missing_user');
+  END IF;
+
+  SELECT COUNT(*)::int INTO founding_columns
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'profiles'
+    AND column_name IN (
+      'founding_user','founding_number','founding_trial_ends_at',
+      'founding_price_lock','founding_locked_plan','lifetime_premium',
+      'is_pro','plan_tier'
+    );
+
+  IF to_regclass('public.platform_launch') IS NULL OR founding_columns < 8 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'founding_unavailable');
   END IF;
 
   -- The auth identity must prove ownership before consuming a scarce Founding

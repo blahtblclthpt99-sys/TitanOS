@@ -179,6 +179,9 @@ async function registerViaServer({ email, password, fullName }) {
       if (!response.ok) {
         throw apiError(body.error || "Registration failed", response.status);
       }
+      if (clientProjectRef && body.projectRef !== clientProjectRef) {
+        throw apiError("Signup environment changed. Reload TitanOS and try again.", 409);
+      }
       if (body.session?.access_token && body.session?.refresh_token) {
         const { error } = await supabase.auth.setSession({
           access_token: body.session.access_token,

@@ -48,13 +48,15 @@ test("production signup generates and delivers an explicit verification OTP", as
 
   assert.match(registration, /createSignupWithConfirmation/);
   assert.match(registration, /verificationMode: "otp"/);
+  assert.match(registration, /startsWith\("SIGNUP_"\)/);
+  assert.match(registration, /res\.status\(424\)/);
   assert.match(confirmation, /admin\.auth\.admin\.generateLink/);
   assert.match(confirmation, /type: "signup"/);
   assert.match(confirmation, /properties\?\.email_otp/);
   assert.match(confirmation, /\^\\d\{6\}\$/);
   assert.match(confirmation, /"Idempotency-Key": deliveryKey/);
   assert.match(confirmation, /titan_signup_\$\{user\.id\}/);
-  assert.match(confirmation, /if \(delivery\.definitive\) await deleteGeneratedUser/);
+  assert.match(confirmation, /if \(!delivery\.accepted\)[\s\S]*await deleteGeneratedUser\(admin, user\.id\)/);
   assert.match(registerPage, /result\?\.verificationMode === "otp"/);
   assert.match(registerPage, /await api\.auth\.verifyOtp\(\{ email, otpCode \}\)/);
   assert.doesNotMatch(registerPage, /setToken\(result\.access_token\)/);

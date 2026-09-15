@@ -18,9 +18,24 @@ import {
   listQueue,
   listRules,
   markQueueSent,
+  retryAutopilotFollowUp,
   seedDefaultFollowUpRules,
   sendFollowUpNow,
 } from "@/lib/followUpApi";
+
+const RECEIPT_REASON_LABELS = {
+  recent_autopilot_reminder: "Stopped: this invoice was reminded within the last 72 hours",
+  autopilot_delivery_in_progress: "Stopped: another protected Autopilot delivery is already in progress",
+  approved_recipient_changed: "Stopped: the customer email changed after approval",
+  approved_recipient_mismatch: "Stopped: the saved recipient no longer matches the approved recipient",
+  invoice_no_longer_eligible: "Stopped: the invoice is no longer overdue and unpaid",
+  delivery_unconfirmed_invoice_no_longer_eligible: "Stopped: the invoice changed while delivery was being reconciled",
+  provider_idempotency_window_expired: "Needs review: the provider-safe retry window expired",
+  idempotency_window_expired: "Needs review: the provider-safe retry window expired",
+  network_ambiguous: "Safe retry: the provider response could not be confirmed",
+  concurrent_idempotent_requests: "Safe retry: the provider is still reconciling the same delivery",
+  provider_accepted_receipt_persist_ambiguous: "Safe retry: provider acceptance was received but receipt persistence needs reconciliation",
+};
 
 function receiptLabel(row) {
   if (row.provider_message_id) {
@@ -28,7 +43,10 @@ function receiptLabel(row) {
     return `Provider receipt …${id.slice(-8)}`;
   }
   if (row.status === "sent") return "Provider acceptance recorded";
-  if (row.delivery_error_code) return row.delivery_error_code.replaceAll("_", " ");
+  if (row.delivery_error_code) {
+    return RECEIPT_REASON_LABELS[row.delivery_error_code]
+      || row.delivery_error_code.replaceAll("_", " ");
+  }
   if (row.status === "pending") return "Awaiting safe reconciliation";
   return "Recorded by Titan Autopilot";
 }
@@ -113,6 +131,24 @@ export default function FollowUps() {
     }
   };
 
+  const retryAutopilot = async (row) => {
+    setSendingId(row.id);
+    try {
+      const result = await retryAutopilotFollowUp(user, row);
+      await reload();
+      const retryable = result?.retryable === true || Number(result?.pending || 0) > 0;
+      toast({
+        title: retryable ? "Autopilot still needs a safe retry" : "Autopilot recovery reconciled",
+        description: `${result?.sent || 0} sent · ${result?.failed || 0} failed · ${result?.skipped || 0} stopped · ${result?.pending || 0} pending`,
+        variant: !retryable && result?.success === false ? "destructive" : undefined,
+      });
+    } catch (err) {
+      toast({ title: "Couldn't retry Autopilot safely", description: err?.message, variant: "destructive" });
+    } finally {
+      setSendingId(null);
+    }
+  };
+
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading follow-ups" />;
 
   if (!user?.id) {
@@ -161,7 +197,7 @@ export default function FollowUps() {
                 <h2 className="font-semibold text-foreground">Autopilot Recovery Receipts</h2>
               </div>
               <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                These records are read-only evidence from Titan Autopilot. Sent rows preserve provider acceptance; stopped rows were blocked by a safety check; pending rows must be retried through Autopilot so duplicate protection remains intact.
+                These records are read-only evidence from Titan Autopilot. Sent rows preserve provider acceptance; stopped rows were blocked by a safety check; pending free-run rows can be reconciled here using the original run and provider idempotency key.
               </p>
             </div>
             <Button type="button" variant="outline" onClick={() => { window.location.href = "/autopilot"; }}>
@@ -188,8 +224,14 @@ export default function FollowUps() {
                     </div>
                   </div>
                   {row.status === "pending" && (
-                    <Button size="sm" variant="outline" onClick={() => { window.location.href = "/autopilot"; }}>
-                      <RefreshCw className="w-3.5 h-3.5" aria-hidden /> Retry safely
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => retryAutopilot(row)}
+                      disabled={sendingId === row.id}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" aria-hidden />
+                      {sendingId === row.id ? "Reconciling…" : "Retry safely"}
                     </Button>
                   )}
                 </div>

@@ -124,7 +124,7 @@ test("new free deliveries are atomically serialized per owner and invoice", asyn
   assert.match(reclaim, /TO service_role/);
 });
 
-test("shared delivery engine preserves provider evidence and deterministic idempotency", async () => {
+test("shared delivery engine preserves provider evidence and requires an explicit sender", async () => {
   const helper = await read("api/_lib/autopilotDelivery.js");
   const migration = await read("supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql");
   assert.match(helper, /"Idempotency-Key": deliveryKey/);
@@ -132,6 +132,10 @@ test("shared delivery engine preserves provider evidence and deterministic idemp
   assert.match(helper, /network_ambiguous/);
   assert.match(helper, /concurrent_idempotent_requests/);
   assert.match(helper, /provider_accepted_receipt_persist_ambiguous/);
+  assert.match(helper, /process\.env\.RESEND_FROM/);
+  assert.match(helper, /delivery_sender_not_configured/);
+  assert.match(helper, /from: resendFrom/);
+  assert.doesNotMatch(helper, /noreply@titanos\.app/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_autopilot_run_once/);
   assert.match(migration, /rule_id LIKE 'autopilot_run:%'/);
 });

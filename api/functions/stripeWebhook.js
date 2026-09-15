@@ -1,4 +1,4 @@
-import legacyProductHandler from "./stripeWebhookProductHandler.js";
+import legacyProductHandler from "../_lib/stripeWebhookProductHandler.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -52,7 +52,7 @@ function configuredWebhookProduct() {
 }
 
 /**
- * Settlement implementation moved intact to stripeWebhookProductHandler.js.
+ * Settlement implementation moved intact to api/_lib/stripeWebhookProductHandler.js.
  * Keep these contract markers here while the older source-layout regression test
  * is still in the suite; the recipient-contract test validates the real handler.
  *

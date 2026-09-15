@@ -140,6 +140,20 @@ test("preview and recognized Titan hosts keep function writes on the current dep
   assert.match(functions, /Nothing was sent/);
 });
 
+test("production env template documents every free Autopilot runtime dependency", async () => {
+  const env = await read(".env.production.example");
+  assert.match(env, /^VITE_APP_SURFACE=titanos$/m);
+  assert.match(env, /^VITE_SUPABASE_URL=https:\/\/YOUR_PROJECT\.supabase\.co$/m);
+  assert.match(env, /^SUPABASE_URL=https:\/\/YOUR_PROJECT\.supabase\.co$/m);
+  assert.match(env, /^SUPABASE_SERVICE_ROLE_KEY=/m);
+  assert.match(env, /^RESEND_API_KEY=/m);
+  assert.match(env, /^RESEND_FROM=/m);
+  assert.match(env, /^REGISTER_REQUIRE_EMAIL_CONFIRM=true$/m);
+  assert.match(env, /same canonical project/i);
+  assert.match(env, /Autopilot is free/i);
+  assert.doesNotMatch(env, /^VITE_AUTOPILOT_.*(?:PRICE|CHECKOUT|PAID)/m);
+});
+
 test("TitanOS quality and Android workflows select Recovery Staging without Autopilot Stripe scope", async () => {
   const quality = await read(".github/workflows/attention-build.yml");
   const android = await read(".github/workflows/android-release.yml");

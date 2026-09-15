@@ -236,12 +236,14 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and confirms the account immediately for Play testers.
+      // Product Hunt / production registration has one authoritative path: the
+      // Titan server endpoint with durable throttling and product-owned OTP
+      // delivery. Direct Supabase signup remains a development-only escape hatch.
       try {
         return await registerViaServer({ email, password, fullName });
       } catch (serverError) {
-        // Fall back to direct Supabase signup when API is unavailable
+        if (!import.meta.env.DEV) throw serverError;
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -260,7 +262,7 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
-        // Best-effort: log email when client falls back to direct Supabase signup
+        // Development fallback telemetry is best-effort only.
         try {
           const bases = [];
           const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -271,7 +273,7 @@ export function createAuthModule() {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, fullName, source: "supabase_fallback" }),
+              body: JSON.stringify({ email, fullName, source: "supabase_fallback_dev" }),
             });
             if (res.ok) break;
           }

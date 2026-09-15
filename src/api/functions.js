@@ -52,7 +52,7 @@ async function postJson(url, payload, token) {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw apiError(body.error || body.message || "Function call failed", response.status, "HTTP_ERROR");
+      throw apiError(body.error || body.message || "Function call failed", response.status, body.code || "HTTP_ERROR");
     }
     return body;
   } catch (error) {
@@ -110,7 +110,11 @@ async function localFallback(functionName, payload) {
     functionName === "runAutopilotOrder" ||
     functionName === "runAutopilotMembership"
   ) {
-    return unavailableWrite("Titan Autopilot requires a secure connection to the live billing service.");
+    return unavailableWrite("This retired Titan Autopilot payment path is unavailable.");
+  }
+
+  if (functionName === "runAutopilotFree") {
+    return unavailableWrite("Titan Autopilot could not reach the live recovery service. Nothing was sent.");
   }
 
   if (functionName === "calculateFee") {
@@ -182,25 +186,31 @@ async function localFallback(functionName, payload) {
   throw apiError(`Function "${functionName}" is unavailable offline`, 503, "OFFLINE_UNAVAILABLE");
 }
 
+function isRecognizedSameOriginHost(hostname) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".vercel.app") ||
+    hostname.endsWith("titanfieldos.com") ||
+    hostname === "titanos-web.vercel.app"
+  );
+}
+
 function candidateUrls(path) {
   const urls = [];
-  const base = functionsBaseUrl();
-  if (base) urls.push(`${base}${path}`);
 
+  // On a Vercel preview (and other recognized Titan hosts), same-origin must be
+  // authoritative. Otherwise a preview can accidentally execute a stale
+  // production API merely because VITE_API_BASE_URL points at production.
   if (typeof window !== "undefined") {
     const { hostname, origin } = window.location;
-    // Same-origin /api on Vercel / custom domains
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com") ||
-      hostname === "titanos-web.vercel.app"
-    ) {
+    if (isRecognizedSameOriginHost(hostname)) {
       urls.push(`${origin}${path}`);
-      urls.push(path);
     }
   }
+
+  const base = functionsBaseUrl();
+  if (base) urls.push(`${base}${path}`);
 
   return [...new Set(urls)];
 }
@@ -238,7 +248,8 @@ export function createFunctionsModule() {
           }
 
           // Validation, authorization, entitlement, conflict, and rate-limit errors
-          // are real server decisions. Do not mask them as an offline condition.
+          // are real server decisions. Do not mask them as an offline condition or
+          // route the same write to a different deployment.
           if (isClientRejection(lastError)) break;
         }
       }

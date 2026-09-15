@@ -10,7 +10,7 @@ function normalizeSupabaseUrl(value = "") {
   return raw.replace(/\/(rest|auth)\/v1\/?$/i, "").replace(/\/$/, "");
 }
 
-function standardSupabaseProjectRef(value = "") {
+export function standardSupabaseProjectRef(value = "") {
   const normalized = normalizeSupabaseUrl(value);
   if (!normalized) return "";
   try {

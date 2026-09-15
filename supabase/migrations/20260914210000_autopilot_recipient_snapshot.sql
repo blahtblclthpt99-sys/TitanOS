@@ -49,7 +49,7 @@ REVOKE ALL ON FUNCTION public.snapshot_invoice_customer_email() FROM PUBLIC, ano
 
 DROP TRIGGER IF EXISTS trg_snapshot_invoice_customer_email ON public.invoices;
 CREATE TRIGGER trg_snapshot_invoice_customer_email
-BEFORE INSERT OR UPDATE OF customer_id, created_by_id
+BEFORE INSERT OR UPDATE OF customer_id, created_by_id, customer_email
 ON public.invoices
 FOR EACH ROW
 EXECUTE FUNCTION public.snapshot_invoice_customer_email();
@@ -64,6 +64,6 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 COMMENT ON COLUMN public.invoices.customer_email IS
-  'Invoice-time customer email snapshot used for explicit Autopilot recipient approval.';
+  'Server-derived invoice-time customer email snapshot used for explicit Autopilot recipient approval.';
 COMMENT ON COLUMN public.autopilot_membership_claims.recipient_snapshot IS
   'Exact invoice_id/customer_email pairs approved when the monthly Autopilot claim was created.';

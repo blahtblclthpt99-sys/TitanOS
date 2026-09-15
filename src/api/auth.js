@@ -194,6 +194,7 @@ async function registerViaServer({ email, password, fullName }) {
         user: body.user || null,
         needsEmailVerification: Boolean(body.needsEmailVerification),
         verificationMode: body.verificationMode || null,
+        verificationDelivery: body.verificationDelivery || null,
       };
     } catch (err) {
       lastError = err;

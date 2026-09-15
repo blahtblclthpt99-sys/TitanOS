@@ -28,6 +28,14 @@ CREATE TABLE IF NOT EXISTS public.autopilot_funnel_events (
 ALTER TABLE public.autopilot_funnel_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.autopilot_funnel_events FROM anon, authenticated;
 
+DROP POLICY IF EXISTS autopilot_funnel_events_no_client ON public.autopilot_funnel_events;
+CREATE POLICY autopilot_funnel_events_no_client
+  ON public.autopilot_funnel_events
+  FOR ALL
+  TO anon, authenticated
+  USING (false)
+  WITH CHECK (false);
+
 CREATE INDEX IF NOT EXISTS idx_autopilot_funnel_events_name_created
   ON public.autopilot_funnel_events(event_name, created_at DESC);
 

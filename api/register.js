@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.js";
 import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
-import { assertRateLimit } from "./_lib/rateLimit.js";
+import { assertRateLimitAsync } from "./_lib/rateLimit.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
@@ -10,7 +10,8 @@ import { captureApiException } from "./_lib/sentry.js";
  * Server-side registration.
  * Production (VERCEL_ENV=production) requires email confirm unless
  * REGISTER_REQUIRE_EMAIL_CONFIRM is explicitly set to "false".
- * Non-production defaults to auto-confirm for closed beta — still rate-limited.
+ * Registration uses Titan's durable rate-limit path in production so multiple
+ * function instances cannot independently grant the full signup allowance.
  */
 export default async function handler(req, res) {
   applyCors(res, req);
@@ -18,7 +19,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!assertRateLimit(req, res, { limit: 8, windowMs: 60 * 60 * 1000, key: "register" })) {
+  if (!(await assertRateLimitAsync(req, res, {
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+    key: "register",
+    requireDurable: true,
+  }))) {
     return;
   }
 

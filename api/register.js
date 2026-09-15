@@ -21,9 +21,13 @@ function registrationErrorResponse(res, error) {
       code: "WEAK_PASSWORD",
     });
   }
-  if (String(error?.code || "").startsWith("SIGNUP_MAIL_")) {
+  if (String(error?.code || "").startsWith("SIGNUP_")) {
     logError("api/register:confirmation", { code: error.code, message });
-    return res.status(503).json({
+    // 424 is deliberate: the browser registration client only falls back to
+    // direct Supabase signup for unavailable API hosts (404/502/503). A mail or
+    // OTP dependency failure must stay fail-closed instead of silently changing
+    // confirmation mechanisms mid-attempt.
+    return res.status(424).json({
       error: "Verification email is temporarily unavailable. Please try again shortly.",
       code: error.code,
     });

@@ -2,7 +2,6 @@ import legacyProductHandler from "../_lib/stripeWebhookProductHandler.js";
 
 export const config = { api: { bodyParser: false } };
 
-const AUTOPILOT_TASK = "invoice_recovery_sprint";
 const ATTENTION_KIND = "attention_campaign_funding";
 
 async function readRawBody(req) {
@@ -14,76 +13,43 @@ async function readRawBody(req) {
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
-function classifyStripeProduct(event) {
-  const metadata = event?.data?.object?.metadata || {};
-  if (metadata.task_type === AUTOPILOT_TASK) return "autopilot";
-  if (metadata.kind === ATTENTION_KIND) return "attention";
-  return "unclassified";
-}
-
-function configuredWebhookProduct() {
+function isAttentionDeployment() {
   const explicit = String(
     process.env.TITAN_STRIPE_WEBHOOK_PRODUCT ||
     process.env.TITAN_PRODUCT_SURFACE ||
     process.env.VITE_APP_SURFACE ||
     ""
   ).trim().toLowerCase();
-
-  if (["autopilot", "titanos", "titan_os"].includes(explicit)) return "autopilot";
-  if (["attention", "titan_attention"].includes(explicit)) return "attention";
+  if (["attention", "titan_attention"].includes(explicit)) return true;
+  if (["titanos", "autopilot", "titan_os"].includes(explicit)) return false;
 
   const hostHint = String(
     process.env.VERCEL_PROJECT_PRODUCTION_URL ||
     process.env.VERCEL_URL ||
     ""
   ).toLowerCase();
-  if (
+  return (
     hostHint.includes("titan-os-six.vercel.app") ||
     hostHint.includes("titan-os-git-") ||
     /(^|\.)titan-o[a-z0-9-]*\.vercel\.app$/.test(hostHint)
-  ) {
-    return "attention";
-  }
-
-  // Fail toward TitanOS/Autopilot, which is the primary product surface and
-  // Recovery Staging schema. Attention deployments should explicitly set
-  // TITAN_STRIPE_WEBHOOK_PRODUCT=attention (or VITE_APP_SURFACE=attention).
-  return "autopilot";
+  );
 }
 
-/**
- * Settlement implementation moved intact to api/_lib/stripeWebhookProductHandler.js.
- * Keep these contract markers here while the older source-layout regression test
- * is still in the suite; the recipient-contract test validates the real handler.
- *
- * session.payment_status !== "paid"
- * readValidatedAutopilotPayment
- * Autopilot payment user mismatch
- * Autopilot payment creator mismatch
- * Autopilot payment provider mismatch
- * Autopilot payment currency mismatch
- * Autopilot checkout session mismatch
- * Autopilot local order contract mismatch
- * Autopilot checkout amount mismatch
- * AUTOPILOT_PRICE_CENTS
- * stripe_webhook_events
- * claimAutopilotEvent
- * completeAutopilotEvent
- * failAutopilotEvent
- * AUTOPILOT_EVENT_LEASE_MS
- * processing_status
- * guardAutopilotPaymentMutation
- * .eq("user_id", payment.user_id)
- * .eq("amount", payment.amount)
- * .eq("currency", payment.currency)
- * .eq("provider", payment.provider)
- * .eq("note", payment.note)
- * .is("external_id", null)
- * status: "succeeded"
- */
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  // Titan Autopilot is free. Its deployment has no Stripe execution or pricing
+  // dependency; acknowledge stale webhook deliveries without opening Stripe or
+  // Supabase. Titan Attention remains an isolated product surface below.
+  if (!isAttentionDeployment()) {
+    return res.status(200).json({
+      received: true,
+      ignored: true,
+      product: "titanos",
+      reason: "autopilot_payments_retired",
+    });
+  }
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -107,26 +73,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid Stripe signature" });
   }
 
-  const eventProduct = classifyStripeProduct(event);
-  const deploymentProduct = configuredWebhookProduct();
-
-  if (eventProduct === "unclassified") {
-    return res.status(200).json({ received: true, ignored: true, product: "unclassified", type: event.type });
-  }
-
-  if (eventProduct !== deploymentProduct) {
+  const metadata = event?.data?.object?.metadata || {};
+  if (metadata.kind !== ATTENTION_KIND) {
     return res.status(200).json({
       received: true,
       ignored: true,
-      product: eventProduct,
-      deployment_product: deploymentProduct,
-      scope_mismatch: true,
+      product: "unclassified",
       type: event.type,
     });
   }
 
-  // The product handler performs signature verification again. Preserve the raw
-  // bytes here so the request stream never needs to be consumed a second time.
   req.rawBody = rawBody;
   return legacyProductHandler(req, res);
 }

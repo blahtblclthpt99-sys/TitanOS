@@ -91,6 +91,21 @@ test("Recovery Receipts are owner-readable but protected from client mutation", 
   assert.match(rls, /NOT LIKE 'autopilot_run:%'/);
 });
 
+test("pending free Recovery Receipt can resume its exact run after refresh", async () => {
+  const client = await read("src/lib/followUpApi.js");
+  const page = await read("src/pages/FollowUps.jsx");
+  assert.match(client, /FREE_RUN_RULE_RE/);
+  assert.match(client, /export function autopilotFreeRunId\(row\)/);
+  assert.match(client, /export async function retryAutopilotFollowUp\(user, row\)/);
+  assert.match(client, /row\.status !== "pending"/);
+  assert.match(client, /api\.functions\.invoke\("runAutopilotFree", \{ run_id: runId \}\)/);
+  assert.match(page, /retryAutopilotFollowUp/);
+  assert.match(page, /Retry safely/);
+  assert.match(page, /Autopilot recovery reconciled/);
+  assert.match(page, /recent_autopilot_reminder/);
+  assert.match(page, /autopilot_delivery_in_progress/);
+});
+
 test("recovered TitanOS keeps service-role-only durable abuse protection", async () => {
   const migration = await read("supabase/migrations/20260914211500_restore_durable_rate_limit_backend.sql");
   const limiter = await read("api/_lib/rateLimit.js");

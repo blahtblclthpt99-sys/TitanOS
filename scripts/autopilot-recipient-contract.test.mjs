@@ -116,7 +116,7 @@ test("TitanOS stays the default surface and Product Hunt Autopilot remains reach
 
 test("Stripe webhook verifies first and isolates Autopilot from Titan Attention", async () => {
   const router = await read("api/functions/stripeWebhook.js");
-  const productHandler = await read("api/functions/stripeWebhookProductHandler.js");
+  const productHandler = await read("api/_lib/stripeWebhookProductHandler.js");
 
   assert.match(router, /constructEvent\(rawBody, signature, webhookSecret\)/);
   assert.match(router, /function classifyStripeProduct\(event\)/);
@@ -129,9 +129,22 @@ test("Stripe webhook verifies first and isolates Autopilot from Titan Attention"
   assert.match(router, /scope_mismatch: true/);
   assert.match(router, /req\.rawBody = rawBody/);
   assert.match(router, /return legacyProductHandler\(req, res\)/);
+  assert.match(router, /\.\.\/_lib\/stripeWebhookProductHandler\.js/);
   assert.doesNotMatch(router, /getSupabaseAdmin/);
 
+  assert.match(productHandler, /session\.payment_status !== "paid"/);
+  assert.match(productHandler, /readValidatedAutopilotPayment/);
+  assert.match(productHandler, /Autopilot payment user mismatch/);
+  assert.match(productHandler, /Autopilot payment creator mismatch/);
+  assert.match(productHandler, /Autopilot payment provider mismatch/);
+  assert.match(productHandler, /Autopilot payment currency mismatch/);
+  assert.match(productHandler, /Autopilot checkout session mismatch/);
+  assert.match(productHandler, /Autopilot local order contract mismatch/);
+  assert.match(productHandler, /Autopilot checkout amount mismatch/);
   assert.match(productHandler, /claimAutopilotEvent/);
+  assert.match(productHandler, /completeAutopilotEvent/);
+  assert.match(productHandler, /failAutopilotEvent/);
+  assert.match(productHandler, /guardAutopilotPaymentMutation/);
   assert.match(productHandler, /attention_payment_events/);
   assert.match(productHandler, /activate_attention_campaign_funding_service/);
 });

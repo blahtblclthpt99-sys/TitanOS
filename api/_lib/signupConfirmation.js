@@ -21,6 +21,11 @@ async function deleteGeneratedUser(admin, userId) {
   }
 }
 
+function ambiguousProviderResponse(status, body = "") {
+  if (Number(status) >= 500) return true;
+  return Number(status) === 409 && /concurrent_idempotent_requests/i.test(String(body));
+}
+
 export async function sendSignupVerificationOtp({ email, otp, deliveryKey }) {
   const { apiKey, from } = configuredMailer();
   let lastError = null;
@@ -46,25 +51,34 @@ export async function sendSignupVerificationOtp({ email, otp, deliveryKey }) {
         }),
       });
 
-      if (response.ok) return { accepted: true };
+      if (response.ok) return { accepted: true, definitive: true, delivery: "accepted" };
 
       const body = await response.text().catch(() => "");
       const error = new Error(`Signup confirmation provider rejected delivery (${response.status})`);
-      error.code = "SIGNUP_MAIL_REJECTED";
       error.status = response.status;
       error.providerBody = body.slice(0, 240);
-      return { accepted: false, error };
+
+      if (ambiguousProviderResponse(response.status, body)) {
+        error.code = "SIGNUP_MAIL_AMBIGUOUS";
+        lastError = error;
+        if (attempt === 0) continue;
+        return { accepted: false, definitive: false, delivery: "uncertain", error };
+      }
+
+      error.code = "SIGNUP_MAIL_REJECTED";
+      return { accepted: false, definitive: true, delivery: "rejected", error };
     } catch (error) {
       lastError = error;
-      // Retry once with the same provider idempotency key. If the first request
-      // was accepted but its response was lost, Resend must not send it twice.
+      // Retry once with the exact same OTP and provider idempotency key. If the
+      // first request was accepted but its response was lost, the retry cannot
+      // intentionally create a second delivery.
     }
   }
 
   const error = new Error("Signup confirmation delivery could not be verified");
   error.code = "SIGNUP_MAIL_AMBIGUOUS";
   error.cause = lastError;
-  return { accepted: false, error };
+  return { accepted: false, definitive: false, delivery: "uncertain", error };
 }
 
 function validGeneratedOtp(data, expectedUserId = "") {
@@ -102,9 +116,13 @@ export async function sendExistingSignupOtp(admin, { email, expectedUserId = "" 
     otp: generated.otp,
     deliveryKey: `titan_signup_resend_${generated.user.id}_${generated.hashed.slice(0, 32)}`,
   });
-  if (!delivery.accepted) throw delivery.error;
+  if (!delivery.accepted && delivery.definitive) throw delivery.error;
 
-  return { user: generated.user, verificationType: "magiclink" };
+  return {
+    user: generated.user,
+    verificationType: "magiclink",
+    delivery: delivery.accepted ? "accepted" : "uncertain",
+  };
 }
 
 /**
@@ -140,15 +158,19 @@ export async function createSignupWithConfirmation(admin, { email, password, ful
     deliveryKey: `titan_signup_${user.id}`,
   });
 
-  if (!delivery.accepted) {
-    // If mail delivery cannot be proven, remove the generated unconfirmed user
-    // so the person can retry registration cleanly. A provider-accepted but
-    // response-lost email may arrive with a now-invalid code, but the next clean
-    // attempt produces the authoritative replacement code instead of trapping
-    // the email address behind an unreachable account.
+  if (!delivery.accepted && delivery.definitive) {
+    // A definitive provider rejection proves no accepted delivery for this
+    // attempt, so remove the generated account and permit a clean retry.
     await deleteGeneratedUser(admin, user.id);
     throw delivery.error;
   }
 
-  return { user, verificationType: "signup", delivery: "accepted" };
+  // An ambiguous response deliberately keeps the unconfirmed account and OTP
+  // intact. The message may already have been accepted; the UI can still verify
+  // that code or explicitly request a fresh product-owned resend.
+  return {
+    user,
+    verificationType: "signup",
+    delivery: delivery.accepted ? "accepted" : "uncertain",
+  };
 }

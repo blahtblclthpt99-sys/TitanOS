@@ -31,7 +31,7 @@ test("server and browser Supabase canonical project refs must agree", () => {
   );
 });
 
-test("registration requires two-way canonical Supabase project proof", async () => {
+test("registration requires two-way canonical Supabase project proof before persistence", async () => {
   const registration = await read("api/register.js");
   const authClient = await read("src/api/auth.js");
   const clientUrl = await read("src/lib/supabaseUrl.js");
@@ -47,6 +47,12 @@ test("registration requires two-way canonical Supabase project proof", async () 
   assert.match(registration, /clientProjectRef !== serverProjectRef/);
   assert.match(registration, /code: "AUTH_ENVIRONMENT_MISMATCH"/);
   assert.match(registration, /projectRef: serverProjectRef \|\| null/);
+
+  const proofIndex = registration.indexOf("const clientProjectRef =");
+  const limiterIndex = registration.indexOf("if (!(await assertRateLimitAsync");
+  const adminIndex = registration.indexOf("const admin = getSupabaseAdmin()");
+  assert.ok(proofIndex >= 0 && limiterIndex > proofIndex, "project proof must precede durable rate limiting");
+  assert.ok(adminIndex > limiterIndex, "admin access must remain after project proof and limiter");
 });
 
 test("Founding claims require verified auth and tolerate recovered environments without Founding schema", async () => {
@@ -135,7 +141,7 @@ test("abandoned unconfirmed signup is recoverable only after password proof", as
   assert.match(confirmation, /type: "magiclink"/);
 });
 
-test("signup code resend stays product-owned and bound to the pending user", async () => {
+test("signup code resend stays product-owned, project-bound, and tied to the pending user", async () => {
   const endpoint = await read("api/resendSignupOtp.js");
   const confirmation = await read("api/_lib/signupConfirmation.js");
   const client = await read("src/lib/signupOtpClient.js");
@@ -143,13 +149,22 @@ test("signup code resend stays product-owned and bound to the pending user", asy
 
   assert.match(endpoint, /key: "resendSignupOtp"/);
   assert.match(endpoint, /requireDurable: true/);
+  assert.match(endpoint, /durableUnavailableStatus: 424/);
   assert.match(endpoint, /getUserById\(userId\)/);
   assert.match(endpoint, /normalizedEmail\(user\.email\) !== email/);
   assert.match(endpoint, /user\.email_confirmed_at/);
   assert.match(endpoint, /sendExistingSignupOtp\(admin/);
   assert.match(endpoint, /expectedUserId: userId/);
   assert.match(endpoint, /verificationType: generated\.verificationType/);
+  assert.match(endpoint, /projectRef: serverProjectRef \|\| null/);
+  assert.match(endpoint, /code: "AUTH_ENVIRONMENT_MISMATCH"/);
   assert.match(endpoint, /res\.status\(424\)/);
+
+  const resendProofIndex = endpoint.indexOf("const clientProjectRef =");
+  const resendLimiterIndex = endpoint.indexOf("if (!(await assertRateLimitAsync");
+  const resendAdminIndex = endpoint.indexOf("const admin = getSupabaseAdmin()");
+  assert.ok(resendProofIndex >= 0 && resendLimiterIndex > resendProofIndex, "resend project proof must precede durable rate limiting");
+  assert.ok(resendAdminIndex > resendLimiterIndex, "resend admin access must remain after project proof and limiter");
 
   assert.match(confirmation, /type: "magiclink"/);
   assert.match(confirmation, /properties\?\.email_otp/);
@@ -157,6 +172,9 @@ test("signup code resend stays product-owned and bound to the pending user", asy
   assert.match(confirmation, /titan_signup_resend_\$\{generated\.user\.id\}_\$\{generated\.hashed\.slice\(0, 32\)\}/);
   assert.match(confirmation, /verificationType: "magiclink"/);
 
+  assert.match(client, /const clientProjectRef = standardSupabaseProjectRef\(import\.meta\.env\.VITE_SUPABASE_URL\)/);
+  assert.match(client, /JSON\.stringify\(\{ email, user_id: userId, clientProjectRef \}\)/);
+  assert.match(client, /clientProjectRef && body\.projectRef !== clientProjectRef/);
   assert.match(client, /\/api\/resendSignupOtp/);
   assert.match(client, /body\.verificationType !== "magiclink"/);
   assert.match(client, /verificationType === "magiclink" \? "magiclink" : "signup"/);

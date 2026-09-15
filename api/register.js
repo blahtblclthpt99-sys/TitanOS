@@ -193,8 +193,10 @@ export default async function handler(req, res) {
         },
         session: null,
         needsEmailVerification: true,
-        verificationMode: "otp",
-        verificationType: verificationType === "magiclink" ? "magiclink" : "signup",
+        // registerViaServer already transports verificationMode. Encode the
+        // recovered magic-link OTP in that field instead of depending on an
+        // additional response property that older clients drop.
+        verificationMode: verificationType === "magiclink" ? "otp_magiclink" : "otp",
       });
     }
 
@@ -212,7 +214,6 @@ export default async function handler(req, res) {
         session: null,
         needsEmailVerification: false,
         verificationMode: null,
-        verificationType: null,
         userId: createdUser?.id,
       });
     }
@@ -228,7 +229,6 @@ export default async function handler(req, res) {
       },
       needsEmailVerification: false,
       verificationMode: null,
-      verificationType: null,
     });
   } catch (err) {
     logError("api/register", { message: err?.message || String(err) });

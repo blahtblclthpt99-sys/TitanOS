@@ -16,7 +16,8 @@ async function deleteGeneratedUser(admin, userId) {
   try {
     await admin.auth.admin.deleteUser(userId);
   } catch {
-    // Best effort only. The caller still fails closed and never reports signup success.
+    // Best effort only. A later password-proven registration retry can recover
+    // the still-unconfirmed account with a fresh product-owned OTP.
   }
 }
 
@@ -66,6 +67,46 @@ export async function sendSignupVerificationOtp({ email, otp, deliveryKey }) {
   return { accepted: false, error };
 }
 
+function validGeneratedOtp(data, expectedUserId = "") {
+  const user = data?.user || null;
+  const otp = String(data?.properties?.email_otp || "").trim();
+  const hashed = String(data?.properties?.hashed_token || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  const expectedMatches = !expectedUserId || String(user?.id || "") === String(expectedUserId);
+  return user?.id && expectedMatches && /^\d{6}$/.test(otp) && hashed
+    ? { user, otp, hashed }
+    : null;
+}
+
+/**
+ * Generates a fresh magic-link OTP for a user already known to exist. Callers
+ * must independently prove that the account is the intended unconfirmed user
+ * before invoking this helper (password proof or exact user-id/email binding).
+ */
+export async function sendExistingSignupOtp(admin, { email, expectedUserId = "" }) {
+  configuredMailer();
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+  if (error) throw error;
+
+  const generated = validGeneratedOtp(data, expectedUserId);
+  if (!generated) {
+    const contractError = new Error("Supabase did not return a valid resend verification code");
+    contractError.code = "SIGNUP_RESEND_CONTRACT_INVALID";
+    throw contractError;
+  }
+
+  const delivery = await sendSignupVerificationOtp({
+    email,
+    otp: generated.otp,
+    deliveryKey: `titan_signup_resend_${generated.user.id}_${generated.hashed.slice(0, 32)}`,
+  });
+  if (!delivery.accepted) throw delivery.error;
+
+  return { user: generated.user, verificationType: "magiclink" };
+}
+
 /**
  * Creates an unconfirmed Supabase signup and delivers its signup OTP through
  * Titan's transactional mail provider. generateLink creates the auth user but
@@ -109,5 +150,5 @@ export async function createSignupWithConfirmation(admin, { email, password, ful
     throw delivery.error;
   }
 
-  return { user, delivery: "accepted" };
+  return { user, verificationType: "signup", delivery: "accepted" };
 }

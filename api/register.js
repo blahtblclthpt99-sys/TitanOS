@@ -99,6 +99,10 @@ export default async function handler(req, res) {
     windowMs: 60 * 60 * 1000,
     key: "register",
     requireDurable: true,
+    // registerViaServer treats 503 as a host-availability signal and may fall
+    // through to direct Supabase signup. Use a non-fallback dependency status
+    // so missing durable protection cannot be bypassed in production.
+    durableUnavailableStatus: 424,
   }))) {
     return;
   }

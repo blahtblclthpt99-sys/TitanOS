@@ -1,17 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
   Bot,
   CheckCircle2,
   Clock,
-  DollarSign,
-  ExternalLink,
   Eye,
   Mail,
+  ReceiptText,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useSearchParams } from "react-router";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
@@ -21,7 +18,6 @@ import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
 import { toast } from "@/components/ui/use-toast";
 import { useSafeAsync } from "@/hooks/useSafeAsync";
-import { getPlanCheckoutUrl, resolvePlan } from "@/lib/plan";
 import { trackAutopilotEvent } from "@/lib/autopilotTelemetry";
 
 const DAY_MS = 86_400_000;
@@ -40,130 +36,15 @@ function money(value) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0));
 }
 
-function ExamplePreview() {
-  const rows = [
-    { id: "INV-2041", customer: "Sample customer A", age: "34 days overdue", balance: "$840.00" },
-    { id: "INV-2053", customer: "Sample customer B", age: "18 days overdue", balance: "$465.00" },
-    { id: "INV-2060", customer: "Sample customer C", age: "9 days overdue", balance: "$220.00" },
-  ];
-
-  return (
-    <section className="titan-surface overflow-hidden border border-titan-cyan/25">
-      <div className="border-b border-border bg-titan-cyan/5 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-titan-cyan">Example preview · sample data</p>
-          <h2 className="text-lg font-semibold mt-1">Recovery Command Center</h2>
-        </div>
-        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-          Owner approval required
-        </span>
-      </div>
-      <div className="p-5 space-y-3">
-        {rows.map((row, index) => (
-          <div key={row.id} className="rounded-xl border border-border bg-card/70 p-4 flex items-center gap-3">
-            <div className="h-9 w-9 shrink-0 rounded-lg bg-titan-cyan/10 text-titan-cyan flex items-center justify-center font-semibold text-sm">
-              {index + 1}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium truncate">{row.customer}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{row.id} · {row.age}</p>
-            </div>
-            <p className="font-semibold tabular-nums">{row.balance}</p>
-          </div>
-        ))}
-        <div className="grid sm:grid-cols-3 gap-3 pt-2">
-          <div className="rounded-xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">1. Detect</p>
-            <p className="text-sm font-medium mt-1">Find overdue balances</p>
-          </div>
-          <div className="rounded-xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">2. Approve</p>
-            <p className="text-sm font-medium mt-1">Choose exact recipients</p>
-          </div>
-          <div className="rounded-xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">3. Execute</p>
-            <p className="text-sm font-medium mt-1">Send + audit every result</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PublicAutopilot() {
-  useEffect(() => {
-    void trackAutopilotEvent("preview_view", { mode: "public" });
-  }, []);
-
-  return (
-    <div className="page-pad max-w-5xl mx-auto pb-24">
-      <PageHeader
-        title="Titan Autopilot"
-        subtitle="Turn overdue invoices into approved, trackable follow-ups — without spending your day chasing payments."
-      />
-
-      <section className="titan-surface p-5 sm:p-7 mb-5 border border-titan-cyan/25">
-        <div className="max-w-3xl">
-          <p className="text-xs font-medium text-titan-cyan">Invoice recovery, with you in control</p>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-2">
-            Approve the customers. Titan handles the repetitive follow-up.
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-3 leading-relaxed">
-            Titan Autopilot finds eligible overdue invoices, lets you approve up to 10 recipients, sends one factual payment reminder, and records the outcome. If an invoice is paid before execution, the reminder is stopped automatically.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-3 mt-6">
-          <div className="rounded-xl border border-border bg-card/70 p-4">
-            <Eye className="w-5 h-5 text-titan-cyan" aria-hidden />
-            <p className="font-medium mt-3">Nothing hidden</p>
-            <p className="text-xs text-muted-foreground mt-1">You see and approve every recipient before Titan acts.</p>
-          </div>
-          <div className="rounded-xl border border-border bg-card/70 p-4">
-            <ShieldCheck className="w-5 h-5 text-titan-cyan" aria-hidden />
-            <p className="font-medium mt-3">Paid-invoice safety stop</p>
-            <p className="text-xs text-muted-foreground mt-1">Eligibility is checked again immediately before delivery.</p>
-          </div>
-          <div className="rounded-xl border border-border bg-card/70 p-4">
-            <CheckCircle2 className="w-5 h-5 text-titan-cyan" aria-hidden />
-            <p className="font-medium mt-3">Auditable execution</p>
-            <p className="text-xs text-muted-foreground mt-1">Sent, failed, skipped, and retry-needed outcomes stay visible instead of disappearing.</p>
-          </div>
-        </div>
-      </section>
-
-      <ExamplePreview />
-
-      <section className="mt-5 rounded-2xl border border-border bg-card/60 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1">
-          <p className="font-semibold">Use your real invoice data</p>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to see eligible overdue invoices and approve your first recovery batch.</p>
-        </div>
-        <Button className="min-h-11 shrink-0 gap-2" onClick={() => { window.location.href = "/login"; }}>
-          Open Titan Autopilot <ArrowRight className="w-4 h-4" aria-hidden />
-        </Button>
-      </section>
-
-      <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
-        Titan Autopilot is a follow-up workflow, not a collections agency and not a payment guarantee. It only works with customer records you already own and invoices you select.
-      </p>
-    </div>
-  );
-}
-
 export default function Autopilot() {
   const { user, authChecked, isLoadingAuth } = useAuth();
-  const [searchParams] = useSearchParams();
-  const returnedOrder = searchParams.get("order");
-  const checkout = searchParams.get("checkout");
   const [selected, setSelected] = useState([]);
   const [working, setWorking] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const signedViewTracked = useRef(false);
   const eligibleTracked = useRef(false);
   const batchTracked = useRef(false);
-  const checkoutReturnTracked = useRef(false);
-  const paidMembership = user?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(resolvePlan(user));
-  const showOneTime = import.meta.env.VITE_AUTOPILOT_ONETIME_CHECKOUT === "true";
+
   const { data: invoices = [], loading, error, reload } = useSafeAsync(
     () => api.entities.Invoice.list("due_date", 200),
     [user?.id],
@@ -183,47 +64,47 @@ export default function Autopilot() {
       return ageDiff || balanceOf(b) - balanceOf(a);
     }), [invoices]);
 
-  const uniqueEligibleCount = useMemo(() => new Set(eligible.map(recipientKey).filter(Boolean)).size, [eligible]);
+  const uniqueEligibleCount = useMemo(
+    () => new Set(eligible.map(recipientKey).filter(Boolean)).size,
+    [eligible]
+  );
   const selectedRows = useMemo(
     () => selected.map((id) => eligible.find((invoice) => invoice.id === id)).filter(Boolean),
     [eligible, selected]
   );
-  const eligibleBalance = useMemo(() => eligible.reduce((sum, invoice) => sum + balanceOf(invoice), 0), [eligible]);
-  const selectedBalance = useMemo(() => selectedRows.reduce((sum, invoice) => sum + balanceOf(invoice), 0), [selectedRows]);
+  const eligibleBalance = useMemo(
+    () => eligible.reduce((sum, invoice) => sum + balanceOf(invoice), 0),
+    [eligible]
+  );
+  const selectedBalance = useMemo(
+    () => selectedRows.reduce((sum, invoice) => sum + balanceOf(invoice), 0),
+    [selectedRows]
+  );
   const previewInvoice = selectedRows[0] || null;
 
   useEffect(() => {
     if (!user?.id || !authChecked || isLoadingAuth || signedViewTracked.current) return;
     signedViewTracked.current = true;
-    void trackAutopilotEvent("signed_in_view", { mode: paidMembership ? "membership" : "unknown" });
-  }, [authChecked, isLoadingAuth, paidMembership, user?.id]);
+    void trackAutopilotEvent("signed_in_view", { mode: "free" });
+  }, [authChecked, isLoadingAuth, user?.id]);
 
   useEffect(() => {
     if (!user?.id || loading || error || eligibleTracked.current) return;
     eligibleTracked.current = true;
     void trackAutopilotEvent("eligible_loaded", {
-      mode: paidMembership ? "membership" : "unknown",
+      mode: "free",
       invoiceCount: Math.min(10, uniqueEligibleCount),
     });
-  }, [error, loading, paidMembership, uniqueEligibleCount, user?.id]);
+  }, [error, loading, uniqueEligibleCount, user?.id]);
 
   useEffect(() => {
     if (!user?.id || selected.length === 0 || batchTracked.current) return;
     batchTracked.current = true;
     void trackAutopilotEvent("batch_approved", {
-      mode: paidMembership ? "membership" : showOneTime ? "one_time" : "unknown",
+      mode: "free",
       invoiceCount: selected.length,
     });
-  }, [paidMembership, selected.length, showOneTime, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !checkout || checkoutReturnTracked.current) return;
-    checkoutReturnTracked.current = true;
-    void trackAutopilotEvent("checkout_returned", {
-      mode: "one_time",
-      outcome: checkout === "canceled" ? "canceled" : "pending",
-    });
-  }, [checkout, user?.id]);
+  }, [selected.length, user?.id]);
 
   const toggle = (id) => setSelected((current) => {
     if (current.includes(id)) return current.filter((item) => item !== id);
@@ -258,56 +139,30 @@ export default function Autopilot() {
     setSelected(ids);
   };
 
-  const checkoutNow = async () => {
-    setWorking(true);
-    try {
-      const result = await api.functions.invoke("createAutopilotOrder", { invoice_ids: selected });
-      if (!result.checkout_url) throw new Error("Checkout URL missing");
-      window.location.assign(result.checkout_url);
-    } catch (err) {
-      toast({ title: "Checkout couldn't start", description: err?.message, variant: "destructive" });
-      setWorking(false);
-    }
-  };
+  const runFree = async ({ retry = false } = {}) => {
+    if (retry && !lastResult?.run_id) return;
+    if (!retry && selected.length === 0) return;
 
-  const runOrder = async () => {
     setWorking(true);
     try {
-      const result = await api.functions.invoke("runAutopilotOrder", { order_id: returnedOrder });
+      const payload = retry
+        ? { run_id: lastResult.run_id }
+        : { invoice_ids: selected };
+      const result = await api.functions.invoke("runAutopilotFree", payload);
       setLastResult(result);
       const retryable = result.retryable === true || Number(result.pending || 0) > 0;
       toast({
         title: retryable
-          ? "Safe retry required"
+          ? "Safe retry available"
           : result.duplicate
             ? "Sprint already completed"
             : "Recovery sprint completed",
-        description: `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped · ${result.pending || 0} pending`,
+        description: `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} stopped · ${result.pending || 0} pending`,
       });
-    } catch (err) {
-      toast({ title: "Sprint isn't ready", description: err?.message, variant: "destructive" });
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  const runMembership = async () => {
-    setWorking(true);
-    try {
-      const result = await api.functions.invoke("runAutopilotMembership", { invoice_ids: selected });
-      setLastResult(result);
-      const queued = result.delivery_mode === "review_queue";
-      const retryable = result.retryable === true || Number(result.pending || 0) > 0;
-      toast({
-        title: retryable
-          ? "Safe retry required"
-          : queued
-            ? "Reminders prepared for review"
-            : "Included recovery sprint completed",
-        description: queued
-          ? `${result.prepared || 0} ready in Follow-ups · ${result.skipped || 0} skipped`
-          : `${result.sent || 0} sent · ${result.failed || 0} failed · ${result.skipped || 0} skipped · ${result.pending || 0} pending`,
-      });
+      if (!retryable) {
+        batchTracked.current = false;
+        await reload();
+      }
     } catch (err) {
       toast({ title: "Sprint couldn't run", description: err?.message, variant: "destructive" });
     } finally {
@@ -316,7 +171,21 @@ export default function Autopilot() {
   };
 
   if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading Titan Autopilot" />;
-  if (!user) return <PublicAutopilot />;
+  if (!user) {
+    return (
+      <div className="page-pad max-w-3xl mx-auto pb-24">
+        <PageHeader title="Titan Autopilot" subtitle="Free invoice follow-up with approval, safety stops, and Recovery Receipts." />
+        <section className="titan-surface p-6">
+          <p className="font-semibold">Sign in to use your invoice data</p>
+          <p className="text-sm text-muted-foreground mt-2">Titan Autopilot is free. Create an account or sign in to approve a recovery sprint.</p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Button onClick={() => { window.location.href = "/register?from_url=%2Fautopilot"; }}>Create account</Button>
+            <Button variant="outline" onClick={() => { window.location.href = "/login?from_url=%2Fautopilot"; }}>Sign in</Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
   if (loading) return <PageLoader variant="list" label="Finding overdue invoices" />;
   if (error) return <ErrorState title="Couldn't load invoice recovery" onRetry={reload} />;
 
@@ -324,7 +193,7 @@ export default function Autopilot() {
     <div className="page-pad max-w-5xl mx-auto pb-24">
       <PageHeader
         title="Titan Autopilot"
-        subtitle="Turn overdue invoices into approved, trackable follow-ups."
+        subtitle="Free, owner-approved follow-up for overdue invoices."
       />
 
       <section className="titan-surface p-5 sm:p-6 mb-5 border border-titan-cyan/25">
@@ -335,10 +204,13 @@ export default function Autopilot() {
                 <Bot className="w-6 h-6 text-titan-cyan" aria-hidden />
               </div>
               <div>
-                <p className="text-xs font-medium text-titan-cyan">Recovery Command Center</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-medium text-titan-cyan">Recovery Command Center</p>
+                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">Free</span>
+                </div>
                 <h2 className="text-xl font-semibold mt-1">Approve the work. Titan handles the repetition.</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-                  Titan ranks eligible invoices by age, you choose the exact recipients, and every delivery is rechecked and audited before it leaves.
+                  Titan ranks eligible invoices by age, you choose the exact recipients, and every delivery is rechecked and audited before it leaves. There is no checkout or paid plan required.
                 </p>
               </div>
             </div>
@@ -357,46 +229,10 @@ export default function Autopilot() {
 
         <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
           <div className="rounded-lg bg-muted/50 p-3"><Mail className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />One factual reminder per customer</div>
-          <div className="rounded-lg bg-muted/50 p-3"><ShieldCheck className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Paid-after-approval safety stop</div>
+          <div className="rounded-lg bg-muted/50 p-3"><ShieldCheck className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Paid-invoice safety stop</div>
           <div className="rounded-lg bg-muted/50 p-3"><CheckCircle2 className="w-4 h-4 mb-2 text-titan-cyan" aria-hidden />Provider-idempotent audited execution</div>
         </div>
-
-        {!paidMembership && (
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-titan-cyan/30 bg-titan-cyan/5 p-4">
-            <div className="flex-1">
-              <p className="font-semibold">Put invoice follow-up on repeat</p>
-              <p className="text-sm text-muted-foreground mt-1">Pro includes one recovery sprint every month, plus the full TitanOS Pro toolkit.</p>
-            </div>
-            <Button asChild className="min-h-11 shrink-0">
-              <a href={getPlanCheckoutUrl("worker_premium")} target="_blank" rel="noopener noreferrer">
-                Get Pro · $9.99/month <ExternalLink className="w-4 h-4" aria-hidden />
-              </a>
-            </Button>
-          </div>
-        )}
       </section>
-
-      {checkout === "success" && returnedOrder && (
-        <section className="titan-surface p-5 mb-5 border border-emerald-500/30">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" aria-hidden />
-            <div className="flex-1">
-              <h2 className="font-semibold">Checkout complete — verifying payment</h2>
-              <p className="text-sm text-muted-foreground mt-1">Returning from Stripe does not unlock delivery by itself. Titan verifies a signed Stripe webhook and settled payment before sending anything.</p>
-            </div>
-          </div>
-          <Button className="mt-4 min-h-11" onClick={runOrder} disabled={working}>
-            {working ? "Verifying and running…" : "Verify payment and run approved sprint"}
-          </Button>
-        </section>
-      )}
-
-      {checkout === "canceled" && (
-        <section className="rounded-2xl border border-border bg-card/60 p-4 mb-5">
-          <p className="font-medium">Checkout canceled</p>
-          <p className="text-sm text-muted-foreground mt-1">Nothing was sent. Your invoices are unchanged.</p>
-        </section>
-      )}
 
       {lastResult && (
         <section className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 mb-5" aria-live="polite">
@@ -405,16 +241,23 @@ export default function Autopilot() {
             <div className="flex-1">
               <p className="font-semibold">{lastResult.retryable ? "Autopilot needs a safe retry" : "Autopilot run recorded"}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {lastResult.sent || 0} sent · {lastResult.prepared || 0} prepared · {lastResult.failed || 0} failed · {lastResult.skipped || 0} skipped · {lastResult.pending || 0} pending
+                {lastResult.sent || 0} sent · {lastResult.failed || 0} failed · {lastResult.skipped || 0} stopped · {lastResult.pending || 0} pending
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 {lastResult.retryable
-                  ? "A provider response was ambiguous. Titan kept that delivery pending so retrying can reuse the same idempotency key instead of risking a duplicate."
-                  : "Skipped invoices include balances that were no longer eligible when Titan rechecked them."}
+                  ? "A provider result is still uncertain. Safe retry reuses this run's exact approved recipients and provider idempotency keys."
+                  : "Stopped invoices include balances that became ineligible or whose approved recipient changed before delivery."}
               </p>
-              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => { window.location.href = "/follow-ups"; }}>
-                View Recovery Receipts
-              </Button>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {lastResult.retryable && (
+                  <Button type="button" size="sm" onClick={() => runFree({ retry: true })} disabled={working}>
+                    {working ? "Reconciling…" : "Safe retry"}
+                  </Button>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={() => { window.location.href = "/follow-ups"; }}>
+                  View Recovery Receipts
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -465,9 +308,7 @@ export default function Autopilot() {
                       <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                         <Clock className="w-3 h-3" aria-hidden /> {overdue}d overdue
                       </span>
-                      {duplicateRecipientSelected && (
-                        <span className="text-[11px] text-muted-foreground">Customer already selected</span>
-                      )}
+                      {duplicateRecipientSelected && <span className="text-[11px] text-muted-foreground">Customer already selected</span>}
                     </span>
                     <span className="text-xs text-muted-foreground mt-1 block truncate">
                       {invoice.invoice_number || "Invoice"} · {invoice.customer_email} · due {invoice.due_date}
@@ -495,7 +336,7 @@ export default function Autopilot() {
               <Eye className="w-5 h-5 text-titan-cyan shrink-0 mt-0.5" aria-hidden />
               <div className="min-w-0">
                 <p className="text-sm font-semibold">Reminder preview</p>
-                <p className="text-xs text-muted-foreground mt-1">Previewing the first approved invoice. Each reminder uses that invoice's current customer, balance, number, and due date.</p>
+                <p className="text-xs text-muted-foreground mt-1">Previewing the first approved invoice. Every reminder is rechecked before sending.</p>
                 <div className="mt-3 rounded-lg border border-border bg-card p-3 text-sm leading-relaxed whitespace-pre-line">
                   {`Hi ${previewInvoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${previewInvoice.invoice_number || previewInvoice.id} for ${money(balanceOf(previewInvoice))} was due ${previewInvoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`}
                 </div>
@@ -508,23 +349,14 @@ export default function Autopilot() {
           <div className="mt-5 rounded-xl border border-titan-cyan/25 bg-titan-cyan/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-titan-cyan" aria-hidden />
+                <ReceiptText className="w-4 h-4 text-titan-cyan" aria-hidden />
                 <p className="font-semibold">{money(selectedBalance)} selected across {selected.length} customer{selected.length === 1 ? "" : "s"}</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">This is the overdue balance being followed up on — not guaranteed recovered revenue.</p>
+              <p className="text-xs text-muted-foreground mt-1">This is the overdue balance being followed up on, not a fee and not guaranteed recovered revenue.</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-              {paidMembership && (
-                <Button className="min-h-11" disabled={working} onClick={runMembership}>
-                  {working ? "Running approved sprint…" : "Run included sprint"}
-                </Button>
-              )}
-              {showOneTime && (
-                <Button variant={paidMembership ? "outline" : "default"} className="min-h-11" disabled={working} onClick={checkoutNow}>
-                  {working ? "Opening secure checkout…" : <>One-time sprint · $9 <ExternalLink className="w-4 h-4" aria-hidden /></>}
-                </Button>
-              )}
-            </div>
+            <Button className="min-h-11 shrink-0" disabled={working} onClick={() => runFree()}>
+              {working ? "Running approved sprint…" : "Run free recovery sprint"}
+            </Button>
           </div>
         )}
       </section>
@@ -541,9 +373,9 @@ export default function Autopilot() {
           <p className="text-xs text-muted-foreground mt-2">Interrupted sends recover with the same provider idempotency key instead of blindly sending a second email.</p>
         </div>
         <div className="rounded-xl border border-border bg-card/60 p-4">
-          <p className="text-xs text-muted-foreground">Truth</p>
-          <p className="font-medium mt-1">No fake collection claims</p>
-          <p className="text-xs text-muted-foreground mt-2">Titan reports delivery outcomes. It never claims a reminder guarantees payment.</p>
+          <p className="text-xs text-muted-foreground">Access</p>
+          <p className="font-medium mt-1">Free for now</p>
+          <p className="text-xs text-muted-foreground mt-2">No checkout or paid membership is required. Future monetization is intentionally separate from the recovery workflow.</p>
         </div>
       </section>
     </div>

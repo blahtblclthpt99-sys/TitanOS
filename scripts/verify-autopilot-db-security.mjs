@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 function loadEnv(path) {
@@ -40,9 +40,11 @@ async function main() {
   };
 
   let userId = null;
+  let invoiceId = null;
   let receiptId = null;
   let manualId = null;
   let freeRunId = null;
+  let guardDeliveryKey = null;
 
   try {
     const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
@@ -53,13 +55,29 @@ async function main() {
     const { error: signInError } = await client.auth.signInWithPassword({ email, password });
     if (signInError) throw signInError;
 
+    const { data: invoice, error: invoiceError } = await admin
+      .from("invoices")
+      .insert({
+        created_by_id: userId,
+        invoice_number: `SECURITY-${suffix}`,
+        customer_name: "Autopilot Security Probe",
+        status: "sent",
+        total: 1,
+        balance_due: 1,
+        due_date: "2026-01-01",
+      })
+      .select("id")
+      .single();
+    if (invoiceError || !invoice?.id) throw invoiceError || new Error("probe_invoice_not_created");
+    invoiceId = invoice.id;
+
     const { data: freeRun, error: freeRunError } = await admin
       .from("autopilot_runs")
       .insert({
         user_id: userId,
         status: "running",
-        invoice_ids: ["security-probe-invoice"],
-        recipient_snapshot: [{ invoice_id: "security-probe-invoice", customer_email: `recipient-${suffix}@titanos.invalid` }],
+        invoice_ids: [invoiceId],
+        recipient_snapshot: [{ invoice_id: invoiceId, customer_email: `recipient-${suffix}@titanos.invalid` }],
       })
       .select("id,status")
       .single();
@@ -76,6 +94,57 @@ async function main() {
       freeRunClientBlocked = authoritative?.status === "running";
     }
     report.probes.freeRunClientWriteBlocked = { pass: freeRunClientBlocked, clientError: errorSummary(freeRunClientError) };
+
+    guardDeliveryKey = `autopilot_run:free:${freeRunId}:${invoiceId}`;
+    const { data: serviceClaimRows, error: serviceClaimError } = await admin.rpc("claim_autopilot_invoice_delivery", {
+      p_user_id: userId,
+      p_invoice_id: invoiceId,
+      p_run_id: freeRunId,
+      p_delivery_key: guardDeliveryKey,
+    });
+    const serviceClaim = Array.isArray(serviceClaimRows) ? serviceClaimRows[0] : serviceClaimRows;
+    const guardServiceWritable = !serviceClaimError && serviceClaim?.claimed === true;
+    report.probes.guardServiceClaimWorks = { pass: guardServiceWritable, error: errorSummary(serviceClaimError) };
+
+    const { data: guardVisible, error: guardReadError } = await client
+      .from("autopilot_invoice_delivery_guards")
+      .select("user_id,invoice_id")
+      .eq("user_id", userId)
+      .eq("invoice_id", invoiceId)
+      .maybeSingle();
+    const guardClientReadBlocked = Boolean(guardReadError) || !guardVisible;
+    report.probes.guardClientReadBlocked = { pass: guardClientReadBlocked, clientError: errorSummary(guardReadError) };
+
+    const { data: clientClaimRows, error: clientClaimError } = await client.rpc("claim_autopilot_invoice_delivery", {
+      p_user_id: userId,
+      p_invoice_id: invoiceId,
+      p_run_id: randomUUID(),
+      p_delivery_key: `autopilot_run:free:${randomUUID()}:${invoiceId}`,
+    });
+    const guardClientRpcBlocked = Boolean(clientClaimError) && !clientClaimRows;
+    report.probes.guardClientRpcBlocked = { pass: guardClientRpcBlocked, clientError: errorSummary(clientClaimError) };
+
+    const { data: secondClaimRows, error: secondClaimError } = await admin.rpc("claim_autopilot_invoice_delivery", {
+      p_user_id: userId,
+      p_invoice_id: invoiceId,
+      p_run_id: randomUUID(),
+      p_delivery_key: `autopilot_run:free:${randomUUID()}:${invoiceId}`,
+    });
+    const secondClaim = Array.isArray(secondClaimRows) ? secondClaimRows[0] : secondClaimRows;
+    const guardSerializes = !secondClaimError && secondClaim?.claimed === false && secondClaim?.reason === "active_reservation";
+    report.probes.guardSerializesNewRuns = { pass: guardSerializes, error: errorSummary(secondClaimError), reason: secondClaim?.reason || null };
+
+    if (guardServiceWritable) {
+      const { data: released, error: releaseError } = await admin.rpc("release_autopilot_invoice_delivery", {
+        p_user_id: userId,
+        p_invoice_id: invoiceId,
+        p_run_id: freeRunId,
+        p_delivery_key: guardDeliveryKey,
+      });
+      report.probes.guardServiceReleaseWorks = { pass: !releaseError && released === true, error: errorSummary(releaseError) };
+    } else {
+      report.probes.guardServiceReleaseWorks = { pass: false, error: { message: "claim_not_acquired" } };
+    }
 
     const deliveryKey = `autopilot_run:security_probe:${suffix}`;
     const { data: receipt, error: receiptError } = await admin
@@ -182,6 +251,11 @@ async function main() {
     const required = [
       freeRunServiceWritable,
       freeRunClientBlocked,
+      guardServiceWritable,
+      guardClientReadBlocked,
+      guardClientRpcBlocked,
+      guardSerializes,
+      report.probes.guardServiceReleaseWorks.pass,
       receiptReadable,
       updateBlocked,
       deleteBlocked,
@@ -196,7 +270,9 @@ async function main() {
   } finally {
     if (receiptId) await admin.from("follow_up_queue").delete().eq("id", receiptId);
     if (manualId) await admin.from("follow_up_queue").delete().eq("id", manualId);
+    if (userId) await admin.from("autopilot_invoice_delivery_guards").delete().eq("user_id", userId);
     if (freeRunId) await admin.from("autopilot_runs").delete().eq("id", freeRunId);
+    if (invoiceId) await admin.from("invoices").delete().eq("id", invoiceId);
     if (userId) {
       await admin.from("profiles").delete().eq("id", userId);
       await admin.auth.admin.deleteUser(userId);

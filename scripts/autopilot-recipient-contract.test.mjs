@@ -114,6 +114,28 @@ test("TitanOS stays the default surface and Product Hunt Autopilot remains reach
   assert.doesNotMatch(android, /VITE_SUPABASE_URL: "https:\/\/xcfjpxcmokdfwkarwomy\.supabase\.co"/);
 });
 
+test("Stripe webhook verifies first and isolates Autopilot from Titan Attention", async () => {
+  const router = await read("api/functions/stripeWebhook.js");
+  const productHandler = await read("api/functions/stripeWebhookProductHandler.js");
+
+  assert.match(router, /constructEvent\(rawBody, signature, webhookSecret\)/);
+  assert.match(router, /function classifyStripeProduct\(event\)/);
+  assert.match(router, /metadata\.task_type === AUTOPILOT_TASK/);
+  assert.match(router, /metadata\.kind === ATTENTION_KIND/);
+  assert.match(router, /function configuredWebhookProduct\(\)/);
+  assert.match(router, /TITAN_STRIPE_WEBHOOK_PRODUCT/);
+  assert.match(router, /eventProduct === "unclassified"/);
+  assert.match(router, /eventProduct !== deploymentProduct/);
+  assert.match(router, /scope_mismatch: true/);
+  assert.match(router, /req\.rawBody = rawBody/);
+  assert.match(router, /return legacyProductHandler\(req, res\)/);
+  assert.doesNotMatch(router, /getSupabaseAdmin/);
+
+  assert.match(productHandler, /claimAutopilotEvent/);
+  assert.match(productHandler, /attention_payment_events/);
+  assert.match(productHandler, /activate_attention_campaign_funding_service/);
+});
+
 test("recipient contract never infers a replacement address during recovery", async () => {
   const order = await read("api/functions/runAutopilotOrder.js");
   const membership = await read("api/functions/runAutopilotMembership.js");

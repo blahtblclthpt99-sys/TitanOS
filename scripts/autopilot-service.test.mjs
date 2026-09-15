@@ -60,9 +60,12 @@ test("free Autopilot runner has no payment or subscription entitlement dependenc
   assert.doesNotMatch(source, /Stripe|checkout|paying_subscriber|plan_tier|price_cents|payments/);
 });
 
-test("free runner snapshots exact recipients and enforces one customer per sprint", async () => {
+test("free runner validates IDs, snapshots exact recipients, and enforces one customer per sprint", async () => {
   const source = await read("api/functions/runAutopilotFree.js");
   const ui = await read("src/pages/Autopilot.jsx");
+  assert.match(source, /UUID_RE/);
+  assert.match(source, /requestedInvoiceIds\.some\(\(id\) => !UUID_RE\.test\(id\)\)/);
+  assert.match(source, /One or more invoice IDs are invalid/);
   assert.match(source, /buildRecipientSnapshot/);
   assert.match(source, /approvedRecipientMap/);
   assert.match(source, /hasDuplicateRecipients\(ordered\)/);
@@ -97,15 +100,29 @@ test("free runner rechecks eligibility and recipient immediately before delivery
   assert.match(source, /status: "skipped"/);
 });
 
-test("free runner blocks repeated reminders for the same invoice inside the safety window", async () => {
+test("new free deliveries are atomically serialized per owner and invoice", async () => {
   const source = await read("api/functions/runAutopilotFree.js");
-  assert.match(source, /REPEAT_REMINDER_COOLDOWN_MS = 72 \* 60 \* 60 \* 1000/);
-  assert.match(source, /async function recentAutopilotDelivery/);
-  assert.match(source, /\.eq\("status", "sent"\)/);
-  assert.match(source, /\.gte\("sent_at", since\)/);
-  assert.match(source, /\.like\("rule_id", `autopilot_run:%:\$\{invoiceId\}`\)/);
+  const migration = await read("supabase/migrations/20260915043000_autopilot_invoice_delivery_guard.sql");
+
+  assert.match(source, /claim_autopilot_invoice_delivery/);
+  assert.match(source, /release_autopilot_invoice_delivery/);
+  assert.match(source, /claimInvoiceDelivery\(auth\.admin, auth\.user\.id, invoiceId, run\.id, deliveryKey\)/);
+  assert.match(source, /autopilot_delivery_in_progress/);
   assert.match(source, /recent_autopilot_reminder/);
   assert.match(source, /72-hour safety window/);
+  assert.match(source, /persisted pending Receipt now protects this invoice/);
+
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.autopilot_invoice_delivery_guards/);
+  assert.match(migration, /PRIMARY KEY \(user_id, invoice_id\)/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /INTERVAL '72 hours'/);
+  assert.match(migration, /INTERVAL '23 hours'/);
+  assert.match(migration, /INTERVAL '5 minutes'/);
+  assert.match(migration, /'recent_sent'/);
+  assert.match(migration, /'pending_delivery'/);
+  assert.match(migration, /'active_reservation'/);
+  assert.match(migration, /REVOKE ALL ON public\.autopilot_invoice_delivery_guards FROM anon, authenticated/);
+  assert.match(migration, /TO service_role/);
 });
 
 test("shared delivery engine preserves provider evidence and deterministic idempotency", async () => {

@@ -1,6 +1,6 @@
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimitAsync } from "./_lib/rateLimit.js";
-import { getSupabaseAdmin, readJson } from "./_lib/supabase.js";
+import { getSupabaseAdmin, readJson, standardSupabaseProjectRef } from "./_lib/supabase.js";
 import { sendExistingSignupOtp } from "./_lib/signupConfirmation.js";
 import { logError } from "./_lib/safeLog.js";
 
@@ -20,14 +20,29 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const body = readJson(req);
+  const clientProjectRef = String(body.clientProjectRef || "").trim().toLowerCase();
+  const serverProjectRef = standardSupabaseProjectRef(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  );
+  if (clientProjectRef && !/^[a-z0-9]+$/.test(clientProjectRef)) {
+    return res.status(400).json({ error: "Invalid verification environment" });
+  }
+  if (clientProjectRef && serverProjectRef && clientProjectRef !== serverProjectRef) {
+    return res.status(409).json({
+      error: "Verification environment changed. Reload TitanOS and try again.",
+      code: "AUTH_ENVIRONMENT_MISMATCH",
+    });
+  }
+
   if (!(await assertRateLimitAsync(req, res, {
     limit: 5,
     windowMs: 10 * 60 * 1000,
     key: "resendSignupOtp",
     requireDurable: true,
+    durableUnavailableStatus: 424,
   }))) return;
 
-  const body = readJson(req);
   const userId = uuid(body.user_id || body.userId);
   const email = normalizedEmail(body.email);
   if (!userId || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -53,7 +68,11 @@ export default async function handler(req, res) {
       expectedUserId: userId,
     });
 
-    return res.status(202).json({ sent: true, verificationType: generated.verificationType });
+    return res.status(202).json({
+      projectRef: serverProjectRef || null,
+      sent: true,
+      verificationType: generated.verificationType,
+    });
   } catch (error) {
     logError("api/resendSignupOtp", { code: error?.code, message: error?.message || String(error) });
     return res.status(424).json({

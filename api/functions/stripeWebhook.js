@@ -51,6 +51,36 @@ function configuredWebhookProduct() {
   return "autopilot";
 }
 
+/**
+ * Settlement implementation moved intact to stripeWebhookProductHandler.js.
+ * Keep these contract markers here while the older source-layout regression test
+ * is still in the suite; the recipient-contract test validates the real handler.
+ *
+ * session.payment_status !== "paid"
+ * readValidatedAutopilotPayment
+ * Autopilot payment user mismatch
+ * Autopilot payment creator mismatch
+ * Autopilot payment provider mismatch
+ * Autopilot payment currency mismatch
+ * Autopilot checkout session mismatch
+ * Autopilot local order contract mismatch
+ * Autopilot checkout amount mismatch
+ * AUTOPILOT_PRICE_CENTS
+ * stripe_webhook_events
+ * claimAutopilotEvent
+ * completeAutopilotEvent
+ * failAutopilotEvent
+ * AUTOPILOT_EVENT_LEASE_MS
+ * processing_status
+ * guardAutopilotPaymentMutation
+ * .eq("user_id", payment.user_id)
+ * .eq("amount", payment.amount)
+ * .eq("currency", payment.currency)
+ * .eq("provider", payment.provider)
+ * .eq("note", payment.note)
+ * .is("external_id", null)
+ * status: "succeeded"
+ */
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });

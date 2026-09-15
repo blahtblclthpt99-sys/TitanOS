@@ -58,8 +58,38 @@ test("production signup generates and delivers an explicit verification OTP", as
   assert.match(confirmation, /titan_signup_\$\{user\.id\}/);
   assert.match(confirmation, /if \(!delivery\.accepted\)[\s\S]*await deleteGeneratedUser\(admin, user\.id\)/);
   assert.match(registerPage, /result\?\.verificationMode === "otp"/);
-  assert.match(registerPage, /await api\.auth\.verifyOtp\(\{ email, otpCode \}\)/);
+  assert.match(registerPage, /setPendingUserId\(result\.user\.id\)/);
+  assert.match(registerPage, /setOtpType\("signup"\)/);
   assert.doesNotMatch(registerPage, /setToken\(result\.access_token\)/);
+});
+
+test("signup code resend stays product-owned and bound to the pending user", async () => {
+  const endpoint = await read("api/resendSignupOtp.js");
+  const client = await read("src/lib/signupOtpClient.js");
+  const registerPage = await read("src/pages/Register.jsx");
+
+  assert.match(endpoint, /key: "resendSignupOtp"/);
+  assert.match(endpoint, /requireDurable: true/);
+  assert.match(endpoint, /getUserById\(userId\)/);
+  assert.match(endpoint, /normalizedEmail\(user\.email\) !== email/);
+  assert.match(endpoint, /user\.email_confirmed_at/);
+  assert.match(endpoint, /type: "magiclink"/);
+  assert.match(endpoint, /String\(generatedUser\?\.id \|\| ""\) !== userId/);
+  assert.match(endpoint, /properties\?\.email_otp/);
+  assert.match(endpoint, /properties\?\.hashed_token/);
+  assert.match(endpoint, /titan_signup_resend_\$\{userId\}_\$\{hashed\.slice\(0, 32\)\}/);
+  assert.match(endpoint, /verificationType: "magiclink"/);
+  assert.match(endpoint, /res\.status\(424\)/);
+
+  assert.match(client, /\/api\/resendSignupOtp/);
+  assert.match(client, /body\.verificationType !== "magiclink"/);
+  assert.match(client, /verificationType === "magiclink" \? "magiclink" : "signup"/);
+  assert.match(client, /\^\\d\{6\}\$/.test ? /\^\\d\{6\}\$/ : /six-digit verification code/);
+  assert.match(client, /supabase\.auth\.verifyOtp/);
+
+  assert.match(registerPage, /resendSignupOtp\(\{ email, userId: pendingUserId \}\)/);
+  assert.match(registerPage, /setOtpType\(result\.verificationType\)/);
+  assert.match(registerPage, /verifySignupOtp\(\{ email, otpCode, verificationType: otpType \}\)/);
 });
 
 test("Product Hunt auth CTAs safely return users to Autopilot", async () => {

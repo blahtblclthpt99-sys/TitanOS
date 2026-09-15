@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.js";
+import {
+  getSupabaseAdmin,
+  getSupabaseAnonKey,
+  readJson,
+  standardSupabaseProjectRef,
+} from "./_lib/supabase.js";
 import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimitAsync } from "./_lib/rateLimit.js";
@@ -35,23 +40,15 @@ async function recoverUnconfirmedSignup(admin, { email, password }) {
   const client = createServerAuthClient();
   const { data, error } = await client.auth.signInWithPassword({ email, password });
 
-  // A successful sign-in means the account is already confirmed; do not turn a
-  // registration retry into a login response. Wrong passwords also fail below.
   if (!error || data?.session) return null;
   if (!isEmailNotConfirmed(error)) return null;
 
-  // Supabase Auth authenticates the password before returning
-  // email_not_confirmed. That makes this a password-proven recovery of the same
-  // unconfirmed signup rather than an email-only account takeover path.
   return sendExistingSignupOtp(admin, { email });
 }
 
 function registrationErrorResponse(res, error) {
   const message = String(error?.message || "");
   if (isDuplicateSignupError(error)) {
-    // Do not positively disclose whether an email is already registered. A
-    // legitimate returning user has clear recovery actions without turning the
-    // registration endpoint into a high-signal account-enumeration oracle.
     return res.status(409).json({
       error: "Could not create or resume this account. Try signing in or resetting your password.",
       code: "ACCOUNT_UNAVAILABLE",
@@ -65,10 +62,6 @@ function registrationErrorResponse(res, error) {
   }
   if (String(error?.code || "").startsWith("SIGNUP_")) {
     logError("api/register:confirmation", { code: error.code, message });
-    // 424 is deliberate: the browser registration client only falls back to
-    // direct Supabase signup for unavailable API hosts (404/502/503). A mail or
-    // OTP dependency failure must stay fail-closed instead of silently changing
-    // confirmation mechanisms mid-attempt.
     return res.status(424).json({
       error: "Verification email is temporarily unavailable. Please try again shortly.",
       code: error.code,
@@ -81,13 +74,6 @@ function registrationErrorResponse(res, error) {
   });
 }
 
-/**
- * Server-side registration.
- * Production (VERCEL_ENV=production) requires email confirmation unless
- * REGISTER_REQUIRE_EMAIL_CONFIRM is explicitly set to "false".
- * Registration uses Titan's durable rate-limit path in production so multiple
- * function instances cannot independently grant the full signup allowance.
- */
 export default async function handler(req, res) {
   applyCors(res, req);
   if (handleOptions(req, res)) return;
@@ -99,9 +85,6 @@ export default async function handler(req, res) {
     windowMs: 60 * 60 * 1000,
     key: "register",
     requireDurable: true,
-    // registerViaServer treats 503 as a host-availability signal and may fall
-    // through to direct Supabase signup. Use a non-fallback dependency status
-    // so missing durable protection cannot be bypassed in production.
     durableUnavailableStatus: 424,
   }))) {
     return;
@@ -114,6 +97,24 @@ export default async function handler(req, res) {
       .toLowerCase();
     const password = String(body.password || "");
     const fullName = String(body.fullName || body.full_name || "").trim();
+    const clientProjectRef = String(body.clientProjectRef || "").trim().toLowerCase();
+    const serverProjectRef = standardSupabaseProjectRef(
+      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+    );
+
+    // A browser may try more than one API host during availability failover. If
+    // both sides can prove canonical hosted Supabase refs, never let a browser
+    // configured for one project create an account through another deployment.
+    if (clientProjectRef && !/^[a-z0-9]+$/.test(clientProjectRef)) {
+      return res.status(400).json({ error: "Invalid registration environment" });
+    }
+    if (clientProjectRef && serverProjectRef && clientProjectRef !== serverProjectRef) {
+      return res.status(409).json({
+        error: "Signup environment changed. Reload TitanOS and try again.",
+        code: "AUTH_ENVIRONMENT_MISMATCH",
+      });
+    }
+
     const flag = process.env.REGISTER_REQUIRE_EMAIL_CONFIRM;
     const requireConfirm =
       flag != null && String(flag).trim() !== ""
@@ -183,9 +184,6 @@ export default async function handler(req, res) {
 
     await recordSignupEmail(admin, { email, fullName, source: "register" });
 
-    // Confirm-required users are claimed only by the verified-auth database
-    // transition. This direct best-effort claim is reserved for environments
-    // that explicitly create already-confirmed users.
     if (createdUser?.id && !requireConfirm) {
       try {
         await admin.rpc("claim_founding_slot", { p_user_id: createdUser.id });
@@ -202,9 +200,6 @@ export default async function handler(req, res) {
         },
         session: null,
         needsEmailVerification: true,
-        // registerViaServer already transports verificationMode. Encode the
-        // recovered magic-link OTP in that field instead of depending on an
-        // additional response property that older clients drop.
         verificationMode: verificationType === "magiclink" ? "otp_magiclink" : "otp",
       });
     }

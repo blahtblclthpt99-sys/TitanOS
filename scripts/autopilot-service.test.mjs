@@ -35,17 +35,12 @@ test("Product Hunt attribution remains coarse", () => {
 });
 
 test("Autopilot paid entrypoints are retired and cannot create charges", async () => {
-  for (const path of [
-    "api/functions/createAutopilotOrder.js",
-    "api/functions/runAutopilotOrder.js",
-    "api/functions/runAutopilotMembership.js",
-  ]) {
+  for (const path of ["api/functions/createAutopilotOrder.js", "api/functions/runAutopilotOrder.js", "api/functions/runAutopilotMembership.js"]) {
     const source = await read(path);
     assert.match(source, /res\.status\(410\)/);
     assert.doesNotMatch(source, /new Stripe|stripe\.checkout|stripe\.prices|SPRINT_PRICE_CENTS/);
   }
-  const checkout = await read("api/functions/createAutopilotOrder.js");
-  assert.match(checkout, /AUTOPILOT_PAID_CHECKOUT_RETIRED/);
+  assert.match(await read("api/functions/createAutopilotOrder.js"), /AUTOPILOT_PAID_CHECKOUT_RETIRED/);
 });
 
 test("free Autopilot runner has no payment or subscription entitlement dependency", async () => {
@@ -103,7 +98,7 @@ test("free runner rechecks eligibility and recipient immediately before delivery
 test("new free deliveries are atomically serialized per owner and invoice", async () => {
   const source = await read("api/functions/runAutopilotFree.js");
   const migration = await read("supabase/migrations/20260915043000_autopilot_invoice_delivery_guard.sql");
-
+  const reclaim = await read("supabase/migrations/20260915050000_autopilot_guard_same_run_reclaim.sql");
   assert.match(source, /claim_autopilot_invoice_delivery/);
   assert.match(source, /release_autopilot_invoice_delivery/);
   assert.match(source, /claimInvoiceDelivery\(auth\.admin, auth\.user\.id, invoiceId, run\.id, deliveryKey\)/);
@@ -111,7 +106,6 @@ test("new free deliveries are atomically serialized per owner and invoice", asyn
   assert.match(source, /recent_autopilot_reminder/);
   assert.match(source, /72-hour safety window/);
   assert.match(source, /persisted pending Receipt now protects this invoice/);
-
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.autopilot_invoice_delivery_guards/);
   assert.match(migration, /PRIMARY KEY \(user_id, invoice_id\)/);
   assert.match(migration, /pg_advisory_xact_lock/);
@@ -123,6 +117,11 @@ test("new free deliveries are atomically serialized per owner and invoice", asyn
   assert.match(migration, /'active_reservation'/);
   assert.match(migration, /REVOKE ALL ON public\.autopilot_invoice_delivery_guards FROM anon, authenticated/);
   assert.match(migration, /TO service_role/);
+  assert.match(reclaim, /v_guard\.run_id = p_run_id AND v_guard\.delivery_key = v_delivery_key/);
+  assert.match(reclaim, /'reclaimed_same_run'/);
+  assert.match(reclaim, /'active_reservation'/);
+  assert.match(reclaim, /REVOKE ALL ON FUNCTION public\.claim_autopilot_invoice_delivery/);
+  assert.match(reclaim, /TO service_role/);
 });
 
 test("shared delivery engine preserves provider evidence and deterministic idempotency", async () => {
@@ -155,6 +154,7 @@ test("authenticated Autopilot UI is free-only", async () => {
   assert.match(page, /runAutopilotFree/);
   assert.match(page, /Run free recovery sprint/);
   assert.match(page, /There is no checkout or paid plan required/);
+  assert.match(page, /setSelected\(\[\]\)/);
   assert.doesNotMatch(page, /createAutopilotOrder|runAutopilotOrder|runAutopilotMembership/);
   assert.doesNotMatch(page, /getPlanCheckoutUrl|resolvePlan|VITE_AUTOPILOT_ONETIME_CHECKOUT/);
   assert.doesNotMatch(page, /\$9(?:\.00|\.99)?|Checkout complete|Get Pro/);

@@ -59,6 +59,15 @@ test("TitanOS registration requires durable cross-instance throttling", async ()
   assert.doesNotMatch(registration, /import \{ assertRateLimit \} from/);
 });
 
+test("registration avoids account enumeration and pre-verification entitlement claims", async () => {
+  const registration = await read("api/register.js");
+  assert.match(registration, /code: "ACCOUNT_UNAVAILABLE"/);
+  assert.match(registration, /Try signing in or resetting your password/);
+  assert.doesNotMatch(registration, /An account with this email already exists/);
+  assert.doesNotMatch(registration, /code: "EMAIL_TAKEN"/);
+  assert.match(registration, /if \(createdUser\?\.id && !requireConfirm\)/);
+});
+
 test("production signup generates and delivers an explicit verification OTP", async () => {
   const registration = await read("api/register.js");
   const confirmation = await read("api/_lib/signupConfirmation.js");

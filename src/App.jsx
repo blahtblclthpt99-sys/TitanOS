@@ -35,7 +35,7 @@ const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const PublicSign = lazy(() => import("@/pages/PublicSign"));
 const ShareReport = lazy(() => import("@/pages/ShareReport"));
-const Autopilot = lazy(() => import("@/pages/Autopilot"));
+const AutopilotPublic = lazy(() => import("@/pages/AutopilotPublic"));
 
 /** Marketing + auth screens that must not require authentication. */
 const PUBLIC_EXACT = new Set([
@@ -94,7 +94,7 @@ function PublicRoutes() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/autopilot" element={<Autopilot />} />
+          <Route path="/autopilot" element={<AutopilotPublic />} />
           <Route path="/book/:slug" element={<PublicBooking />} />
           <Route path="/u/:username" element={<PublicProfile />} />
           <Route path="/sign/:token" element={<PublicSign />} />

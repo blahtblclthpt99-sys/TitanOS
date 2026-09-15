@@ -66,13 +66,13 @@ export default function Register() {
         await finishSignup(me?.id || result?.user?.id);
         return;
       }
-      if (result?.verificationMode === "otp") {
+      if (["otp", "otp_magiclink"].includes(result?.verificationMode)) {
         if (!result?.user?.id) {
           setError("Signup verification could not be initialized. Please try again.");
           return;
         }
         setPendingUserId(result.user.id);
-        setOtpType("signup");
+        setOtpType(result.verificationMode === "otp_magiclink" ? "magiclink" : "signup");
         setOtpCode("");
         setShowOtp(true);
         return;

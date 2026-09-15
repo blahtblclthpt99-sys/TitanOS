@@ -467,7 +467,10 @@ export default async function handler(req, res) {
         count(autopilotQueueOutcome(current));
         continue;
       }
-      if (queueError) throw queueError;
+      if (queueError) {
+        await releaseInvoiceDelivery(auth.admin, auth.user.id, invoiceId, run.id, deliveryKey);
+        throw queueError;
+      }
 
       // The persisted pending Receipt now protects this invoice for the provider
       // retry window, so the short pre-queue reservation can be released.

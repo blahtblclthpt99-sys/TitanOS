@@ -14,6 +14,7 @@ import {
 
 const MAX_INVOICES = 10;
 const STALE_RUN_MS = 15 * 60 * 1000;
+const REPEAT_REMINDER_COOLDOWN_MS = 72 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RUN_SELECT = "id,user_id,status,updated_at,invoice_ids,recipient_snapshot,prepared_count,sent_count,failed_count,skipped_count,pending_count";
 
@@ -80,7 +81,7 @@ function reminderMessage(invoice) {
   return `Hi ${invoice.customer_name || "there"},\n\nThis is a friendly reminder that invoice ${invoice.invoice_number || invoice.id} for $${balance} was due ${invoice.due_date}. Please contact us if you have already paid or need help with payment.\n\nThank you.`;
 }
 
-async function insertSkippedReceipt(admin, ownerId, { invoiceId, customerName = "", email, deliveryKey, code, message }) {
+async function insertSkippedReceipt(admin, ownerId, { customerName = "", email, deliveryKey, code, message }) {
   const { error } = await admin.from("follow_up_queue").insert({
     created_by_id: ownerId,
     user_id: ownerId,
@@ -99,6 +100,22 @@ async function insertSkippedReceipt(admin, ownerId, { invoiceId, customerName = 
   }
   const current = await readAutopilotQueue(admin, { ownerId, deliveryKey });
   return autopilotQueueOutcome(current);
+}
+
+async function recentAutopilotDelivery(admin, ownerId, invoiceId) {
+  const since = new Date(Date.now() - REPEAT_REMINDER_COOLDOWN_MS).toISOString();
+  const { data, error } = await admin
+    .from("follow_up_queue")
+    .select("id,sent_at,rule_id")
+    .eq("created_by_id", ownerId)
+    .eq("status", "sent")
+    .gte("sent_at", since)
+    .like("rule_id", `autopilot_run:%:${invoiceId}`)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
 }
 
 async function readRun(admin, ownerId, runId) {
@@ -128,7 +145,7 @@ async function acquireRun(admin, ownerId, requestedInvoiceIds, requestedSnapshot
       };
     }
 
-    const lease = new Date().toISOString();
+    const requestedLease = new Date().toISOString();
     const { data: reclaimed, error } = await admin
       .from("autopilot_runs")
       .update({
@@ -138,7 +155,7 @@ async function acquireRun(admin, ownerId, requestedInvoiceIds, requestedSnapshot
         failed_count: 0,
         skipped_count: 0,
         pending_count: 0,
-        updated_at: lease,
+        updated_at: requestedLease,
         completed_at: null,
       })
       .eq("id", existing.id)
@@ -149,13 +166,19 @@ async function acquireRun(admin, ownerId, requestedInvoiceIds, requestedSnapshot
       .maybeSingle();
     if (error) throw error;
     if (!reclaimed) return { error: "This recovery sprint changed while retrying. Try again.", status: 409 };
-    return { run: reclaimed, lease, invoiceIds: originalInvoiceIds, snapshot: existing.recipient_snapshot, recovered: true };
+    return {
+      run: reclaimed,
+      lease: reclaimed.updated_at || requestedLease,
+      invoiceIds: originalInvoiceIds,
+      snapshot: existing.recipient_snapshot,
+      recovered: true,
+    };
   }
 
   if (!requestedInvoiceIds.length || !approvedRecipientMap(requestedInvoiceIds, requestedSnapshot)) {
     return { error: "Select at least one overdue invoice with an approved customer email", status: 400 };
   }
-  const lease = new Date().toISOString();
+  const requestedLease = new Date().toISOString();
   const { data: created, error } = await admin
     .from("autopilot_runs")
     .insert({
@@ -163,12 +186,18 @@ async function acquireRun(admin, ownerId, requestedInvoiceIds, requestedSnapshot
       status: "running",
       invoice_ids: requestedInvoiceIds,
       recipient_snapshot: requestedSnapshot,
-      updated_at: lease,
+      updated_at: requestedLease,
     })
     .select(RUN_SELECT)
     .single();
   if (error) throw error;
-  return { run: created, lease: created.updated_at || lease, invoiceIds: requestedInvoiceIds, snapshot: requestedSnapshot, recovered: false };
+  return {
+    run: created,
+    lease: created.updated_at || requestedLease,
+    invoiceIds: requestedInvoiceIds,
+    snapshot: requestedSnapshot,
+    recovered: false,
+  };
 }
 
 export default async function handler(req, res) {
@@ -349,7 +378,6 @@ export default async function handler(req, res) {
       const invoice = currentById.get(invoiceId) || null;
       if (!invoice) {
         const outcome = await insertSkippedReceipt(auth.admin, auth.user.id, {
-          invoiceId,
           email: approvedEmail,
           deliveryKey,
           code: "invoice_missing_after_approval",
@@ -369,7 +397,6 @@ export default async function handler(req, res) {
       const recipientChanged = recipientKey(fresh) !== approvedEmail;
       if (!isStillEligible(fresh, today) || recipientChanged) {
         const outcome = await insertSkippedReceipt(auth.admin, auth.user.id, {
-          invoiceId,
           customerName: invoice.customer_name || "",
           email: approvedEmail,
           deliveryKey,
@@ -377,6 +404,19 @@ export default async function handler(req, res) {
           message: recipientChanged
             ? `Skipped invoice ${invoice.invoice_number || invoiceId}: the customer email changed after approval and requires a new recovery approval.`
             : `Skipped invoice ${invoice.invoice_number || invoiceId}: it is no longer an eligible overdue balance.`,
+        });
+        count(outcome);
+        continue;
+      }
+
+      const recentDelivery = await recentAutopilotDelivery(auth.admin, auth.user.id, invoiceId);
+      if (recentDelivery) {
+        const outcome = await insertSkippedReceipt(auth.admin, auth.user.id, {
+          customerName: fresh.customer_name || invoice.customer_name || "",
+          email: approvedEmail,
+          deliveryKey,
+          code: "recent_autopilot_reminder",
+          message: `Skipped invoice ${fresh.invoice_number || invoiceId}: Titan already sent a reminder for this invoice within the 72-hour safety window.`,
         });
         count(outcome);
         continue;
@@ -418,7 +458,7 @@ export default async function handler(req, res) {
     }
 
     const retryable = pending > 0;
-    const finalStatus = retryable ? "retryable" : "completed";
+    const finalStatus = retryable ? "retryable" : failed > 0 ? "failed" : "completed";
     const finishedAt = new Date().toISOString();
     const { data: finalized, error: finalizeError } = await auth.admin
       .from("autopilot_runs")
@@ -443,15 +483,15 @@ export default async function handler(req, res) {
 
     await recordAutopilotFunnel(auth.admin, {
       userId: auth.user.id,
-      eventName: retryable ? "run_retryable" : "run_completed",
+      eventName: retryable ? "run_retryable" : failed > 0 ? "run_failed" : "run_completed",
       source,
       mode: "free",
       invoiceCount: funnelInvoiceCount,
-      outcome: retryable ? "retryable" : "completed",
+      outcome: retryable ? "retryable" : failed > 0 ? "failed" : "completed",
     });
 
     return res.status(retryable ? 202 : 200).json({
-      success: !retryable,
+      success: finalStatus === "completed",
       retryable,
       run_id: run.id,
       prepared,

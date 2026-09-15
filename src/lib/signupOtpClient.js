@@ -6,44 +6,40 @@ function apiError(message, status = 400) {
   return error;
 }
 
-function apiBases() {
-  const bases = [];
+function apiBase() {
   const configured = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) bases.push(configured);
+  if (configured) return configured;
   if (typeof window !== "undefined") {
     const { hostname, origin } = window.location;
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
-      bases.push(origin);
+      return origin;
     }
-    bases.push("https://titanos-web.vercel.app");
   }
-  return [...new Set(bases)];
+  return "https://titanos-web.vercel.app";
 }
 
 export async function resendSignupOtp({ email, userId }) {
   if (!email || !userId) throw apiError("Restart signup to request a new code", 400);
-  let lastError = null;
 
-  for (const base of apiBases()) {
-    try {
-      const response = await fetch(`${base}/api/resendSignupOtp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, user_id: userId }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw apiError(body.error || "Verification code could not be resent", response.status);
-      if (body.sent !== true || body.verificationType !== "magiclink") {
-        throw apiError("Verification service returned an unexpected response", 502);
-      }
-      return { sent: true, verificationType: "magiclink" };
-    } catch (error) {
-      lastError = error;
-      if (error?.status && ![404, 502, 503].includes(error.status)) throw error;
+  try {
+    const response = await fetch(`${apiBase()}/api/resendSignupOtp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, user_id: userId }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw apiError(body.error || "Verification code could not be resent", response.status);
+    if (body.sent !== true || body.verificationType !== "magiclink") {
+      throw apiError("Verification service returned an unexpected response", 502);
     }
+    return { sent: true, verificationType: "magiclink" };
+  } catch (error) {
+    if (error?.status) throw error;
+    // Never retry a resend request against another host after an ambiguous
+    // network failure: the first host may already have generated and sent a new
+    // token. The user can explicitly tap Resend again after the failure clears.
+    throw apiError("Could not verify whether the new code was sent. Please check your email before retrying.", 503);
   }
-
-  throw lastError || apiError("Verification service is unavailable", 503);
 }
 
 export async function verifySignupOtp({ email, otpCode, verificationType = "signup" }) {

@@ -3,7 +3,7 @@ import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
 import { resolveStoredUploadUrl } from "./integrations";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
-import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
+import { normalizeSupabaseUrl, standardSupabaseProjectRef } from "@/lib/supabaseUrl";
 
 function apiError(message, status = 400) {
   const error = new Error(message);
@@ -166,13 +166,14 @@ async function registerViaServer({ email, password, fullName }) {
     bases.push("https://titanos-web.vercel.app");
   }
 
+  const clientProjectRef = standardSupabaseProjectRef(import.meta.env.VITE_SUPABASE_URL);
   let lastError;
   for (const base of [...new Set(bases)]) {
     try {
       const response = await fetch(`${base}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, password, fullName, clientProjectRef }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {

@@ -20,7 +20,8 @@ async function deleteGeneratedUser(admin, userId) {
   }
 }
 
-async function sendOtpEmail({ apiKey, from, email, otp, deliveryKey }) {
+export async function sendSignupVerificationOtp({ email, otp, deliveryKey }) {
+  const { apiKey, from } = configuredMailer();
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -71,7 +72,8 @@ async function sendOtpEmail({ apiKey, from, email, otp, deliveryKey }) {
  * does not send mail; this keeps mail delivery explicit and auditable.
  */
 export async function createSignupWithConfirmation(admin, { email, password, fullName = "" }) {
-  const mailer = configuredMailer();
+  // Prove the mail dependency exists before creating an auth user.
+  configuredMailer();
   const { data, error } = await admin.auth.admin.generateLink({
     type: "signup",
     email,
@@ -91,8 +93,7 @@ export async function createSignupWithConfirmation(admin, { email, password, ful
     throw contractError;
   }
 
-  const delivery = await sendOtpEmail({
-    ...mailer,
+  const delivery = await sendSignupVerificationOtp({
     email,
     otp,
     deliveryKey: `titan_signup_${user.id}`,

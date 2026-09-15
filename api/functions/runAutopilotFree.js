@@ -14,7 +14,6 @@ import {
 
 const MAX_INVOICES = 10;
 const STALE_RUN_MS = 15 * 60 * 1000;
-const REPEAT_REMINDER_COOLDOWN_MS = 72 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RUN_SELECT = "id,user_id,status,updated_at,invoice_ids,recipient_snapshot,prepared_count,sent_count,failed_count,skipped_count,pending_count";
 
@@ -102,20 +101,35 @@ async function insertSkippedReceipt(admin, ownerId, { customerName = "", email, 
   return autopilotQueueOutcome(current);
 }
 
-async function recentAutopilotDelivery(admin, ownerId, invoiceId) {
-  const since = new Date(Date.now() - REPEAT_REMINDER_COOLDOWN_MS).toISOString();
-  const { data, error } = await admin
-    .from("follow_up_queue")
-    .select("id,sent_at,rule_id")
-    .eq("created_by_id", ownerId)
-    .eq("status", "sent")
-    .gte("sent_at", since)
-    .like("rule_id", `autopilot_run:%:${invoiceId}`)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+async function claimInvoiceDelivery(admin, ownerId, invoiceId, runId, deliveryKey) {
+  const { data, error } = await admin.rpc("claim_autopilot_invoice_delivery", {
+    p_user_id: ownerId,
+    p_invoice_id: invoiceId,
+    p_run_id: runId,
+    p_delivery_key: deliveryKey,
+  });
   if (error) throw error;
-  return data || null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row.claimed !== "boolean") {
+    throw new Error("Autopilot delivery guard returned an invalid claim response");
+  }
+  return row;
+}
+
+async function releaseInvoiceDelivery(admin, ownerId, invoiceId, runId, deliveryKey) {
+  try {
+    const { error } = await admin.rpc("release_autopilot_invoice_delivery", {
+      p_user_id: ownerId,
+      p_invoice_id: invoiceId,
+      p_run_id: runId,
+      p_delivery_key: deliveryKey,
+    });
+    if (error) throw error;
+  } catch (error) {
+    // Once a pending Recovery Receipt exists, it is the authoritative long-lived
+    // concurrency guard. A stale short reservation expires after five minutes.
+    logError("runAutopilotFree:guard_release", error, { runId, invoiceId });
+  }
 }
 
 async function readRun(admin, ownerId, runId) {
@@ -237,6 +251,9 @@ export default async function handler(req, res) {
     }
 
     const requestedInvoiceIds = requestedRunId ? [] : invoiceIdsFrom(body.invoice_ids);
+    if (!requestedRunId && requestedInvoiceIds.some((id) => !UUID_RE.test(id))) {
+      return res.status(400).json({ error: "One or more invoice IDs are invalid" });
+    }
     const today = new Date().toISOString().slice(0, 10);
     let requestedSnapshot = null;
 
@@ -409,14 +426,19 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const recentDelivery = await recentAutopilotDelivery(auth.admin, auth.user.id, invoiceId);
-      if (recentDelivery) {
+      const claim = await claimInvoiceDelivery(auth.admin, auth.user.id, invoiceId, run.id, deliveryKey);
+      if (!claim.claimed) {
+        const recent = claim.reason === "recent_sent";
+        const code = recent ? "recent_autopilot_reminder" : "autopilot_delivery_in_progress";
+        const message = recent
+          ? `Skipped invoice ${fresh.invoice_number || invoiceId}: Titan already sent a reminder for this invoice within the 72-hour safety window.`
+          : `Skipped invoice ${fresh.invoice_number || invoiceId}: another Autopilot delivery for this invoice is already in progress. Retry after the existing delivery is reconciled.`;
         const outcome = await insertSkippedReceipt(auth.admin, auth.user.id, {
           customerName: fresh.customer_name || invoice.customer_name || "",
           email: approvedEmail,
           deliveryKey,
-          code: "recent_autopilot_reminder",
-          message: `Skipped invoice ${fresh.invoice_number || invoiceId}: Titan already sent a reminder for this invoice within the 72-hour safety window.`,
+          code,
+          message,
         });
         count(outcome);
         continue;
@@ -441,10 +463,15 @@ export default async function handler(req, res) {
 
       if (queueError?.code === "23505") {
         const current = await readAutopilotQueue(auth.admin, { ownerId: auth.user.id, deliveryKey });
+        await releaseInvoiceDelivery(auth.admin, auth.user.id, invoiceId, run.id, deliveryKey);
         count(autopilotQueueOutcome(current));
         continue;
       }
       if (queueError) throw queueError;
+
+      // The persisted pending Receipt now protects this invoice for the provider
+      // retry window, so the short pre-queue reservation can be released.
+      await releaseInvoiceDelivery(auth.admin, auth.user.id, invoiceId, run.id, deliveryKey);
 
       const result = await deliverAutopilotQueue({
         admin: auth.admin,

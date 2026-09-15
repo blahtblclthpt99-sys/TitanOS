@@ -112,12 +112,14 @@ export default function AutopilotPublic() {
         <div className="flex flex-col sm:flex-row gap-2 shrink-0">
           <a
             href={`/register?from_url=${AUTOPILOT_RETURN}`}
+            aria-label="Open Titan Autopilot — create account"
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Create account <ArrowRight className="w-4 h-4" aria-hidden="true" />
           </a>
           <a
             href={`/login?from_url=${AUTOPILOT_RETURN}`}
+            aria-label="Open Titan Autopilot — sign in"
             className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Sign in

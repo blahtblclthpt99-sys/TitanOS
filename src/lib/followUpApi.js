@@ -2,6 +2,7 @@ import { api } from "@/api/apiClient";
 import { readLocal, uid, writeLocal } from "@/lib/localStore";
 
 const PREFIX = "titanos_followups";
+const FREE_RUN_RULE_RE = /^autopilot_run:free:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const defaults = [
   { name: "Thanks", delay_days: 0, message_template: "Thanks for choosing us, {customer_name}!" },
   { name: "Need another service?", delay_days: 30, message_template: "Hi {customer_name}, need help with another project?" },
@@ -12,6 +13,22 @@ const write = (userId, key, rows) => writeLocal(PREFIX, userId, key, rows);
 
 export function isAutopilotFollowUp(row) {
   return String(row?.rule_id || "").startsWith("autopilot_run:");
+}
+
+export function autopilotFreeRunId(row) {
+  if (!isAutopilotFollowUp(row)) return "";
+  return String(row?.rule_id || "").match(FREE_RUN_RULE_RE)?.[1] || "";
+}
+
+export async function retryAutopilotFollowUp(user, row) {
+  if (!user?.id || !row?.id || row.status !== "pending" || !isAutopilotFollowUp(row)) {
+    throw new Error("Only a pending Titan Autopilot Recovery Receipt can be retried safely");
+  }
+  const runId = autopilotFreeRunId(row);
+  if (!runId) {
+    throw new Error("This older Recovery Receipt cannot be resumed automatically. Start a new free sprint after reviewing the invoice.");
+  }
+  return api.functions.invoke("runAutopilotFree", { run_id: runId });
 }
 
 export async function listRules(userId) {

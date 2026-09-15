@@ -3,13 +3,52 @@ import { getSupabaseAdmin, getSupabaseAnonKey, readJson } from "./_lib/supabase.
 import { recordSignupEmail } from "./_lib/recordSignupEmail.js";
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimitAsync } from "./_lib/rateLimit.js";
-import { createSignupWithConfirmation } from "./_lib/signupConfirmation.js";
+import { createSignupWithConfirmation, sendExistingSignupOtp } from "./_lib/signupConfirmation.js";
 import { logError } from "./_lib/safeLog.js";
 import { captureApiException } from "./_lib/sentry.js";
 
+function isDuplicateSignupError(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || "");
+  return ["email_exists", "user_already_exists"].includes(code) || /already|registered|exists/i.test(message);
+}
+
+function isEmailNotConfirmed(error) {
+  return String(error?.code || "").toLowerCase() === "email_not_confirmed" ||
+    /email\s+not\s+confirmed/i.test(String(error?.message || ""));
+}
+
+function createServerAuthClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const anon = getSupabaseAnonKey();
+  if (!url || !anon) {
+    const error = new Error("Server auth is misconfigured");
+    error.code = "SERVER_AUTH_MISCONFIGURED";
+    throw error;
+  }
+  return createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function recoverUnconfirmedSignup(admin, { email, password }) {
+  const client = createServerAuthClient();
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+  // A successful sign-in means the account is already confirmed; do not turn a
+  // registration retry into a login response. Wrong passwords also fail below.
+  if (!error || data?.session) return null;
+  if (!isEmailNotConfirmed(error)) return null;
+
+  // Supabase Auth authenticates the password before returning
+  // email_not_confirmed. That makes this a password-proven recovery of the same
+  // unconfirmed signup rather than an email-only account takeover path.
+  return sendExistingSignupOtp(admin, { email });
+}
+
 function registrationErrorResponse(res, error) {
   const message = String(error?.message || "");
-  if (/already|registered|exists/i.test(message)) {
+  if (isDuplicateSignupError(error)) {
     return res.status(409).json({
       error: "An account with this email already exists",
       code: "EMAIL_TAKEN",
@@ -86,6 +125,7 @@ export default async function handler(req, res) {
 
     const admin = getSupabaseAdmin();
     let createdUser = null;
+    let verificationType = null;
     let signInClient = null;
 
     if (requireConfirm) {
@@ -96,18 +136,33 @@ export default async function handler(req, res) {
           fullName,
         });
         createdUser = generated.user;
+        verificationType = generated.verificationType;
       } catch (createError) {
-        return registrationErrorResponse(res, createError);
+        if (isDuplicateSignupError(createError)) {
+          try {
+            const recovered = await recoverUnconfirmedSignup(admin, { email, password });
+            if (recovered?.user?.id) {
+              createdUser = recovered.user;
+              verificationType = recovered.verificationType;
+            } else {
+              return registrationErrorResponse(res, createError);
+            }
+          } catch (recoveryError) {
+            if (String(recoveryError?.code || "").startsWith("SIGNUP_")) {
+              return registrationErrorResponse(res, recoveryError);
+            }
+            return registrationErrorResponse(res, createError);
+          }
+        } else {
+          return registrationErrorResponse(res, createError);
+        }
       }
     } else {
-      const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-      const anon = getSupabaseAnonKey();
-      if (!url || !anon) {
-        return res.status(500).json({ error: "Server auth is misconfigured" });
+      try {
+        signInClient = createServerAuthClient();
+      } catch (error) {
+        return res.status(500).json({ error: error.message });
       }
-      signInClient = createClient(url, anon, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
@@ -139,6 +194,7 @@ export default async function handler(req, res) {
         session: null,
         needsEmailVerification: true,
         verificationMode: "otp",
+        verificationType: verificationType === "magiclink" ? "magiclink" : "signup",
       });
     }
 
@@ -156,6 +212,7 @@ export default async function handler(req, res) {
         session: null,
         needsEmailVerification: false,
         verificationMode: null,
+        verificationType: null,
         userId: createdUser?.id,
       });
     }
@@ -171,6 +228,7 @@ export default async function handler(req, res) {
       },
       needsEmailVerification: false,
       verificationMode: null,
+      verificationType: null,
     });
   } catch (err) {
     logError("api/register", { message: err?.message || String(err) });

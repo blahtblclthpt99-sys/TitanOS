@@ -34,10 +34,14 @@ export async function resendSignupOtp({ email, userId }) {
     if (clientProjectRef && body.projectRef !== clientProjectRef) {
       throw apiError("Verification environment changed. Reload TitanOS and try again.", 409);
     }
-    if (body.sent !== true || body.verificationType !== "magiclink") {
+    if (!["accepted", "uncertain"].includes(body.deliveryStatus) || body.verificationType !== "magiclink") {
       throw apiError("Verification service returned an unexpected response", 502);
     }
-    return { sent: true, verificationType: "magiclink" };
+    return {
+      sent: body.deliveryStatus === "accepted",
+      deliveryStatus: body.deliveryStatus,
+      verificationType: "magiclink",
+    };
   } catch (error) {
     if (error?.status) throw error;
     throw apiError("Could not verify whether the new code was sent. Please check your email before retrying.", 503);

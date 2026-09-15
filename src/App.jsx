@@ -35,8 +35,9 @@ const PublicBooking = lazy(() => import("@/pages/PublicBooking"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const PublicSign = lazy(() => import("@/pages/PublicSign"));
 const ShareReport = lazy(() => import("@/pages/ShareReport"));
+const Autopilot = lazy(() => import("@/pages/Autopilot"));
 
-/** Marketing + auth screens that must not use the app shell. */
+/** Marketing + auth screens that must not require authentication. */
 const PUBLIC_EXACT = new Set([
   "/pricing",
   "/download",
@@ -53,7 +54,12 @@ const PUBLIC_EXACT = new Set([
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  "/autopilot",
 ]);
+
+// These routes have a public preview but authenticated users should enter the
+// full TitanOS shell instead of staying in the marketing-only route tree.
+const PUBLIC_PREVIEW_APP_ROUTES = new Set(["/autopilot"]);
 
 function isPublicPath(pathname) {
   const p = normalizeAppPath(pathname);
@@ -88,6 +94,7 @@ function PublicRoutes() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/autopilot" element={<Autopilot />} />
           <Route path="/book/:slug" element={<PublicBooking />} />
           <Route path="/u/:username" element={<PublicProfile />} />
           <Route path="/sign/:token" element={<PublicSign />} />
@@ -102,6 +109,8 @@ function PublicRoutes() {
 /**
  * One AppLayout instance for every authenticated app route (including `/`).
  * Public/marketing routes paint immediately without waiting on auth.
+ * `/autopilot` is dual-mode: anonymous visitors see the Product Hunt preview,
+ * while signed-in users get the full Recovery Command Center in AppLayout.
  */
 function AppShellGate() {
   const location = useLocation();
@@ -116,9 +125,9 @@ function AppShellGate() {
 
   const pathname = normalizeAppPath(location.pathname);
   const publicPath = isPublicPath(pathname);
+  const previewAppRoute = PUBLIC_PREVIEW_APP_ROUTES.has(pathname);
   const isHome = pathname === "/";
   const nativeRoot = shouldUseHashRouter() && isHome;
-  // Re-check on every render so post-login navigation sees the new session immediately.
   const cachedSession = hasCachedAuthSession();
 
   useEffect(() => {
@@ -127,22 +136,18 @@ function AppShellGate() {
     }
   }, [authChecked, isLoadingAuth, checkUserAuth]);
 
-  // Soft session on app routes: stay on spinner / shell — never bounce to /login
-  // (that redirect was looping Login ↔ `/`).
   useEffect(() => {
-    if (!cachedSession || isAuthenticated || isLoadingAuth || publicPath) return;
+    if (!cachedSession || isAuthenticated || isLoadingAuth || (publicPath && !previewAppRoute)) return;
     if (!authChecked) return;
     const t = setTimeout(() => {
       checkUserAuth().catch(() => {});
     }, 1500);
     return () => clearTimeout(t);
-  }, [cachedSession, isAuthenticated, isLoadingAuth, authChecked, publicPath, checkUserAuth]);
+  }, [cachedSession, isAuthenticated, isLoadingAuth, authChecked, publicPath, previewAppRoute, checkUserAuth]);
 
-  // Authenticated shell for app routes (and home when signed in / session present)
   const wantsAppShell =
-    (isAuthenticated && !publicPath) ||
-    (isAuthenticated && isHome) ||
-    (cachedSession && (isHome || !publicPath));
+    (isAuthenticated && (!publicPath || isHome || previewAppRoute)) ||
+    (cachedSession && (isHome || !publicPath || previewAppRoute));
 
   if (wantsAppShell) {
     if (authError?.type === "user_not_registered") {
@@ -160,13 +165,10 @@ function AppShellGate() {
     );
   }
 
-  // Public marketing / auth — paint immediately (no auth spinner)
-  // Home (`/`) is Landing only on the web; native `/` should enter the app flow.
   if ((!nativeRoot && isHome) || publicPath) {
     return <PublicRoutes />;
   }
 
-  // Protected deep-link while auth resolves
   if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
     return <Spinner fullScreen label="Loading TitanOS" />;
   }

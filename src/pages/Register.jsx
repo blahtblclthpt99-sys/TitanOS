@@ -63,6 +63,11 @@ export default function Register() {
         await finishSignup(me?.id || result?.user?.id);
         return;
       }
+      if (result?.verificationMode === "otp") {
+        setOtpCode("");
+        setShowOtp(true);
+        return;
+      }
       if (result?.verificationMode === "email_link" || result?.needsEmailVerification) {
         setError("");
         toast({
@@ -72,7 +77,15 @@ export default function Register() {
         navigate("/login", { replace: true });
         return;
       }
-      setShowOtp(true);
+      if (result?.user?.id) {
+        toast({
+          title: "Account created",
+          description: "Sign in to continue.",
+        });
+        navigate("/login", { replace: true });
+        return;
+      }
+      setError("Registration did not return a usable account state. Please try again.");
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {

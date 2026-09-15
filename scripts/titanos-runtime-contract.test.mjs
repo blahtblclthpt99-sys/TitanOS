@@ -22,8 +22,6 @@ test("server and browser Supabase canonical project refs must agree", () => {
     /Supabase server\/client project mismatch/
   );
 
-  // Custom domains cannot be mapped to a project ref from hostname alone, so
-  // they remain an E2E deployment-verification responsibility.
   assert.equal(
     assertSupabaseProjectConsistency({
       serverUrl: "https://db.example.com",
@@ -53,9 +51,13 @@ test("Founding claims require verified auth and tolerate recovered environments 
 
 test("TitanOS registration requires durable cross-instance throttling", async () => {
   const registration = await read("api/register.js");
+  const rateLimit = await read("api/_lib/rateLimit.js");
   assert.match(registration, /assertRateLimitAsync/);
   assert.match(registration, /key: "register"/);
   assert.match(registration, /requireDurable: true/);
+  assert.match(registration, /durableUnavailableStatus: 424/);
+  assert.match(rateLimit, /opts\.durableUnavailableStatus/);
+  assert.match(rateLimit, /return durableUnavailable\(res, opts\.durableUnavailableStatus\)/);
   assert.doesNotMatch(registration, /import \{ assertRateLimit \} from/);
 });
 

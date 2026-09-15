@@ -87,6 +87,7 @@ test("TitanOS stays the default surface and Product Hunt Autopilot remains reach
   const main = await read("src/main.jsx");
   const app = await read("src/App.jsx");
   const publicPreview = await read("src/pages/AutopilotPublic.jsx");
+  const publicTelemetry = await read("src/lib/autopilotPublicTelemetry.js");
   const tabs = await read("src/components/layout/TabStack.jsx");
   const attentionSurface = await read("src/AttentionSurface.jsx");
   const android = await read(".github/workflows/android-release.yml");
@@ -107,9 +108,12 @@ test("TitanOS stays the default surface and Product Hunt Autopilot remains reach
   assert.match(tabs, /"\/autopilot": Autopilot/);
 
   assert.match(publicPreview, /Example preview · sample data/);
-  assert.match(publicPreview, /trackAutopilotEvent\("preview_view"/);
+  assert.match(publicPreview, /trackPublicAutopilotPreview/);
   assert.match(publicPreview, /Open Titan Autopilot/);
-  assert.doesNotMatch(publicPreview, /useAuth|api\.entities|api\.functions|Invoice\.list|runAutopilot|createAutopilotOrder/);
+  assert.doesNotMatch(publicPreview, /useAuth|api\.entities|api\.functions|Invoice\.list|runAutopilot|createAutopilotOrder|PageHeader|components\/ui\/button/);
+  assert.match(publicTelemetry, /fetch\("\/api\/functions\/trackAutopilotEvent"/);
+  assert.match(publicTelemetry, /event_name: "preview_view"/);
+  assert.doesNotMatch(publicTelemetry, /apiClient|createClient|supabase|useAuth/);
 
   assert.match(attentionSurface, /import AttentionApp from "\.\/AttentionApp\.jsx"/);
   assert.match(attentionSurface, /import "\.\/attention\.css"/);

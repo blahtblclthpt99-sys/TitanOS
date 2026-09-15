@@ -7,13 +7,13 @@
 
 ## Result
 
-**Database migration and RLS certification: PASS**
+**Database migration, RLS, recipient-integrity, and durable-rate-limit certification: PASS**
 
-This report covers database/schema/security behavior only. It does **not** certify production hosting, GitHub CI, live Stripe delivery, Resend delivery, or Product Hunt launch readiness.
+This report does **not** certify production hosting, executable GitHub CI, live Stripe delivery, Resend delivery, or Product Hunt launch readiness.
 
-## Applied staging migrations
+## Applied Recovery Staging migrations
 
-The following Autopilot schema changes were applied successfully to Recovery Staging in order:
+The following branch migrations were applied successfully:
 
 1. `041_titan_autopilot.sql`
 2. `042_autopilot_membership_claims.sql`
@@ -22,29 +22,27 @@ The following Autopilot schema changes were applied successfully to Recovery Sta
 5. `20260914194500_autopilot_queue_rls.sql`
 6. `20260914203000_stripe_webhook_claim_state.sql`
 7. `20260914210000_autopilot_recipient_snapshot.sql`
+8. `20260914211500_restore_durable_rate_limit_backend.sql`
 
-During post-migration linting, the two server-only Autopilot tables were reported as `RLS Enabled No Policy` INFO findings. The branch was tightened to include explicit client-deny policies and the same policies were applied to Recovery Staging. The security advisor then returned to its exact pre-Autopilot baseline.
+An additional staging remediation applied explicit client-deny policies to the two service-only Autopilot tables after security linting identified their earlier no-policy deny-by-default state as informational. The branch versions now include those policies directly for clean installs.
 
-## Schema verification
+## Verified schema and policy state
 
-Verified present after migration:
+Verified after migration:
 
 - `follow_up_queue.customer_email`
 - `follow_up_queue.provider_message_id`
 - `follow_up_queue.delivery_error_code`
 - `idx_followup_autopilot_run_once`
 - `idx_followup_provider_message_id`
-- `autopilot_membership_claims`
-- `autopilot_membership_claims.recipient_snapshot`
+- `autopilot_membership_claims` + `recipient_snapshot`
 - `autopilot_funnel_events`
 - `invoices.customer_email`
 - `trg_snapshot_invoice_customer_email`
-- Stripe ledger fields:
-  - `processing_status`
-  - `claimed_at`
-  - `attempt_count`
-  - `last_error`
+- Stripe ledger fields `processing_status`, `claimed_at`, `attempt_count`, `last_error`
 - `idx_stripe_webhook_events_claim_state`
+- `titan_rate_limit_buckets`
+- `consume_rate_limit(text, integer, integer)`
 
 Verified Follow-up policies:
 
@@ -53,13 +51,13 @@ Verified Follow-up policies:
 - `follow_queue_update_own_non_autopilot`
 - `follow_queue_delete_own_non_autopilot`
 
-Verified `autopilot_funnel_events` has no anon/authenticated table grants.
+Autopilot claims, funnel telemetry, and durable rate-limit storage are explicit client-deny surfaces.
 
-## Live rollback-only RLS / recipient behavior probe
+## Rollback-only RLS / recipient behavior probe
 
-A synthetic auth user, customer, invoice, Recovery Receipt, and ordinary Follow-up were created inside a database transaction, the session switched to the `authenticated` role with the synthetic JWT subject, behavior was tested, and the transaction was rolled back.
+Synthetic auth/customer/invoice/receipt data was created inside a transaction, tested as the `authenticated` role, and rolled back.
 
-All checks passed:
+Passed:
 
 - `receipt_readable = true`
 - `receipt_update_blocked = true`
@@ -67,73 +65,91 @@ All checks passed:
 - `manual_followup_update_allowed = true`
 - `direct_recipient_override_rederived = true`
 
-The last check proves a direct authenticated attempt to change `invoices.customer_email` to another address is overwritten by the database trigger with the email from the owner-matched customer relationship.
+The last result proves an authenticated attempt to replace `invoices.customer_email` with another address is overwritten by the database trigger with the owner-matched customer's email.
 
-## Live rollback-only client-write probe
+## Rollback-only client-write probe
 
-A second synthetic transaction verified:
+Passed:
 
 - `forged_autopilot_insert_blocked = true`
 - `funnel_client_write_blocked = true`
 - `membership_claim_client_write_blocked = true`
 
-No probe rows or users were persisted.
+No synthetic users or operational rows were persisted.
+
+## Durable rate-limit live probe
+
+The restored service-role fallback was exercised inside rollback-only probes.
+
+Fixed-window behavior passed:
+
+- `first_allowed = true`
+- `second_allowed = true`
+- `third_blocked = true` for limit `2`
+- `third_retry_after_positive = true`
+
+Client isolation passed:
+
+- direct authenticated function execution blocked;
+- direct authenticated rate-limit bucket write blocked.
+
+The application therefore has a durable database fallback for routes that set `requireDurable: true`, independent of optional Upstash configuration.
 
 ## Security advisor result
 
-Before Autopilot migrations, Recovery Staging had two unrelated INFO findings:
+Before Autopilot, Recovery Staging had two unrelated INFO findings:
 
 - `public.portal_sessions` — RLS enabled, no policy
 - `public.titan_comms_channel_secrets` — RLS enabled, no policy
 
-After adding explicit deny policies to the two Autopilot server-only tables, the security advisor returned to the same two pre-existing findings. No Autopilot security lint remains.
+After Autopilot hardening and durable-rate-limit restoration, the advisor returned to the same two pre-existing findings. **No Autopilot or rate-limit security lint remains.**
 
 Reference: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
 
 ## Performance advisor result
 
-The performance advisor continues to report pre-existing unused-index and multiple-permissive-policy findings throughout the recovered staging schema. No index was removed based only on staging usage counters.
+Pre-existing unused-index and multiple-permissive-policy findings remain throughout the recovered staging schema. No index was removed based only on staging usage counters.
 
 References:
 
 - https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index
 - https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies
 
-## Recipient approval contract verified in branch
+## Branch regression contract
 
-The branch now requires:
+`scripts/autopilot-recipient-contract.test.mjs` is part of `npm run test:payments`, and `test:payments` is part of `npm run gate:ship`.
 
-- server-derived invoice customer email;
-- owner-matched customer relationship;
-- one-time `approved_recipients` snapshot before Checkout;
-- monthly `recipient_snapshot` preservation;
-- exact recipient comparison during new delivery and safe retry;
-- `approved_recipient_changed` stop if an email changes after approval;
-- `AUTOPILOT_RECIPIENT_SNAPSHOT_REQUIRED` for legacy/incomplete approval evidence;
-- no inferred replacement recipient.
+The branch gates:
 
-`scripts/autopilot-recipient-contract.test.mjs` is included in `npm run test:payments`, which is included in `npm run gate:ship`.
+- server-derived, owner-matched invoice recipient snapshots;
+- one-time exact `approved_recipients` evidence;
+- monthly exact `recipient_snapshot` preservation;
+- changed-recipient stop behavior;
+- fail-closed legacy/incomplete approval evidence;
+- explicit client-deny policies;
+- service-role-only durable rate-limit fallback.
 
-## Remaining staging/runtime blocker
+## Current-head external blockers
 
-Recovery Staging does not currently expose `public.consume_rate_limit(text, integer, integer)`.
+Latest head checks still show:
 
-Titan's outbound API protection requires a durable limiter when `requireDurable: true` is used. Before controlled email execution, provide at least one of:
+- GitHub quality job: failure before any steps execute (`steps: null`, no logs).
+- GitHub Android job: failure before any steps execute (`steps: null`, no logs).
+- Vercel `titan-os`: platform-level failure / blocked account.
+- Vercel `titanos-web`: platform-level failure / blocked account.
 
-1. valid runtime `UPSTASH_REDIS_REST_*` configuration; or
-2. the existing service-role-only `consume_rate_limit` database backend from `20260816231000_durable_rate_limits.sql`.
+These do not provide application test/build evidence either way.
 
-Do not weaken `requireDurable: true` to bypass this gate.
+## Remaining release work
 
-## Remaining release blockers outside the database
-
-- GitHub Actions jobs still fail before any workflow step executes, including manual reruns.
-- Both linked Vercel checks have reported `Account is blocked`.
-- No current-branch preview build is available for mobile/desktop walkthrough.
-- Live Stripe/Resend end-to-end execution is not yet certified.
+- Restore executable GitHub Actions or otherwise obtain an equivalent clean CI/build result.
+- Restore an unblocked preview/hosting path.
+- Run controlled Stripe Checkout/webhook settlement tests against the intended application environment.
+- Run controlled Resend delivery/idempotency/receipt tests.
+- Complete mobile + desktop `/autopilot` and Recovery Receipt walkthroughs.
 
 ## Promotion decision
 
 **PR #85 stays draft. Do not merge or launch yet.**
 
-Database certification has advanced from unverified to PASS on Recovery Staging, but production-grade promotion still requires executable CI, an unblocked host/preview, durable outbound rate limiting, and controlled Stripe + Resend end-to-end certification.
+The Recovery Staging database/runtime layer is now certified for the implemented Autopilot contract. Remaining blockers are CI, hosting/preview, and application-level Stripe/Resend/UI certification.

@@ -61,6 +61,17 @@ test("TitanOS registration requires durable cross-instance throttling", async ()
   assert.doesNotMatch(registration, /import \{ assertRateLimit \} from/);
 });
 
+test("production signup cannot fall back to hosted Supabase signup", async () => {
+  const authClient = await read("src/api/auth.js");
+  const prodGuard = authClient.indexOf("if (!import.meta.env.DEV)");
+  const directSignup = authClient.indexOf("supabase.auth.signUp");
+  assert.ok(prodGuard >= 0, "missing production fail-closed signup guard");
+  assert.ok(directSignup > prodGuard, "direct Supabase signup must remain behind the DEV guard");
+  assert.match(authClient, /Signup service is temporarily unavailable\. Please try again shortly\./);
+  assert.match(authClient, /source: "supabase_fallback_dev"/);
+  assert.doesNotMatch(authClient, /source: "supabase_fallback"/);
+});
+
 test("registration avoids account enumeration and pre-verification entitlement claims", async () => {
   const registration = await read("api/register.js");
   assert.match(registration, /code: "ACCOUNT_UNAVAILABLE"/);

@@ -1,4 +1,5 @@
 import { supabase } from "@/api/supabaseClient";
+import { standardSupabaseProjectRef } from "@/lib/supabaseUrl";
 
 function apiError(message, status = 400) {
   const error = new Error(message);
@@ -20,24 +21,25 @@ function apiBase() {
 
 export async function resendSignupOtp({ email, userId }) {
   if (!email || !userId) throw apiError("Restart signup to request a new code", 400);
+  const clientProjectRef = standardSupabaseProjectRef(import.meta.env.VITE_SUPABASE_URL);
 
   try {
     const response = await fetch(`${apiBase()}/api/resendSignupOtp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, user_id: userId }),
+      body: JSON.stringify({ email, user_id: userId, clientProjectRef }),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw apiError(body.error || "Verification code could not be resent", response.status);
+    if (clientProjectRef && body.projectRef !== clientProjectRef) {
+      throw apiError("Verification environment changed. Reload TitanOS and try again.", 409);
+    }
     if (body.sent !== true || body.verificationType !== "magiclink") {
       throw apiError("Verification service returned an unexpected response", 502);
     }
     return { sent: true, verificationType: "magiclink" };
   } catch (error) {
     if (error?.status) throw error;
-    // Never retry a resend request against another host after an ambiguous
-    // network failure: the first host may already have generated and sent a new
-    // token. The user can explicitly tap Resend again after the failure clears.
     throw apiError("Could not verify whether the new code was sent. Please check your email before retrying.", 503);
   }
 }

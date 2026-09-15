@@ -47,7 +47,7 @@ test("production signup generates and delivers an explicit verification OTP", as
   const registerPage = await read("src/pages/Register.jsx");
 
   assert.match(registration, /createSignupWithConfirmation/);
-  assert.match(registration, /verificationMode: "otp"/);
+  assert.match(registration, /verificationMode: verificationType === "magiclink" \? "otp_magiclink" : "otp"/);
   assert.match(registration, /startsWith\("SIGNUP_"\)/);
   assert.match(registration, /res\.status\(424\)/);
   assert.match(confirmation, /admin\.auth\.admin\.generateLink/);
@@ -57,14 +57,29 @@ test("production signup generates and delivers an explicit verification OTP", as
   assert.match(confirmation, /"Idempotency-Key": deliveryKey/);
   assert.match(confirmation, /titan_signup_\$\{user\.id\}/);
   assert.match(confirmation, /if \(!delivery\.accepted\)[\s\S]*await deleteGeneratedUser\(admin, user\.id\)/);
-  assert.match(registerPage, /result\?\.verificationMode === "otp"/);
+  assert.match(registerPage, /\["otp", "otp_magiclink"\]\.includes\(result\?\.verificationMode\)/);
   assert.match(registerPage, /setPendingUserId\(result\.user\.id\)/);
-  assert.match(registerPage, /setOtpType\("signup"\)/);
+  assert.match(registerPage, /result\.verificationMode === "otp_magiclink" \? "magiclink" : "signup"/);
   assert.doesNotMatch(registerPage, /setToken\(result\.access_token\)/);
+});
+
+test("abandoned unconfirmed signup is recoverable only after password proof", async () => {
+  const registration = await read("api/register.js");
+  const confirmation = await read("api/_lib/signupConfirmation.js");
+
+  assert.match(registration, /async function recoverUnconfirmedSignup/);
+  assert.match(registration, /signInWithPassword\(\{ email, password \}\)/);
+  assert.match(registration, /if \(!isEmailNotConfirmed\(error\)\) return null/);
+  assert.match(registration, /return sendExistingSignupOtp\(admin, \{ email \}\)/);
+  assert.match(registration, /isDuplicateSignupError\(createError\)/);
+  assert.match(registration, /verificationType = recovered\.verificationType/);
+  assert.match(confirmation, /export async function sendExistingSignupOtp/);
+  assert.match(confirmation, /type: "magiclink"/);
 });
 
 test("signup code resend stays product-owned and bound to the pending user", async () => {
   const endpoint = await read("api/resendSignupOtp.js");
+  const confirmation = await read("api/_lib/signupConfirmation.js");
   const client = await read("src/lib/signupOtpClient.js");
   const registerPage = await read("src/pages/Register.jsx");
 
@@ -73,13 +88,16 @@ test("signup code resend stays product-owned and bound to the pending user", asy
   assert.match(endpoint, /getUserById\(userId\)/);
   assert.match(endpoint, /normalizedEmail\(user\.email\) !== email/);
   assert.match(endpoint, /user\.email_confirmed_at/);
-  assert.match(endpoint, /type: "magiclink"/);
-  assert.match(endpoint, /String\(generatedUser\?\.id \|\| ""\) !== userId/);
-  assert.match(endpoint, /properties\?\.email_otp/);
-  assert.match(endpoint, /properties\?\.hashed_token/);
-  assert.match(endpoint, /titan_signup_resend_\$\{userId\}_\$\{hashed\.slice\(0, 32\)\}/);
-  assert.match(endpoint, /verificationType: "magiclink"/);
+  assert.match(endpoint, /sendExistingSignupOtp\(admin/);
+  assert.match(endpoint, /expectedUserId: userId/);
+  assert.match(endpoint, /verificationType: generated\.verificationType/);
   assert.match(endpoint, /res\.status\(424\)/);
+
+  assert.match(confirmation, /type: "magiclink"/);
+  assert.match(confirmation, /properties\?\.email_otp/);
+  assert.match(confirmation, /properties\?\.hashed_token/);
+  assert.match(confirmation, /titan_signup_resend_\$\{generated\.user\.id\}_\$\{generated\.hashed\.slice\(0, 32\)\}/);
+  assert.match(confirmation, /verificationType: "magiclink"/);
 
   assert.match(client, /\/api\/resendSignupOtp/);
   assert.match(client, /body\.verificationType !== "magiclink"/);

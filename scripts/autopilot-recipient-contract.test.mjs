@@ -69,6 +69,20 @@ test("Autopilot service-only tables are explicit client deny-by-default", async 
   assert.match(funnel, /FOR ALL[\s\S]*TO anon, authenticated[\s\S]*USING \(false\)[\s\S]*WITH CHECK \(false\)/);
 });
 
+test("recovered TitanOS has a service-role-only durable outbound rate-limit fallback", async () => {
+  const migration = await read("supabase/migrations/20260914211500_restore_durable_rate_limit_backend.sql");
+  const limiter = await read("api/_lib/rateLimit.js");
+
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.titan_rate_limit_buckets/);
+  assert.match(migration, /CREATE POLICY titan_rate_limit_buckets_no_client/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.consume_rate_limit/);
+  assert.match(migration, /SECURITY DEFINER/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.consume_rate_limit/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.consume_rate_limit[\s\S]*TO service_role/);
+  assert.match(limiter, /consume_rate_limit/);
+  assert.match(limiter, /requireDurable/);
+});
+
 test("recipient contract never infers a replacement address during recovery", async () => {
   const order = await read("api/functions/runAutopilotOrder.js");
   const membership = await read("api/functions/runAutopilotMembership.js");

@@ -80,9 +80,6 @@ test("signup OTP delivery preserves ambiguity instead of invalidating a possibly
   assert.match(confirmation, /if \(!delivery\.accepted && delivery\.definitive\)/);
   assert.match(confirmation, /delivery: delivery\.accepted \? "accepted" : "uncertain"/);
 
-  // Cleanup is allowed only inside the definitive-rejection branch. Ambiguous
-  // provider outcomes must preserve the generated user/code because the email
-  // may already have been accepted despite a lost response.
   const definitiveBranch = confirmation.indexOf("if (!delivery.accepted && delivery.definitive)");
   const cleanup = confirmation.indexOf("deleteGeneratedUser(admin, user.id)");
   const deliveryReturn = confirmation.indexOf('delivery: delivery.accepted ? "accepted" : "uncertain"');
@@ -128,6 +125,19 @@ test("Product Hunt auth CTAs safely return users to Autopilot", async () => {
   assert.match(preview, /\/register\?from_url=\$\{AUTOPILOT_RETURN\}/);
   assert.match(preview, /\/login\?from_url=\$\{AUTOPILOT_RETURN\}/);
   assert.match(returnTo, /sanitizeReturnPath/);
+});
+
+test("preview and recognized Titan hosts keep function writes on the current deployment first", async () => {
+  const functions = await read("src/api/functions.js");
+  assert.match(functions, /isRecognizedSameOriginHost/);
+  assert.match(functions, /hostname\.endsWith\("\.vercel\.app"\)/);
+  assert.match(functions, /urls\.push\(`\$\{origin\}\$\{path\}`\)/);
+  const sameOriginPush = functions.indexOf("urls.push(`${origin}${path}`)");
+  const configuredBase = functions.indexOf("const base = functionsBaseUrl()");
+  assert.ok(sameOriginPush >= 0 && configuredBase > sameOriginPush);
+  assert.match(functions, /if \(isClientRejection\(lastError\)\) break/);
+  assert.match(functions, /runAutopilotFree/);
+  assert.match(functions, /Nothing was sent/);
 });
 
 test("TitanOS quality and Android workflows select Recovery Staging without Autopilot Stripe scope", async () => {

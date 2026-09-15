@@ -39,7 +39,8 @@ The trust model is a product feature:
 - Autopilot Recovery Receipts cannot be manually resent/deleted through generic Follow-ups;
 - one-time execution cannot begin until Stripe settlement is verified;
 - Autopilot Stripe events use recoverable processing leases;
-- unrelated or Titan Attention Stripe events cannot touch the TitanOS/Autopilot ledger.
+- unrelated or Titan Attention Stripe events cannot touch the TitanOS/Autopilot ledger;
+- production signup uses one durable, product-owned verification path rather than silently changing mechanisms during outages.
 
 Product Hunt's current featuring guidance emphasizes useful, novel, high-craft, and creative products. Titan's strongest angle is usefulness + high craft + a visible trust/reliability model rather than novelty theater.
 
@@ -64,9 +65,10 @@ This branch is a material functional release:
 11. public Recovery Command Center preview and truthful outcome states;
 12. privacy-minimized first-party activation telemetry;
 13. restored TitanOS root application while preserving Titan Attention as an isolated second product surface;
-14. Recovery Staging database/RLS/rate-limit certification.
+14. Recovery Staging database/RLS/rate-limit certification;
+15. product-owned signup OTP/resend, durable registration throttling, abandoned-signup recovery, and verified-only optional Founding entitlement claims.
 
-**Relaunch framing:** Titan Autopilot moved from a basic reminder flow into a controlled Recovery Command Center with verified settlement, exact recipient authorization, replay-safe payments, provider-level duplicate protection, live safety stops, interruption recovery, immutable Recovery Receipts, and a public product preview.
+**Relaunch framing:** Titan Autopilot moved from a basic reminder flow into a controlled Recovery Command Center with verified settlement, exact recipient authorization, replay-safe payments, provider-level duplicate protection, live safety stops, interruption recovery, immutable Recovery Receipts, a public product preview, and hardened launch onboarding.
 
 Official references:
 
@@ -127,18 +129,19 @@ Do **not** manufacture customer logos, testimonials, recovery percentages, recov
 Keep the demo on one recovery job:
 
 1. Open the lightweight public `/autopilot` preview.
-2. Sign into a seeded non-production demo account.
-3. Show three overdue sample invoices for three distinct customers.
-4. Select the oldest three customers.
-5. Show the approved overdue balance.
-6. Read the exact reminder preview.
-7. Run the sprint against a controlled recipient sandbox.
-8. Show one provider-accepted `sent` result.
-9. Mark one approved demo invoice paid and demonstrate the pre-send safety stop.
-10. Show read-only Recovery Receipts and a safe-retry state.
-11. End on: **nothing sends without approval, and retries preserve duplicate protection.**
+2. Create or sign into a seeded non-production demo account.
+3. If demonstrating signup, show Titan's six-digit verification code flow and return to `/autopilot` without exposing the real recipient inbox.
+4. Show three overdue sample invoices for three distinct customers.
+5. Select the oldest three customers.
+6. Show the approved overdue balance.
+7. Read the exact reminder preview.
+8. Run the sprint against a controlled recipient sandbox.
+9. Show one provider-accepted `sent` result.
+10. Mark one approved demo invoice paid and demonstrate the pre-send safety stop.
+11. Show read-only Recovery Receipts and a safe-retry state.
+12. End on: **nothing sends without approval, and retries preserve duplicate protection.**
 
-Target: roughly 35–55 seconds. Do not turn the video into a general TitanOS tour.
+Target: roughly 35–55 seconds if signup is omitted; keep a signup-inclusive version concise. Do not turn the video into a general TitanOS tour.
 
 ## 6. Runtime architecture required for launch
 
@@ -149,9 +152,11 @@ TitanOS and Titan Attention are two product surfaces in the same repository and 
 - intended Vercel project: `titanos-web`;
 - `VITE_APP_SURFACE=titanos` preferred;
 - client Supabase must point at the certified TitanOS database, not the Attention-only project;
+- server `SUPABASE_URL` and browser `VITE_SUPABASE_URL` canonical project refs must match;
 - `TITAN_STRIPE_WEBHOOK_PRODUCT=autopilot` preferred on server functions;
 - `/autopilot` must load the public `AutopilotPublic` route for anonymous visitors;
-- authenticated `/autopilot` must enter `AuthenticatedShell`/`TabStack` and the private Recovery Command Center.
+- authenticated `/autopilot` must enter `AuthenticatedShell`/`TabStack` and the private Recovery Command Center;
+- production registration must use `/api/register`; direct browser `supabase.auth.signUp()` fallback is development-only.
 
 ### Titan Attention surface
 
@@ -187,8 +192,10 @@ Required order for a recovered TitanOS environment:
 6. `20260914203000_stripe_webhook_claim_state.sql`
 7. `20260914210000_autopilot_recipient_snapshot.sql`
 8. `20260914211500_restore_durable_rate_limit_backend.sql`
+9. `20260915024500_founding_claim_requires_verified_auth.sql`
+10. `20260915025000_founding_claim_optional_schema_guard.sql`
 
-Recovery Staging (`wbymywwrpbljfbsemung`) has passed schema, RLS, recipient-integrity, signup-trigger, security-advisor, and durable-rate-limit probes. That is **database/runtime certification only**, not production launch certification.
+Recovery Staging (`wbymywwrpbljfbsemung`) has passed schema, RLS, recipient-integrity, Auth/profile confirmation compatibility, security-advisor, and durable-rate-limit probes. The Founding compatibility guard is required because this recovered environment does not contain the optional historical Founding-100 schema. This is **database/runtime certification only**, not production launch certification.
 
 ## 8. Launch conversion + production checklist
 
@@ -198,12 +205,21 @@ Before a Product Hunt launch/relaunch request:
 - public preview remains isolated from `useAuth`, invoice entities, private function calls, and the full API client;
 - public telemetry uses the lightweight same-origin path and never blocks rendering;
 - anonymous preview works at iPhone and desktop widths;
+- **Create account** and **Sign in** both preserve a sanitized return to `/autopilot`;
 - authenticated `/autopilot` resolves to the private Recovery Command Center;
 - the `titanos-web` runtime points at the intended TitanOS Supabase project;
+- server/client canonical Supabase project refs agree;
 - the Attention deployment remains on the Attention schema;
-- the eight recovery-compatible migrations are present where required;
+- the ten recovery-compatible migrations are present where required;
 - `node scripts/verify-autopilot-db-security.mjs` passes against the target database;
-- durable outbound rate limiting is available and `requireDurable: true` remains intact;
+- durable registration/outbound rate limiting is available and `requireDurable: true` remains intact;
+- production registration does not fall back to direct hosted Supabase signup;
+- `RESEND_API_KEY` and verified `RESEND_FROM` support the signup OTP and Autopilot delivery paths;
+- fresh account creation sends the initial six-digit OTP;
+- Resend Code issues a fresh product-owned `magiclink` OTP bound to the pending user/email;
+- OTP verification creates/preserves a refreshable browser session and returns the Product Hunt visitor to `/autopilot`;
+- an abandoned unconfirmed signup can be resumed only with the original valid password;
+- optional Founding logic cannot consume a slot before verification and cannot break confirmation when its schema is absent;
 - one-time Checkout works end-to-end with the live $9 Stripe price if the one-time option is enabled;
 - `VITE_AUTOPILOT_ONETIME_CHECKOUT=true` is verified only when the one-time $9 CTA is intended to be live;
 - Stripe promotes the exact Autopilot payment only after a signed paid event;
@@ -243,6 +259,11 @@ Do not submit/relaunch if any of these are true:
 - current-branch hosting/preview is unavailable;
 - the production runtime database/project mapping is unverified;
 - any required Autopilot migration/capability is absent;
+- production registration can silently fall back to hosted Supabase signup;
+- durable registration protection can be bypassed when its backend is unavailable;
+- signup OTP initial send/resend/verification has not been exercised with deployed credentials;
+- an unverified account can consume a scarce Founding entitlement;
+- optional Founding schema absence can break Auth confirmation;
 - the public `/autopilot` preview is unreachable, slow-blocked by auth, or errors on mobile;
 - authenticated `/autopilot` does not reach the Recovery Command Center;
 - Attention and Autopilot can touch each other's database ledgers;

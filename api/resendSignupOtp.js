@@ -1,7 +1,7 @@
 import { applyCors, handleOptions } from "./_lib/cors.js";
 import { assertRateLimitAsync } from "./_lib/rateLimit.js";
 import { getSupabaseAdmin, readJson } from "./_lib/supabase.js";
-import { sendSignupVerificationOtp } from "./_lib/signupConfirmation.js";
+import { sendExistingSignupOtp } from "./_lib/signupConfirmation.js";
 import { logError } from "./_lib/safeLog.js";
 
 function uuid(value) {
@@ -48,29 +48,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Verification code could not be resent" });
     }
 
-    const { data, error } = await admin.auth.admin.generateLink({
-      type: "magiclink",
+    const generated = await sendExistingSignupOtp(admin, {
       email,
+      expectedUserId: userId,
     });
-    if (error) throw error;
 
-    const generatedUser = data?.user || null;
-    const otp = String(data?.properties?.email_otp || "").trim();
-    const hashed = String(data?.properties?.hashed_token || "").replace(/[^a-zA-Z0-9_-]/g, "");
-    if (String(generatedUser?.id || "") !== userId || !/^\d{6}$/.test(otp) || !hashed) {
-      const contractError = new Error("Supabase did not return a valid resend verification code");
-      contractError.code = "SIGNUP_RESEND_CONTRACT_INVALID";
-      throw contractError;
-    }
-
-    const delivery = await sendSignupVerificationOtp({
-      email,
-      otp,
-      deliveryKey: `titan_signup_resend_${userId}_${hashed.slice(0, 32)}`,
-    });
-    if (!delivery.accepted) throw delivery.error;
-
-    return res.status(202).json({ sent: true, verificationType: "magiclink" });
+    return res.status(202).json({ sent: true, verificationType: generated.verificationType });
   } catch (error) {
     logError("api/resendSignupOtp", { code: error?.code, message: error?.message || String(error) });
     return res.status(424).json({

@@ -41,6 +41,25 @@ test("TitanOS registration requires durable cross-instance throttling", async ()
   assert.doesNotMatch(registration, /import \{ assertRateLimit \} from/);
 });
 
+test("production signup generates and delivers an explicit verification OTP", async () => {
+  const registration = await read("api/register.js");
+  const confirmation = await read("api/_lib/signupConfirmation.js");
+  const registerPage = await read("src/pages/Register.jsx");
+
+  assert.match(registration, /createSignupWithConfirmation/);
+  assert.match(registration, /verificationMode: "otp"/);
+  assert.match(confirmation, /admin\.auth\.admin\.generateLink/);
+  assert.match(confirmation, /type: "signup"/);
+  assert.match(confirmation, /properties\?\.email_otp/);
+  assert.match(confirmation, /\^\\d\{6\}\$/);
+  assert.match(confirmation, /"Idempotency-Key": deliveryKey/);
+  assert.match(confirmation, /titan_signup_\$\{user\.id\}/);
+  assert.match(confirmation, /if \(delivery\.definitive\) await deleteGeneratedUser/);
+  assert.match(registerPage, /result\?\.verificationMode === "otp"/);
+  assert.match(registerPage, /await api\.auth\.verifyOtp\(\{ email, otpCode \}\)/);
+  assert.doesNotMatch(registerPage, /setToken\(result\.access_token\)/);
+});
+
 test("Product Hunt auth CTAs safely return users to Autopilot", async () => {
   const preview = await read("src/pages/AutopilotPublic.jsx");
   const returnTo = await read("src/lib/returnTo.js");

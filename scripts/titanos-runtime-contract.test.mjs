@@ -154,6 +154,19 @@ test("production env template documents every free Autopilot runtime dependency"
   assert.doesNotMatch(env, /^VITE_AUTOPILOT_.*(?:PRICE|CHECKOUT|PAID)/m);
 });
 
+test("Autopilot readiness probe is secret-safe and fails closed on missing runtime dependencies", async () => {
+  const health = await read("api/functions/autopilotHealth.js");
+  assert.match(health, /req\.method !== "GET"/);
+  assert.match(health, /assertSupabaseProjectConsistency/);
+  assert.match(health, /supabaseServiceRole/);
+  assert.match(health, /resendApiKey/);
+  assert.match(health, /resendFrom/);
+  assert.match(health, /status\(ready \? 200 : 503\)/);
+  assert.match(health, /mode: "free"/);
+  assert.doesNotMatch(health, /SUPABASE_SERVICE_ROLE_KEY\s*:/);
+  assert.doesNotMatch(health, /RESEND_API_KEY\s*:/);
+});
+
 test("TitanOS quality and Android workflows select Recovery Staging without Autopilot Stripe scope", async () => {
   const quality = await read(".github/workflows/attention-build.yml");
   const android = await read(".github/workflows/android-release.yml");

@@ -13,7 +13,7 @@ This document records the verified staging contract. It is not authorization to 
 
 ## Verified Recovery Staging prerequisites
 
-Read-only inspection on 2026-09-14 confirmed:
+Read-only inspection confirmed:
 
 - `auth.users` and `gen_random_uuid()` exist;
 - `public.customers` contains `id`, `created_by_id`, and `email`;
@@ -22,6 +22,8 @@ Read-only inspection on 2026-09-14 confirmed:
 - `public.stripe_webhook_events` already exists with the canonical event-id primary-key ledger.
 
 The recovered project does **not** need historical migration `018_stripe_webhook_idempotency.sql` replayed merely to satisfy a filename assumption. The prerequisite is the verified canonical ledger shape.
+
+Recovery Staging also intentionally does not contain the optional historical Founding-100 schema (`public.platform_launch` and `profiles.founding_*`). Signup/confirmation hardening must therefore treat Founding as optional and never make Auth confirmation depend on those tables existing.
 
 ## Required Recovery Staging migration order
 
@@ -35,8 +37,10 @@ Apply only to the recovered TitanOS operational database, in this order:
 6. `supabase/migrations/20260914203000_stripe_webhook_claim_state.sql`
 7. `supabase/migrations/20260914210000_autopilot_recipient_snapshot.sql`
 8. `supabase/migrations/20260914211500_restore_durable_rate_limit_backend.sql`
+9. `supabase/migrations/20260915024500_founding_claim_requires_verified_auth.sql`
+10. `supabase/migrations/20260915025000_founding_claim_optional_schema_guard.sql`
 
-The first seven implement the Autopilot product contract. The eighth restores Titan's service-role-only durable rate-limit fallback for recovered environments that omitted the historical rate-limit migration.
+The first seven implement the Autopilot product contract. The eighth restores Titan's service-role-only durable rate-limit fallback for recovered environments. The final two prevent unverified users from consuming Founding entitlements when that feature exists and make the claim path a safe `founding_unavailable` no-op when the optional schema is absent.
 
 ## Recipient safety contract
 
@@ -49,6 +53,20 @@ Autopilot recipient authorization is intentionally stricter than ordinary follow
 5. Execution and retry compare current invoice recipient state with the approved snapshot.
 6. A recipient change stops the invoice and requires fresh approval.
 7. Legacy/incomplete runs without exact approval evidence fail closed rather than inferring a replacement recipient.
+
+## Signup confirmation contract
+
+Production signup is product-owned rather than dependent on implicit Admin Auth mail behavior:
+
+1. Registration is protected by Titan's durable cross-instance limiter.
+2. Supabase admin `generateLink(type: "signup")` creates the unconfirmed user and returns a six-digit signup OTP.
+3. Titan sends that OTP through Resend with deterministic provider idempotency.
+4. Mail/OTP dependency failures fail closed and do not silently switch confirmation mechanisms.
+5. The browser verifies through its persistent Supabase client and preserves the complete refreshable session.
+6. Resend requests are bound to the exact pending `userId + email`, use a fresh `magiclink` OTP, and do not automatically fan out across multiple API hosts after an ambiguous network result.
+7. An abandoned unconfirmed signup can be recovered only after Supabase validates the original password and returns `email_not_confirmed`.
+8. Founding entitlements, when installed, cannot be claimed until email or phone verification is recorded.
+9. Missing optional Founding schema must return `founding_unavailable` and must not abort Auth confirmation.
 
 ## Service-only data contract
 
@@ -63,8 +81,9 @@ Autopilot recipient authorization is intentionally stricter than ordinary follow
 
 - `scripts/autopilot-service.test.mjs`
 - `scripts/autopilot-recipient-contract.test.mjs`
+- `scripts/titanos-runtime-contract.test.mjs`
 
-The recipient/runtime contract test gates owner-matched recipient derivation, direct-email override protection, one-time/monthly approval evidence, changed-recipient stops, explicit client-deny policies, no inferred replacement recipients, and the durable rate-limit fallback.
+The runtime contract test gates TitanOS/Attention Supabase isolation, durable signup throttling, product-owned signup OTP generation/resend, abandoned-signup recovery, Product Hunt return-to behavior, workflow surface mapping, verified-only Founding claims, and optional-schema compatibility.
 
 `npm run gate:ship` includes `test:payments`.
 
@@ -75,7 +94,7 @@ Before Autopilot, Recovery Staging had two unrelated security-advisor INFO findi
 - `public.portal_sessions` — RLS enabled with no policy.
 - `public.titan_comms_channel_secrets` — RLS enabled with no policy.
 
-After Autopilot plus durable-rate-limit restoration, the security advisor returned to this exact baseline. No Autopilot or rate-limit security lint remains.
+After Autopilot, durable-rate-limit restoration, and signup/Founding compatibility hardening, the security advisor returned to this exact baseline. No Autopilot, rate-limit, signup, or Founding migration security lint remains.
 
 Performance advisor output contains pre-existing unused-index and multiple-permissive-policy findings across the recovered schema. Do not delete indexes solely because staging usage counters are zero.
 
@@ -97,14 +116,18 @@ Recovery Staging must demonstrate all of the following before application-level 
 6. Direct client edits to `invoices.customer_email` are re-derived from the owner-matched customer relationship.
 7. Durable rate limiter allows requests within the configured limit and blocks the next request with positive retry metadata.
 8. Authenticated clients cannot execute `consume_rate_limit` or write its bucket table.
-9. Security advisor shows no new Autopilot/rate-limit finding.
+9. Synthetic Auth profile creation works.
+10. Email confirmation does not fail when optional Founding schema is absent.
+11. Synthetic Auth/profile probe rows are fully cleaned up.
+12. Security advisor shows no new Autopilot/rate-limit/signup finding.
 
-These database checks have now passed on Recovery Staging; evidence is recorded in `AUTOPILOT_RECOVERY_STAGING_REPORT.md`.
+These database checks have passed on Recovery Staging; evidence is recorded in `AUTOPILOT_RECOVERY_STAGING_REPORT.md`.
 
 ## Remaining non-database blockers
 
 - GitHub Actions quality and Android jobs still terminate before any workflow step executes, so no executable CI result exists for the current head.
-- Both linked Vercel projects still report a platform-level blocked-account failure, so no current-branch preview build is available.
-- Controlled Stripe + Resend application-level execution and mobile/desktop walkthrough remain required after hosting is restored.
+- Both linked Vercel projects still report `Account is blocked.`, so no current-branch preview build is available.
+- Fresh-account signup OTP delivery/resend/confirmation must still be exercised using actual deployed Supabase/Resend credentials.
+- Controlled Stripe + Autopilot Resend application-level execution and mobile/desktop walkthrough remain required after hosting is restored.
 
 Do not merge PR #85 or promote a Product Hunt relaunch while those release-evidence paths are unavailable.

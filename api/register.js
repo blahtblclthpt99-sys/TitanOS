@@ -102,9 +102,6 @@ export default async function handler(req, res) {
       process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
     );
 
-    // A browser may try more than one API host during availability failover. If
-    // both sides can prove canonical hosted Supabase refs, never let a browser
-    // configured for one project create an account through another deployment.
     if (clientProjectRef && !/^[a-z0-9]+$/.test(clientProjectRef)) {
       return res.status(400).json({ error: "Invalid registration environment" });
     }
@@ -194,6 +191,7 @@ export default async function handler(req, res) {
 
     if (requireConfirm) {
       return res.status(200).json({
+        projectRef: serverProjectRef || null,
         user: {
           id: createdUser?.id,
           email: createdUser?.email || email,
@@ -211,6 +209,7 @@ export default async function handler(req, res) {
     if (signInError || !signedIn.session) {
       logError("api/register:signIn", signInError);
       return res.status(200).json({
+        projectRef: serverProjectRef || null,
         user: {
           id: createdUser?.id,
           email: createdUser?.email || email,
@@ -223,6 +222,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
+      projectRef: serverProjectRef || null,
       user: {
         id: signedIn.user.id,
         email: signedIn.user.email,

@@ -1,6 +1,8 @@
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "./supabaseClient";
 
-const FUNCTION_TIMEOUT_MS = 15_000;
+const DEFAULT_FUNCTION_TIMEOUT_MS = 15_000;
+const AUTOPILOT_FUNCTION_TIMEOUT_MS = 45_000;
 
 function apiError(message, status = 400, code = "") {
   const error = new Error(message);
@@ -36,9 +38,15 @@ function functionsBaseUrl() {
   return "";
 }
 
-async function postJson(url, payload, token) {
+function functionTimeout(functionName) {
+  return functionName === "runAutopilotFree"
+    ? AUTOPILOT_FUNCTION_TIMEOUT_MS
+    : DEFAULT_FUNCTION_TIMEOUT_MS;
+}
+
+async function postJson(url, payload, token, timeoutMs = DEFAULT_FUNCTION_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FUNCTION_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -52,7 +60,7 @@ async function postJson(url, payload, token) {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw apiError(body.error || body.message || "Function call failed", response.status, "HTTP_ERROR");
+      throw apiError(body.error || body.message || "Function call failed", response.status, body.code || "HTTP_ERROR");
     }
     return body;
   } catch (error) {
@@ -76,8 +84,6 @@ async function localFallback(functionName, payload) {
     const { answerFromSummary } = await import("@/lib/ai-business-summary");
     const last =
       (payload.messages || []).filter((m) => m.role === "user").slice(-1)[0]?.content || "";
-    // Offline: only answer from a client display snapshot with clear provenance —
-    // never claim server truth. Prefer empty/unavailable over invented facts.
     const summary = payload.offlineSnapshot || null;
     const local = summary ? answerFromSummary(last, summary) : null;
     return {
@@ -110,7 +116,11 @@ async function localFallback(functionName, payload) {
     functionName === "runAutopilotOrder" ||
     functionName === "runAutopilotMembership"
   ) {
-    return unavailableWrite("Titan Autopilot requires a secure connection to the live billing service.");
+    return unavailableWrite("This retired Titan Autopilot payment path is unavailable.");
+  }
+
+  if (functionName === "runAutopilotFree") {
+    return unavailableWrite("Titan Autopilot could not reach the live recovery service. Nothing was sent.");
   }
 
   if (functionName === "calculateFee") {
@@ -182,25 +192,35 @@ async function localFallback(functionName, payload) {
   throw apiError(`Function "${functionName}" is unavailable offline`, 503, "OFFLINE_UNAVAILABLE");
 }
 
+function isDeployedSameOriginHost(hostname) {
+  return (
+    hostname.endsWith(".vercel.app") ||
+    hostname === "titanos.app" ||
+    hostname === "www.titanos.app" ||
+    hostname === "titanfieldos.com" ||
+    hostname === "www.titanfieldos.com"
+  );
+}
+
 function candidateUrls(path) {
   const urls = [];
-  const base = functionsBaseUrl();
-  if (base) urls.push(`${base}${path}`);
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     const { hostname, origin } = window.location;
-    // Same-origin /api on Vercel / custom domains
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.endsWith(".vercel.app") ||
-      hostname.endsWith("titanfieldos.com") ||
-      hostname === "titanos-web.vercel.app"
-    ) {
+
+    // A deployed web build is bound to its own server functions. Never route a
+    // failed preview write to a different production deployment/commit.
+    if (isDeployedSameOriginHost(hostname)) {
+      return [`${origin}${path}`];
+    }
+
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
       urls.push(`${origin}${path}`);
-      urls.push(path);
     }
   }
+
+  const base = functionsBaseUrl();
+  if (base) urls.push(`${base}${path}`);
 
   return [...new Set(urls)];
 }
@@ -216,12 +236,13 @@ export function createFunctionsModule() {
       let token = await getAccessToken();
       const path = `/api/functions/${functionName}`;
       const candidates = candidateUrls(path);
+      const timeoutMs = functionTimeout(functionName);
 
       let lastError;
       let refreshedAfter401 = false;
       for (const url of candidates) {
         try {
-          return await postJson(url, payload, token);
+          return await postJson(url, payload, token, timeoutMs);
         } catch (error) {
           lastError = error;
 
@@ -230,15 +251,16 @@ export function createFunctionsModule() {
             token = await getAccessToken({ forceRefresh: true });
             if (token) {
               try {
-                return await postJson(url, payload, token);
+                return await postJson(url, payload, token, timeoutMs);
               } catch (retryError) {
                 lastError = retryError;
               }
             }
           }
 
-          // Validation, authorization, entitlement, conflict, and rate-limit errors
-          // are real server decisions. Do not mask them as an offline condition.
+          // Validation, authorization, conflict, and rate-limit errors are real
+          // server decisions. Deployed web builds have only one candidate by
+          // design, so no write can silently cross into another deployment.
           if (isClientRejection(lastError)) break;
         }
       }

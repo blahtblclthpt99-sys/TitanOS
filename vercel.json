@@ -6,7 +6,8 @@
   "installCommand": "npm ci",
   "functions": {
     "api/attention/create-checkout.js": { "maxDuration": 30 },
-    "api/functions/stripeWebhook.js": { "maxDuration": 30 }
+    "api/functions/stripeWebhook.js": { "maxDuration": 30 },
+    "api/functions/runAutopilotFree.js": { "maxDuration": 60 }
   },
   "rewrites": [
     {

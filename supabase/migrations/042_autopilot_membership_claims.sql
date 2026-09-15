@@ -16,5 +16,13 @@ CREATE TABLE IF NOT EXISTS public.autopilot_membership_claims (
 ALTER TABLE public.autopilot_membership_claims ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.autopilot_membership_claims FROM anon, authenticated;
 
+DROP POLICY IF EXISTS autopilot_membership_claims_no_client ON public.autopilot_membership_claims;
+CREATE POLICY autopilot_membership_claims_no_client
+  ON public.autopilot_membership_claims
+  FOR ALL
+  TO anon, authenticated
+  USING (false)
+  WITH CHECK (false);
+
 CREATE INDEX IF NOT EXISTS idx_autopilot_claims_user_period
   ON public.autopilot_membership_claims(user_id, period_key DESC);

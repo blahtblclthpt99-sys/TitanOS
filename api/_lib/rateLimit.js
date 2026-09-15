@@ -81,9 +81,11 @@ function deny(res, retryAfterSec) {
   return false;
 }
 function productionRuntime() { return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production"; }
-function durableUnavailable(res) {
+function durableUnavailable(res, requestedStatus = 503) {
+  const parsed = Number(requestedStatus);
+  const status = Number.isInteger(parsed) && parsed >= 400 && parsed <= 599 ? parsed : 503;
   res.setHeader("Retry-After", "60");
-  res.status(503).json({ error: "Verification protection is temporarily unavailable. Please try again shortly." });
+  res.status(status).json({ error: "Verification protection is temporarily unavailable. Please try again shortly." });
   return false;
 }
 
@@ -104,7 +106,9 @@ export async function assertRateLimitAsync(req, res, opts = {}) {
   let remote = await upstashAllow(bucketKey, limit, windowMs);
   if (!remote && opts.requireDurable) remote = await supabaseAllow(bucketKey, limit, windowMs);
   if (remote) return remote.ok ? true : deny(res, remote.retryAfterSec);
-  if (opts.requireDurable && productionRuntime()) return durableUnavailable(res);
+  if (opts.requireDurable && productionRuntime()) {
+    return durableUnavailable(res, opts.durableUnavailableStatus);
+  }
 
   const mem = memoryAllow(bucketKey, limit, windowMs);
   return mem.ok ? true : deny(res, mem.retryAfterSec);

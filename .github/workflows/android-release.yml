@@ -42,8 +42,9 @@ jobs:
     timeout-minutes: 30
     env:
       VITE_CAPACITOR_BUILD: "true"
-      VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
-      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
+      VITE_APP_SURFACE: "titanos"
+      VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
       VITE_API_BASE_URL: "https://titanos-web.vercel.app"
       VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
 
@@ -94,8 +95,8 @@ jobs:
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
           grep -q 'exchangeCodeForSession' src/main.jsx
-          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
-          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'emailRedirectTo: getAuthRedirectTo("/auth/callback")' src/api/auth.js
+          ! grep -q 'emailRedirectTo: window.location.origin' src/api/auth.js
           grep -q 'native-polish.css' src/main.jsx
           grep -q 'safe-area-inset-top' src/native-polish.css
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml

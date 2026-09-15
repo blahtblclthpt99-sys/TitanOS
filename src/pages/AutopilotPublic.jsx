@@ -7,6 +7,7 @@ const SAMPLE_ROWS = [
   { id: "INV-2053", customer: "Sample customer B", age: "18 days overdue", balance: "$465.00" },
   { id: "INV-2060", customer: "Sample customer C", age: "9 days overdue", balance: "$220.00" },
 ];
+const AUTOPILOT_RETURN = encodeURIComponent("/autopilot");
 
 function ExamplePreview() {
   return (
@@ -105,15 +106,23 @@ export default function AutopilotPublic() {
 
       <section className="mt-5 rounded-2xl border border-border bg-card/60 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <p className="font-semibold">Use your real invoice data</p>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to see eligible overdue invoices and approve your first recovery batch.</p>
+          <p className="font-semibold">Try it with your real invoice data</p>
+          <p className="text-sm text-muted-foreground mt-1">Create a TitanOS account or sign in, then come straight back to the Recovery Command Center.</p>
         </div>
-        <a
-          href="/login"
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Open Titan Autopilot <ArrowRight className="w-4 h-4" aria-hidden="true" />
-        </a>
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <a
+            href={`/register?from_url=${AUTOPILOT_RETURN}`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Create account <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </a>
+          <a
+            href={`/login?from_url=${AUTOPILOT_RETURN}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Sign in
+          </a>
+        </div>
       </section>
 
       <p className="text-xs text-muted-foreground mt-4 leading-relaxed">

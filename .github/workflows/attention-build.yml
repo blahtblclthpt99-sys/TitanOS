@@ -23,7 +23,6 @@ jobs:
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
       VITE_API_BASE_URL: "https://titanos-web.vercel.app"
       VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
-      TITAN_STRIPE_WEBHOOK_PRODUCT: "autopilot"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

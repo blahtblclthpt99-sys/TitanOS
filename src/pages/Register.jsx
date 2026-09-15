@@ -13,6 +13,7 @@ import { attachReferralOnSignup } from "@/lib/referralApi";
 import { useAuth } from "@/lib/AuthContext";
 import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { resendSignupOtp, verifySignupOtp } from "@/lib/signupOtpClient";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -30,6 +31,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [otpType, setOtpType] = useState("signup");
+  const [pendingUserId, setPendingUserId] = useState("");
 
   const finishSignup = async (userId) => {
     if (refCode) {
@@ -64,6 +67,12 @@ export default function Register() {
         return;
       }
       if (result?.verificationMode === "otp") {
+        if (!result?.user?.id) {
+          setError("Signup verification could not be initialized. Please try again.");
+          return;
+        }
+        setPendingUserId(result.user.id);
+        setOtpType("signup");
         setOtpCode("");
         setShowOtp(true);
         return;
@@ -97,12 +106,11 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      // verifyOtp runs on Titan's persistent Supabase browser client and stores
-      // the returned access + refresh session. Do not overwrite it with an
-      // access-token-only setSession call.
-      await api.auth.verifyOtp({ email, otpCode });
+      // verifySignupOtp uses Titan's persistent Supabase browser client, so the
+      // full access + refresh session remains authoritative after verification.
+      await verifySignupOtp({ email, otpCode, verificationType: otpType });
       const me = await api.auth.me().catch(() => null);
-      await finishSignup(me?.id);
+      await finishSignup(me?.id || pendingUserId);
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -112,11 +120,16 @@ export default function Register() {
 
   const handleResend = async () => {
     setError("");
+    setLoading(true);
     try {
-      await api.auth.resendOtp(email);
+      const result = await resendSignupOtp({ email, userId: pendingUserId });
+      setOtpType(result.verificationType);
+      setOtpCode("");
       toast({ title: "Code sent", description: "Check your email for the new code." });
     } catch (err) {
       setError(err.message || "Failed to resend code");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -154,7 +167,12 @@ export default function Register() {
         </Button>
         <p className="text-center text-sm text-muted-foreground mt-4">
           Didn't receive the code?{" "}
-          <button type="button" onClick={handleResend} className="font-semibold text-foreground hover:underline">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={loading || !pendingUserId}
+            className="font-semibold text-foreground hover:underline disabled:opacity-50"
+          >
             Resend
           </button>
         </p>

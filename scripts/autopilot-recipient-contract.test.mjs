@@ -60,6 +60,28 @@ test("atomic invoice delivery guard is service-only and fail-closed", async () =
   assert.match(runner, /releaseInvoiceDelivery/);
 });
 
+test("interrupted free run can reclaim only its own short delivery reservation", async () => {
+  const migration = await read("supabase/migrations/20260915050000_autopilot_guard_same_run_reclaim.sql");
+  assert.match(migration, /v_guard\.run_id = p_run_id AND v_guard\.delivery_key = v_delivery_key/);
+  assert.match(migration, /'reclaimed_same_run'/);
+  assert.match(migration, /'active_reservation'/);
+  assert.match(migration, /reserved_until = v_now \+ INTERVAL '5 minutes'/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.claim_autopilot_invoice_delivery/);
+  assert.match(migration, /TO service_role/);
+});
+
+test("retryable provider responses remain pending for same-key reconciliation", async () => {
+  const helper = await read("api/_lib/autopilotDelivery.js");
+  assert.match(helper, /function providerRetryableResponse\(status, code\)/);
+  assert.match(helper, /numericStatus === 408/);
+  assert.match(helper, /numericStatus === 425/);
+  assert.match(helper, /numericStatus === 429/);
+  assert.match(helper, /numericStatus >= 500/);
+  assert.match(helper, /numericStatus === 409 && code === "concurrent_idempotent_requests"/);
+  assert.match(helper, /if \(providerRetryableResponse\(response\.status, code\)\)/);
+  assert.match(helper, /const current = await markAmbiguous\(admin, queue\.id, code\)/);
+});
+
 test("Recovery Receipts are owner-readable but protected from client mutation", async () => {
   const rls = await read("supabase/migrations/20260914194500_autopilot_queue_rls.sql");
   assert.match(rls, /FOR SELECT/);

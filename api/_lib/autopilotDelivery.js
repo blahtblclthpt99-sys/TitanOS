@@ -99,6 +99,22 @@ export async function deliverAutopilotQueue({
   route,
   context = {},
 }) {
+  const resendFrom = String(process.env.RESEND_FROM || "").trim();
+  if (!resendFrom) {
+    const current = await failAutopilotPending(admin, queue.id, "delivery_sender_not_configured");
+    const reconciled = autopilotQueueOutcome(current);
+    logError(
+      `${route}:resend_config`,
+      new Error("Autopilot email sender is not configured"),
+      { ...context, reconciled }
+    );
+    return {
+      outcome: reconciled === "missing" ? "failed" : reconciled,
+      errorCode: "delivery_sender_not_configured",
+      row: current,
+    };
+  }
+
   let response;
   try {
     response = await fetch("https://api.resend.com/emails", {
@@ -109,7 +125,7 @@ export async function deliverAutopilotQueue({
         "Idempotency-Key": deliveryKey,
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM || "TitanOS <noreply@titanos.app>",
+        from: resendFrom,
         to: [queue.customer_email],
         subject: RESEND_SUBJECT,
         text: queue.message,

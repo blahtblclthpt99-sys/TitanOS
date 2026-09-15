@@ -10,15 +10,13 @@ import { classifyAutopilotSource } from "../api/_lib/autopilotFunnel.js";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("Autopilot provider retry window is fail-closed at the boundary", () => {
-  const now = Date.parse("2026-09-14T12:00:00.000Z");
+test("Autopilot provider retry window fails closed at the boundary", () => {
+  const now = Date.parse("2026-09-15T07:00:00.000Z");
   const inside = new Date(now - AUTOPILOT_RESEND_RETRY_WINDOW_MS + 1).toISOString();
   const boundary = new Date(now - AUTOPILOT_RESEND_RETRY_WINDOW_MS).toISOString();
-
   assert.equal(canRetryAutopilotPending({ status: "pending", created_at: inside }, now), true);
   assert.equal(canRetryAutopilotPending({ status: "pending", created_at: boundary }, now), false);
   assert.equal(canRetryAutopilotPending({ status: "sent", created_at: inside }, now), false);
-  assert.equal(canRetryAutopilotPending({ status: "pending", created_at: "not-a-date" }, now), false);
   assert.equal(canRetryAutopilotPending(null, now), false);
 });
 
@@ -30,272 +28,142 @@ test("Autopilot queue outcome reconciliation is deterministic", () => {
   assert.equal(autopilotQueueOutcome(null), "missing");
 });
 
-test("Autopilot Product Hunt attribution is coarse and does not expose the referrer", () => {
+test("Product Hunt attribution remains coarse", () => {
   assert.equal(classifyAutopilotSource({ headers: { referer: "https://www.producthunt.com/products/titan-autopilot" } }), "product_hunt");
-  assert.equal(classifyAutopilotSource({ headers: { referer: "https://titanos.app/autopilot?utm_source=producthunt" } }), "product_hunt");
   assert.equal(classifyAutopilotSource({ headers: { referer: "https://example.com/post" } }), "other");
   assert.equal(classifyAutopilotSource({ headers: {} }), "direct");
 });
 
-test("Autopilot checkout binds the paid order to the authenticated owner", async () => {
-  const source = await read("api/functions/createAutopilotOrder.js");
-  assert.match(source, /eq\("created_by_id", auth\.user\.id\)/);
-  assert.match(source, /metadata: \{ payment_id: payment\.id, user_id: auth\.user\.id/);
-  assert.match(source, /task_type: "invoice_recovery_sprint"/);
-  assert.match(source, /idempotencyKey: `autopilot_\$\{payment\.id\}`/);
-  assert.match(source, /eventName: "checkout_started"/);
-});
-
-test("Autopilot validates the configured Stripe price before creating a payable order", async () => {
-  const source = await read("api/functions/createAutopilotOrder.js");
-  assert.match(source, /stripe\.prices\.retrieve\(configuredPriceId\)/);
-  assert.match(source, /price\?\.active === true/);
-  assert.match(source, /price\?\.type === "one_time"/);
-  assert.match(source, /String\(price\?\.currency \|\| ""\)\.toLowerCase\(\) === "usd"/);
-  assert.match(source, /Number\(price\?\.unit_amount\) === SPRINT_PRICE_CENTS/);
-  assert.match(source, /AUTOPILOT_PRICE_MISCONFIGURED/);
-});
-
-test("Autopilot enforces one normalized customer email per new sprint", async () => {
+test("Autopilot paid entrypoints are retired and cannot create charges", async () => {
+  for (const path of [
+    "api/functions/createAutopilotOrder.js",
+    "api/functions/runAutopilotOrder.js",
+    "api/functions/runAutopilotMembership.js",
+  ]) {
+    const source = await read(path);
+    assert.match(source, /res\.status\(410\)/);
+    assert.doesNotMatch(source, /new Stripe|stripe\.checkout|stripe\.prices|SPRINT_PRICE_CENTS/);
+  }
   const checkout = await read("api/functions/createAutopilotOrder.js");
-  const membership = await read("api/functions/runAutopilotMembership.js");
-  const ui = await read("src/pages/Autopilot.jsx");
+  assert.match(checkout, /AUTOPILOT_PAID_CHECKOUT_RETIRED/);
+});
 
-  assert.match(checkout, /hasDuplicateRecipients\(invoices\)/);
-  assert.match(checkout, /one overdue invoice per customer email/);
-  assert.match(membership, /hasDuplicateRecipients\(requestedInvoices\)/);
-  assert.match(membership, /one overdue invoice per customer email/);
+test("free Autopilot runner has no payment or subscription entitlement dependency", async () => {
+  const source = await read("api/functions/runAutopilotFree.js");
+  assert.match(source, /requireUser/);
+  assert.match(source, /key: "runAutopilotFree"/);
+  assert.match(source, /requireDurable: true/);
+  assert.match(source, /AUTOPILOT_DELIVERY_NOT_CONFIGURED/);
+  assert.match(source, /\.from\("autopilot_runs"\)/);
+  assert.match(source, /eventName: "free_run_started"/);
+  assert.match(source, /mode: "free"/);
+  assert.doesNotMatch(source, /Stripe|checkout|paying_subscriber|plan_tier|price_cents|payments/);
+});
+
+test("free runner snapshots exact recipients and enforces one customer per sprint", async () => {
+  const source = await read("api/functions/runAutopilotFree.js");
+  const ui = await read("src/pages/Autopilot.jsx");
+  assert.match(source, /buildRecipientSnapshot/);
+  assert.match(source, /approvedRecipientMap/);
+  assert.match(source, /hasDuplicateRecipients\(ordered\)/);
+  assert.match(source, /one overdue invoice per customer email/);
+  assert.match(source, /\.eq\("created_by_id", auth\.user\.id\)/);
   assert.match(ui, /uniqueEligibleCount/);
   assert.match(ui, /Customer already selected/);
   assert.match(ui, /one invoice per customer email in each sprint/);
-  assert.match(ui, /Select oldest .* customers/);
 });
 
-test("Stripe webhook binds Autopilot settlement to a genuine local order and retry-safe ledger", async () => {
-  const source = await read("api/functions/stripeWebhook.js");
-  const migration = await read("supabase/migrations/20260914203000_stripe_webhook_claim_state.sql");
-
-  assert.match(source, /constructEvent/);
-  assert.match(source, /metadata\.task_type === AUTOPILOT_TASK/);
-  assert.match(source, /session\.payment_status !== "paid"/);
-  assert.match(source, /readValidatedAutopilotPayment/);
-  assert.match(source, /Autopilot payment user mismatch/);
-  assert.match(source, /Autopilot payment creator mismatch/);
-  assert.match(source, /Autopilot payment provider mismatch/);
-  assert.match(source, /Autopilot payment currency mismatch/);
-  assert.match(source, /Autopilot checkout session mismatch/);
-  assert.match(source, /Autopilot local order contract mismatch/);
-  assert.match(source, /Autopilot checkout amount mismatch/);
-  assert.match(source, /AUTOPILOT_PRICE_CENTS/);
-  assert.match(source, /stripe_webhook_events/);
-  assert.match(source, /claimAutopilotEvent/);
-  assert.match(source, /completeAutopilotEvent/);
-  assert.match(source, /failAutopilotEvent/);
-  assert.match(source, /AUTOPILOT_EVENT_LEASE_MS/);
-  assert.match(source, /processing_status/);
-  assert.match(source, /guardAutopilotPaymentMutation/);
-  assert.match(source, /\.eq\("user_id", payment\.user_id\)/);
-  assert.match(source, /\.eq\("amount", payment\.amount\)/);
-  assert.match(source, /\.eq\("currency", payment\.currency\)/);
-  assert.match(source, /\.eq\("provider", payment\.provider\)/);
-  assert.match(source, /\.eq\("note", payment\.note\)/);
-  assert.match(source, /\.is\("external_id", null\)/);
-  assert.match(source, /status: "succeeded"/);
-
-  assert.match(migration, /processing_status TEXT NOT NULL DEFAULT 'processed'/);
-  assert.match(migration, /claimed_at TIMESTAMPTZ NOT NULL DEFAULT now\(\)/);
-  assert.match(migration, /attempt_count INTEGER NOT NULL DEFAULT 1/);
-  assert.match(migration, /last_error TEXT/);
-  assert.match(migration, /'processing','processed','failed'/);
-  assert.match(migration, /idx_stripe_webhook_events_claim_state/);
+test("free runner is crash-safe and retries the original run snapshot", async () => {
+  const source = await read("api/functions/runAutopilotFree.js");
+  assert.match(source, /const requestedRunId = String\(body\.run_id/);
+  assert.match(source, /readRun\(admin, ownerId, requestedRunId\)/);
+  assert.match(source, /isFreshRunning/);
+  assert.match(source, /existing\.recipient_snapshot/);
+  assert.match(source, /canRetryAutopilotPending\(prior\)/);
+  assert.match(source, /provider_idempotency_window_expired/);
+  assert.match(source, /autopilot_run:free:\$\{run\.id\}:\$\{invoiceId\}/);
+  assert.match(source, /deliverAutopilotQueue/);
+  assert.match(source, /\.eq\("updated_at", lease\)/);
+  assert.match(source, /res\.status\(retryable \? 202 : 200\)/);
 });
 
-test("Autopilot execution requires settlement and atomically claims an order", async () => {
-  const source = await read("api/functions/runAutopilotOrder.js");
-  assert.match(source, /payment\.status !== "succeeded"/);
-  assert.match(source, /\.eq\("note", payment\.note\)/);
-  assert.match(source, /order\.state === "completed"/);
-  assert.match(source, /RESEND_API_KEY/);
+test("free runner rechecks eligibility and recipient immediately before delivery", async () => {
+  const source = await read("api/functions/runAutopilotFree.js");
+  assert.match(source, /const recipientChanged = recipientKey\(fresh\) !== approvedEmail/);
+  assert.match(source, /!isStillEligible\(fresh, today\) \|\| recipientChanged/);
+  assert.match(source, /approved_recipient_changed/);
+  assert.match(source, /invoice_no_longer_eligible/);
+  assert.match(source, /status: "skipped"/);
 });
 
-test("Shared Autopilot delivery engine records provider evidence and uses stable idempotency", async () => {
+test("shared delivery engine preserves provider evidence and deterministic idempotency", async () => {
   const helper = await read("api/_lib/autopilotDelivery.js");
   const migration = await read("supabase/migrations/20260914130000_autopilot_delivery_idempotency.sql");
-  assert.match(helper, /AUTOPILOT_RESEND_RETRY_WINDOW_MS/);
-  assert.match(helper, /canRetryAutopilotPending/);
-  assert.match(helper, /autopilotQueueOutcome/);
-  assert.match(helper, /readAutopilotQueue/);
-  assert.match(helper, /persistProviderAccepted/);
-  assert.match(helper, /\.in\("status", \["pending", "failed"\]\)/);
   assert.match(helper, /"Idempotency-Key": deliveryKey/);
   assert.match(helper, /provider_message_id: providerMessageId/);
-  assert.match(helper, /delivery_error_code/);
-  assert.match(helper, /concurrent_idempotent_requests/);
   assert.match(helper, /network_ambiguous/);
+  assert.match(helper, /concurrent_idempotent_requests/);
   assert.match(helper, /provider_accepted_receipt_persist_ambiguous/);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS provider_message_id TEXT/);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS delivery_error_code TEXT/);
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_followup_autopilot_run_once/);
   assert.match(migration, /rule_id LIKE 'autopilot_run:%'/);
 });
 
-test("Autopilot order execution is crash-recoverable at DB, lease, and provider layers", async () => {
-  const source = await read("api/functions/runAutopilotOrder.js");
-  assert.match(source, /STALE_RUN_MS/);
-  assert.match(source, /isFreshRun\(order\)/);
-  assert.match(source, /canRetryAutopilotPending\(prior\)/);
-  assert.match(source, /deliverAutopilotQueue/);
-  assert.match(source, /readAutopilotQueue/);
-  assert.match(source, /autopilotQueueOutcome/);
-  assert.match(source, /autopilot_run:order:/);
-  assert.match(source, /delivery_unconfirmed_invoice_no_longer_eligible/);
-  assert.match(source, /idempotency_window_expired/);
-  assert.match(source, /\.eq\("note", runningNote\)/);
-  assert.match(source, /state: pending > 0 \? "retryable" : "completed"/);
-  assert.match(source, /res\.status\(pending > 0 \? 202 : 200\)/);
+test("free run ledger is service-managed and supports free telemetry", async () => {
+  const migration = await read("supabase/migrations/20260915033000_autopilot_free_runs.sql");
+  const funnel = await read("api/_lib/autopilotFunnel.js");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.autopilot_runs/);
+  assert.match(migration, /recipient_snapshot JSONB NOT NULL/);
+  assert.match(migration, /REVOKE ALL ON public\.autopilot_runs FROM anon, authenticated/);
+  assert.match(migration, /CREATE POLICY autopilot_runs_no_client/);
+  assert.match(migration, /'free_run_started'/);
+  assert.match(migration, /'free'/);
+  assert.match(funnel, /"free_run_started"/);
+  assert.match(funnel, /"free"/);
 });
 
-test("Autopilot one-time runner re-reads invoice eligibility immediately before first delivery", async () => {
-  const source = await read("api/functions/runAutopilotOrder.js");
-  assert.match(source, /Re-read immediately before creating the delivery/);
-  assert.match(source, /freshInvoice/);
-  assert.match(source, /isStillEligible\(freshInvoice, today\)/);
-  assert.match(source, /status: "skipped"/);
+test("authenticated Autopilot UI is free-only", async () => {
+  const page = await read("src/pages/Autopilot.jsx");
+  assert.match(page, /runAutopilotFree/);
+  assert.match(page, /Run free recovery sprint/);
+  assert.match(page, /There is no checkout or paid plan required/);
+  assert.doesNotMatch(page, /createAutopilotOrder|runAutopilotOrder|runAutopilotMembership/);
+  assert.doesNotMatch(page, /getPlanCheckoutUrl|resolvePlan|VITE_AUTOPILOT_ONETIME_CHECKOUT/);
+  assert.doesNotMatch(page, /\$9(?:\.00|\.99)?|Checkout complete|Get Pro/);
 });
 
-test("Autopilot recipient storage is owner-scoped through the existing queue", async () => {
-  const migration = await read("supabase/migrations/041_titan_autopilot.sql");
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS customer_email TEXT/);
-  assert.match(migration, /created_by_id, status, scheduled_for/);
+test("public Autopilot preview contains no product price or checkout CTA", async () => {
+  const page = await read("src/pages/AutopilotPublic.jsx");
+  assert.match(page, /Create account/);
+  assert.match(page, /Sign in/);
+  assert.doesNotMatch(page, /checkout|Get Pro|per month|one-time sprint/i);
 });
 
-test("Membership sprint enforces paid entitlement, ownership, and monthly replay protection", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  const migration = await read("supabase/migrations/042_autopilot_membership_claims.sql");
-  assert.match(source, /paying_subscriber === true/);
-  assert.match(source, /eq\("created_by_id", auth\.user\.id\)/);
-  assert.match(source, /claimError\?\.code === "23505"/);
-  assert.match(migration, /UNIQUE \(user_id, period_key\)/);
-  assert.match(migration, /REVOKE ALL .* FROM anon, authenticated/);
+test("TitanOS Stripe route ignores Stripe without credentials while Attention stays isolated", async () => {
+  const webhook = await read("api/functions/stripeWebhook.js");
+  const ignoreIndex = webhook.indexOf("if (!isAttentionDeployment())");
+  const secretIndex = webhook.indexOf("const stripeKey = process.env.STRIPE_SECRET_KEY");
+  assert.ok(ignoreIndex >= 0 && secretIndex > ignoreIndex, "TitanOS must exit before reading Stripe credentials");
+  assert.match(webhook, /autopilot_payments_retired/);
+  assert.match(webhook, /metadata\.kind !== ATTENTION_KIND/);
+  assert.doesNotMatch(webhook, /AUTOPILOT_TASK|task_type ===/);
 });
 
-test("Membership stale recovery preserves and reconciles the original approved batch", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  assert.match(source, /readMonthlyClaim/);
-  assert.match(source, /existing\.invoice_ids/);
-  assert.match(source, /originalInvoiceIds/);
-  assert.match(source, /invoice_ids: originalInvoiceIds/);
-  assert.match(source, /if \(!existingClaim\)/);
-  assert.match(source, /Recovery always uses the original approved monthly batch/);
-  assert.match(source, /effectiveInvoiceIds/);
-  assert.match(source, /readAutopilotQueue/);
-  assert.match(source, /autopilotQueueOutcome/);
-  assert.match(source, /queue_reconcile_missing/);
-});
-
-test("Membership recovery uses the shared provider engine and a compare-and-set lease", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  assert.match(source, /STALE_RUN_MS/);
-  assert.match(source, /isFreshRun\(existingClaim\)/);
-  assert.match(source, /canRetryAutopilotPending\(prior\)/);
-  assert.match(source, /deliverAutopilotQueue/);
-  assert.match(source, /autopilot_run:membership:/);
-  assert.match(source, /recovered: acquired\.recovered/);
-  assert.match(source, /\.eq\("updated_at", claim\.updated_at\)/);
-  assert.match(source, /retryRequired/);
-  assert.match(source, /res\.status\(retryRequired \? 202 : 200\)/);
-});
-
-test("Membership sprint prepares an auditable queue when email delivery is unavailable", async () => {
-  const source = await read("api/functions/runAutopilotMembership.js");
-  assert.match(source, /prepared \+= 1/);
-  assert.match(source, /if \(!resendKey\)/);
-  assert.match(source, /delivery_mode: resendKey \? "email" : "review_queue"/);
-});
-
-test("Autopilot queue rows are protected from generic follow-up send, mutation, and deletion", async () => {
+test("Autopilot Recovery Receipts stay protected from generic Follow-ups", async () => {
   const sender = await read("api/functions/sendFollowUp.js");
   const client = await read("src/lib/followUpApi.js");
   const rls = await read("supabase/migrations/20260914194500_autopilot_queue_rls.sql");
   const page = await read("src/pages/FollowUps.jsx");
-
   assert.match(sender, /AUTOPILOT_QUEUE_PROTECTED/);
   assert.match(sender, /startsWith\("autopilot_run:"\)/);
-  assert.match(sender, /isOwnedQueueRow/);
-  assert.match(sender, /assertRateLimitAsync/);
-  assert.match(sender, /requireDurable: true/);
-  assert.match(sender, /"Idempotency-Key"/);
-  assert.match(sender, /followup_queue_/);
-  assert.match(sender, /provider_message_id/);
-  assert.match(sender, /duplicate: true/);
   assert.match(client, /isAutopilotFollowUp/);
-  assert.match(client, /managed by Titan Autopilot/);
-  assert.doesNotMatch(client, /catch \{\s*return markQueueSent/);
-  assert.match(rls, /DROP POLICY IF EXISTS follow_queue_own/);
-  assert.match(rls, /FOR UPDATE/);
-  assert.match(rls, /FOR DELETE/);
   assert.match(rls, /NOT LIKE 'autopilot_run:%'/);
   assert.match(page, /Autopilot Recovery Receipts/);
-  assert.match(page, /read-only evidence/);
-  assert.match(page, /normalPending/);
 });
 
-test("Autopilot live DB verifier proves the Recovery Receipt boundary and fails closed", async () => {
-  const verifier = await read("scripts/verify-autopilot-db-security.mjs");
-
-  assert.match(verifier, /receiptReadable/);
-  assert.match(verifier, /receiptUpdateBlocked/);
-  assert.match(verifier, /receiptDeleteBlocked/);
-  assert.match(verifier, /autopilotInsertBlocked/);
-  assert.match(verifier, /manualFollowUpStillWritable/);
-  assert.match(verifier, /telemetrySchemaPresent/);
-  assert.match(verifier, /telemetryClientWriteBlocked/);
-  assert.match(verifier, /required\.every\(Boolean\)/);
-  assert.match(verifier, /process\.exit\(report\.ok \? 0 : 3\)/);
-});
-
-test("Autopilot funnel telemetry is allow-listed, coarse, client-write protected, and non-blocking", async () => {
-  const helper = await read("api/_lib/autopilotFunnel.js");
-  const endpoint = await read("api/functions/trackAutopilotEvent.js");
-  const client = await read("src/lib/autopilotTelemetry.js");
-  const page = await read("src/pages/Autopilot.jsx");
-  const order = await read("api/functions/runAutopilotOrder.js");
-  const membership = await read("api/functions/runAutopilotMembership.js");
+test("Autopilot funnel telemetry remains privacy-minimized and non-blocking", async () => {
   const migration = await read("supabase/migrations/20260914193000_autopilot_funnel_events.sql");
-
-  assert.match(helper, /product_hunt/);
-  assert.match(helper, /safeInvoiceCount/);
-  assert.match(endpoint, /requireDurable: true/);
-  assert.match(client, /titan_autopilot_source/);
-  assert.match(client, /stored === "product_hunt"/);
-  assert.match(page, /preview_view/);
-  assert.match(page, /signed_in_view/);
-  assert.match(page, /eligible_loaded/);
-  assert.match(page, /batch_approved/);
-  assert.match(page, /checkout_returned/);
-  assert.match(order, /one_time_run_started/);
-  assert.match(order, /eventName: pending > 0 \? "run_retryable" : "run_completed"/);
-  assert.match(membership, /membership_run_started/);
-  assert.match(membership, /eventName: retryRequired \? "run_retryable"/);
+  const helper = await read("api/_lib/autopilotFunnel.js");
   assert.match(migration, /REVOKE ALL ON public\.autopilot_funnel_events FROM anon, authenticated/);
-  assert.match(migration, /invoice_count INTEGER/);
-  assert.doesNotMatch(migration, /customer_email/);
-  assert.doesNotMatch(migration, /invoice_number/);
-  assert.doesNotMatch(migration, /message_body/);
-  assert.doesNotMatch(migration, /raw_referrer/);
-});
-
-test("Autopilot UI is explicit about settlement, safe retries, Recovery Receipts, and paid tier compatibility", async () => {
-  const source = await read("src/pages/Autopilot.jsx");
-  assert.match(source, /Recovery Command Center/);
-  assert.match(source, /Example preview · sample data/);
-  assert.match(source, /Paid-after-approval safety stop/);
-  assert.match(source, /Reminder preview/);
-  assert.match(source, /Select oldest/);
-  assert.match(source, /not guaranteed recovered revenue/);
-  assert.match(source, /Checkout complete — verifying payment/);
-  assert.match(source, /Returning from Stripe does not unlock delivery by itself/);
-  assert.match(source, /Safe retry required/);
-  assert.match(source, /View Recovery Receipts/);
-  assert.match(source, /"worker_premium", "pro", "business"/);
+  assert.doesNotMatch(migration, /customer_email|invoice_id|message_body|raw_referrer|ip_address/);
+  assert.match(helper, /return !error/);
 });

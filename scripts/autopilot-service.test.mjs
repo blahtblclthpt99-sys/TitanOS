@@ -79,6 +79,7 @@ test("free runner is crash-safe and retries the original run snapshot", async ()
   assert.match(source, /readRun\(admin, ownerId, requestedRunId\)/);
   assert.match(source, /isFreshRunning/);
   assert.match(source, /existing\.recipient_snapshot/);
+  assert.match(source, /lease: reclaimed\.updated_at \|\| requestedLease/);
   assert.match(source, /canRetryAutopilotPending\(prior\)/);
   assert.match(source, /provider_idempotency_window_expired/);
   assert.match(source, /autopilot_run:free:\$\{run\.id\}:\$\{invoiceId\}/);
@@ -94,6 +95,17 @@ test("free runner rechecks eligibility and recipient immediately before delivery
   assert.match(source, /approved_recipient_changed/);
   assert.match(source, /invoice_no_longer_eligible/);
   assert.match(source, /status: "skipped"/);
+});
+
+test("free runner blocks repeated reminders for the same invoice inside the safety window", async () => {
+  const source = await read("api/functions/runAutopilotFree.js");
+  assert.match(source, /REPEAT_REMINDER_COOLDOWN_MS = 72 \* 60 \* 60 \* 1000/);
+  assert.match(source, /async function recentAutopilotDelivery/);
+  assert.match(source, /\.eq\("status", "sent"\)/);
+  assert.match(source, /\.gte\("sent_at", since\)/);
+  assert.match(source, /\.like\("rule_id", `autopilot_run:%:\$\{invoiceId\}`\)/);
+  assert.match(source, /recent_autopilot_reminder/);
+  assert.match(source, /72-hour safety window/);
 });
 
 test("shared delivery engine preserves provider evidence and deterministic idempotency", async () => {
@@ -131,20 +143,25 @@ test("authenticated Autopilot UI is free-only", async () => {
   assert.doesNotMatch(page, /\$9(?:\.00|\.99)?|Checkout complete|Get Pro/);
 });
 
-test("public Autopilot preview contains no product price or checkout CTA", async () => {
+test("public Autopilot preview is explicitly free and has no paid execution CTA", async () => {
   const page = await read("src/pages/AutopilotPublic.jsx");
+  assert.match(page, /Free to use/);
+  assert.match(page, /No checkout or paid plan is required/);
   assert.match(page, /Create account/);
   assert.match(page, /Sign in/);
-  assert.doesNotMatch(page, /checkout|Get Pro|per month|one-time sprint/i);
+  assert.doesNotMatch(page, /createAutopilotOrder|runAutopilotOrder|runAutopilotMembership|VITE_AUTOPILOT_ONETIME_CHECKOUT|\$9(?:\.00|\.99)?|Get Pro|one-time sprint/i);
 });
 
-test("TitanOS Stripe route ignores Stripe without credentials while Attention stays isolated", async () => {
+test("TitanOS Stripe route exits before loading Stripe while Attention stays isolated", async () => {
   const webhook = await read("api/functions/stripeWebhook.js");
   const ignoreIndex = webhook.indexOf("if (!isAttentionDeployment())");
   const secretIndex = webhook.indexOf("const stripeKey = process.env.STRIPE_SECRET_KEY");
+  const handlerImportIndex = webhook.indexOf("await import(\"../_lib/stripeWebhookProductHandler.js\")");
   assert.ok(ignoreIndex >= 0 && secretIndex > ignoreIndex, "TitanOS must exit before reading Stripe credentials");
+  assert.ok(handlerImportIndex > secretIndex, "Attention payment handler must be loaded only after TitanOS has exited");
   assert.match(webhook, /autopilot_payments_retired/);
   assert.match(webhook, /metadata\.kind !== ATTENTION_KIND/);
+  assert.doesNotMatch(webhook, /^import .*stripeWebhookProductHandler/m);
   assert.doesNotMatch(webhook, /AUTOPILOT_TASK|task_type ===/);
 });
 

@@ -86,6 +86,7 @@ test("recovered TitanOS has a service-role-only durable outbound rate-limit fall
 test("TitanOS stays the default surface and Product Hunt Autopilot remains reachable", async () => {
   const main = await read("src/main.jsx");
   const app = await read("src/App.jsx");
+  const publicPreview = await read("src/pages/AutopilotPublic.jsx");
   const tabs = await read("src/components/layout/TabStack.jsx");
   const attentionSurface = await read("src/AttentionSurface.jsx");
   const android = await read(".github/workflows/android-release.yml");
@@ -99,11 +100,16 @@ test("TitanOS stays the default surface and Product Hunt Autopilot remains reach
   assert.match(main, /bootAttention/);
   assert.doesNotMatch(main, /LEGACY_PURGE_MARKER|purgeLegacyClientStateOnce|LEGACY_KEY_PATTERN/);
 
-  assert.match(app, /const Autopilot = lazy\(\(\) => import\("@\/pages\/Autopilot"\)\)/);
-  assert.match(app, /"\/autopilot"/);
+  assert.match(app, /const AutopilotPublic = lazy\(\(\) => import\("@\/pages\/AutopilotPublic"\)\)/);
+  assert.match(app, /<Route path="\/autopilot" element=\{<AutopilotPublic \/>\} \/>/);
   assert.match(app, /PUBLIC_PREVIEW_APP_ROUTES/);
   assert.match(app, /previewAppRoute/);
   assert.match(tabs, /"\/autopilot": Autopilot/);
+
+  assert.match(publicPreview, /Example preview · sample data/);
+  assert.match(publicPreview, /trackAutopilotEvent\("preview_view"/);
+  assert.match(publicPreview, /Open Titan Autopilot/);
+  assert.doesNotMatch(publicPreview, /useAuth|api\.entities|api\.functions|Invoice\.list|runAutopilot|createAutopilotOrder/);
 
   assert.match(attentionSurface, /import AttentionApp from "\.\/AttentionApp\.jsx"/);
   assert.match(attentionSurface, /import "\.\/attention\.css"/);

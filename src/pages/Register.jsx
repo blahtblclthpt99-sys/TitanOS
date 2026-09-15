@@ -28,10 +28,12 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpType, setOtpType] = useState("signup");
+  const [otpDeliveryStatus, setOtpDeliveryStatus] = useState("accepted");
   const [pendingUserId, setPendingUserId] = useState("");
 
   const finishSignup = async (userId) => {
@@ -50,6 +52,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -71,9 +74,16 @@ export default function Register() {
           setError("Signup verification could not be initialized. Please try again.");
           return;
         }
+        const deliveryStatus = result?.verificationDelivery === "uncertain" ? "uncertain" : "accepted";
         setPendingUserId(result.user.id);
         setOtpType(result.verificationMode === "otp_magiclink" ? "magiclink" : "signup");
+        setOtpDeliveryStatus(deliveryStatus);
         setOtpCode("");
+        if (deliveryStatus === "uncertain") {
+          setNotice(
+            "We couldn't confirm whether the verification email was delivered. If a code arrives, it is still valid. Otherwise, tap Resend for a fresh code."
+          );
+        }
         setShowOtp(true);
         return;
       }
@@ -106,8 +116,6 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      // verifySignupOtp uses Titan's persistent Supabase browser client, so the
-      // full access + refresh session remains authoritative after verification.
       await verifySignupOtp({ email, otpCode, verificationType: otpType });
       const me = await api.auth.me().catch(() => null);
       await finishSignup(me?.id || pendingUserId);
@@ -120,12 +128,20 @@ export default function Register() {
 
   const handleResend = async () => {
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       const result = await resendSignupOtp({ email, userId: pendingUserId });
       setOtpType(result.verificationType);
+      setOtpDeliveryStatus(result.deliveryStatus);
       setOtpCode("");
-      toast({ title: "Code sent", description: "Check your email for the new code." });
+      if (result.deliveryStatus === "uncertain") {
+        setNotice(
+          "Titan generated a fresh code, but couldn't confirm provider delivery. Check your inbox before requesting another code."
+        );
+      } else {
+        toast({ title: "Code sent", description: "Check your email for the new code." });
+      }
     } catch (err) {
       setError(err.message || "Failed to resend code");
     } finally {
@@ -134,8 +150,17 @@ export default function Register() {
   };
 
   if (showOtp) {
+    const subtitle =
+      otpDeliveryStatus === "uncertain"
+        ? `Check ${email} for your verification code`
+        : `We sent a code to ${email}`;
     return (
-      <AuthLayout title="Verify your email" subtitle={`We sent a code to ${email}`}>
+      <AuthLayout title="Verify your email" subtitle={subtitle}>
+        {notice && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+            {notice}
+          </div>
+        )}
         {error && (
           <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {error}

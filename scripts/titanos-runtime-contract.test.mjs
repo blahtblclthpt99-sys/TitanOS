@@ -33,6 +33,24 @@ test("server and browser Supabase canonical project refs must agree", () => {
   );
 });
 
+test("Founding claims require verified auth and tolerate recovered environments without Founding schema", async () => {
+  const verifiedGate = await read("supabase/migrations/20260915024500_founding_claim_requires_verified_auth.sql");
+  const compatibility = await read("supabase/migrations/20260915025000_founding_claim_optional_schema_guard.sql");
+
+  for (const migration of [verifiedGate, compatibility]) {
+    assert.match(migration, /to_regclass\('public\.platform_launch'\) IS NULL/);
+    assert.match(migration, /founding_columns < 8/);
+    assert.match(migration, /founding_unavailable/);
+    assert.match(migration, /email_confirmed_at IS NOT NULL OR u\.phone_confirmed_at IS NOT NULL/);
+    assert.match(migration, /unverified_user/);
+  }
+
+  assert.match(verifiedGate, /auth_user_claim_founding_after_verification/);
+  assert.match(verifiedGate, /AFTER UPDATE OF email_confirmed_at, phone_confirmed_at ON auth\.users/);
+  assert.match(verifiedGate, /OLD\.email_confirmed_at IS NULL AND NEW\.email_confirmed_at IS NOT NULL/);
+  assert.match(verifiedGate, /PERFORM public\.claim_founding_slot\(NEW\.id\)/);
+});
+
 test("TitanOS registration requires durable cross-instance throttling", async () => {
   const registration = await read("api/register.js");
   assert.match(registration, /assertRateLimitAsync/);
@@ -104,6 +122,7 @@ test("signup code resend stays product-owned and bound to the pending user", asy
   assert.match(client, /verificationType === "magiclink" \? "magiclink" : "signup"/);
   assert.match(client, /if \(!\/\^\\d\{6\}\$\/\.test\(token\)\)/);
   assert.match(client, /supabase\.auth\.verifyOtp/);
+  assert.doesNotMatch(client, /for \(const base of/);
 
   assert.match(registerPage, /resendSignupOtp\(\{ email, userId: pendingUserId \}\)/);
   assert.match(registerPage, /setOtpType\(result\.verificationType\)/);

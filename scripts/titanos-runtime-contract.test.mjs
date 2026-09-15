@@ -31,6 +31,24 @@ test("server and browser Supabase canonical project refs must agree", () => {
   );
 });
 
+test("registration requires two-way canonical Supabase project proof", async () => {
+  const registration = await read("api/register.js");
+  const authClient = await read("src/api/auth.js");
+  const clientUrl = await read("src/lib/supabaseUrl.js");
+  const serverSupabase = await read("api/_lib/supabase.js");
+
+  assert.match(clientUrl, /export function standardSupabaseProjectRef/);
+  assert.match(serverSupabase, /export function standardSupabaseProjectRef/);
+  assert.match(authClient, /const clientProjectRef = standardSupabaseProjectRef\(import\.meta\.env\.VITE_SUPABASE_URL\)/);
+  assert.match(authClient, /JSON\.stringify\(\{ email, password, fullName, clientProjectRef \}\)/);
+  assert.match(authClient, /clientProjectRef && body\.projectRef !== clientProjectRef/);
+  assert.match(registration, /const clientProjectRef = String\(body\.clientProjectRef \|\| ""\)/);
+  assert.match(registration, /const serverProjectRef = standardSupabaseProjectRef/);
+  assert.match(registration, /clientProjectRef !== serverProjectRef/);
+  assert.match(registration, /code: "AUTH_ENVIRONMENT_MISMATCH"/);
+  assert.match(registration, /projectRef: serverProjectRef \|\| null/);
+});
+
 test("Founding claims require verified auth and tolerate recovered environments without Founding schema", async () => {
   const verifiedGate = await read("supabase/migrations/20260915024500_founding_claim_requires_verified_auth.sql");
   const compatibility = await read("supabase/migrations/20260915025000_founding_claim_optional_schema_guard.sql");

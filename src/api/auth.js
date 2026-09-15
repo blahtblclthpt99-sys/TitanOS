@@ -154,21 +154,31 @@ async function assertOAuthProviderEnabled(provider) {
   }
 }
 
-async function registerViaServer({ email, password, fullName }) {
+function serverApiBases() {
   const bases = [];
-  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (configured) bases.push(configured);
-  if (typeof window !== "undefined") {
+
+  // A web preview must use its own API before any configured production host.
+  // This keeps UI and server code on the same commit. Native shells deliberately
+  // skip browser same-origin and use the configured/canonical server instead.
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     const { hostname, origin } = window.location;
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
       bases.push(origin);
     }
-    bases.push("https://titanos-web.vercel.app");
   }
 
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (configured) bases.push(configured);
+  bases.push("https://titanos-web.vercel.app");
+
+  return [...new Set(bases)];
+}
+
+async function registerViaServer({ email, password, fullName }) {
+  const bases = serverApiBases();
   const clientProjectRef = standardSupabaseProjectRef(import.meta.env.VITE_SUPABASE_URL);
   let lastError;
-  for (const base of [...new Set(bases)]) {
+  for (const base of bases) {
     try {
       const response = await fetch(`${base}/api/register`, {
         method: "POST",
@@ -266,12 +276,7 @@ export function createAuthModule() {
           throwIfError(error);
         }
         try {
-          const bases = [];
-          const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-          if (configured) bases.push(configured);
-          if (typeof window !== "undefined") bases.push(window.location.origin);
-          bases.push("https://titanos-web.vercel.app");
-          for (const base of [...new Set(bases)]) {
+          for (const base of serverApiBases()) {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

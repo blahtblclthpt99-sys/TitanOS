@@ -26,6 +26,7 @@ function resolveSurface() {
     if (
       host === "titan-os-six.vercel.app" ||
       host.startsWith("titan-os-git-") ||
+      host.startsWith("titan-o") ||
       host.includes("titan-attention")
     ) {
       return "attention";
@@ -33,8 +34,8 @@ function resolveSurface() {
   }
 
   // TitanOS is the safe default for Product Hunt, native builds, localhost, and
-  // unknown preview aliases. The Attention Vercel project should set
-  // VITE_APP_SURFACE=attention so random preview hostnames are deterministic.
+  // unknown preview aliases. The Attention Vercel project should still set
+  // VITE_APP_SURFACE=attention so custom/renamed hosts remain deterministic.
   return "titanos";
 }
 

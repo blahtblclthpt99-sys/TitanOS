@@ -83,6 +83,37 @@ test("recovered TitanOS has a service-role-only durable outbound rate-limit fall
   assert.match(limiter, /requireDurable/);
 });
 
+test("TitanOS stays the default surface and Product Hunt Autopilot remains reachable", async () => {
+  const main = await read("src/main.jsx");
+  const app = await read("src/App.jsx");
+  const tabs = await read("src/components/layout/TabStack.jsx");
+  const attentionSurface = await read("src/AttentionSurface.jsx");
+  const android = await read(".github/workflows/android-release.yml");
+
+  assert.match(main, /VITE_APP_SURFACE/);
+  assert.match(main, /if \(isNativeApp\(\)\) return "titanos"/);
+  assert.match(main, /return "titanos"/);
+  assert.match(main, /import\("\.\/AttentionSurface\.jsx"\)/);
+  assert.match(main, /import\("\.\/App\.jsx"\)/);
+  assert.match(main, /bootTitanOS/);
+  assert.match(main, /bootAttention/);
+  assert.doesNotMatch(main, /LEGACY_PURGE_MARKER|purgeLegacyClientStateOnce|LEGACY_KEY_PATTERN/);
+
+  assert.match(app, /const Autopilot = lazy\(\(\) => import\("@\/pages\/Autopilot"\)\)/);
+  assert.match(app, /"\/autopilot"/);
+  assert.match(app, /PUBLIC_PREVIEW_APP_ROUTES/);
+  assert.match(app, /previewAppRoute/);
+  assert.match(tabs, /"\/autopilot": Autopilot/);
+
+  assert.match(attentionSurface, /import AttentionApp from "\.\/AttentionApp\.jsx"/);
+  assert.match(attentionSurface, /import "\.\/attention\.css"/);
+  assert.doesNotMatch(app, /attention\.css/);
+
+  assert.match(android, /VITE_APP_SURFACE: "titanos"/);
+  assert.match(android, /wbymywwrpbljfbsemung\.supabase\.co/);
+  assert.doesNotMatch(android, /VITE_SUPABASE_URL: "https:\/\/xcfjpxcmokdfwkarwomy\.supabase\.co"/);
+});
+
 test("recipient contract never infers a replacement address during recovery", async () => {
   const order = await read("api/functions/runAutopilotOrder.js");
   const membership = await read("api/functions/runAutopilotMembership.js");

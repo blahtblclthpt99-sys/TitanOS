@@ -1287,6 +1287,343 @@ Deno.serve(async (req: Request) => {
         }
         return reply(origin, 200, { success: true, id: result?.id || null, provider: "resend" });
       }
+
+      case "createAutopilotOrder": {
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+        if (!stripeKey) {
+          return reply(origin, 503, { error: "Autopilot checkout is not configured", code: "PAYMENT_PROVIDER_UNAVAILABLE" });
+        }
+        const rate = await consumeEdgeRateLimit(adminClient(), "createAutopilotOrder:" + user.id, 8, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many checkout requests. Try again shortly.", retry_after: rate.retryAfter });
+
+        const invoiceIds = Array.from(new Set(
+          (Array.isArray(payload.invoice_ids) ? payload.invoice_ids : []).map((value) => String(value))
+        )).slice(0, 10);
+        if (!invoiceIds.length) return reply(origin, 400, { error: "Select at least one overdue invoice" });
+
+        const admin = adminClient();
+        const { data: invoices, error: invoiceError } = await admin
+          .from("invoices")
+          .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
+          .in("id", invoiceIds)
+          .eq("created_by_id", user.id);
+        if (invoiceError) throw invoiceError;
+        if ((invoices || []).length !== invoiceIds.length) return reply(origin, 403, { error: "One or more invoices are unavailable" });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const eligible = (invoices || []).every((invoice) =>
+          invoice.customer_email &&
+          String(invoice.status || "").toLowerCase() !== "paid" &&
+          invoice.due_date &&
+          invoice.due_date < today &&
+          Number(invoice.balance_due ?? invoice.total) > 0
+        );
+        if (!eligible) return reply(origin, 400, { error: "Every selection must be overdue, unpaid, and have a customer email" });
+
+        const orderData = {
+          type: "invoice_recovery_sprint",
+          state: "awaiting_payment",
+          invoice_ids: invoiceIds,
+          approved_at: new Date().toISOString(),
+          price_cents: 900,
+        };
+        const { data: payment, error: paymentError } = await admin.from("payments").insert({
+          created_by_id: user.id,
+          user_id: user.id,
+          customer_name: user.email || "TitanOS user",
+          amount: 9,
+          currency: "usd",
+          provider: "stripe",
+          status: "pending",
+          note: "AUTOPILOT:" + JSON.stringify(orderData),
+        }).select("*").single();
+        if (paymentError) throw paymentError;
+
+        const appOrigin = cleanText(Deno.env.get("APP_ORIGIN") || "https://titanos.app", 500).replace(/\/$/, "");
+        const params = new URLSearchParams();
+        params.append("mode", "payment");
+        params.append("customer_email", String(user.email || ""));
+        const configuredPriceId = cleanText(Deno.env.get("STRIPE_AUTOPILOT_PRICE_ID") || "", 200);
+        if (configuredPriceId) {
+          params.append("line_items[0][price]", configuredPriceId);
+        } else {
+          params.append("line_items[0][price_data][currency]", "usd");
+          params.append("line_items[0][price_data][unit_amount]", "900");
+          params.append("line_items[0][price_data][product_data][name]", "Titan Autopilot — Invoice Recovery Sprint");
+          params.append("line_items[0][price_data][product_data][description]", "Approved follow-up for " + invoiceIds.length + " overdue invoice(s).");
+        }
+        params.append("line_items[0][quantity]", "1");
+        params.append("metadata[payment_id]", payment.id);
+        params.append("metadata[user_id]", user.id);
+        params.append("metadata[task_type]", "invoice_recovery_sprint");
+        params.append("success_url", appOrigin + "/autopilot?order=" + encodeURIComponent(payment.id) + "&checkout=success");
+        params.append("cancel_url", appOrigin + "/autopilot?order=" + encodeURIComponent(payment.id) + "&checkout=canceled");
+
+        const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + stripeKey,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Idempotency-Key": "autopilot_" + payment.id,
+          },
+          body: params,
+        });
+        const checkout = await response.json().catch(() => ({}));
+        if (!response.ok || !checkout?.url) {
+          await admin.from("payments").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", payment.id);
+          return reply(origin, 502, { error: "Autopilot checkout could not be created", code: "PAYMENT_PROVIDER_ERROR" });
+        }
+
+        const { error: updateError } = await admin.from("payments")
+          .update({ external_id: checkout.id, checkout_url: checkout.url })
+          .eq("id", payment.id);
+        if (updateError) throw updateError;
+        return reply(origin, 200, { order_id: payment.id, checkout_url: checkout.url, amount: 9, invoice_count: invoiceIds.length });
+      }
+
+      case "runAutopilotOrder": {
+        const orderId = cleanText(payload.order_id, 80);
+        if (!orderId) return reply(origin, 400, { error: "order_id is required" });
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (!resendKey) {
+          return reply(origin, 503, { error: "Email delivery is not configured", code: "EMAIL_PROVIDER_UNAVAILABLE" });
+        }
+
+        const admin = adminClient();
+        const rate = await consumeEdgeRateLimit(admin, "runAutopilotOrder:" + user.id, 5, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many sprint requests. Try again shortly.", retry_after: rate.retryAfter });
+
+        const { data: payment, error: paymentError } = await admin
+          .from("payments")
+          .select("id,user_id,status,note")
+          .eq("id", orderId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (paymentError) throw paymentError;
+
+        let order: Record<string, unknown> | null = null;
+        if (payment?.note && String(payment.note).startsWith("AUTOPILOT:")) {
+          try { order = JSON.parse(String(payment.note).slice(10)); } catch { order = null; }
+        }
+        if (!payment || !order || order.type !== "invoice_recovery_sprint") {
+          return reply(origin, 404, { error: "Autopilot order not found" });
+        }
+        if (payment.status !== "succeeded") {
+          return reply(origin, 409, { error: "Payment is still processing. Try again in a moment.", payment_status: payment.status });
+        }
+        if (order.state === "completed") {
+          return reply(origin, 200, { success: true, duplicate: true, sent: Number(order.sent || 0), failed: Number(order.failed || 0) });
+        }
+        if (order.state === "running") return reply(origin, 409, { error: "This recovery sprint is already running." });
+
+        const running = { ...order, state: "running", started_at: new Date().toISOString() };
+        const { data: claimed, error: claimError } = await admin.from("payments")
+          .update({ note: "AUTOPILOT:" + JSON.stringify(running), updated_at: new Date().toISOString() })
+          .eq("id", payment.id)
+          .eq("status", "succeeded")
+          .eq("note", payment.note)
+          .select("id")
+          .maybeSingle();
+        if (claimError) throw claimError;
+        if (!claimed) return reply(origin, 409, { error: "This recovery sprint has already been claimed." });
+
+        const invoiceIds = Array.isArray(order.invoice_ids) ? order.invoice_ids.map(String).slice(0, 10) : [];
+        const { data: invoices, error: invoiceError } = await admin.from("invoices")
+          .select("id,invoice_number,customer_name,customer_email,balance_due,total,due_date,created_by_id")
+          .in("id", invoiceIds)
+          .eq("created_by_id", user.id);
+        if (invoiceError) throw invoiceError;
+
+        let sent = 0;
+        let failed = 0;
+        const from = cleanText(Deno.env.get("RESEND_FROM_EMAIL") || Deno.env.get("RESEND_FROM") || "TitanOS <noreply@titanos.app>", 320);
+        for (const invoice of invoices || []) {
+          const balance = Number(invoice.balance_due ?? invoice.total ?? 0).toFixed(2);
+          const message =
+            "Hi " + (invoice.customer_name || "there") + ",\n\n" +
+            "This is a friendly reminder that invoice " + (invoice.invoice_number || invoice.id) +
+            " for $" + balance + " was due " + invoice.due_date +
+            ". Please contact us if you have already paid or need help with payment.\n\nThank you.";
+
+          const { data: queue, error: queueError } = await admin.from("follow_up_queue").insert({
+            created_by_id: user.id,
+            user_id: user.id,
+            customer_name: invoice.customer_name || "",
+            customer_email: invoice.customer_email,
+            scheduled_for: new Date().toISOString(),
+            status: "pending",
+            channel: "email",
+            message,
+          }).select("id").single();
+          if (queueError) { failed += 1; continue; }
+
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + resendKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from,
+              to: [invoice.customer_email],
+              subject: "Payment reminder — invoice " + (invoice.invoice_number || "due"),
+              text: message,
+            }),
+          });
+          const provider = await response.json().catch(() => ({}));
+          if (response.ok) {
+            sent += 1;
+            await admin.from("follow_up_queue").update({
+              status: "sent",
+              sent_at: new Date().toISOString(),
+              provider_message_id: provider?.id || null,
+              delivery_error_code: null,
+            }).eq("id", queue.id);
+          } else {
+            failed += 1;
+            await admin.from("follow_up_queue").update({
+              status: "failed",
+              delivery_error_code: "provider_rejected",
+            }).eq("id", queue.id);
+          }
+        }
+
+        const completed = { ...running, state: "completed", completed_at: new Date().toISOString(), sent, failed };
+        await admin.from("payments")
+          .update({ note: "AUTOPILOT:" + JSON.stringify(completed), updated_at: new Date().toISOString() })
+          .eq("id", payment.id)
+          .eq("status", "succeeded");
+        return reply(origin, 200, { success: true, sent, failed });
+      }
+
+      case "runAutopilotMembership": {
+        const admin = adminClient();
+        const rate = await consumeEdgeRateLimit(admin, "runAutopilotMembership:" + user.id, 4, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many sprint requests. Try again shortly.", retry_after: rate.retryAfter });
+
+        const { data: profile, error: profileError } = await admin.from("profiles")
+          .select("plan_tier,paying_subscriber,role")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profileError) throw profileError;
+        const plan = String(profile?.plan_tier || "").toLowerCase();
+        const entitled = profile?.role === "admin" ||
+          (profile?.paying_subscriber === true && ["worker_premium", "pro", "business"].includes(plan));
+        if (!entitled) return reply(origin, 402, { error: "A paid Pro or Business membership is required." });
+
+        const invoiceIds = Array.from(new Set(
+          (Array.isArray(payload.invoice_ids) ? payload.invoice_ids : []).map((value) => String(value))
+        )).slice(0, 10);
+        if (!invoiceIds.length) return reply(origin, 400, { error: "Select at least one overdue invoice" });
+
+        const { data: invoices, error: invoiceError } = await admin.from("invoices")
+          .select("id,invoice_number,customer_name,customer_email,status,balance_due,total,due_date,created_by_id")
+          .in("id", invoiceIds)
+          .eq("created_by_id", user.id);
+        if (invoiceError) throw invoiceError;
+
+        const today = new Date().toISOString().slice(0, 10);
+        if ((invoices || []).length !== invoiceIds.length || !(invoices || []).every((invoice) =>
+          invoice.customer_email &&
+          String(invoice.status || "").toLowerCase() !== "paid" &&
+          invoice.due_date &&
+          invoice.due_date < today &&
+          Number(invoice.balance_due ?? invoice.total) > 0
+        )) return reply(origin, 400, { error: "Every selection must be overdue, unpaid, and have a customer email" });
+
+        const periodKey = new Date().toISOString().slice(0, 7) + "-01";
+        const recipientSnapshot = (invoices || []).map((invoice) => ({
+          invoice_id: invoice.id,
+          customer_email: invoice.customer_email,
+          customer_name: invoice.customer_name || "",
+          balance_due: Number(invoice.balance_due ?? invoice.total ?? 0),
+          due_date: invoice.due_date,
+        }));
+        const { data: claim, error: claimError } = await admin.from("autopilot_membership_claims").insert({
+          user_id: user.id,
+          period_key: periodKey,
+          invoice_ids: invoiceIds,
+          recipient_snapshot: recipientSnapshot,
+          status: "running",
+        }).select("id").single();
+        if (claimError?.code === "23505") {
+          return reply(origin, 409, { error: "This month's included recovery sprint has already been used." });
+        }
+        if (claimError) throw claimError;
+
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        const from = cleanText(Deno.env.get("RESEND_FROM_EMAIL") || Deno.env.get("RESEND_FROM") || "TitanOS <noreply@titanos.app>", 320);
+        let prepared = 0;
+        let sent = 0;
+        let failed = 0;
+
+        for (const invoice of invoices || []) {
+          const balance = Number(invoice.balance_due ?? invoice.total ?? 0).toFixed(2);
+          const message =
+            "Hi " + (invoice.customer_name || "there") + ",\n\n" +
+            "This is a friendly reminder that invoice " + (invoice.invoice_number || invoice.id) +
+            " for $" + balance + " was due " + invoice.due_date +
+            ". Please contact us if you have already paid or need help with payment.\n\nThank you.";
+
+          const { data: queue, error: queueError } = await admin.from("follow_up_queue").insert({
+            created_by_id: user.id,
+            user_id: user.id,
+            customer_name: invoice.customer_name || "",
+            customer_email: invoice.customer_email,
+            scheduled_for: new Date().toISOString(),
+            status: "pending",
+            channel: "email",
+            message,
+            rule_id: "autopilot_membership",
+          }).select("id").single();
+          if (queueError) { failed += 1; continue; }
+          prepared += 1;
+          if (!resendKey) continue;
+
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + resendKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from,
+              to: [invoice.customer_email],
+              subject: "Payment reminder — invoice " + (invoice.invoice_number || "due"),
+              text: message,
+            }),
+          });
+          const provider = await response.json().catch(() => ({}));
+          if (response.ok) {
+            sent += 1;
+            await admin.from("follow_up_queue").update({
+              status: "sent",
+              sent_at: new Date().toISOString(),
+              provider_message_id: provider?.id || null,
+              delivery_error_code: null,
+            }).eq("id", queue.id);
+          } else {
+            failed += 1;
+            await admin.from("follow_up_queue").update({
+              status: "failed",
+              delivery_error_code: "provider_rejected",
+            }).eq("id", queue.id);
+          }
+        }
+
+        const finalStatus = prepared > 0 ? "completed" : "failed";
+        await admin.from("autopilot_membership_claims").update({
+          status: finalStatus,
+          prepared_count: prepared,
+          sent_count: sent,
+          failed_count: failed,
+          updated_at: new Date().toISOString(),
+        }).eq("id", claim.id);
+
+        return reply(origin, 200, {
+          success: prepared > 0,
+          prepared,
+          sent,
+          failed,
+          delivery_mode: resendKey ? "email" : "review_queue",
+          period: periodKey,
+        });
+      }
+
       case "createPaymentLink":
         return reply(origin, 503, { error: "Payment provider is not configured on the TitanOS Edge backend", code: "PAYMENT_PROVIDER_UNAVAILABLE" });
       case "receiptVisionOcr":

@@ -1,4 +1,4 @@
-name: TitanOS Google Play Release AAB
+# TitanOS Play certification trigger: Edge backend cutover\nname: TitanOS Google Play Release AAB
 
 on:
   push:

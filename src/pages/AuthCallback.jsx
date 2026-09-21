@@ -94,7 +94,21 @@ export default function AuthCallback() {
           PROFILE_BOOT_TIMEOUT_MS,
           "Your account signed in, but profile setup took too long. Tap retry to continue."
         );
-        const dest = consumeReturnTo("/driver");
+
+        let callbackDestination = "";
+        if (typeof window !== "undefined") {
+          try {
+            callbackDestination =
+              window.localStorage.getItem("titanos_auth_callback_destination") || "";
+            window.localStorage.removeItem("titanos_auth_callback_destination");
+          } catch {
+            /* callback destination is optional */
+          }
+        }
+        const dest =
+          callbackDestination === "/reset-password"
+            ? "/reset-password"
+            : consumeReturnTo("/driver");
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

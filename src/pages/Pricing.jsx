@@ -33,6 +33,8 @@ import {
   isAndroidPlayBuild,
   loadPlaySubscriptions,
   onPlayPurchaseUpdated,
+  reconcilePlaySubscriptionState,
+  restorePlaySubscriptions,
   startPlaySubscription,
   verifyPlayPurchase,
 } from "@/lib/playBilling";
@@ -254,6 +256,31 @@ export default function Pricing() {
     }
   }, [user?.id]);
 
+  const restoreWithPlay = React.useCallback(async () => {
+    if (!user?.id) {
+      toast({ title: "Sign in first", description: "Sign in to the TitanOS account linked to your Play subscription." });
+      window.location.assign("/login?next=/pricing");
+      return;
+    }
+    try {
+      setPurchasing(true);
+      const purchases = await restorePlaySubscriptions();
+      const activePurchases = purchases.filter((purchase) => purchase.purchaseState === 1);
+      for (const purchase of activePurchases) await verifyPlayPurchase(purchase);
+      const state = await reconcilePlaySubscriptionState();
+      await checkUserAuth();
+      if (activePurchases.length || state?.active) {
+        toast({ title: "Purchases restored", description: "Your Google Play subscription is linked to this TitanOS account." });
+      } else {
+        toast({ title: "No active Play subscription found", description: "Google Play did not report an active TitanOS subscription for this account." });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Restore couldn't complete", description: error?.message || "Try again shortly." });
+    } finally {
+      setPurchasing(false);
+    }
+  }, [user?.id, checkUserAuth]);
+
   const buyWithStripe = React.useCallback(async (planId) => {
     if (!user?.id) {
       toast({ title: "Sign in first", description: "Your subscription must be linked to your TitanOS account." });
@@ -329,13 +356,26 @@ export default function Pricing() {
               Same plans on mobile via Google Play
             </p>
           </div>
-          <Button
-            onClick={openPlayStore}
-            className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 px-4 gap-1.5 flex-shrink-0"
-          >
-            <Download className="w-4 h-4" />
-            Get App
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+            {androidPlay && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={restoreWithPlay}
+                disabled={purchasing}
+                className="rounded-xl h-10 px-4"
+              >
+                {purchasing ? "Checking Play…" : "Restore purchases"}
+              </Button>
+            )}
+            <Button
+              onClick={openPlayStore}
+              className="bg-titan-cyan hover:bg-titan-cyan/90 text-black font-semibold rounded-xl h-10 px-4 gap-1.5"
+            >
+              <Download className="w-4 h-4" />
+              Open Google Play
+            </Button>
+          </div>
         </div>
       </motion.div>
 

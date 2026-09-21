@@ -17,6 +17,8 @@
   --green: #63f5b7;
   --violet: #9c7dff;
   --shadow: 0 24px 70px rgba(0,0,0,.32);
+  /* Fixed chrome above MobileNav — dock / bulk bars / FABs share this */
+  --mobile-chrome-bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
 }
 
 * { box-sizing: border-box; }

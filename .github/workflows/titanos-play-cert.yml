@@ -1,0 +1,125 @@
+name: TitanOS Play Certification
+
+on:
+  push:
+    branches:
+      - release/titanos-play
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-play-cert-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      VITE_CAPACITOR_BUILD: "true"
+      VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
+      VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+      VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/titanos-play
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify Edge backend
+        shell: bash
+        run: |
+          curl -fsS -X POST             "https://wbymywwrpbljfbsemung.supabase.co/functions/v1/titan-api"             -H "Content-Type: application/json"             --data '{"functionName":"health","payload":{}}' > edge-health.json
+          node -e "const x=require('./edge-health.json'); if(!x.ok||x.backend!=='supabase-edge'||!x.capabilities?.database||!x.capabilities?.auth) process.exit(1)"
+
+      - name: Install and certify application
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run lint
+          npm run typecheck
+          npm run gate:ship
+          npm test
+
+      - name: Restore Play upload key when configured
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/titanos-upload.jks
+            cat > android/keystore.properties <<EOF
+          storeFile=titanos-upload.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+            echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+          else
+            echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Android release AAB
+        run: |
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon clean lintRelease bundleRelease
+
+      - name: Verify release artifact
+        shell: bash
+        run: |
+          AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          test -f "$AAB"
+          unzip -t "$AAB" >/dev/null
+          sha256sum "$AAB" | tee TitanOS-2.0.5-code38-SHA256.txt
+          if jarsigner -verify "$AAB" >/dev/null 2>&1; then
+            AAB_SIGNED=true
+          else
+            AAB_SIGNED=false
+          fi
+          {
+            echo "VERSION_NAME=2.0.5"
+            echo "VERSION_CODE=38"
+            echo "APPLICATION_ID=com.titanos.myapp"
+            echo "TARGET_SDK=36"
+            echo "COMMIT_SHA=$(git rev-parse HEAD)"
+            echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED"
+            echo "AAB_SIGNED=$AAB_SIGNED"
+          } | tee TitanOS-2.0.5-code38-build-info.txt
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/titanos-upload.jks android/keystore.properties
+
+      - name: Upload certification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-2.0.5-code38-certified-AAB
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            TitanOS-2.0.5-code38-SHA256.txt
+            TitanOS-2.0.5-code38-build-info.txt
+            android/app/build/reports/lint-results-release.html
+            edge-health.json
+          if-no-files-found: error
+          retention-days: 30

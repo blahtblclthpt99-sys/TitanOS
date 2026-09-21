@@ -1,4 +1,5 @@
-# TitanOS Play certification trigger: Edge backend cutover\nname: TitanOS Google Play Release AAB
+# TitanOS Play certification trigger: Edge backend cutover
+name: TitanOS Google Play Release AAB
 
 on:
   push:
@@ -15,6 +16,8 @@ on:
       - "vite.config.*"
       - "package.json"
       - "package-lock.json"
+      - "supabase/**"
+      - "scripts/**"
   pull_request:
     branches:
       - release/titanos-play
@@ -29,6 +32,8 @@ on:
       - "vite.config.*"
       - "package.json"
       - "package-lock.json"
+      - "supabase/**"
+      - "scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -133,10 +138,17 @@ jobs:
           test -f "$AAB"
           unzip -t "$AAB" >/dev/null
           sha256sum "$AAB" | tee TitanOS-2.0.5-code38-AAB-SHA256.txt
-          if jarsigner -verify "$AAB" >/dev/null 2>&1; then
+          EXPECTED_UPLOAD_SHA256="7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D"
+          if keytool -printcert -jarfile "$AAB" > TitanOS-AAB-certificate.txt 2>&1; then
             AAB_SIGNED=true
+            ACTUAL_UPLOAD_SHA256="$(grep 'SHA256:' TitanOS-AAB-certificate.txt | head -1 | sed 's/.*SHA256: //')"
           else
             AAB_SIGNED=false
+            ACTUAL_UPLOAD_SHA256=""
+          fi
+          if [ "$PLAY_SIGNING_CONFIGURED" = "true" ]; then
+            test "$AAB_SIGNED" = "true"
+            test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256"
           fi
           {
             echo "VERSION_NAME=2.0.5"
@@ -146,6 +158,7 @@ jobs:
             echo "COMMIT_SHA=$GITHUB_SHA"
             echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED"
             echo "AAB_SIGNED=$AAB_SIGNED"
+            echo "UPLOAD_CERT_SHA256=$ACTUAL_UPLOAD_SHA256"
             echo "API_BASE_URL=$VITE_API_BASE_URL"
             echo "SUPABASE_URL=$VITE_SUPABASE_URL"
           } > TitanOS-2.0.5-code38-build-info.txt
@@ -165,5 +178,6 @@ jobs:
             TitanOS-2.0.5-code38-AAB-SHA256.txt
             TitanOS-2.0.5-code38-build-info.txt
             android/app/build/reports/lint-results-release.html
+            TitanOS-AAB-certificate.txt
           if-no-files-found: error
           retention-days: 30

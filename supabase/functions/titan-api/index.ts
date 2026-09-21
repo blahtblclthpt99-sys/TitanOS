@@ -1701,8 +1701,8 @@ Deno.serve(async (req: Request) => {
           expiresAt.getTime() > Date.now()
         );
 
-        if (!line || !active || (accountId && accountId !== expectedAccountId)) {
-          return reply(origin, 403, { error: "Google Play purchase is not active for this account" });
+        if (!line || (accountId && accountId !== expectedAccountId)) {
+          return reply(origin, 403, { error: "Google Play purchase is not valid for this account" });
         }
 
         let acknowledged = purchase?.acknowledgementState === "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED";
@@ -1739,6 +1739,39 @@ Deno.serve(async (req: Request) => {
         if (receiptError) throw receiptError;
 
         const planTier = PLAY_PRODUCT_PLANS[productId];
+        const { data: currentProfile, error: currentProfileError } = await admin
+          .from("profiles")
+          .select("id,plan_tier,is_pro,paying_subscriber,lifetime_premium,founding_user,founding_trial_ends_at")
+          .eq("id", user.id)
+          .single();
+        if (currentProfileError) throw currentProfileError;
+
+        if (!active) {
+          const foundingStillActive = Boolean(
+            currentProfile?.founding_user === true &&
+            currentProfile?.founding_trial_ends_at &&
+            new Date(currentProfile.founding_trial_ends_at).getTime() > Date.now()
+          );
+          const permanent = currentProfile?.lifetime_premium === true;
+          const patch = {
+            paying_subscriber: false,
+            is_pro: Boolean(permanent || foundingStillActive),
+          };
+          const { data: profile, error: profileError } = await admin
+            .from("profiles")
+            .update(patch)
+            .eq("id", user.id)
+            .select("id,plan_tier,is_pro,paying_subscriber")
+            .single();
+          if (profileError) throw profileError;
+          return reply(origin, 403, {
+            error: "Google Play subscription is no longer active",
+            code: "PLAY_SUBSCRIPTION_INACTIVE",
+            entitlement: profile,
+            expiresAt: expiresAt!.toISOString(),
+          });
+        }
+
         const { data: profile, error: profileError } = await admin
           .from("profiles")
           .update({ plan_tier: planTier, is_pro: true, paying_subscriber: true })
@@ -1752,6 +1785,62 @@ Deno.serve(async (req: Request) => {
           entitlement: profile,
           expiresAt: expiresAt!.toISOString(),
         });
+      }
+
+      case "googlePlayReconcileSubscriptions": {
+        const admin = adminClient();
+        const rate = await consumeEdgeRateLimit(admin, "googlePlayReconcileSubscriptions:" + user.id, 12, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many subscription checks. Try again shortly.", retry_after: rate.retryAfter });
+
+        const { data: rows, error: receiptError } = await admin
+          .from("google_play_subscriptions")
+          .select("product_id,subscription_state,expires_at,last_verified_at")
+          .eq("user_id", user.id)
+          .order("last_verified_at", { ascending: false })
+          .limit(20);
+        if (receiptError) throw receiptError;
+
+        const activeReceipt = (rows || []).find((row) =>
+          PLAY_ENTITLED_STATES.has(String(row.subscription_state || "")) &&
+          row.expires_at &&
+          new Date(row.expires_at).getTime() > Date.now()
+        );
+        if (activeReceipt) {
+          const planTier = PLAY_PRODUCT_PLANS[String(activeReceipt.product_id)] || "worker_premium";
+          const { data: profile, error } = await admin
+            .from("profiles")
+            .update({ plan_tier: planTier, is_pro: true, paying_subscriber: true })
+            .eq("id", user.id)
+            .select("id,plan_tier,is_pro,paying_subscriber")
+            .single();
+          if (error) throw error;
+          return reply(origin, 200, { active: true, entitlement: profile, source: "stored_play_receipt" });
+        }
+
+        if (!(rows || []).length) {
+          return reply(origin, 200, { active: false, changed: false, reason: "no_play_receipts" });
+        }
+
+        const { data: profile, error: profileError } = await admin
+          .from("profiles")
+          .select("id,lifetime_premium,founding_user,founding_trial_ends_at,paying_subscriber,is_pro,plan_tier")
+          .eq("id", user.id)
+          .single();
+        if (profileError) throw profileError;
+        const foundingStillActive = Boolean(
+          profile?.founding_user === true &&
+          profile?.founding_trial_ends_at &&
+          new Date(profile.founding_trial_ends_at).getTime() > Date.now()
+        );
+        const permanent = profile?.lifetime_premium === true;
+        const { data: updated, error: updateError } = await admin
+          .from("profiles")
+          .update({ paying_subscriber: false, is_pro: Boolean(permanent || foundingStillActive) })
+          .eq("id", user.id)
+          .select("id,plan_tier,is_pro,paying_subscriber")
+          .single();
+        if (updateError) throw updateError;
+        return reply(origin, 200, { active: false, changed: true, entitlement: updated, source: "expired_play_receipts" });
       }
 
       case "createAutopilotOrder": {

@@ -5,6 +5,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+const PORTAL_ACTIONS = new Set([
+  "portalRequestOtp",
+  "portalVerifyOtp",
+  "portalGetData",
+  "portalAcceptEstimate",
+  "portalLeaveReview",
+  "portalPayInvoice",
+]);
+
 const ALLOWED_ORIGINS = new Set([
   "https://titanos.app",
   "https://localhost",
@@ -140,6 +149,383 @@ async function nextFeeVersion(admin: ReturnType<typeof createClient>, categoryId
   return Number(data?.[0]?.version || 0) + 1;
 }
 
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function portalPepper() {
+  return Deno.env.get("PORTAL_OTP_PEPPER") || SUPABASE_SERVICE_ROLE_KEY || "titanos-portal-otp-dev-only";
+}
+
+async function hashPortalOtpEdge(email: string, code: string) {
+  return sha256Hex(portalPepper() + ":" + email.trim().toLowerCase() + ":" + code.trim());
+}
+
+async function hashPortalTokenEdge(token: string) {
+  return sha256Hex(portalPepper() + ":portal-session:" + token);
+}
+
+async function consumeEdgeRateLimit(admin: ReturnType<typeof createClient>, key: string, limit: number, windowSeconds: number) {
+  const { data, error } = await admin.rpc("consume_rate_limit", {
+    p_bucket_key: key.slice(0, 512),
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    allowed: row?.allowed !== false,
+    retryAfter: Number(row?.retry_after_seconds || 0),
+  };
+}
+
+function randomSixDigitOtp() {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String(100000 + (bytes[0] % 900000));
+}
+
+async function requirePortalSessionEdge(admin: ReturnType<typeof createClient>, rawToken: unknown) {
+  const token = cleanText(rawToken, 256);
+  if (token.length < 32) return { error: "Missing session token", status: 400 } as const;
+  const hashed = await hashPortalTokenEdge(token);
+  const { data, error } = await admin
+    .from("portal_sessions")
+    .select("id,created_by_id,email,customer_id,verified,token_expires_at")
+    .eq("token", hashed)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.verified) return { error: "Invalid or expired session", status: 401 } as const;
+  if (!data.token_expires_at || new Date(data.token_expires_at).getTime() <= Date.now()) {
+    return { error: "Session expired. Please sign in again.", status: 401 } as const;
+  }
+  return { session: data } as const;
+}
+
+async function handlePortalAction(functionName: string, payload: Record<string, unknown>, origin: string | null) {
+  const admin = adminClient();
+  const remoteHint = cleanText(payload.email || payload.token || "anonymous", 320).toLowerCase();
+
+  if (functionName === "portalRequestOtp") {
+    const email = cleanText(payload.email, 320).toLowerCase();
+    if (!email || !email.includes("@")) return reply(origin, 400, { error: "Email is required" });
+
+    const rate = await consumeEdgeRateLimit(admin, "portalRequestOtp:" + email, 3, 600);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many requests. Try again later.", retry_after: rate.retryAfter });
+
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendKey) {
+      return reply(origin, 503, { error: "Portal email is temporarily unavailable. Please try again later.", code: "EMAIL_PROVIDER_UNAVAILABLE" });
+    }
+
+    const { data: matches, error } = await admin
+      .from("customers")
+      .select("id,email,created_by_id")
+      .ilike("email", email)
+      .limit(3);
+    if (error) throw error;
+
+    const customer = (matches || []).length === 1 && matches?.[0]?.created_by_id ? matches[0] : null;
+    if (customer) {
+      const otp = randomSixDigitOtp();
+      const otpHash = await hashPortalOtpEdge(email, otp);
+      const expires = new Date(Date.now() + 10 * 60_000).toISOString();
+
+      await admin.from("portal_sessions").delete().eq("email", email);
+      const { error: insertError } = await admin.from("portal_sessions").insert({
+        email,
+        customer_id: customer.id,
+        created_by_id: customer.created_by_id,
+        otp_code: otpHash,
+        otp_expires_at: expires,
+        verified: false,
+      });
+      if (insertError) throw insertError;
+
+      const from = cleanText(
+        Deno.env.get("RESEND_FROM_EMAIL") || Deno.env.get("RESEND_FROM") || "TitanOS <noreply@titanos.app>",
+        320
+      );
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + resendKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from,
+          to: [String(customer.email)],
+          subject: "Your TitanOS Portal Verification Code",
+          text: "Your verification code is: " + otp + "\n\nThis code expires in 10 minutes. If you did not request this, you can safely ignore this email.",
+        }),
+      });
+      if (!response.ok) {
+        await admin.from("portal_sessions").delete().eq("email", email);
+        return reply(origin, 503, { error: "Could not send verification email. Please try again later.", code: "EMAIL_PROVIDER_ERROR" });
+      }
+    }
+
+    // Enumeration-safe response whether or not a matching customer exists.
+    return reply(origin, 200, { success: true });
+  }
+
+  if (functionName === "portalVerifyOtp") {
+    const email = cleanText(payload.email, 320).toLowerCase();
+    const submitted = cleanText(payload.otp_code, 6);
+    if (!email || !/^\d{6}$/.test(submitted)) return reply(origin, 401, { error: "Invalid verification code" });
+
+    const rate = await consumeEdgeRateLimit(admin, "portalVerifyOtp:" + email, 8, 600);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many attempts. Try again later.", retry_after: rate.retryAfter });
+
+    const expectedHash = await hashPortalOtpEdge(email, submitted);
+    const { data: sessions, error } = await admin
+      .from("portal_sessions")
+      .select("id,email,customer_id,created_by_id,otp_code,otp_expires_at,verified")
+      .eq("email", email)
+      .eq("verified", false)
+      .limit(5);
+    if (error) throw error;
+
+    const session = (sessions || []).find((row) =>
+      row.created_by_id &&
+      row.otp_code === expectedHash &&
+      row.otp_expires_at &&
+      new Date(row.otp_expires_at).getTime() > Date.now()
+    );
+    if (!session) return reply(origin, 401, { error: "Invalid or expired verification code" });
+
+    const { data: customer, error: customerError } = await admin
+      .from("customers")
+      .select("id,first_name,last_name,email,created_by_id")
+      .eq("id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .maybeSingle();
+    if (customerError) throw customerError;
+    if (!customer || String(customer.email || "").trim().toLowerCase() !== email) {
+      return reply(origin, 401, { error: "Invalid verification code" });
+    }
+
+    const rawToken = crypto.randomUUID() + crypto.randomUUID();
+    const tokenHash = await hashPortalTokenEdge(rawToken);
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    const { error: updateError } = await admin
+      .from("portal_sessions")
+      .update({ verified: true, token: tokenHash, token_expires_at: tokenExpiresAt, otp_code: null })
+      .eq("id", session.id)
+      .eq("verified", false);
+    if (updateError) throw updateError;
+
+    const result = {
+      token: rawToken,
+      customer: {
+        id: customer.id,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        email: customer.email,
+      },
+    };
+    return reply(origin, 200, { ...result, data: result });
+  }
+
+  const rate = await consumeEdgeRateLimit(admin, "portalAction:" + functionName + ":" + remoteHint.slice(0, 96), 60, 60);
+  if (!rate.allowed) return reply(origin, 429, { error: "Too many portal requests. Try again shortly.", retry_after: rate.retryAfter });
+
+  const auth = await requirePortalSessionEdge(admin, payload.token);
+  if ("error" in auth) return reply(origin, auth.status, { error: auth.error });
+  const session = auth.session;
+  if (!session.created_by_id || !session.customer_id) return reply(origin, 401, { error: "Invalid or expired session" });
+
+  if (functionName === "portalGetData") {
+    const { data: customer, error: customerError } = await admin
+      .from("customers")
+      .select("id,first_name,last_name,email,created_by_id")
+      .eq("id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .maybeSingle();
+    if (customerError) throw customerError;
+    if (!customer || String(customer.email || "").trim().toLowerCase() !== String(session.email || "").trim().toLowerCase()) {
+      return reply(origin, 401, { error: "Invalid or expired session" });
+    }
+
+    const [jobs, estimates, invoices] = await Promise.all([
+      admin.from("jobs")
+        .select("id,created_at,updated_at,title,description,customer_id,customer_name,status,priority,service_type,scheduled_date,scheduled_time,estimated_duration,address,amount,completed_at")
+        .eq("customer_id", customer.id).eq("created_by_id", session.created_by_id)
+        .order("scheduled_date", { ascending: false }).limit(50),
+      admin.from("estimates")
+        .select("id,created_at,updated_at,estimate_number,customer_id,customer_name,status,line_items,subtotal,tax_rate,tax_amount,discount,total,valid_until,service_type,address")
+        .eq("customer_id", customer.id).eq("created_by_id", session.created_by_id)
+        .order("created_at", { ascending: false }).limit(50),
+      admin.from("invoices")
+        .select("id,created_at,updated_at,invoice_number,customer_id,customer_name,job_id,status,line_items,subtotal,tax_rate,tax_amount,discount,total,amount_paid,balance_due,due_date,payment_method")
+        .eq("customer_id", customer.id).eq("created_by_id", session.created_by_id)
+        .order("created_at", { ascending: false }).limit(50),
+    ]);
+    for (const result of [jobs, estimates, invoices]) if (result.error) throw result.error;
+
+    return reply(origin, 200, {
+      customer: { id: customer.id, first_name: customer.first_name, last_name: customer.last_name, email: customer.email },
+      jobs: jobs.data || [],
+      estimates: estimates.data || [],
+      invoices: invoices.data || [],
+    });
+  }
+
+  if (functionName === "portalAcceptEstimate") {
+    const estimateId = cleanText(payload.estimate_id, 80);
+    if (!estimateId) return reply(origin, 400, { error: "estimate_id is required" });
+    const decision = payload.decision === "declined" ? "declined" : "accepted";
+    const { data: estimate, error } = await admin
+      .from("estimates")
+      .select("id,total,status,customer_id,created_by_id")
+      .eq("id", estimateId)
+      .eq("customer_id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!estimate) return reply(origin, 404, { error: "Estimate not found" });
+    if (!["sent", "draft", "viewed"].includes(String(estimate.status || "").toLowerCase())) {
+      return reply(origin, 409, { error: "Estimate can no longer be changed from the portal" });
+    }
+    const { data: updated, error: updateError } = await admin
+      .from("estimates")
+      .update({ status: decision, updated_at: new Date().toISOString() })
+      .eq("id", estimateId)
+      .eq("customer_id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .select("*")
+      .maybeSingle();
+    if (updateError) throw updateError;
+    if (!updated) return reply(origin, 409, { error: "Estimate could not be updated" });
+
+    await admin.from("portal_actions").insert({
+      customer_id: session.customer_id,
+      action: decision === "accepted" ? "accept_estimate" : "decline_estimate",
+      entity_type: "estimate",
+      entity_id: estimateId,
+      meta: { total: estimate.total || 0, owner_id: session.created_by_id },
+    });
+    return reply(origin, 200, { estimate: updated });
+  }
+
+  if (functionName === "portalLeaveReview") {
+    const jobId = cleanText(payload.job_id, 80);
+    if (!jobId) return reply(origin, 400, { error: "job_id is required" });
+    const stars = Math.min(5, Math.max(1, Math.round(Number(payload.rating) || 5)));
+    const { data: job, error } = await admin
+      .from("jobs")
+      .select("id,status,customer_id,created_by_id")
+      .eq("id", jobId)
+      .eq("customer_id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!job) return reply(origin, 404, { error: "Job not found" });
+    if (String(job.status || "").toLowerCase() !== "completed") {
+      return reply(origin, 409, { error: "Reviews are available after job completion" });
+    }
+
+    const { data: existing, error: existingError } = await admin
+      .from("job_reviews")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("reviewer_id", String(session.customer_id))
+      .eq("reviewee_id", String(session.created_by_id))
+      .limit(1)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (existing) return reply(origin, 409, { error: "A review has already been submitted for this job" });
+
+    const { data: review, error: reviewError } = await admin
+      .from("job_reviews")
+      .insert({
+        job_id: jobId,
+        rating: stars,
+        body: cleanText(payload.comment || "", 2000),
+        reviewer_role: "customer",
+        reviewer_id: String(session.customer_id),
+        reviewee_id: String(session.created_by_id),
+        created_by_id: session.created_by_id,
+        badges: [],
+      })
+      .select("*")
+      .single();
+    if (reviewError) throw reviewError;
+
+    await admin.from("portal_actions").insert({
+      customer_id: session.customer_id,
+      action: "leave_review",
+      entity_type: "job",
+      entity_id: jobId,
+      meta: { rating: stars, owner_id: session.created_by_id },
+    });
+    return reply(origin, 200, { review });
+  }
+
+  if (functionName === "portalPayInvoice") {
+    const invoiceId = cleanText(payload.invoice_id, 80);
+    if (!invoiceId) return reply(origin, 400, { error: "invoice_id is required" });
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      return reply(origin, 503, { error: "Payments are not configured yet.", setupRequired: true, code: "PAYMENT_PROVIDER_UNAVAILABLE" });
+    }
+
+    const { data: invoice, error } = await admin
+      .from("invoices")
+      .select("id,invoice_number,customer_id,created_by_id,status,total,balance_due")
+      .eq("id", invoiceId)
+      .eq("customer_id", session.customer_id)
+      .eq("created_by_id", session.created_by_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!invoice) return reply(origin, 404, { error: "Invoice not found" });
+    if (["paid", "void", "cancelled", "refunded"].includes(String(invoice.status || "").toLowerCase())) {
+      return reply(origin, 409, { error: "Invoice is not payable" });
+    }
+    const amount = Number(invoice.balance_due || invoice.total || 0);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
+      return reply(origin, 400, { error: "Invoice has no valid balance due" });
+    }
+
+    const appOrigin = cleanText(Deno.env.get("APP_ORIGIN") || "https://titanos.app", 500).replace(/\/$/, "");
+    const params = new URLSearchParams();
+    params.append("mode", "payment");
+    params.append("success_url", appOrigin + "/portal?paid=1");
+    params.append("cancel_url", appOrigin + "/portal?paid=0");
+    params.append("line_items[0][price_data][currency]", "usd");
+    params.append("line_items[0][price_data][product_data][name]", invoice.invoice_number || "Invoice");
+    params.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
+    params.append("line_items[0][quantity]", "1");
+    params.append("metadata[invoice_id]", invoiceId);
+    params.append("metadata[invoice_owner_id]", String(session.created_by_id));
+    params.append("metadata[customer_id]", String(session.customer_id));
+    params.append("metadata[source]", "portal");
+    params.append("client_reference_id", invoiceId);
+
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + stripeKey, "Content-Type": "application/x-www-form-urlencoded" },
+      body: params,
+    });
+    const checkout = await response.json().catch(() => ({}));
+    if (!response.ok || !checkout?.url) {
+      return reply(origin, 502, { error: "Could not create checkout session", code: "PAYMENT_PROVIDER_ERROR" });
+    }
+
+    await admin.from("portal_actions").insert({
+      customer_id: session.customer_id,
+      action: "pay_invoice_checkout",
+      entity_type: "invoice",
+      entity_id: invoiceId,
+      meta: { amount, checkout_id: checkout.id, owner_id: session.created_by_id },
+    });
+    return reply(origin, 200, { url: checkout.url, checkout: true });
+  }
+
+  return reply(origin, 404, { error: "Portal action is unavailable" });
+}
+
 async function liveBusinessSummary(client: ReturnType<typeof createClient>, userId: string, prompt: string) {
   const [
     customersResult,
@@ -241,6 +627,15 @@ Deno.serve(async (req: Request) => {
         resendConfigured: Boolean(Deno.env.get("RESEND_API_KEY")),
       },
     });
+  }
+
+  if (PORTAL_ACTIONS.has(functionName)) {
+    try {
+      return await handlePortalAction(functionName, payload, origin);
+    } catch (error) {
+      console.error("titan-api:portal", functionName, error);
+      return reply(origin, 500, { error: "Portal service could not complete the request", code: "PORTAL_EXECUTION_FAILED" });
+    }
   }
 
   const auth = await requireUser(req);

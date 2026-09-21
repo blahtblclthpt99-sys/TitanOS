@@ -4,6 +4,7 @@
  */
 import { envString } from "@/lib/viteEnv";
 import { getLaunchStatus } from './launchStatus.js';
+import { createFunctionsModule } from "@/api/functions";
 
 const LOCAL_KEY = "titanos_feature_flags_override_v1";
 const CACHE_KEY = "titanos_feature_flags_remote_v1";
@@ -105,9 +106,7 @@ export function clearLocalFeatureOverrides() {
 /** Fetch public flags from API (best-effort). */
 export async function refreshFeatureFlagsFromServer() {
   try {
-    const res = await fetch("/api/functions/featureFlags", { credentials: "same-origin" });
-    if (!res.ok) return getFeatureFlags();
-    const data = await res.json();
+    const data = await createFunctionsModule().invoke("featureFlags", {});
     if (data?.flags && typeof data.flags === "object") {
       writeJson(CACHE_KEY, { flags: data.flags, fetchedAt: Date.now() });
       memory = mergeFlags(parseEnvOverlay(), data.flags, readJson(LOCAL_KEY));

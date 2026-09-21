@@ -36,6 +36,17 @@ function functionsBaseUrl() {
   return "";
 }
 
+function edgeBridgeUrl() {
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+  return supabaseUrl ? `${supabaseUrl}/functions/v1/titan-api` : "";
+}
+
+async function invokeEdge(functionName, payload, token) {
+  const url = edgeBridgeUrl();
+  if (!url) throw apiError("Titan Edge API is not configured", 503, "EDGE_NOT_CONFIGURED");
+  return postJson(url, { functionName, payload }, token);
+}
+
 async function postJson(url, payload, token) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FUNCTION_TIMEOUT_MS);
@@ -205,9 +216,12 @@ function candidateUrls(path) {
   return [...new Set(urls)];
 }
 
-function isClientRejection(error) {
+function isTerminalClientRejection(error) {
   const status = Number(error?.status || 0);
-  return status >= 400 && status < 500;
+  // 402 can mean an upstream host/account is disabled and 404 can mean that
+  // a compatibility backend does not implement this function. Both should
+  // continue through Titan's failover chain rather than block a healthy edge API.
+  return [400, 401, 403, 409, 422, 429].includes(status);
 }
 
 export function createFunctionsModule() {
@@ -219,6 +233,29 @@ export function createFunctionsModule() {
 
       let lastError;
       let refreshedAfter401 = false;
+
+      // Android/Play releases use the Supabase Edge bridge as the primary
+      // server path so a disabled Vercel deployment cannot take the app down.
+      try {
+        return await invokeEdge(functionName, payload, token);
+      } catch (error) {
+        lastError = error;
+        if (error?.status === 401 && !refreshedAfter401) {
+          refreshedAfter401 = true;
+          token = await getAccessToken({ forceRefresh: true });
+          if (token) {
+            try {
+              return await invokeEdge(functionName, payload, token);
+            } catch (retryError) {
+              lastError = retryError;
+            }
+          }
+        }
+        if (isTerminalClientRejection(lastError)) {
+          throw lastError;
+        }
+      }
+
       for (const url of candidates) {
         try {
           return await postJson(url, payload, token);
@@ -238,12 +275,13 @@ export function createFunctionsModule() {
           }
 
           // Validation, authorization, entitlement, conflict, and rate-limit errors
-          // are real server decisions. Do not mask them as an offline condition.
-          if (isClientRejection(lastError)) break;
+          // are authoritative. Infrastructure-style 402/404/5xx responses keep
+          // moving through Titan's compatibility/offline fallback chain.
+          if (isTerminalClientRejection(lastError)) break;
         }
       }
 
-      if (isClientRejection(lastError)) {
+      if (isTerminalClientRejection(lastError)) {
         throw lastError;
       }
 

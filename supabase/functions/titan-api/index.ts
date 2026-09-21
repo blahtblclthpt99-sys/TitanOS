@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { importPKCS8, SignJWT } from "npm:jose@5.9.6";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -526,6 +527,72 @@ async function handlePortalAction(functionName: string, payload: Record<string, 
   return reply(origin, 404, { error: "Portal action is unavailable" });
 }
 
+
+const PLAY_PACKAGE_NAME = "com.titanos.myapp";
+const PLAY_PRODUCT_PLANS: Record<string, string> = {
+  titanos_starter_monthly: "starter",
+  titanos_pro_monthly: "worker_premium",
+  titanos_business_monthly: "business",
+};
+const PLAY_ENTITLED_STATES = new Set([
+  "SUBSCRIPTION_STATE_ACTIVE",
+  "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+  "SUBSCRIPTION_STATE_CANCELED",
+]);
+
+async function googlePlayAccessToken() {
+  const raw = Deno.env.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON");
+  if (!raw) throw new Error("Google Play verification is not configured");
+
+  let account: Record<string, string>;
+  try {
+    account = JSON.parse(raw);
+  } catch {
+    throw new Error("Google Play service account is invalid");
+  }
+  if (!account.client_email || !account.private_key) {
+    throw new Error("Google Play service account is incomplete");
+  }
+
+  const key = await importPKCS8(account.private_key, "RS256");
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = await new SignJWT({
+    scope: "https://www.googleapis.com/auth/androidpublisher",
+  })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(account.client_email)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(key);
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.access_token) throw new Error("Google Play authorization failed");
+  return String(body.access_token);
+}
+
+async function googlePlayRequest(url: string, token: string, options: RequestInit = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error("Google Play API request failed (" + response.status + ")");
+  return body;
+}
+
 async function liveBusinessSummary(client: ReturnType<typeof createClient>, userId: string, prompt: string) {
   const [
     customersResult,
@@ -622,6 +689,8 @@ Deno.serve(async (req: Request) => {
         supportStaff: true,
         supportAttachments: true,
         supportCsat: true,
+        googlePlayBilling: true,
+        googlePlayConfigured: Boolean(Deno.env.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")),
         openaiConfigured: Boolean(Deno.env.get("OPENAI_API_KEY")),
         stripeConfigured: Boolean(Deno.env.get("STRIPE_SECRET_KEY")),
         resendConfigured: Boolean(Deno.env.get("RESEND_API_KEY")),
@@ -1286,6 +1355,125 @@ Deno.serve(async (req: Request) => {
           if (error) throw error;
         }
         return reply(origin, 200, { success: true, id: result?.id || null, provider: "resend" });
+      }
+
+
+      case "googlePlayVerifySubscription": {
+        const rate = await consumeEdgeRateLimit(adminClient(), "googlePlayVerifySubscription:" + user.id, 10, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many purchase verification attempts. Try again shortly.", retry_after: rate.retryAfter });
+
+        const packageName = cleanText(payload.packageName, 160);
+        const productId = cleanText(payload.productId, 160);
+        const purchaseToken = cleanText(payload.purchaseToken, 4096);
+        if (
+          packageName !== PLAY_PACKAGE_NAME ||
+          !PLAY_PRODUCT_PLANS[productId] ||
+          purchaseToken.length < 20 ||
+          purchaseToken.length > 4096
+        ) {
+          return reply(origin, 400, { error: "Invalid Google Play purchase" });
+        }
+
+        const admin = adminClient();
+        const { data: claimed, error: claimLookupError } = await admin
+          .from("google_play_subscriptions")
+          .select("user_id")
+          .eq("purchase_token", purchaseToken)
+          .maybeSingle();
+        if (claimLookupError) throw claimLookupError;
+        if (claimed && claimed.user_id !== user.id) {
+          return reply(origin, 409, { error: "Purchase is linked to another account" });
+        }
+
+        let googleToken: string;
+        try {
+          googleToken = await googlePlayAccessToken();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const unavailable = /not configured|incomplete|invalid/.test(message);
+          return reply(origin, unavailable ? 503 : 502, {
+            error: unavailable ? "Google Play verification is being configured" : "Could not verify Google Play purchase",
+            code: unavailable ? "PLAY_VERIFICATION_UNAVAILABLE" : "PLAY_VERIFICATION_FAILED",
+          });
+        }
+
+        const encodedToken = encodeURIComponent(purchaseToken);
+        let purchase: any;
+        try {
+          purchase = await googlePlayRequest(
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/" +
+              PLAY_PACKAGE_NAME + "/purchases/subscriptionsv2/tokens/" + encodedToken,
+            googleToken
+          );
+        } catch {
+          return reply(origin, 502, { error: "Could not verify Google Play purchase", code: "PLAY_VERIFICATION_FAILED" });
+        }
+
+        const state = String(purchase?.subscriptionState || "");
+        const line = (Array.isArray(purchase?.lineItems) ? purchase.lineItems : []).find(
+          (item: Record<string, any>) => item?.productId === productId
+        );
+        const expiresAt = line?.expiryTime ? new Date(String(line.expiryTime)) : null;
+        const accountId = purchase?.externalAccountIdentifiers?.obfuscatedExternalAccountId;
+        const expectedAccountId = await sha256Hex(user.id);
+        const active = Boolean(
+          PLAY_ENTITLED_STATES.has(state) &&
+          expiresAt &&
+          Number.isFinite(expiresAt.getTime()) &&
+          expiresAt.getTime() > Date.now()
+        );
+
+        if (!line || !active || (accountId && accountId !== expectedAccountId)) {
+          return reply(origin, 403, { error: "Google Play purchase is not active for this account" });
+        }
+
+        let acknowledged = purchase?.acknowledgementState === "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED";
+        if (!acknowledged) {
+          try {
+            await googlePlayRequest(
+              "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/" +
+                PLAY_PACKAGE_NAME + "/purchases/subscriptions/" + encodeURIComponent(productId) +
+                "/tokens/" + encodedToken + ":acknowledge",
+              googleToken,
+              { method: "POST", body: JSON.stringify({}) }
+            );
+            acknowledged = true;
+          } catch {
+            return reply(origin, 502, { error: "Google Play purchase could not be acknowledged", code: "PLAY_ACK_FAILED" });
+          }
+        }
+
+        const receipt = {
+          purchase_token: purchaseToken,
+          user_id: user.id,
+          product_id: productId,
+          base_plan_id: line?.offerDetails?.basePlanId || null,
+          subscription_state: state,
+          expires_at: expiresAt!.toISOString(),
+          auto_renewing: line?.autoRenewingPlan?.autoRenewEnabled === true,
+          acknowledged,
+          linked_purchase_token: purchase?.linkedPurchaseToken || null,
+          last_verified_at: new Date().toISOString(),
+        };
+        const { error: receiptError } = await admin
+          .from("google_play_subscriptions")
+          .upsert(receipt, { onConflict: "purchase_token" });
+        if (receiptError) throw receiptError;
+
+        const planTier = PLAY_PRODUCT_PLANS[productId];
+        const { data: profile, error: profileError } = await admin
+          .from("profiles")
+          .update({ plan_tier: planTier, is_pro: true, paying_subscriber: true })
+          .eq("id", user.id)
+          .select("id,plan_tier,is_pro,paying_subscriber")
+          .single();
+        if (profileError) throw profileError;
+
+        return reply(origin, 200, {
+          verified: true,
+          entitlement: profile,
+          expiresAt: expiresAt!.toISOString(),
+        });
       }
 
       case "createAutopilotOrder": {

@@ -54,15 +54,22 @@ describe("Stripe money path guards", () => {
     assert.match(src, /assertRateLimit/);
   });
 
-  it("webhook verifies signature before claiming the attention payment event", () => {
-    const src = read("api/functions/stripeWebhook.js");
-    assert.match(src, /bodyParser:\s*false/);
-    assert.match(src, /constructEvent/);
-    assert.match(src, /attention_payment_events/);
-    assert.ok(
-      src.indexOf("constructEvent") < src.indexOf("attention_payment_events"),
-      "Stripe signature verification must happen before the idempotency ledger claim",
-    );
+  it("TitanOS exits Stripe before load while Attention verifies before its payment ledger", () => {
+    const router = read("api/functions/stripeWebhook.js");
+    const attentionHandler = read("api/_lib/stripeWebhookProductHandler.js");
+
+    const titanExit = router.indexOf("if (!isAttentionDeployment())");
+    const stripeImport = router.indexOf('await import("stripe")');
+    const signature = router.indexOf("constructEvent");
+    const attentionImport = router.indexOf('await import("../_lib/stripeWebhookProductHandler.js")');
+
+    assert.match(router, /bodyParser:\s*false/);
+    assert.match(router, /autopilot_payments_retired/);
+    assert.ok(titanExit >= 0 && stripeImport > titanExit, "TitanOS must exit before Stripe loads");
+    assert.ok(signature > stripeImport, "Attention must verify the Stripe signature");
+    assert.ok(attentionImport > signature, "Attention payment handler must load only after signature verification");
+    assert.match(attentionHandler, /attention_payment_events/);
+    assert.match(attentionHandler, /activate_attention_campaign_funding_service/);
   });
 });
 

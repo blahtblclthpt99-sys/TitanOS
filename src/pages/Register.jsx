@@ -13,6 +13,7 @@ import { attachReferralOnSignup } from "@/lib/referralApi";
 import { useAuth } from "@/lib/AuthContext";
 import { consumeReturnTo, resolveReturnTo } from "@/lib/returnTo";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { resendSignupOtp, verifySignupOtp } from "@/lib/signupOtpClient";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -27,9 +28,13 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [otpType, setOtpType] = useState("signup");
+  const [otpDeliveryStatus, setOtpDeliveryStatus] = useState("accepted");
+  const [pendingUserId, setPendingUserId] = useState("");
 
   const finishSignup = async (userId) => {
     if (refCode) {
@@ -47,6 +52,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -63,6 +69,24 @@ export default function Register() {
         await finishSignup(me?.id || result?.user?.id);
         return;
       }
+      if (["otp", "otp_magiclink"].includes(result?.verificationMode)) {
+        if (!result?.user?.id) {
+          setError("Signup verification could not be initialized. Please try again.");
+          return;
+        }
+        const deliveryStatus = result?.verificationDelivery === "uncertain" ? "uncertain" : "accepted";
+        setPendingUserId(result.user.id);
+        setOtpType(result.verificationMode === "otp_magiclink" ? "magiclink" : "signup");
+        setOtpDeliveryStatus(deliveryStatus);
+        setOtpCode("");
+        if (deliveryStatus === "uncertain") {
+          setNotice(
+            "We couldn't confirm whether the verification email was delivered. If a code arrives, it is still valid. Otherwise, tap Resend for a fresh code."
+          );
+        }
+        setShowOtp(true);
+        return;
+      }
       if (result?.verificationMode === "email_link" || result?.needsEmailVerification) {
         setError("");
         toast({
@@ -72,7 +96,15 @@ export default function Register() {
         navigate("/login", { replace: true });
         return;
       }
-      setShowOtp(true);
+      if (result?.user?.id) {
+        toast({
+          title: "Account created",
+          description: "Sign in to continue.",
+        });
+        navigate("/login", { replace: true });
+        return;
+      }
+      setError("Registration did not return a usable account state. Please try again.");
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -84,12 +116,9 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const result = await api.auth.verifyOtp({ email, otpCode });
-      if (result?.access_token) {
-        await api.auth.setToken(result.access_token);
-      }
+      await verifySignupOtp({ email, otpCode, verificationType: otpType });
       const me = await api.auth.me().catch(() => null);
-      await finishSignup(me?.id);
+      await finishSignup(me?.id || pendingUserId);
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -99,17 +128,39 @@ export default function Register() {
 
   const handleResend = async () => {
     setError("");
+    setNotice("");
+    setLoading(true);
     try {
-      await api.auth.resendOtp(email);
-      toast({ title: "Code sent", description: "Check your email for the new code." });
+      const result = await resendSignupOtp({ email, userId: pendingUserId });
+      setOtpType(result.verificationType);
+      setOtpDeliveryStatus(result.deliveryStatus);
+      setOtpCode("");
+      if (result.deliveryStatus === "uncertain") {
+        setNotice(
+          "Titan generated a fresh code, but couldn't confirm provider delivery. Check your inbox before requesting another code."
+        );
+      } else {
+        toast({ title: "Code sent", description: "Check your email for the new code." });
+      }
     } catch (err) {
       setError(err.message || "Failed to resend code");
+    } finally {
+      setLoading(false);
     }
   };
 
   if (showOtp) {
+    const subtitle =
+      otpDeliveryStatus === "uncertain"
+        ? `Check ${email} for your verification code`
+        : `We sent a code to ${email}`;
     return (
-      <AuthLayout title="Verify your email" subtitle={`We sent a code to ${email}`}>
+      <AuthLayout title="Verify your email" subtitle={subtitle}>
+        {notice && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+            {notice}
+          </div>
+        )}
         {error && (
           <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {error}
@@ -141,7 +192,12 @@ export default function Register() {
         </Button>
         <p className="text-center text-sm text-muted-foreground mt-4">
           Didn't receive the code?{" "}
-          <button type="button" onClick={handleResend} className="font-semibold text-foreground hover:underline">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={loading || !pendingUserId}
+            className="font-semibold text-foreground hover:underline disabled:opacity-50"
+          >
             Resend
           </button>
         </p>

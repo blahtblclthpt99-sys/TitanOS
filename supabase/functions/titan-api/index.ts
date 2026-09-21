@@ -390,7 +390,7 @@ Deno.serve(async (req: Request) => {
         const admin = adminClient();
         const { data: supportCase } = await admin.from("support_cases").select("id,created_by_id").eq("id", caseId).eq("created_by_id", user.id).maybeSingle();
         if (!supportCase) return reply(origin, 404, { error: "Support case not found" });
-        const prefix = \`\${user.id}/\${caseId}/\`;
+        const prefix = `${user.id}/${caseId}/`;
         if (!storagePath.startsWith(prefix)) return reply(origin, 403, { error: "Attachment path is not authorized for this case" });
         const slash = storagePath.lastIndexOf("/");
         const folder = slash >= 0 ? storagePath.slice(0, slash) : "";
@@ -623,7 +623,7 @@ Deno.serve(async (req: Request) => {
           user_id: referrer.id,
           type: "referrals",
           title: "New referral signup",
-          body: \`\${email || "Someone"} signed up with your code.\`,
+          body: `${email || "Someone"} signed up with your code.`,
           link: "/referral",
           created_by_id: user.id,
         });
@@ -795,7 +795,7 @@ Deno.serve(async (req: Request) => {
             tax_rate: Number(snap.tax_rate) || 0,
             tiers: Array.isArray(snap.tiers) ? snap.tiers : [],
             promo: snap.promo || null,
-            notes: \`Rollback from history \${historyId}\`,
+            notes: `Rollback from history ${historyId}`,
             created_by_id: user.id,
           };
           const { data, error } = await admin.from("fee_rules").insert(row).select("*").single();
@@ -803,7 +803,7 @@ Deno.serve(async (req: Request) => {
           await writeFeeHistory(admin, data.id, "rollback", { ...data, from_history: historyId }, user.id);
           return reply(origin, 200, { rule: data });
         }
-        return reply(origin, 400, { error: \`Unknown fee action: \${action}\` });
+        return reply(origin, 400, { error: `Unknown fee action: ${action}` });
       }
 
       case "installMarketplaceModule": {
@@ -877,7 +877,7 @@ Deno.serve(async (req: Request) => {
         const from = cleanText(Deno.env.get("RESEND_FROM_EMAIL") || "TitanOS <noreply@titanos.app>", 320);
         const response = await fetch("https://api.resend.com/emails", {
           method: "POST",
-          headers: { Authorization: \`Bearer \${resendKey}\`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({ from, to: [to], subject, text: textBody }),
         });
         const result = await response.json().catch(() => ({}));

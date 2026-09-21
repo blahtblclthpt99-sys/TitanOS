@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "@/api/apiClient";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,22 @@ const PROVIDERS = [{ id: "google", label: "Continue with Google", Icon: GoogleIc
 
 export default function SocialAuthButtons({ onError, returnTo }) {
   const [loadingProvider, setLoadingProvider] = useState("");
+  const [googleEnabled, setGoogleEnabled] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    api.auth
+      .isOAuthProviderEnabled("google")
+      .then((enabled) => {
+        if (active) setGoogleEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setGoogleEnabled(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const start = async (provider) => {
     setLoadingProvider(provider);
@@ -35,6 +51,17 @@ export default function SocialAuthButtons({ onError, returnTo }) {
       onError?.(message);
     }
   };
+
+  if (googleEnabled === false) {
+    return (
+      <div
+        role="status"
+        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-xs text-slate-600"
+      >
+        Google sign-in is not configured yet. Use email below.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2.5">

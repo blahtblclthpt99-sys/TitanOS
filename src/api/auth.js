@@ -131,27 +131,33 @@ async function buildUser(authUser, profile) {
   };
 }
 
-async function assertOAuthProviderEnabled(provider) {
+async function oauthProviderEnabled(provider) {
   const base = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!base || !anon) return;
+  const publicKey =
+    import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!base || !publicKey) return null;
   try {
     const res = await fetch(`${base}/auth/v1/settings`, {
-      headers: { apikey: anon, Authorization: `Bearer ${anon}` },
+      headers: { apikey: publicKey, Authorization: `Bearer ${publicKey}` },
     });
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const settings = await res.json();
     const key = provider === "azure" ? "azure" : provider;
-    if (settings?.external && settings.external[key] === false) {
-      const label = provider === "google" ? "Google" : provider;
-      throw apiError(
-        `${label} sign-in is not enabled yet in Supabase. Use email, or finish GOOGLE_AUTH.md setup.`,
-        400
-      );
-    }
-  } catch (err) {
-    if (err?.status) throw err;
-    // Network hiccup — let OAuth attempt proceed
+    if (!settings?.external || typeof settings.external[key] !== "boolean") return null;
+    return settings.external[key];
+  } catch {
+    return null;
+  }
+}
+
+async function assertOAuthProviderEnabled(provider) {
+  const enabled = await oauthProviderEnabled(provider);
+  if (enabled === false) {
+    const label = provider === "google" ? "Google" : provider;
+    throw apiError(
+      `${label} sign-in is not enabled yet. Use email sign-in for now.`,
+      400
+    );
   }
 }
 
@@ -206,6 +212,10 @@ async function registerViaServer({ email, password, fullName }) {
 
 export function createAuthModule() {
   return {
+    async isOAuthProviderEnabled(provider) {
+      return oauthProviderEnabled(provider);
+    },
+
     async me() {
       // Prefer getUser (validates JWT). Fall back to local session so slow/flaky
       // network never locks the user out of the shell.
@@ -236,13 +246,18 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and confirms the account immediately for Play testers.
-      try {
-        return await registerViaServer({ email, password, fullName });
-      } catch (serverError) {
-        // Fall back to direct Supabase signup when API is unavailable
-        const { data, error } = await supabase.auth.signUp({
+      // Web may use the compatibility server endpoint. Android goes straight
+      // to the healthy Supabase Auth project so disabled Vercel cannot block signup.
+      let serverError = null;
+      if (!Capacitor.isNativePlatform()) {
+        try {
+          return await registerViaServer({ email, password, fullName });
+        } catch (error) {
+          serverError = error;
+        }
+      }
+
+      const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -250,7 +265,7 @@ export function createAuthModule() {
             data: fullName ? { full_name: fullName } : undefined,
           },
         });
-        if (error) {
+      if (error) {
           if (/rate limit/i.test(error.message || "")) {
             throw apiError(
               serverError?.message ||
@@ -258,11 +273,11 @@ export function createAuthModule() {
               429
             );
           }
-          throwIfError(error);
-        }
-        // Best-effort: log email when client falls back to direct Supabase signup
-        try {
-          const bases = [];
+        throwIfError(error);
+      }
+      // Best-effort: log email when client falls back to direct Supabase signup
+      try {
+        const bases = [];
           const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
           if (configured) bases.push(configured);
           if (typeof window !== "undefined") bases.push(window.location.origin);
@@ -275,15 +290,14 @@ export function createAuthModule() {
             });
             if (res.ok) break;
           }
-        } catch {
-          /* ignore logging failures */
-        }
-        return {
-          session: data.session,
-          user: data.user,
-          needsEmailVerification: !data.session,
-        };
+      } catch {
+        /* ignore logging failures */
       }
+      return {
+        session: data.session,
+        user: data.user,
+        needsEmailVerification: !data.session,
+      };
     },
 
     async verifyOtp({ email, otpCode }) {
@@ -361,9 +375,24 @@ export function createAuthModule() {
     },
 
     async resetPasswordRequest(email) {
+      const callbackKey = "titanos_auth_callback_destination";
+      if (Capacitor.isNativePlatform() && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(callbackKey, "/reset-password");
+        } catch {
+          /* durable callback hint is best-effort */
+        }
+      }
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: getAuthRedirectTo("/reset-password"),
       });
+      if (error && Capacitor.isNativePlatform() && typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem(callbackKey);
+        } catch {
+          /* ignore */
+        }
+      }
       throwIfError(error);
     },
 

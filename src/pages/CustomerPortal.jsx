@@ -69,7 +69,9 @@ function PortalLogin({ onLogin }) {
     setLoading(true);
     try {
       const res = await api.functions.invoke("portalVerifyOtp", { email: email.trim(), otp_code: code.trim() });
-      onLogin(res.data.token, res.data.customer);
+      const data = res?.data || res;
+      if (!data?.token || !data?.customer) throw new Error("Portal session could not be created.");
+      onLogin(data.token, data.customer);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || "Invalid or expired code. Please try again.");
     } finally {

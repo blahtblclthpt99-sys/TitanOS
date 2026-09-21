@@ -4,6 +4,7 @@
  */
 import { getObservabilityPrefs } from "@/lib/observabilityPrefs";
 import { envFlag } from "@/lib/viteEnv";
+import { createFunctionsModule } from "@/api/functions";
 
 /** Only these names may be recorded. */
 export const ALLOWED_ANALYTICS_EVENTS = Object.freeze([
@@ -93,16 +94,10 @@ export async function flushAnalyticsBuffer() {
   const rows = readBuffer();
   if (!rows.length) return { flushed: 0 };
   try {
-    const res = await fetch("/api/functions/analyticsIngest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ events: rows.slice(-40) }),
-      credentials: "same-origin",
-    });
-    if (res.ok) {
-      writeBuffer([]);
-      return { flushed: rows.length };
-    }
+    const result = await createFunctionsModule().invoke("analyticsIngest", { events: rows.slice(-40) });
+    if (result?.disabled) return { flushed: 0 };
+    writeBuffer([]);
+    return { flushed: rows.length };
   } catch {
     /* keep buffer */
   }

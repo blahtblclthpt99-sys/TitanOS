@@ -49,6 +49,11 @@ export async function restorePlaySubscriptions() {
   return purchases;
 }
 
+export async function reconcilePlaySubscriptionState() {
+  if (!isAndroidPlayBuild()) return { active: false, changed: false, reason: "not_android" };
+  return createFunctionsModule().invoke("googlePlayReconcileSubscriptions", {});
+}
+
 export function onPlayPurchaseUpdated(listener) {
   return TitanBilling.addListener("purchaseUpdated", listener);
 }

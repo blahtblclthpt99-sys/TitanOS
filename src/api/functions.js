@@ -63,7 +63,7 @@ async function postJson(url, payload, token) {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw apiError(body.error || body.message || "Function call failed", response.status, "HTTP_ERROR");
+      throw apiError(body.error || body.message || "Function call failed", response.status, body.code || "HTTP_ERROR");
     }
     return body;
   } catch (error) {
@@ -232,6 +232,7 @@ export function createFunctionsModule() {
       const candidates = candidateUrls(path);
 
       let lastError;
+      let edgeError;
       let refreshedAfter401 = false;
 
       // Android/Play releases use the Supabase Edge bridge as the primary
@@ -239,6 +240,7 @@ export function createFunctionsModule() {
       try {
         return await invokeEdge(functionName, payload, token);
       } catch (error) {
+        edgeError = error;
         lastError = error;
         if (error?.status === 401 && !refreshedAfter401) {
           refreshedAfter401 = true;
@@ -247,6 +249,7 @@ export function createFunctionsModule() {
             try {
               return await invokeEdge(functionName, payload, token);
             } catch (retryError) {
+              edgeError = retryError;
               lastError = retryError;
             }
           }
@@ -288,6 +291,9 @@ export function createFunctionsModule() {
       try {
         return await localFallback(functionName, payload);
       } catch (fallbackError) {
+        // If Edge gave a meaningful service/configuration failure, preserve it
+        // instead of replacing it with a later compatibility-host 402/5xx.
+        if (edgeError && Number(edgeError.status || 0) !== 404) throw edgeError;
         throw lastError || fallbackError;
       }
     },

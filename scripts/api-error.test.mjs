@@ -59,7 +59,7 @@ describe("apiError helpers", () => {
   it("packages Android with the live Titan API and allows Capacitor's secure localhost origin", () => {
     const workflow = readFileSync(new URL("../.github/workflows/android-release.yml", import.meta.url), "utf8");
     const cors = readFileSync(new URL("../api/_lib/cors.js", import.meta.url), "utf8");
-    assert.match(workflow, /VITE_API_BASE_URL:\\s*["']?https:\\/\\/titanos-web\\.vercel\\.app["']?/);
+    assert.match(workflow, /VITE_API_BASE_URL:\s*["\']?https:\/\/titanos-web\.vercel\.app["\']?/);
     assert.match(cors, /"https:\/\/localhost"/);
   });
 });

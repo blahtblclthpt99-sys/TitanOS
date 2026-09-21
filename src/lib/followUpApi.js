@@ -71,7 +71,11 @@ export async function sendFollowUpNow(user, row, customerEmail = "") {
       write(user.id, "queue", read(user.id, "queue").map((q) => (q.id === row.id ? item : q)));
       return { ...item, send: res };
     }
-  } catch {
-    return markQueueSent(user.id, row.id);
+  } catch (error) {
+    // Delivery failures must never be recorded as successful sends.
+    // Keep the queue item pending so the user can retry or mark it manually.
+    const wrapped = new Error(error?.message || "Follow-up email was not delivered.");
+    wrapped.cause = error;
+    throw wrapped;
   }
 }

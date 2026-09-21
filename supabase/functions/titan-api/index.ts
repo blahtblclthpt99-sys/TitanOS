@@ -168,6 +168,15 @@ function portalPepper() {
   return Deno.env.get("PORTAL_OTP_PEPPER") || SUPABASE_SERVICE_ROLE_KEY || "titanos-portal-otp-dev-only";
 }
 
+async function requestFingerprint(req: Request) {
+  const raw =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+    "unknown";
+  return (await sha256Hex("titan-edge-client:" + raw)).slice(0, 24);
+}
+
 async function hashPortalOtpEdge(email: string, code: string) {
   return sha256Hex(portalPepper() + ":" + email.trim().toLowerCase() + ":" + code.trim());
 }
@@ -214,7 +223,7 @@ async function requirePortalSessionEdge(admin: ReturnType<typeof createClient>, 
   return { session: data } as const;
 }
 
-async function handlePortalAction(functionName: string, payload: Record<string, unknown>, origin: string | null) {
+async function handlePortalAction(functionName: string, payload: Record<string, unknown>, origin: string | null, req: Request) {
   const admin = adminClient();
   const remoteHint = cleanText(payload.email || payload.token || "anonymous", 320).toLowerCase();
 
@@ -222,7 +231,13 @@ async function handlePortalAction(functionName: string, payload: Record<string, 
     const email = cleanText(payload.email, 320).toLowerCase();
     if (!email || !email.includes("@")) return reply(origin, 400, { error: "Email is required" });
 
-    const rate = await consumeEdgeRateLimit(admin, "portalRequestOtp:" + email, 3, 600);
+    const emailKey = (await sha256Hex(email)).slice(0, 24);
+    const ipKey = await requestFingerprint(req);
+    const [emailRate, ipRate] = await Promise.all([
+      consumeEdgeRateLimit(admin, "portalRequestOtp:email:" + emailKey, 3, 600),
+      consumeEdgeRateLimit(admin, "portalRequestOtp:ip:" + ipKey, 12, 600),
+    ]);
+    const rate = !emailRate.allowed ? emailRate : ipRate;
     if (!rate.allowed) return reply(origin, 429, { error: "Too many requests. Try again later.", retry_after: rate.retryAfter });
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -283,7 +298,13 @@ async function handlePortalAction(functionName: string, payload: Record<string, 
     const submitted = cleanText(payload.otp_code, 6);
     if (!email || !/^\d{6}$/.test(submitted)) return reply(origin, 401, { error: "Invalid verification code" });
 
-    const rate = await consumeEdgeRateLimit(admin, "portalVerifyOtp:" + email, 8, 600);
+    const emailKey = (await sha256Hex(email)).slice(0, 24);
+    const ipKey = await requestFingerprint(req);
+    const [emailRate, ipRate] = await Promise.all([
+      consumeEdgeRateLimit(admin, "portalVerifyOtp:email:" + emailKey, 8, 600),
+      consumeEdgeRateLimit(admin, "portalVerifyOtp:ip:" + ipKey, 30, 600),
+    ]);
+    const rate = !emailRate.allowed ? emailRate : ipRate;
     if (!rate.allowed) return reply(origin, 429, { error: "Too many attempts. Try again later.", retry_after: rate.retryAfter });
 
     const expectedHash = await hashPortalOtpEdge(email, submitted);
@@ -615,8 +636,13 @@ function safePublicContract(row: Record<string, any> | null) {
   };
 }
 
-async function handlePublicAction(functionName: string, payload: Record<string, unknown>, origin: string | null) {
+async function handlePublicAction(functionName: string, payload: Record<string, unknown>, origin: string | null, req: Request) {
+  const admin = adminClient();
+  const ipKey = await requestFingerprint(req);
+
   if (functionName === "appVersion") {
+    const rate = await consumeEdgeRateLimit(admin, "appVersion:" + ipKey, 120, 60);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many requests", retry_after: rate.retryAfter });
     return reply(origin, 200, {
       // Keep this aligned with the version currently available on Play.
       // Bump only when the corresponding Play rollout is actually published.
@@ -628,6 +654,8 @@ async function handlePublicAction(functionName: string, payload: Record<string, 
   }
 
   if (functionName === "featureFlags") {
+    const rate = await consumeEdgeRateLimit(admin, "featureFlags:" + ipKey, 120, 60);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many requests", retry_after: rate.retryAfter });
     const defaults: Record<string, boolean> = {
       driver_autopilot: true,
       titancom_ptt: true,
@@ -652,7 +680,6 @@ async function handlePublicAction(functionName: string, payload: Record<string, 
       }
     }
 
-    const admin = adminClient();
     const { data: launchRow } = await admin
       .from("platform_launch")
       .select("founding_cap,founding_claimed,beta_active")
@@ -674,6 +701,8 @@ async function handlePublicAction(functionName: string, payload: Record<string, 
   }
 
   if (functionName === "analyticsIngest") {
+    const rate = await consumeEdgeRateLimit(admin, "analyticsIngest:" + ipKey, 30, 60);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many analytics batches", retry_after: rate.retryAfter });
     if (Deno.env.get("ANALYTICS_INGEST_ENABLED") !== "1") {
       return reply(origin, 200, { accepted: 0, disabled: true });
     }
@@ -689,7 +718,6 @@ async function handlePublicAction(functionName: string, payload: Record<string, 
   }
 
   if (functionName === "publicContract") {
-    const admin = adminClient();
     const token = cleanText(payload.token, 256);
     const action = cleanText(payload.action || "get", 20);
     if (token.length < 32) return reply(origin, 404, { error: "Contract unavailable" });
@@ -868,7 +896,7 @@ Deno.serve(async (req: Request) => {
 
   if (PUBLIC_ACTIONS.has(functionName)) {
     try {
-      return await handlePublicAction(functionName, payload, origin);
+      return await handlePublicAction(functionName, payload, origin, req);
     } catch (error) {
       console.error("titan-api:public", functionName, error);
       return reply(origin, 500, { error: "Public Titan service could not complete the request", code: "PUBLIC_EXECUTION_FAILED" });
@@ -877,7 +905,7 @@ Deno.serve(async (req: Request) => {
 
   if (PORTAL_ACTIONS.has(functionName)) {
     try {
-      return await handlePortalAction(functionName, payload, origin);
+      return await handlePortalAction(functionName, payload, origin, req);
     } catch (error) {
       console.error("titan-api:portal", functionName, error);
       return reply(origin, 500, { error: "Portal service could not complete the request", code: "PORTAL_EXECUTION_FAILED" });

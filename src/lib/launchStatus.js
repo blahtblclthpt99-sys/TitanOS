@@ -1,3 +1,5 @@
+import { createFunctionsModule } from "@/api/functions";
+
 /**
  * Founding-100 / launch status (client cache).
  * Source of truth: `platform_launch` via `/api/functions/featureFlags` (migrations 035 + 037).
@@ -92,9 +94,7 @@ export function applyLaunchStatus(raw) {
 /** Merge launch payload from featureFlags (or health) response. */
 export async function refreshLaunchStatusFromServer() {
   try {
-    const res = await fetch("/api/functions/featureFlags", { credentials: "same-origin" });
-    if (!res.ok) return getLaunchStatus();
-    const data = await res.json();
+    const data = await createFunctionsModule().invoke("featureFlags", {});
     if (data?.launch && typeof data.launch === "object") {
       return applyLaunchStatus(data.launch);
     }

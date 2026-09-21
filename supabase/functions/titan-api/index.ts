@@ -15,6 +15,13 @@ const PORTAL_ACTIONS = new Set([
   "portalPayInvoice",
 ]);
 
+const PUBLIC_ACTIONS = new Set([
+  "featureFlags",
+  "appVersion",
+  "analyticsIngest",
+  "publicContract",
+]);
+
 const ALLOWED_ORIGINS = new Set([
   "https://titanos.app",
   "https://localhost",
@@ -593,6 +600,167 @@ async function googlePlayRequest(url: string, token: string, options: RequestIni
   return body;
 }
 
+
+function safePublicContract(row: Record<string, any> | null) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    customer_name: row.customer_name,
+    title: row.title,
+    body: row.body,
+    status: row.status,
+    signed_at: row.signed_at,
+    owner_signed: Boolean(row.owner_signature),
+    customer_signed: Boolean(row.customer_signature),
+  };
+}
+
+async function handlePublicAction(functionName: string, payload: Record<string, unknown>, origin: string | null) {
+  if (functionName === "appVersion") {
+    return reply(origin, 200, {
+      // Keep this aligned with the version currently available on Play.
+      // Bump only when the corresponding Play rollout is actually published.
+      latest: Deno.env.get("APP_LATEST_VERSION") || "2.0.3",
+      minimum: Deno.env.get("APP_MINIMUM_VERSION") || "2.0.3",
+      android_url: Deno.env.get("ANDROID_STORE_URL") || "https://play.google.com/store/apps/details?id=com.titanos.myapp",
+      ios_url: Deno.env.get("IOS_STORE_URL") || "",
+    });
+  }
+
+  if (functionName === "featureFlags") {
+    const defaults: Record<string, boolean> = {
+      driver_autopilot: true,
+      titancom_ptt: true,
+      ai_assistant: true,
+      marketplace_install: true,
+      product_analytics: true,
+      session_replay: false,
+      export_share_links: true,
+      growth_coach: true,
+      labs_surfaces: true,
+      referrals: false,
+    };
+    const raw = Deno.env.get("FEATURE_FLAGS_JSON") || Deno.env.get("VITE_FEATURE_FLAGS_JSON") || "";
+    if (raw) {
+      try {
+        const overlay = JSON.parse(raw);
+        for (const [key, value] of Object.entries(overlay || {})) {
+          if (key in defaults && typeof value === "boolean") defaults[key] = value;
+        }
+      } catch {
+        // Invalid remote flag JSON never changes safe defaults.
+      }
+    }
+
+    const admin = adminClient();
+    const { data: launchRow } = await admin
+      .from("platform_launch")
+      .select("founding_cap,founding_claimed,beta_active")
+      .eq("id", 1)
+      .maybeSingle();
+    const cap = Math.max(1, Number(launchRow?.founding_cap) || 100);
+    const claimed = Math.max(0, Number(launchRow?.founding_claimed) || 0);
+    return reply(origin, 200, {
+      flags: defaults,
+      launch: {
+        foundingCap: cap,
+        foundingClaimed: claimed,
+        spotsRemaining: Math.max(0, cap - claimed),
+        betaActive: launchRow ? launchRow.beta_active !== false && claimed < cap : true,
+        membershipPaymentsLive: true,
+      },
+      ts: new Date().toISOString(),
+    });
+  }
+
+  if (functionName === "analyticsIngest") {
+    if (Deno.env.get("ANALYTICS_INGEST_ENABLED") !== "1") {
+      return reply(origin, 200, { accepted: 0, disabled: true });
+    }
+    const allowed = new Set([
+      "app_boot","session_start","page_view","nav_tap","job_created","invoice_created",
+      "estimate_created","payment_checkout_start","payment_checkout_return","driver_shift_start",
+      "driver_shift_end","search_query","export_run","ai_intent_used","comms_ptt_start",
+      "feature_flag_evaluated","error_boundary",
+    ]);
+    const events = Array.isArray(payload.events) ? payload.events.slice(0, 40) : [];
+    const accepted = events.filter((event: any) => allowed.has(String(event?.name || ""))).length;
+    return reply(origin, 200, { accepted });
+  }
+
+  if (functionName === "publicContract") {
+    const admin = adminClient();
+    const token = cleanText(payload.token, 256);
+    const action = cleanText(payload.action || "get", 20);
+    if (token.length < 32) return reply(origin, 404, { error: "Contract unavailable" });
+
+    const rate = await consumeEdgeRateLimit(admin, "publicContract:" + (await sha256Hex(token)).slice(0, 24), 30, 60);
+    if (!rate.allowed) return reply(origin, 429, { error: "Too many contract requests. Try again shortly.", retry_after: rate.retryAfter });
+
+    const tokenHash = await sha256Hex(token);
+    const publicFields = "id,customer_name,title,body,status,signed_at,owner_signature,customer_signature";
+
+    if (action === "get") {
+      const { data, error } = await admin
+        .from("contracts")
+        .select(publicFields)
+        .eq("share_token_hash", tokenHash)
+        .in("status", ["sent", "signed"])
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return reply(origin, 404, { error: "Contract unavailable" });
+      return reply(origin, 200, { contract: safePublicContract(data) });
+    }
+
+    if (action === "sign") {
+      const signature = cleanText(payload.signature, 200);
+      const signatureImage = payload.signature_image ? String(payload.signature_image) : null;
+      if (!signature) return reply(origin, 400, { error: "Signature is required" });
+      if (signatureImage && signatureImage.length > 1_000_000) {
+        return reply(origin, 413, { error: "Signature image is too large" });
+      }
+
+      const { data: existing, error: findError } = await admin
+        .from("contracts")
+        .select("id,status,owner_signature,customer_signature")
+        .eq("share_token_hash", tokenHash)
+        .in("status", ["sent", "signed"])
+        .maybeSingle();
+      if (findError) throw findError;
+      if (!existing) return reply(origin, 404, { error: "Contract unavailable" });
+
+      if (existing.customer_signature) {
+        const { data: already, error } = await admin.from("contracts").select(publicFields).eq("id", existing.id).maybeSingle();
+        if (error) throw error;
+        return reply(origin, 200, { contract: safePublicContract(already), alreadySigned: true });
+      }
+
+      const ownerSigned = Boolean(existing.owner_signature);
+      const { data: updated, error: updateError } = await admin
+        .from("contracts")
+        .update({
+          customer_signature: signature,
+          customer_signature_image: signatureImage || null,
+          status: ownerSigned ? "signed" : "sent",
+          signed_at: ownerSigned ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .eq("share_token_hash", tokenHash)
+        .is("customer_signature", null)
+        .select(publicFields)
+        .maybeSingle();
+      if (updateError) throw updateError;
+      if (!updated) return reply(origin, 409, { error: "Contract was already updated" });
+      return reply(origin, 200, { contract: safePublicContract(updated) });
+    }
+
+    return reply(origin, 400, { error: "Unknown action" });
+  }
+
+  return reply(origin, 404, { error: "Public action is unavailable" });
+}
+
 async function liveBusinessSummary(client: ReturnType<typeof createClient>, userId: string, prompt: string) {
   const [
     customersResult,
@@ -696,6 +864,15 @@ Deno.serve(async (req: Request) => {
         resendConfigured: Boolean(Deno.env.get("RESEND_API_KEY")),
       },
     });
+  }
+
+  if (PUBLIC_ACTIONS.has(functionName)) {
+    try {
+      return await handlePublicAction(functionName, payload, origin);
+    } catch (error) {
+      console.error("titan-api:public", functionName, error);
+      return reply(origin, 500, { error: "Public Titan service could not complete the request", code: "PUBLIC_EXECUTION_FAILED" });
+    }
   }
 
   if (PORTAL_ACTIONS.has(functionName)) {
@@ -1357,6 +1534,107 @@ Deno.serve(async (req: Request) => {
         return reply(origin, 200, { success: true, id: result?.id || null, provider: "resend" });
       }
 
+
+
+      case "contractShareToken": {
+        const contractId = cleanText(payload.contract_id, 80);
+        if (!contractId) return reply(origin, 400, { error: "contract_id is required" });
+
+        const admin = adminClient();
+        const rate = await consumeEdgeRateLimit(admin, "contractShareToken:" + user.id, 20, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many signing-link requests. Try again shortly.", retry_after: rate.retryAfter });
+
+        const { data: contract, error } = await admin
+          .from("contracts")
+          .select("id,created_by_id,status")
+          .eq("id", contractId)
+          .eq("created_by_id", user.id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!contract) return reply(origin, 404, { error: "Contract not found" });
+        if (!["draft", "sent", "signed"].includes(String(contract.status || ""))) {
+          return reply(origin, 409, { error: "Contract cannot be shared in its current state" });
+        }
+
+        const bytes = new Uint8Array(32);
+        crypto.getRandomValues(bytes);
+        const token = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+        const tokenHash = await sha256Hex(token);
+        const { error: updateError } = await admin
+          .from("contracts")
+          .update({ share_token: null, share_token_hash: tokenHash, updated_at: new Date().toISOString() })
+          .eq("id", contractId)
+          .eq("created_by_id", user.id);
+        if (updateError) throw updateError;
+        return reply(origin, 200, { token });
+      }
+
+      case "subscriptionStatus": {
+        const admin = adminClient();
+        const rate = await consumeEdgeRateLimit(admin, "subscriptionStatus:" + user.id, 30, 60);
+        if (!rate.allowed) return reply(origin, 429, { error: "Too many membership-status requests. Try again shortly.", retry_after: rate.retryAfter });
+
+        const { data: profile, error: profileError } = await admin
+          .from("profiles")
+          .select("id,plan_tier,is_pro,paying_subscriber,lifetime_premium,founding_user,founding_number,founding_trial_ends_at,founding_price_lock,founding_locked_plan,app_trial_started_at,app_trial_ends_at")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profileError) throw profileError;
+
+        const { data: playRows, error: playError } = await admin
+          .from("google_play_subscriptions")
+          .select("product_id,base_plan_id,subscription_state,expires_at,auto_renewing,acknowledged,last_verified_at")
+          .eq("user_id", user.id)
+          .order("last_verified_at", { ascending: false })
+          .limit(5);
+        if (playError) throw playError;
+        const play = (playRows || []).find((row) =>
+          PLAY_ENTITLED_STATES.has(String(row.subscription_state || "")) &&
+          row.expires_at &&
+          new Date(row.expires_at).getTime() > Date.now()
+        ) || playRows?.[0] || null;
+
+        const now = Date.now();
+        const trialValue = profile?.founding_trial_ends_at || profile?.app_trial_ends_at || null;
+        const trialEndsAt = trialValue && Number.isFinite(new Date(trialValue).getTime())
+          ? new Date(trialValue).toISOString()
+          : null;
+        const trialActive = Boolean(trialEndsAt && new Date(trialEndsAt).getTime() > now);
+        const lifetime = profile?.lifetime_premium === true;
+        const founding = profile?.founding_user === true;
+        const paying = profile?.paying_subscriber === true;
+
+        let accessState = "free";
+        if (lifetime) accessState = "lifetime";
+        else if (founding && trialActive) accessState = "founding_trial";
+        else if (founding) accessState = "founding";
+        else if (trialActive) accessState = "trial";
+        else if (paying || (play && PLAY_ENTITLED_STATES.has(String(play.subscription_state)))) accessState = "paid";
+
+        return reply(origin, 200, {
+          planTier: profile?.plan_tier || "worker_free",
+          isPro: profile?.is_pro === true,
+          payingSubscriber: paying,
+          lifetimePremium: lifetime,
+          foundingUser: founding,
+          foundingNumber: profile?.founding_number || null,
+          foundingPriceLock: profile?.founding_price_lock || null,
+          foundingLockedPlan: profile?.founding_locked_plan || null,
+          trialEndsAt,
+          trialActive,
+          accessState,
+          googlePlay: play ? {
+            productId: play.product_id,
+            basePlanId: play.base_plan_id,
+            state: play.subscription_state,
+            expiresAt: play.expires_at,
+            autoRenewing: play.auto_renewing === true,
+            acknowledged: play.acknowledged === true,
+            lastVerifiedAt: play.last_verified_at,
+          } : null,
+          stripe: null,
+        });
+      }
 
       case "googlePlayVerifySubscription": {
         const rate = await consumeEdgeRateLimit(adminClient(), "googlePlayVerifySubscription:" + user.id, 10, 60);

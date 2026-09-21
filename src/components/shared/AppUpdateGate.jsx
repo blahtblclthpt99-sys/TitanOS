@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
+import { createFunctionsModule } from "@/api/functions";
 
 const DISMISS_KEY = "titanos_update_later_version";
 
@@ -19,17 +20,16 @@ export default function AppUpdateGate() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return undefined;
-    const controller = new AbortController();
-    fetch("https://titanos-web.vercel.app/api/functions/appVersion", { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
+    let active = true;
+    createFunctionsModule().invoke("appVersion", {})
       .then((config) => {
-        if (!config || compareVersions(config.latest, current) <= 0) return;
+        if (!active || !config || compareVersions(config.latest, current) <= 0) return;
         const required = compareVersions(config.minimum, current) > 0;
         if (!required && localStorage.getItem(DISMISS_KEY) === config.latest) return;
         setUpdate({ ...config, required });
       })
       .catch(() => {});
-    return () => controller.abort();
+    return () => { active = false; };
   }, [current]);
 
   if (!update) return null;

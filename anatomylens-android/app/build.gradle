@@ -1,0 +1,17 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.anatomylens.clinician'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.anatomylens.clinician"
+        minSdk 26
+        targetSdk 35
+        versionCode 14
+        versionName "14.0-android"
+    }
+}
+

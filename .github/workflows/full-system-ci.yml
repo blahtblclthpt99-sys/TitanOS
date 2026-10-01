@@ -1,0 +1,82 @@
+name: TitanOS Full-System CI
+
+on:
+  push:
+    branches:
+      - main
+      - audit/full-system-20260909
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: titanos-full-system-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-regression:
+    name: Quality, security, regression, and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: public-anon-placeholder-for-ci
+      VITE_SUPABASE_PUBLISHABLE_KEY: public-publishable-placeholder-for-ci
+      VITE_TITANOS_PUBLIC_ORIGIN: https://example.invalid
+      VITE_API_BASE_URL: https://example.invalid
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Reject high-severity dependency advisories
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Verify database recovery classifier
+        run: node --test scripts/db-recovery-preflight.test.mjs
+
+      - name: Full unit, integration, security, and regression pack
+        run: npm test
+
+      - name: Production web build
+        run: npm run build
+
+  browser-smoke:
+    name: Chromium desktop smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke
+        run: npm run test:e2e

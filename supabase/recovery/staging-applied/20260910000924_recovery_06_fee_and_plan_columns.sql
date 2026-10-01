@@ -1,0 +1,12 @@
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS base_amount NUMERIC;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS platform_fee NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS platform_fee_rate NUMERIC NOT NULL DEFAULT 0.0076;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS amount_total NUMERIC;
+COMMENT ON COLUMN public.payments.base_amount IS 'Invoice/service amount before TitanOS fee';
+COMMENT ON COLUMN public.payments.platform_fee IS 'TitanOS platform fee (0.76% of base)';
+COMMENT ON COLUMN public.payments.amount_total IS 'Total charged to customer (base + platform_fee)';
+COMMENT ON COLUMN public.payments.amount IS 'Legacy amount field; prefer amount_total for charged total';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS account_type TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS plan_tier TEXT;
+COMMENT ON COLUMN public.profiles.account_type IS 'customer | worker | business';
+COMMENT ON COLUMN public.profiles.plan_tier IS 'customer | worker_free | worker_premium | business';

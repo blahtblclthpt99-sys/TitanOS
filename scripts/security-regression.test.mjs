@@ -5,6 +5,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isAllowedAiIntent } from "../api/_lib/aiIntents.js";
 import { sanitizeInvisibleInterface } from "../src/lib/invisibleInterface.js";
+import "./message-integrity.test.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 

@@ -1,0 +1,28 @@
+name: TitanOS Cloudflare API Surface Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "infra/cloudflare-full-app-candidate"
+    paths:
+      - "src/**"
+      - "api/**"
+      - "cloudflare/**"
+      - "scripts/cloudflare-api-surface-audit.mjs"
+      - ".github/workflows/cloudflare-api-surface-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Derive frontend-invoked privileged function surface
+        run: node scripts/cloudflare-api-surface-audit.mjs

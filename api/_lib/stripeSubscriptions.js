@@ -1,4 +1,5 @@
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
+const TERMINAL_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
 export function stripePlanCatalog() {
   return {
@@ -16,6 +17,24 @@ export function planForStripePrice(priceId) {
 export function stripeSubscriptionsConfigured() {
   const prices = stripePlanCatalog();
   return Boolean(process.env.STRIPE_SECRET_KEY && prices.starter && prices.worker_premium && prices.business);
+}
+
+async function syncCheckoutClaim(admin, subscription, { userId, customerId, stripeSubscriptionId, status }) {
+  const checkoutClaimId = String(subscription?.metadata?.checkout_claim_id || "").trim();
+  if (!checkoutClaimId) return;
+
+  const claimState = TERMINAL_STATUSES.has(String(status || "").toLowerCase()) ? "closed" : "completed";
+  const { error } = await admin
+    .from("stripe_subscription_checkout_claims")
+    .update({
+      stripe_customer_id: customerId,
+      stripe_subscription_id: stripeSubscriptionId,
+      state: claimState,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", checkoutClaimId)
+    .eq("user_id", userId);
+  if (error) throw error;
 }
 
 export async function syncStripeSubscription(admin, subscription) {
@@ -45,6 +64,16 @@ export async function syncStripeSubscription(admin, subscription) {
     .from("stripe_subscriptions")
     .upsert(row, { onConflict: "stripe_subscription_id" });
   if (subscriptionError) throw subscriptionError;
+
+  // Checkout claims are server-owned duplicate-billing guards. The claim stays
+  // tied to the actual Stripe subscription across later subscription updates;
+  // terminal provider state closes the claim so a future resubscribe can start.
+  await syncCheckoutClaim(admin, subscription, {
+    userId,
+    customerId,
+    stripeSubscriptionId,
+    status,
+  });
 
   const { data: activeRows, error: activeError } = await admin
     .from("stripe_subscriptions")

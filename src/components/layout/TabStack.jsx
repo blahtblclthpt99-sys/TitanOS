@@ -66,7 +66,7 @@ const Companies = lazy(() => import("@/pages/Companies"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Inventory = lazy(() => import("@/pages/Inventory"));
 const FollowUps = lazy(() => import("@/pages/FollowUps"));
-const Autopilot = lazy(() => import("@/pages/Autopilot"));
+const TitanAuto = lazy(() => import("@/pages/TitanAuto"));
 const Reputation = lazy(() => import("@/pages/Reputation"));
 const Credentials = lazy(() => import("@/pages/Credentials"));
 const Leads = lazy(() => import("@/pages/Leads"));
@@ -91,6 +91,7 @@ const LEGACY_REDIRECTS = {
   "/growth-coach": "/assistant?mode=growth",
   "/marketing": "/assistant?mode=marketing",
   "/phone": "/assistant?mode=phone-script",
+  "/autopilot": "/titan-auto",
   "/community": "/",
   "/emergency": "/",
   "/deals": "/",
@@ -132,7 +133,7 @@ const NON_TAB_ROUTES = {
   "/employees": Employees,
   "/inventory": Inventory,
   "/follow-ups": FollowUps,
-  "/autopilot": Autopilot,
+  "/titan-auto": TitanAuto,
   "/reputation": Reputation,
   "/credentials": Credentials,
   "/leads": Leads,
@@ -206,7 +207,9 @@ function NonTabPage() {
 
 export default function TabStack() {
   const location = useLocation();
-  const recentTabs = useRef(["/"]);
+  // Start the LRU empty. A deep-link to Settings, Customers, etc. must not mount
+  // Dashboard invisibly and pay its render/data cost before the user visits it.
+  const recentTabs = useRef([]);
   const pathname = normalizeAppPath(location.pathname);
   const reduceMotion = usePrefersReducedMotion();
 
@@ -216,7 +219,7 @@ export default function TabStack() {
   if (activeTab) {
     recentTabs.current = [activeTab, ...recentTabs.current.filter((p) => p !== activeTab)].slice(0, TAB_LRU_SIZE);
   }
-  const mountedTabs = new Set(["/", ...recentTabs.current]);
+  const mountedTabs = new Set(recentTabs.current);
   if (activeTab) mountedTabs.add(activeTab);
 
   return (

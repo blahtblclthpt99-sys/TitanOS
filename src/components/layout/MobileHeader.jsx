@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { ArrowLeft, Search } from "lucide-react";
 import { MOBILE_ROOT_PATHS, resolvePageTitle } from "@/lib/nav-items";
@@ -6,7 +6,8 @@ import { normalizeAppPath } from "@/lib/routing";
 import NotificationBell from "@/components/shared/NotificationBell";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import ThemeToggle from "@/components/brand/ThemeToggle";
-import MobileGlobalSearch from "@/components/layout/MobileGlobalSearch";
+
+const MobileGlobalSearch = lazy(() => import("@/components/layout/MobileGlobalSearch"));
 
 /**
  * Map nested routes to a sensible parent when browser history is empty
@@ -95,7 +96,11 @@ export default function MobileHeader() {
           <NotificationBell />
         </div>
       </header>
-      <MobileGlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {searchOpen ? (
+        <Suspense fallback={null}>
+          <MobileGlobalSearch open onClose={() => setSearchOpen(false)} />
+        </Suspense>
+      ) : null}
     </>
   );
 }

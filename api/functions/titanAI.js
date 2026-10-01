@@ -3,6 +3,7 @@ import { applyCors, handleOptions } from "../_lib/cors.js";
 import { assertRateLimitAsync } from "../_lib/rateLimit.js";
 import { captureApiException } from "../_lib/sentry.js";
 import { logError } from "../_lib/safeLog.js";
+import { fetchWithTimeout, isAbortError } from "../_lib/fetchTimeout.js";
 import { buildTitanSystemPrompt, sanitizePageContext } from "../_lib/aiContext.js";
 import { isAllowedAiIntent } from "../_lib/aiIntents.js";
 import { requireFeature, FEATURES } from "../_lib/entitlements.js";
@@ -588,19 +589,38 @@ export default async function handler(req, res) {
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        temperature: 0.3,
-        max_tokens: 450,
-        messages: [
-          { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
-          ...recent,
-        ],
-      }),
-    });
+    let response;
+try {
+  response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.3,
+      max_tokens: 450,
+      messages: [
+        { role: "system", content: buildTitanSystemPrompt({ summary, pageContext, lawMastermind: Boolean(lawMastermind), memoryContext }) },
+        ...recent,
+      ],
+    }),
+  }, 20_000);
+} catch (providerError) {
+  const timedOut = isAbortError(providerError);
+  logError("titanAI:openai_transport", providerError);
+  if (!timedOut) {
+    captureApiException(providerError, { tags: { route: "titanAI", stage: "openai_transport" } });
+  }
+  return res.status(200).json({
+    data: {
+      type: "response",
+      source: "local",
+      dataBasis: "server_snapshot",
+      generalKnowledge: false,
+      interface: buildInvisibleInterface({ question: lastMessage, summary, pageContext }),
+      message: `${timedOut ? "AI provider timed out" : "AI provider is briefly unavailable"}. **YOUR DATA:** **${money(summary.outstandingTotal)}** outstanding, **${money(summary.collectedThisMonth)}** collected this month. You can still use the structured 2nd Me actions.`,
+    },
+  });
+}
 
     if (!response.ok) {
       const errText = await response.text();

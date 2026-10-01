@@ -18,6 +18,10 @@ function mockRes() {
   };
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 describe("apiError helpers", () => {
   it("AppError surfaces curated public message and code", () => {
     const res = mockRes();
@@ -56,10 +60,18 @@ describe("apiError helpers", () => {
     assert.doesNotMatch(res.body.error, /duplicate key/i);
   });
 
-  it("packages Android with the live Titan API and allows Capacitor's secure localhost origin", () => {
+  it("packages Android with the canonical TitanOS API origin and allows Capacitor's secure localhost origin", () => {
     const workflow = readFileSync(new URL("../.github/workflows/android-release.yml", import.meta.url), "utf8");
+    const productionEnv = readFileSync(new URL("../.env.production.example", import.meta.url), "utf8");
     const cors = readFileSync(new URL("../api/_lib/cors.js", import.meta.url), "utf8");
-    assert.match(workflow, /VITE_API_BASE_URL:\s*https:\/\/titanos-web\.vercel\.app/);
+
+    const canonicalOrigin = productionEnv.match(/^VITE_TITANOS_PUBLIC_ORIGIN=(https:\/\/[^\s/]+)$/m)?.[1];
+    assert.equal(canonicalOrigin, "https://app.titanfieldos.com");
+
+    const escapedOrigin = escapeRegExp(canonicalOrigin);
+    assert.match(workflow, new RegExp(`VITE_API_BASE_URL:\\s*["']${escapedOrigin}["']`));
+    assert.match(workflow, new RegExp(`VITE_TITANOS_PUBLIC_ORIGIN:\\s*["']${escapedOrigin}["']`));
+    assert.doesNotMatch(workflow, /titanos-web\.vercel\.app/);
     assert.match(cors, /"https:\/\/localhost"/);
   });
 });

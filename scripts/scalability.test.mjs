@@ -38,12 +38,21 @@ describe("scalability surfaces", () => {
     assert.match(src, /slice\(0,\s*MAX_LOCAL_MESSAGES\)/);
   });
 
-  it("vercel sets maxDuration on money and AI routes", () => {
-    const cfg = JSON.parse(read("vercel.json"));
-    assert.equal(cfg.functions["api/functions/stripeWebhook.js"].maxDuration, 30);
-    assert.equal(cfg.functions["api/functions/titanAI.js"].maxDuration, 60);
-    assert.equal(cfg.functions["api/functions/createPaymentLink.js"].maxDuration, 30);
-  });
+  it("bounds outbound AI and payment provider work at application level", () => {
+  const timeout = read("api/_lib/fetchTimeout.js");
+  const ai = read("api/functions/titanAI.js");
+  const checkout = read("api/functions/createPaymentLink.js");
+  const webhook = read("api/functions/stripeWebhook.js");
+
+  assert.match(timeout, /new AbortController\(\)/);
+  assert.match(timeout, /setTimeout\(\(\) => controller\.abort\(\)/);
+  assert.match(ai, /fetchWithTimeout/);
+  assert.match(ai, /20_000/);
+  assert.match(checkout, /STRIPE_CHECKOUT_TIMEOUT_MS\s*=\s*10_000/);
+  assert.match(checkout, /headers\["Idempotency-Key"\] \? 2 : 1/);
+  assert.match(webhook, /STRIPE_API_TIMEOUT_MS\s*=\s*10_000/);
+  assert.match(webhook, /maxNetworkRetries:\s*1/);
+});
 
   it("rate limit supports durable Upstash async path", () => {
     const src = read("api/_lib/rateLimit.js");

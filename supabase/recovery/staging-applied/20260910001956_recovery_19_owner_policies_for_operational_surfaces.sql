@@ -1,0 +1,16 @@
+CREATE POLICY equipment_own ON public.equipment FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY inventory_own ON public.inventory_items FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY follow_rules_own ON public.follow_up_rules FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY follow_queue_own ON public.follow_up_queue FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY credentials_own ON public.credentials FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY leads_own ON public.leads FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY loyalty_members_owner_all ON public.loyalty_members FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY loyalty_events_owner_all ON public.loyalty_events FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY emergency_jobs_owner_all ON public.emergency_jobs FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY escrow_holds_owner_all ON public.escrow_holds FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY marketing_assets_owner_all ON public.marketing_assets FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY phone_scripts_owner_all ON public.phone_scripts FOR ALL TO authenticated USING (auth.uid()::text=user_id OR created_by_id=auth.uid()) WITH CHECK (auth.uid()::text=user_id OR created_by_id=auth.uid());
+CREATE POLICY payment_accounts_own ON public.payment_accounts FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+CREATE POLICY receipt_scans_own ON public.receipt_scans FOR ALL TO authenticated USING (created_by_id=auth.uid()) WITH CHECK (created_by_id=auth.uid());
+COMMENT ON TABLE public.portal_sessions IS 'Server-only portal authentication state; intentionally no client RLS policy.';
+COMMENT ON TABLE public.titan_comms_channel_secrets IS 'Service-only TitanCom secret material; intentionally no client RLS policy.';

@@ -1,184 +1,166 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { Capacitor } from "@capacitor/core";
-import App from "./App.jsx";
-import "./index.css";
-import "./native-polish.css";
+import React, { useEffect } from 'react'
+import ReactDOM from 'react-dom/client'
+import App from '@/App.jsx'
+import TitanAttention from '@/pages/TitanAttention'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import { initSentry, captureException } from '@/lib/sentry'
+import { hydrateFeatureFlags, refreshFeatureFlagsFromServer } from '@/lib/featureFlags'
+import { hydrateLaunchStatus } from '@/lib/launchStatus'
+import { trackEvent } from '@/lib/productAnalytics'
+import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
+import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
+import '@/index.css'
+import '@/native-polish.css'
 
-const LEGACY_KEY_PATTERN = /^(titanos-|titan-|second-|driver-|job-|business-)/i;
-const CURRENT_KEY_PATTERN = /^titan-attention/i;
-const LEGACY_PURGE_MARKER = "titan-attention:legacy-client-state-purged:v1";
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
-const SUPABASE_KEY = String(
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
-);
-const NATIVE_AUTH_SCHEME = "com.titanos.myapp:";
-
-function isNativeApp() {
-  return Capacitor.isNativePlatform();
-}
+const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
+const CHUNK_RELOAD_TS = "titanos-chunk-reload-at";
+const attentionStandalone =
+  typeof window !== "undefined" && window.location.pathname === "/attention";
 
 function markNativeDocument() {
-  if (typeof document !== "undefined" && isNativeApp()) {
+  if (typeof document === "undefined") return;
+  const nativeBuild = import.meta.env.VITE_CAPACITOR_BUILD === "true";
+  const nativeRuntime =
+    typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.() === true;
+  if (nativeBuild || nativeRuntime) {
     document.documentElement.classList.add("is-native");
   }
 }
 
-function installNativeApiFetchBridge() {
-  if (typeof window === "undefined" || !API_BASE_URL || typeof window.fetch !== "function") return;
-  if (!isNativeApp()) return;
-
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    if (typeof input === "string" && input.startsWith("/api/")) {
-      return originalFetch(`${API_BASE_URL}${input}`, init);
-    }
-    return originalFetch(input, init);
-  };
-}
-
-function authParam(url, name) {
-  const queryValue = url.searchParams.get(name);
-  if (queryValue) return queryValue;
-  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
-  return hash.get(name);
-}
-
-function isSupportedNativeAuthUrl(url) {
-  return url.protocol === NATIVE_AUTH_SCHEME && url.host === "auth" && url.pathname.startsWith("/callback");
-}
-
-async function installNativeAuthDeepLinkBridge() {
-  if (typeof window === "undefined" || !isNativeApp() || !SUPABASE_URL || !SUPABASE_KEY) return;
-
-  try {
-    const [{ App: CapacitorApp }, { createClient }] = await Promise.all([
-      import("@capacitor/app"),
-      import("@supabase/supabase-js"),
-    ]);
-    const authClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
-    let consuming = false;
-
-    const consume = async (rawUrl) => {
-      if (!rawUrl || consuming) return;
-
-      let url;
-      try {
-        url = new URL(rawUrl);
-      } catch {
-        return;
-      }
-      if (!isSupportedNativeAuthUrl(url)) return;
-
-      const errorCode = authParam(url, "error_code") || authParam(url, "error");
-      if (errorCode) return;
-
-      const accessToken = authParam(url, "access_token");
-      const refreshToken = authParam(url, "refresh_token");
-      const code = authParam(url, "code");
-      if ((!accessToken || !refreshToken) && !code) return;
-
-      consuming = true;
-      try {
-        if (accessToken && refreshToken) {
-          const { error } = await authClient.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (error) throw error;
-        } else {
-          const { error } = await authClient.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-        }
-
-        // Reload the packaged app at its clean internal origin. The primary
-        // Supabase client then reads the persisted session during normal boot.
-        window.location.replace(`${window.location.origin}/`);
-      } catch {
-        // Authentication remains fail-closed. The user can retry sign-in rather
-        // than retaining a partial or unverified native session.
-      } finally {
-        consuming = false;
-      }
-    };
-
-    await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
-      void consume(url);
-    });
-
-    const launch = await CapacitorApp.getLaunchUrl();
-    if (launch?.url) void consume(launch.url);
-  } catch {
-    // Native auth bridge is additive; app startup must not depend on it.
-  }
-}
-
-function removeLegacyStorageKeys(storage) {
-  if (!storage) return;
-  const keys = [];
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key && LEGACY_KEY_PATTERN.test(key) && !CURRENT_KEY_PATTERN.test(key)) keys.push(key);
-  }
-  for (const key of keys) storage.removeItem(key);
-}
-
-async function purgeLegacyClientStateOnce() {
-  if (typeof window === "undefined") return;
-
-  try {
-    if (localStorage.getItem(LEGACY_PURGE_MARKER) === "1") return;
-  } catch {
-    // Storage can be unavailable in privacy-restricted contexts; continue best-effort.
-  }
-
-  try {
-    // Render first. Legacy cache/service-worker cleanup is maintenance work and
-    // should not compete with the critical path on every application startup.
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.allSettled(registrations.map((registration) => registration.unregister()));
-    }
-    if (window.caches?.keys) {
-      const keys = await caches.keys();
-      await Promise.allSettled(keys.map((key) => caches.delete(key)));
-    }
-
-    removeLegacyStorageKeys(localStorage);
-    removeLegacyStorageKeys(sessionStorage);
-    localStorage.setItem(LEGACY_PURGE_MARKER, "1");
-  } catch {
-    // Cleanup is best-effort; rendering must never depend on it.
-  }
-}
-
-function scheduleLegacyClientStatePurge() {
-  if (typeof window === "undefined") return;
-  const run = () => void purgeLegacyClientStateOnce();
-
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(run, { timeout: 2000 });
-    return;
-  }
-
-  window.setTimeout(run, 0);
-}
-
 markNativeDocument();
-installNativeApiFetchBridge();
-void installNativeAuthDeepLinkBridge();
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Observability — crash/perf (Sentry), flags, first-party analytics
+initSentry();
+hydrateFeatureFlags();
+hydrateLaunchStatus();
+trackEvent("app_boot");
+runWhenIdle(() => {
+  refreshFeatureFlagsFromServer().catch(() => {});
+});
 
-scheduleLegacyClientStatePurge();
+/** Log uncaught async/sync failures without crashing the shell (ErrorBoundary covers React tree). */
+function installGlobalErrorLogging() {
+  if (typeof window === "undefined") return;
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    const message = reason?.message || String(reason || "Unhandled promise rejection");
+    console.error("[titanos:unhandledrejection]", message, reason);
+    captureException(reason instanceof Error ? reason : new Error(message));
+  });
+  window.addEventListener("error", (event) => {
+    if (event.message) {
+      console.error("[titanos:window.error]", event.message, event.error || event.filename);
+      if (event.error) captureException(event.error);
+    }
+  });
+}
+
+installGlobalErrorLogging();
+
+// Prefer stored preference (system / light / dark). Default is system when unset.
+applyTheme(getStoredTheme());
+watchSystemContrast();
+
+/**
+ * One-shot chunk recovery after deploy.
+ * Do NOT clear the flag at module load (that caused infinite reloads).
+ * Clear only after the app has stayed healthy for a few seconds.
+ */
+function markChunkReloadAttempt() {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    sessionStorage.setItem(CHUNK_RELOAD_TS, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+function canAttemptChunkReload() {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1") return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function clearChunkReloadFlagWhenHealthy() {
+  try {
+    // Only clear if we reloaded recently (within 30s) and stayed up
+    const at = Number(sessionStorage.getItem(CHUNK_RELOAD_TS) || 0);
+    if (!at) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      return;
+    }
+    if (Date.now() - at > 4000) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      sessionStorage.removeItem(CHUNK_RELOAD_TS);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    event.preventDefault?.();
+    if (!canAttemptChunkReload()) return;
+    markChunkReloadAttempt();
+    window.location.reload();
+  });
+
+  // After a successful paint + idle, clear the one-shot flag
+  window.addEventListener("load", () => {
+    window.setTimeout(clearChunkReloadFlagWhenHealthy, 5000);
+  });
+}
+
+// Native-only deep links — keep Capacitor plugins out of the web entry chunk
+if (typeof window !== "undefined") {
+  import("@/lib/capacitor-auth")
+    .then((m) => m.installNativeAuthDeepLinks())
+    .catch(() => {});
+}
+
+function BootProbe({ children }) {
+  useEffect(() => {
+    const id = window.setTimeout(clearChunkReloadFlagWhenHealthy, 3500);
+    return () => window.clearTimeout(id);
+  }, []);
+  return children;
+}
+
+// Paint immediately — never block first render on auth/network.
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary message="The app failed to load." fullScreen showHome>
+    <BootProbe>
+      {attentionStandalone ? <TitanAttention /> : <App />}
+    </BootProbe>
+  </ErrorBoundary>
+)
+
+// Progressive Web App — register service worker after load + idle (keep LCP clean)
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  const isNative = window.Capacitor?.isNativePlatform?.() === true;
+  if (!isNative) {
+    window.addEventListener('load', () => {
+      runWhenIdle(async () => {
+        try {
+          if (!localStorage.getItem('titanos-sw-v8-purge')) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+            if (window.caches?.keys) {
+              const keys = await caches.keys();
+              await Promise.all(keys.filter((k) => k.startsWith('titanos-shell')).map((k) => caches.delete(k)));
+            }
+            localStorage.setItem('titanos-sw-v8-purge', '1');
+          }
+        } catch {
+          /* ignore */
+        }
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        prefetchHotRoutes();
+      }, 2500);
+    });
+  }
+}

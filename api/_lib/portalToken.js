@@ -1,15 +1,11 @@
 import { createHash } from "node:crypto";
 
 function pepper() {
-  const configured = process.env.PORTAL_OTP_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (configured) return configured;
-
-  const vercelEnv = String(process.env.VERCEL_ENV || "").toLowerCase();
-  const productionLike = process.env.NODE_ENV === "production" || vercelEnv === "production" || vercelEnv === "preview";
-  if (productionLike) {
-    throw new Error("PORTAL_OTP_PEPPER or SUPABASE_SERVICE_ROLE_KEY is required outside local development");
+  const value = String(process.env.PORTAL_OTP_PEPPER || "").trim();
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PORTAL_OTP_PEPPER is required in production");
   }
-
   return "titanos-portal-otp-dev-only";
 }
 

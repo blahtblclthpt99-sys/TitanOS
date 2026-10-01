@@ -12,17 +12,17 @@ const AREAS = [
   },
   {
     title: "TitanAI",
-    description: "Ask questions, analyze TitanOS information, create content, and perform approved actions.",
+    description: "Ask questions, analyze TitanOS information, create content, and prepare approved actions.",
     icon: Bot,
     path: "/assistant",
     action: "Open TitanAI",
   },
   {
-    title: "Autopilot",
-    description: "Manage approved recurring actions, reminders, monitoring, and automation history.",
+    title: "Titan Auto",
+    description: "Turn approved TitanAI and Second Me work into repeatable job-seeker, independent-work, and business workflows with execution history and safeguards.",
     icon: Workflow,
-    path: "/autopilot",
-    action: "Open Autopilot",
+    path: "/titan-auto",
+    action: "Open Titan Auto",
   },
 ];
 
@@ -32,7 +32,7 @@ export default function SecondMe() {
       <PageHeader
         eyebrow="Intelligence"
         title="Second Me"
-        subtitle="Your long-term TitanOS context layer — separate from active TitanAI conversations and Autopilot automation."
+        subtitle="Your long-term TitanOS context layer — connected to TitanAI for intelligence and Titan Auto for approved execution."
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -60,7 +60,7 @@ export default function SecondMe() {
 
       <div className="mt-5 flex gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-        <p>Second Me does not grant broader permissions. Memory retrieval and generated actions remain subject to the same account, tenant, authorization, confirmation, and safety boundaries as the rest of TitanOS.</p>
+        <p>Second Me does not grant broader permissions. Memory retrieval, TitanAI preparation, and Titan Auto execution remain subject to the same account, tenant, authorization, confirmation, and safety boundaries as the rest of TitanOS.</p>
       </div>
     </PageShell>
   );

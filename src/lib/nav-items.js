@@ -74,7 +74,7 @@ export const APP_NAV_ITEMS = [
   // SECOND ME
   { icon: Brain, label: "Second Me", path: "/second-me", group: "second_me" },
   { icon: Bot, label: "TitanAI", path: "/assistant", group: "second_me" },
-  { icon: Workflow, label: "Autopilot", path: "/autopilot", group: "second_me" },
+  { icon: Workflow, label: "Titan Auto", legacyName: "Autopilot", path: "/titan-auto", group: "second_me" },
 
   // BUSINESS
   { icon: Building2, label: "My Business", path: "/companies", group: "business" },
@@ -166,7 +166,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Second Me",
     description: "Memory, intelligence, and approved automation",
-    paths: ["/second-me", "/assistant", "/autopilot"],
+    paths: ["/second-me", "/assistant", "/titan-auto"],
   },
   {
     title: "Business",
@@ -192,8 +192,13 @@ export const QUICK_CREATE_ACTIONS = [
   { label: "Customer", path: "/customers?new=1", icon: Users },
 ];
 
-export function resolveNavDomain(pathname = "/") {
+function canonicalNavPath(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
+  return path === "/autopilot" ? "/titan-auto" : path;
+}
+
+export function resolveNavDomain(pathname = "/") {
+  const path = canonicalNavPath(pathname);
   const item =
     APP_NAV_ITEMS.find((n) => n.path === path) ||
     APP_NAV_ITEMS.find((n) => n.path !== "/" && path.startsWith(`${n.path}/`));
@@ -201,7 +206,7 @@ export function resolveNavDomain(pathname = "/") {
 }
 
 export function navItemsByPaths(paths) {
-  return paths.map((path) => APP_NAV_ITEMS.find((item) => item.path === path)).filter(Boolean);
+  return paths.map((path) => APP_NAV_ITEMS.find((item) => item.path === canonicalNavPath(path))).filter(Boolean);
 }
 
 export function filterNavItems(items, { isAdmin = false } = {}) {
@@ -209,7 +214,7 @@ export function filterNavItems(items, { isAdmin = false } = {}) {
 }
 
 export function resolvePageTitle(pathname = "/") {
-  const path = String(pathname || "/").split("?")[0] || "/";
+  const path = canonicalNavPath(pathname);
 
   if (path === "/") return "Home";
   if (path === "/more") return "More";
@@ -243,7 +248,7 @@ export function resolvePageTitle(pathname = "/") {
 }
 
 export function resolveNavParent(pathname = "/") {
-  const path = String(pathname || "/").split("?")[0] || "/";
+  const path = canonicalNavPath(pathname);
   if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
   if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
   if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
@@ -251,6 +256,7 @@ export function resolveNavParent(pathname = "/") {
   if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
   if (path.startsWith("/comms")) return { label: "Communications", path: "/comms" };
   if (path.startsWith("/assistant")) return { label: "TitanAI", path: "/assistant" };
+  if (path.startsWith("/titan-auto")) return { label: "Titan Auto", path: "/titan-auto" };
   if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
   if (path.startsWith("/business-documents") || path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
     return { label: "Business Documents", path: "/business-documents" };

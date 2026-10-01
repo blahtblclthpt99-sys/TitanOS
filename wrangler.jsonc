@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "titanos",
+  "main": "./cloudflare/worker.js",
+  "compatibility_date": "2026-08-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ORIGIN": "https://app.titanfieldos.com",
+    "PUBLIC_APP_URL": "https://app.titanfieldos.com",
+    "CORS_ALLOWED_ORIGINS": "https://app.titanfieldos.com",
+    "SUPABASE_URL": "https://xcfjpxcmokdfwkarwomy.supabase.co",
+    "NODE_ENV": "production",
+    "SENTRY_ENVIRONMENT": "production",
+    "REGISTER_REQUIRE_EMAIL_CONFIRM": "1",
+    "PORTAL_OTP_ALLOW_LEGACY": "0",
+    "PORTAL_TOKEN_ALLOW_LEGACY": "0",
+    "RESEND_FROM": "TitanOS <noreply@titanfieldos.com>"
+  },
+  "secrets": {
+    "required": [
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "ATTENTION_STRIPE_WEBHOOK_SECRET",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PORTAL_OTP_PEPPER",
+      "AUDIT_IP_PEPPER",
+      "RESEND_API_KEY",
+      "OPENAI_API_KEY"
+    ]
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*", "/__titanos/*"]
+  }
+}

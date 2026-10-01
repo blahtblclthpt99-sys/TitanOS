@@ -1,9 +1,6 @@
 /**
  * Sentry Node.js instrument — load before other app modules.
- * Per https://skills.sentry.dev/instrument (Node SDK recommended defaults).
- *
- * Vercel serverless: imported via api/_lib/sentry.js so handlers that use
- * captureApiException initialize Sentry on cold start.
+ * Cloudflare Workers run this through Node compatibility for preserved handlers.
  */
 import * as Sentry from "@sentry/node";
 import { createRequire } from "node:module";
@@ -16,21 +13,11 @@ function resolveDsn() {
 }
 
 function resolveEnvironment() {
-  return (
-    process.env.SENTRY_ENVIRONMENT ||
-    process.env.VERCEL_ENV ||
-    process.env.NODE_ENV ||
-    "development"
-  );
+  return process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "production";
 }
 
 function resolveRelease() {
-  return (
-    process.env.SENTRY_RELEASE ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.VERCEL_GIT_COMMIT_REF ||
-    undefined
-  );
+  return process.env.SENTRY_RELEASE || undefined;
 }
 
 function isDevLike() {

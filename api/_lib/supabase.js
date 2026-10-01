@@ -1,9 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-let cachedAdmin = null;
-let cachedAdminUrl = "";
-let cachedAdminKey = "";
-
 function normalizeSupabaseUrl(value = "") {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -16,16 +12,9 @@ export function getSupabaseAdmin() {
   if (!url || !key) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
   }
-
-  if (!cachedAdmin || cachedAdminUrl !== url || cachedAdminKey !== key) {
-    cachedAdmin = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    cachedAdminUrl = url;
-    cachedAdminKey = key;
-  }
-
-  return cachedAdmin;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export function getSupabaseAnonKey() {

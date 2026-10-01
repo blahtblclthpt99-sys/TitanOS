@@ -8,17 +8,13 @@ import ThemeToggle from "@/components/brand/ThemeToggle";
 import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import { QUICK_CREATE_ACTIONS } from "@/lib/nav-items";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  clearRecentSearches,
-  getAiSearchTips,
-  getRecentSearches,
-  getSavedSearches,
-  getSuggestedSearches,
-  isSearchSaved,
-  pushRecentSearch,
-  runGlobalSearch,
-  toggleSavedSearch,
-} from "@/lib/globalSearch";
+
+let searchToolsPromise = null;
+
+function loadSearchTools() {
+  if (!searchToolsPromise) searchToolsPromise = import("@/lib/globalSearch");
+  return searchToolsPromise;
+}
 
 export default function DesktopTopBar() {
   const navigate = useNavigate();
@@ -26,18 +22,57 @@ export default function DesktopTopBar() {
   const reduceMotion = useReducedMotion();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTools, setSearchTools] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [recent, setRecent] = useState(getRecentSearches);
-  const [saved, setSaved] = useState(getSavedSearches);
+  const [recent, setRecent] = useState([]);
+  const [saved, setSaved] = useState([]);
   const searchRef = useRef(null);
   const createRef = useRef(null);
   const inputRef = useRef(null);
 
-  const results = useMemo(() => runGlobalSearch(query, { userId: user?.id }), [query, user?.id]);
-  const suggestions = useMemo(() => getSuggestedSearches(query), [query]);
-  const aiTips = useMemo(() => getAiSearchTips(query), [query]);
+  const results = useMemo(
+    () => (searchOpen && searchTools ? searchTools.runGlobalSearch(query, { userId: user?.id }) : []),
+    [query, searchOpen, searchTools, user?.id]
+  );
+  const suggestions = useMemo(
+    () => (searchOpen && searchTools ? searchTools.getSuggestedSearches(query) : []),
+    [query, searchOpen, searchTools]
+  );
+  const aiTips = useMemo(
+    () => (searchOpen && searchTools ? searchTools.getAiSearchTips(query) : []),
+    [query, searchOpen, searchTools]
+  );
   const showBrowse = searchOpen && !query.trim();
+
+  const primeSearch = () => {
+    void loadSearchTools();
+  };
+
+  const openSearch = () => {
+    primeSearch();
+    setSearchOpen(true);
+    setCreateOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 40);
+  };
+
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    let active = true;
+
+    void loadSearchTools()
+      .then((tools) => {
+        if (!active) return;
+        setSearchTools(tools);
+        setRecent(tools.getRecentSearches());
+        setSaved(tools.getSavedSearches());
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [searchOpen]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -47,6 +82,7 @@ export default function DesktopTopBar() {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        primeSearch();
         setSearchOpen(true);
         setCreateOpen(false);
         setTimeout(() => inputRef.current?.focus(), 40);
@@ -77,10 +113,12 @@ export default function DesktopTopBar() {
   }, []);
 
   const goTo = (path, label) => {
-    if (query.trim()) {
-      setRecent(pushRecentSearch(query.trim()));
-    } else if (label) {
-      setRecent(pushRecentSearch(label));
+    if (searchTools) {
+      if (query.trim()) {
+        setRecent(searchTools.pushRecentSearch(query.trim()));
+      } else if (label) {
+        setRecent(searchTools.pushRecentSearch(label));
+      }
     }
     navigate(path);
     setSearchOpen(false);
@@ -89,7 +127,7 @@ export default function DesktopTopBar() {
 
   const applyQuery = (q) => {
     setQuery(q);
-    setRecent(pushRecentSearch(q));
+    if (searchTools) setRecent(searchTools.pushRecentSearch(q));
     inputRef.current?.focus();
   };
 
@@ -106,7 +144,7 @@ export default function DesktopTopBar() {
     }
   };
 
-  const savedActive = isSearchSaved(query);
+  const savedActive = searchTools ? searchTools.isSearchSaved(query) : false;
 
   return (
     <header
@@ -128,10 +166,9 @@ export default function DesktopTopBar() {
         <button
           type="button"
           data-search-trigger
-          onClick={() => {
-            setSearchOpen(true);
-            setTimeout(() => inputRef.current?.focus(), 40);
-          }}
+          onPointerEnter={primeSearch}
+          onFocus={primeSearch}
+          onClick={openSearch}
           className={`flex h-11 w-full items-center gap-2 rounded-md border border-border bg-muted px-3 text-left text-muted-foreground shadow-soft transition-colors duration-fast hover:border-primary/30 focus-ring ${
             searchOpen ? "border-primary/40 ring-2 ring-ring" : ""
           }`}
@@ -180,8 +217,11 @@ export default function DesktopTopBar() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setSaved(toggleSavedSearch(query))}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 focus-ring"
+                    onClick={() => {
+                      if (searchTools) setSaved(searchTools.toggleSavedSearch(query));
+                    }}
+                    disabled={!searchTools}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 focus-ring disabled:opacity-50"
                     aria-label={savedActive ? "Unsave search" : "Save search"}
                   >
                     {savedActive ? (
@@ -195,7 +235,13 @@ export default function DesktopTopBar() {
               )}
 
               <div className="max-h-[400px] overflow-y-auto">
-                {showBrowse && (
+                {!searchTools && (
+                  <div className="px-4 py-8 text-center text-sm text-muted-foreground" role="status">
+                    Preparing local search…
+                  </div>
+                )}
+
+                {searchTools && showBrowse && (
                   <div className="space-y-3 p-3">
                     {recent.length > 0 && (
                       <div>
@@ -206,7 +252,7 @@ export default function DesktopTopBar() {
                           <button
                             type="button"
                             onClick={() => {
-                              clearRecentSearches();
+                              searchTools.clearRecentSearches();
                               setRecent([]);
                             }}
                             className="text-[10px] font-semibold text-muted-foreground hover:text-foreground"
@@ -271,42 +317,44 @@ export default function DesktopTopBar() {
                   </div>
                 )}
 
-                <ul className="py-1.5">
-                  {results.map((item, i) => (
-                    <li key={item.id} role="option" id={`titan-search-opt-${item.id}`} aria-selected={i === activeIndex}>
-                      <button
-                        type="button"
-                        onClick={() => goTo(item.path, item.label)}
-                        onMouseEnter={() => setActiveIndex(i)}
-                        className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-fast ${
-                          i === activeIndex ? "bg-muted" : "hover:bg-muted/70"
-                        }`}
-                      >
-                        {item.icon ? (
-                          <item.icon className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
-                        ) : (
-                          <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-foreground">
-                            {item.label}
+                {searchTools && (
+                  <ul className="py-1.5">
+                    {results.map((item, i) => (
+                      <li key={item.id} role="option" id={`titan-search-opt-${item.id}`} aria-selected={i === activeIndex}>
+                        <button
+                          type="button"
+                          onClick={() => goTo(item.path, item.label)}
+                          onMouseEnter={() => setActiveIndex(i)}
+                          className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-fast ${
+                            i === activeIndex ? "bg-muted" : "hover:bg-muted/70"
+                          }`}
+                        >
+                          {item.icon ? (
+                            <item.icon className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
+                          ) : (
+                            <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-foreground">
+                              {item.label}
+                            </span>
+                            <span className="block truncate text-[11px] text-muted-foreground">
+                              {item.group}
+                              {item.hint ? ` · ${item.hint}` : ""}
+                            </span>
                           </span>
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {item.group}
-                            {item.hint ? ` · ${item.hint}` : ""}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                  {query.trim() && results.length === 0 && (
-                    <li className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No matches for “{query}” — try another spelling
-                    </li>
-                  )}
-                </ul>
+                        </button>
+                      </li>
+                    ))}
+                    {query.trim() && results.length === 0 && (
+                      <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No matches for “{query}” — try another spelling
+                      </li>
+                    )}
+                  </ul>
+                )}
 
-                {query.trim() && (
+                {searchTools && query.trim() && (
                   <div className="border-t border-border bg-primary/5 px-3 py-2.5">
                     <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary">
                       <Sparkles className="h-3 w-3" /> AI tip

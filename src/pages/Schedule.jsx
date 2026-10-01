@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Calendar, Clock, User } from "lucide-react";
 import { addDays, addWeeks, format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import TitanAutoLink from "@/components/shared/TitanAutoLink";
 import EmptyState from "@/components/shared/EmptyState";
 import StatusBadge from "@/components/shared/StatusBadge";
 import PageLoader from "@/components/shared/PageLoader";
@@ -70,7 +71,7 @@ export default function Schedule() {
 
   return (
     <div className="page-pad max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Schedule</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -78,7 +79,8 @@ export default function Schedule() {
             {totalThisWeek > 0 && <span className="ml-2 text-primary">· {totalThisWeek} job{totalThisWeek !== 1 ? "s" : ""}</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <TitanAutoLink source="schedule" />
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}
             className="border-border text-muted-foreground hover:text-foreground rounded-md text-xs h-8">
             Today

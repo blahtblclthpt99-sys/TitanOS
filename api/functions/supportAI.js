@@ -13,29 +13,17 @@ import {
 } from "../_lib/support.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6";
-const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.6-sol";
 const MAX_HISTORY = 8;
 const MAX_CONTEXT = 12000;
 
 function providerConfig() {
-  const openAiKey = process.env.OPENAI_API_KEY;
-  if (openAiKey) {
-    return {
-      credential: openAiKey,
-      url: "https://api.openai.com/v1/responses",
-      model: process.env.TITAN_SUPPORT_OPENAI_MODEL || process.env.TITAN_AI_OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
-      source: "openai-responses",
-      gateway: false,
-    };
-  }
-  const credential = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+  const credential = String(process.env.OPENAI_API_KEY || "").trim();
   if (!credential) return null;
   return {
     credential,
-    url: "https://ai-gateway.vercel.sh/v1/responses",
-    model: process.env.TITAN_SUPPORT_GATEWAY_MODEL || process.env.TITAN_AI_GATEWAY_MODEL || DEFAULT_GATEWAY_MODEL,
-    source: "vercel-ai-gateway",
-    gateway: true,
+    url: "https://api.openai.com/v1/responses",
+    model: process.env.TITAN_SUPPORT_OPENAI_MODEL || process.env.TITAN_AI_OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
+    source: "openai-responses",
   };
 }
 
@@ -206,9 +194,6 @@ export default async function handler(req, res) {
         max_output_tokens: 700,
         store: false,
       };
-      if (provider.gateway) {
-        requestBody.providerOptions = { gateway: { disallowPromptTraining: true } };
-      }
 
       const response = await fetch(provider.url, {
         method: "POST",

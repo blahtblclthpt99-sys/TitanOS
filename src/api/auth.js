@@ -155,21 +155,26 @@ async function assertOAuthProviderEnabled(provider) {
   }
 }
 
-async function registerViaServer({ email, password, fullName }) {
+function apiBaseCandidates() {
   const bases = [];
   const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
   if (configured) bases.push(configured);
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".vercel.app")) {
-      bases.push(origin);
-    }
-    // Always allow production API as last resort (Capacitor / IONOS)
-    bases.push("https://titanos-web.vercel.app");
+
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
+    const { hostname, origin, protocol } = window.location;
+    const localHttp = protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1");
+    const secureWeb = protocol === "https:";
+    if ((secureWeb || localHttp) && origin && origin !== "null") bases.push(origin);
   }
 
+  return [...new Set(bases)];
+}
+
+async function registerViaServer({ email, password, fullName }) {
+  const bases = apiBaseCandidates();
+
   let lastError;
-  for (const base of [...new Set(bases)]) {
+  for (const base of bases) {
     try {
       const response = await fetch(`${base}/api/register`, {
         method: "POST",
@@ -236,8 +241,7 @@ export function createAuthModule() {
     },
 
     async register({ email, password, fullName }) {
-      // Prefer server register — avoids Supabase built-in mailer rate limits
-      // and confirms the account immediately for Play testers.
+      // Prefer server registration for centralized policy, logging, and rate limits.
       try {
         return await registerViaServer({ email, password, fullName });
       } catch (serverError) {
@@ -260,14 +264,9 @@ export function createAuthModule() {
           }
           throwIfError(error);
         }
-        // Best-effort: log email when client falls back to direct Supabase signup
+        // Best-effort: log email when client falls back to direct Supabase signup.
         try {
-          const bases = [];
-          const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-          if (configured) bases.push(configured);
-          if (typeof window !== "undefined") bases.push(window.location.origin);
-          bases.push("https://titanos-web.vercel.app");
-          for (const base of [...new Set(bases)]) {
+          for (const base of apiBaseCandidates()) {
             const res = await fetch(`${base}/api/signup-emails`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },

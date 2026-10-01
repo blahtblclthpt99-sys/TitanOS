@@ -41,16 +41,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      # Native builds call the canonical Cloudflare origin; keep these aligned with .env.production.example.
       VITE_CAPACITOR_BUILD: "true"
       VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
-      VITE_API_BASE_URL: "https://titanos-web.vercel.app"
-      VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+      VITE_API_BASE_URL: "https://app.titanfieldos.com"
+      VITE_TITANOS_PUBLIC_ORIGIN: "https://app.titanfieldos.com"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -61,7 +62,7 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Install and verify application bundle
         run: |
@@ -92,11 +93,14 @@ jobs:
           grep -q 'connectionInFlight' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'handleOnResume' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
           grep -q 'queryPurchasesAsync' android/app/src/main/java/com/titanos/myapp/TitanBillingPlugin.java
-          grep -q 'installNativeAuthDeepLinkBridge' src/main.jsx
-          grep -q 'exchangeCodeForSession' src/main.jsx
-          grep -q 'emailRedirectTo: getAuthRedirectTo()' src/App.jsx
-          ! grep -q 'emailRedirectTo: window.location.origin' src/App.jsx
+          grep -q 'installNativeAuthDeepLinks' src/main.jsx
+          grep -q 'App.getLaunchUrl' src/lib/capacitor-auth.js
+          grep -q 'appUrlOpen' src/lib/capacitor-auth.js
+          grep -q 'exchangeCodeForSession' src/lib/oauthBootstrap.js
+          grep -q 'emailRedirectTo: getAuthRedirectTo("/auth/callback")' src/api/auth.js
+          ! grep -q 'emailRedirectTo: window.location.origin' src/api/auth.js
           grep -q 'native-polish.css' src/main.jsx
+          grep -q 'classList.add("is-native")' src/main.jsx
           grep -q 'safe-area-inset-top' src/native-polish.css
           grep -q '<external-files-path' android/app/src/main/res/xml/file_paths.xml
           ! grep -q '<external-path' android/app/src/main/res/xml/file_paths.xml
@@ -130,7 +134,7 @@ jobs:
           } > TitanOS-release-build-info.txt
 
       - name: Upload release build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: TitanOS-2.0.4-code37-unsigned-AAB
           path: |

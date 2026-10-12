@@ -24,7 +24,7 @@ function readAuthParams() {
     code: get("code"),
     accessToken: get("access_token"),
     refreshToken: get("refresh_token"),
-    error: get("error_description") || get("error"),
+    error: get("error_description") || get("error") || get("error_code"),
   };
 }
 
@@ -39,6 +39,7 @@ function cleanAuthParamsFromUrl() {
 export async function completeOAuthFromUrl() {
   const params = readAuthParams();
   if (params.error) {
+    cleanAuthParamsFromUrl();
     return { ok: false, error: params.error };
   }
   if (!params.code && !(params.accessToken && params.refreshToken)) {

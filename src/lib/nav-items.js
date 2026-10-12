@@ -59,11 +59,11 @@ export const NAV_GROUP_ORDER = [
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
   { icon: Briefcase, label: "Find Jobs", path: "/hire" },
-  { icon: Briefcase, label: "Matches", path: "/hire/matches" },
   { icon: FileText, label: "Résumé", path: "/resume" },
+  { icon: Bot, label: "Coach", path: "/assistant" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/hire", "/hire/matches", "/resume", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/hire", "/resume", "/assistant", "/more"];
 
 export const MORE_MENU_GROUPS = [
   { title: "Find Work", description: "Search, save and apply", paths: ["/hire", "/hire/matches", "/hire?tab=saved", "/hire?tab=applications"] },

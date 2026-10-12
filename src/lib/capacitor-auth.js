@@ -15,7 +15,7 @@ export function installNativeAuthDeepLinks() {
   const handleAuthUrl = async (url) => {
     try {
       const parsed = new URL(url);
-      if (parsed.host === "auth" && parsed.pathname.startsWith("/callback")) {
+      if (parsed.protocol === "com.titanos.myapp:" && parsed.host === "auth" && parsed.pathname === "/callback") {
         try {
           await Browser.close();
         } catch {

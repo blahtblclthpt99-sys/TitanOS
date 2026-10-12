@@ -72,3 +72,27 @@ test("mobile job tabs are unambiguous and native callback origin must match", ()
   assert.match(nativeAuth, /parsed\.protocol === "com\.titanos\.myapp:"/);
   assert.match(nativeAuth, /parsed\.pathname === "\/callback"/);
 });
+
+test("résumé backups preserve account-scoped drafts without a cloud-data claim", () => {
+  const resume = source("src/pages/ResumeBuilder.jsx");
+  assert.match(resume, /TitanOS-Resume-Backup/);
+  assert.match(resume, /normalizeResume/);
+  assert.match(resume, /file\.size > 512 \* 1024/);
+  assert.match(resume, /Import backup/);
+  assert.match(resume, /Export backup/);
+  assert.match(resume, /does not sync between devices yet/);
+});
+
+test("native-only job fallback uses real authenticated postings and declines fabricated vacancies", () => {
+  const matcher = source("src/lib/jobMatchApi.js");
+  const page = source("src/pages/JobMatches.jsx");
+  assert.match(matcher, /\.from\("hire_jobs"\)/);
+  assert.match(matcher, /\.eq\("status", "open"\)/);
+  assert.match(matcher, /native_jobs_fallback/);
+  assert.match(matcher, /provider_not_configured/);
+  assert.doesNotMatch(matcher, /mockJobs|sampleJobs|fakeJobs|fabricated/);
+  assert.match(page, /safeJobUrl/);
+  assert.match(page, /Live job matching is unavailable/);
+  assert.match(page, /Preferences saved on this device/);
+  assert.doesNotMatch(page, /Open Driver Hub/);
+});

@@ -21,11 +21,11 @@ export default function MobileNav() {
   const pathname = normalizeAppPath(location.pathname);
   const touchStart = useRef(null);
 
-  const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
+  const moreActive = pathname === "/more" || MORE_PATHS.some((path) => path.split("?")[0] === pathname);
 
   const activeIndex = TABS.findIndex((item) => {
     if (item.path === "/more") return moreActive;
-    return isRouteActive(pathname, item.path);
+    return pathname === item.path;
   });
 
   const handleTab = (path) => {
@@ -62,7 +62,7 @@ export default function MobileNav() {
     >
       <div className="flex h-[64px] items-stretch justify-around px-1">
         {MOBILE_TAB_ITEMS.map((item) => {
-          const isActive = isRouteActive(pathname, item.path);
+          const isActive = pathname === item.path;
           return (
             <button
               key={item.path}

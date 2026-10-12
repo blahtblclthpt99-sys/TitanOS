@@ -16,7 +16,7 @@ const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
 const TAB_LRU_SIZE = 3;
 
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Dashboard = lazy(() => import("@/pages/CareerHome"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
@@ -50,6 +50,7 @@ const Insurance = lazy(() => import("@/pages/Insurance"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Hire = lazy(() => import("@/pages/Hire"));
 const JobMatches = lazy(() => import("@/pages/JobMatches"));
+const ResumeBuilder = lazy(() => import("@/pages/ResumeBuilder"));
 const MatchReadyJobPost = lazy(() => import("@/pages/MatchReadyJobPost"));
 const WorkerMatches = lazy(() => import("@/pages/WorkerMatches"));
 const ExistingPostWorkerMatches = lazy(() => import("@/pages/ExistingPostWorkerMatches"));
@@ -116,6 +117,7 @@ const NON_TAB_ROUTES = {
   "/referral": Referral,
   "/hire": Hire,
   "/hire/matches": JobMatches,
+  "/resume": ResumeBuilder,
   "/hire/post-match-ready": MatchReadyJobPost,
   "/hire/candidates": WorkerMatches,
   "/hire/find-workers": ExistingPostWorkerMatches,

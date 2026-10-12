@@ -22,6 +22,12 @@ function csvText(values) {
   return Array.isArray(values) ? values.join(", ") : "";
 }
 
+function safeJobUrl(raw) {
+  try {
+    const url = new URL(String(raw || ""));
+    return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+  } catch { return ""; }
+}
 function MatchCard({ job, onAction, busy }) {
   const external = isExternalJobMatch(job);
   const score = Number(job.match?.score || 0);
@@ -29,7 +35,7 @@ function MatchCard({ job, onAction, busy }) {
   const blockers = Array.isArray(job.match?.blockers) ? job.match.blockers : [];
   const source = jobMatchSourceLabel(job);
   const state = job.interaction_state || null;
-  const destination = external ? job.source_url || job.match?.source_url : `/hire?tab=browse&job=${encodeURIComponent(job.id)}`;
+  const destination = external ? safeJobUrl(job.source_url || job.match?.source_url) : `/hire?tab=browse&job=${encodeURIComponent(job.id)}`;
 
   return (
     <article className="titan-surface p-5 space-y-4">
@@ -78,7 +84,7 @@ function MatchCard({ job, onAction, busy }) {
 
       {external ? (
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <a href={destination} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-ring">View on {source}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a>
+          {destination ? <a href={destination} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground focus-ring">View on {source}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a> : <span className="text-sm text-muted-foreground">External listing link unavailable or unsafe.</span>}
           <Button type="button" variant="outline" disabled={busy || state === "applied"} onClick={() => onAction(job, "applied")}>{state === "applied" ? "Applied" : "Mark applied"}</Button>
         </div>
       ) : (
@@ -94,6 +100,7 @@ export default function JobMatches() {
   const [saving, setSaving] = useState(false);
   const [actionBusy, setActionBusy] = useState(null);
   const [matches, setMatches] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [view, setView] = useState("all");
   const [status, setStatus] = useState({ needsProfile: false, needsSkills: false, external: {} });
   const [form, setForm] = useState({
@@ -112,12 +119,18 @@ export default function JobMatches() {
   const load = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
+    setLoadError("");
     try {
+      // Do not let a missing legacy Driver Hub profile crash the job-seeker screen.
       const [driver, prefs, result] = await Promise.all([
-        getMyDriverProfile(user.id),
+        getMyDriverProfile(user.id).catch(() => null),
         getMyJobMatchPreferences(user.id).catch(() => null),
-        getJobMatches({ includeExternal: true }),
+        getJobMatches({ includeExternal: true }).catch((error) => ({
+          matches: [], needsProfile: false, needsSkills: false, external: { reason: "service_unavailable" },
+          loadError: error?.message || "The jobs service is not connected.",
+        })),
       ]);
+      setLoadError(result.loadError || "");
       setForm({
         skills: csvText(driver?.skills || prefs?.skills),
         certifications: csvText(driver?.certifications || prefs?.certifications),
@@ -133,6 +146,7 @@ export default function JobMatches() {
       setMatches(result.matches || []);
       setStatus(result);
     } catch (error) {
+      setLoadError(error?.message || "Job matching is temporarily unavailable.");
       toast({ variant: "destructive", title: "Couldn't load job matches", description: error.message || "Please try again." });
     } finally {
       setLoading(false);
@@ -225,13 +239,20 @@ export default function JobMatches() {
 
   return (
     <PageShell maxWidth="lg" className="space-y-6">
-      <PageHeader eyebrow="Work" title="Matches for you" subtitle="Titan ranks work from your skills first, then can search approved external providers when you allow it." />
+      <PageHeader eyebrow="Job search" title="Matches for you" subtitle="Titan ranks genuine work opportunities based on your skills. External search requires your consent and an approved provider." />
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline"><Link to="/hire">Hire home</Link></Button>
-        <Button asChild variant="outline"><Link to="/hire/post-match-ready">Post a match-ready job</Link></Button>
+        <Button asChild variant="outline"><Link to="/hire">Browse jobs</Link></Button>
+        <Button asChild variant="outline"><Link to="/resume">Build résumé</Link></Button>
       </div>
 
+      {loadError && (
+        <div role="alert" className="titan-surface p-4 border-warning/40 text-sm">
+          <strong>Live job matching is unavailable.</strong> No unverified matches will be shown.
+          <p className="mt-2 text-muted-foreground">{loadError}</p>
+          <Link to="/hire" className="inline-block mt-2 text-primary font-semibold underline">Browse available TitanOS job posts instead</Link>
+        </div>
+      )}
       <section className="titan-surface p-5" aria-labelledby="match-profile-heading">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -273,7 +294,7 @@ export default function JobMatches() {
       {loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Finding work that fits you…</div>
       ) : status.needsProfile ? (
-        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Open Driver Hub" onAction={() => { window.location.href = "/driver"; }} />
+        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Edit matching profile" onAction={() => { document.getElementById("match-profile-heading")?.scrollIntoView({ behavior: "smooth" }); }} />
       ) : status.needsSkills ? (
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (

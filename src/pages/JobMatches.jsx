@@ -21,6 +21,16 @@ function csv(value) {
 function csvText(values) {
   return Array.isArray(values) ? values.join(", ") : "";
 }
+function localPrefsFor(userId) {
+  if (!userId) return {};
+  try { return JSON.parse(localStorage.getItem(`titanos:jobprefs:v1:${userId}`) || "{}") || {}; }
+  catch { return {}; }
+}
+function localResumeFor(userId) {
+  if (!userId) return {};
+  try { return JSON.parse(localStorage.getItem(`titanos:resume:v1:${userId}`) || "{}") || {}; }
+  catch { return {}; }
+}
 
 function safeJobUrl(raw) {
   try {
@@ -131,17 +141,19 @@ export default function JobMatches() {
         })),
       ]);
       setLoadError(result.loadError || "");
+      const local = localPrefsFor(user.id);
+      const resume = localResumeFor(user.id);
       setForm({
-        skills: csvText(driver?.skills || prefs?.skills),
-        certifications: csvText(driver?.certifications || prefs?.certifications),
-        interests: csvText(prefs?.job_interests),
-        radius: Number(prefs?.work_radius_miles || 50),
-        desiredPay: Number(prefs?.desired_pay_min || 0),
-        payType: prefs?.desired_pay_type || "hourly",
-        schedule: csvText(prefs?.preferred_schedule),
-        externalConsent: Boolean(prefs?.external_job_search_consent),
-        searchLat: prefs?.search_lat ?? null,
-        searchLng: prefs?.search_lng ?? null,
+        skills: csvText(driver?.skills || prefs?.skills) || local.skills || resume.skills || "",
+        certifications: csvText(driver?.certifications || prefs?.certifications) || local.certifications || resume.certifications || "",
+        interests: csvText(prefs?.job_interests) || local.interests || resume.headline || "",
+        radius: Number(prefs?.work_radius_miles || local.radius || 50),
+        desiredPay: Number(prefs?.desired_pay_min || local.desiredPay || 0),
+        payType: prefs?.desired_pay_type || local.payType || "hourly",
+        schedule: csvText(prefs?.preferred_schedule) || local.schedule || "",
+        externalConsent: Boolean(prefs?.external_job_search_consent ?? local.externalConsent ?? false),
+        searchLat: prefs?.search_lat ?? local.searchLat ?? null,
+        searchLng: prefs?.search_lng ?? local.searchLng ?? null,
       });
       setMatches(result.matches || []);
       setStatus(result);
@@ -180,10 +192,23 @@ export default function JobMatches() {
         search_lat: form.searchLat,
         search_lng: form.searchLng,
       });
-      toast({ title: "Job matching updated", description: "Titan will use these qualifications and private preferences for your matches." });
+      try { localStorage.removeItem(`titanos:jobprefs:v1:${user.id}`); } catch { /* optional cleanup */ }
+      toast({ title: "Job matching updated", description: "Your matching preferences were saved to your account." });
       await load();
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't save matching profile", description: error.message || "Please try again." });
+      // Explicitly label device-only storage: it must not masquerade as cloud sync.
+      try {
+        localStorage.setItem(`titanos:jobprefs:v1:${user.id}`, JSON.stringify({
+          skills: form.skills, certifications: form.certifications, interests: form.interests,
+          radius: form.radius, desiredPay: form.desiredPay, payType: form.payType,
+          schedule: form.schedule, externalConsent: form.externalConsent,
+          searchLat: form.searchLat, searchLng: form.searchLng,
+        }));
+        toast({ title: "Preferences saved on this device", description: "Online profile sync is unavailable. Local matching can still use your skills, but changes are not available on other devices." });
+        await load();
+      } catch {
+        toast({ variant: "destructive", title: "Couldn't save your preferences", description: error?.message || "Storage is unavailable." });
+      }
     } finally {
       setSaving(false);
     }

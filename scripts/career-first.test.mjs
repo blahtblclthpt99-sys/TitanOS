@@ -49,3 +49,26 @@ test("job matching and application UI remain available", () => {
   assert.match(hire, /"applications"/);
   assert.match(matches, /getJobMatches/);
 });
+test("Android candidate is unsigned, jobs-first and does not reuse an advertising account", () => {
+  const gradle = source("android/app/build.gradle");
+  const workflow = source(".github/workflows/android-release.yml");
+  const backendGate = source("scripts/verify-jobs-backend.mjs");
+  const packageJson = JSON.parse(source("package.json"));
+  assert.match(gradle, /versionCode 41/);
+  assert.match(gradle, /versionName "2\.0\.7"/);
+  assert.match(workflow, /UNSIGNED-INTERNAL/);
+  assert.match(workflow, /verify-jobs-backend\.mjs --internal/);
+  assert.doesNotMatch(workflow, /xcfjpxcmokdfwkarwomy|Titan Attention Quality Gate/);
+  assert.match(backendGate, /xcfjpxcmokdfwkarwomy/);
+  assert.match(backendGate, /TITANOS_AUTH_MIGRATION_VERIFIED/);
+  assert.match(packageJson.scripts.prebuild, /verify-jobs-backend\.mjs --auto/);
+});
+
+test("mobile job tabs are unambiguous and native callback origin must match", () => {
+  const mobile = source("src/components/layout/MobileNav.jsx");
+  const nativeAuth = source("src/lib/capacitor-auth.js");
+  assert.match(mobile, /pathname === item\.path/);
+  assert.doesNotMatch(mobile, /const isActive = isRouteActive\(pathname, item\.path\)/);
+  assert.match(nativeAuth, /parsed\.protocol === "com\.titanos\.myapp:"/);
+  assert.match(nativeAuth, /parsed\.pathname === "\/callback"/);
+});

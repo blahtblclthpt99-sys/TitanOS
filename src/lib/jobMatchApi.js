@@ -12,8 +12,15 @@ function savedResumeSkills(userId) {
     const skills = typeof value?.skills === "string"
       ? [...new Set(value.skills.split(/[,;\n]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
       : [];
-    const target = typeof value?.headline === "string" ? value.headline.trim().toLowerCase().slice(0, 150) : "";
-    return { skills, target };
+    let localPrefs = null;
+    try { localPrefs = JSON.parse(localStorage.getItem(`titanos:jobprefs:v1:${userId}`) || "null"); } catch { /* no saved local preferences */ }
+    const prefSkills = typeof localPrefs?.skills === "string"
+      ? [...new Set(localPrefs.skills.split(/[,;\\n]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
+      : [];
+    const target = typeof localPrefs?.interests === "string" && localPrefs.interests.trim()
+      ? localPrefs.interests.split(",")[0].trim().toLowerCase().slice(0, 150)
+      : typeof value?.headline === "string" ? value.headline.trim().toLowerCase().slice(0, 150) : "";
+    return { skills: prefSkills.length ? prefSkills : skills, target };
   } catch { return { skills: [], target: "" }; }
 }
 

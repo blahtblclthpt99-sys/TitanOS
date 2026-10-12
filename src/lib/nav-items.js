@@ -41,57 +41,15 @@ import {
  * their canonical parent feature or compatibility routes rather than cluttering chrome.
  */
 export const APP_NAV_ITEMS = [
-  // TODAY
-  { icon: LayoutDashboard, label: "Home", path: "/", group: "today" },
-  { icon: Bell, label: "Notifications", path: "/notifications", group: "today" },
-
-  // WORK
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "work" },
-  { icon: Calendar, label: "Schedule", path: "/schedule", group: "work" },
-  { icon: Car, label: "Driver Hub", path: "/driver", group: "work" },
-  { icon: Route, label: "Route Planner", path: "/routes", group: "work" },
-  { icon: CalendarCheck, label: "Booking", path: "/booking", group: "work" },
-  { icon: UserCog, label: "Employees", path: "/employees", group: "work" },
-  { icon: Truck, label: "Fleet", path: "/fleet", group: "work" },
-  { icon: Package, label: "Inventory", path: "/inventory", group: "work" },
-  { icon: FolderOpen, label: "Business Documents", path: "/business-documents", group: "work" },
-
-  // CUSTOMERS
-  { icon: Users, label: "Customers", path: "/customers", group: "customers" },
-  { icon: ContactRound, label: "Leads", path: "/leads", group: "customers" },
-  { icon: MessageSquare, label: "Follow-ups", path: "/follow-ups", group: "customers" },
-  { icon: Radio, label: "Communications", legacyName: "TitanCom", path: "/comms", group: "customers" },
-  { icon: Star, label: "Reputation", path: "/reputation", group: "customers" },
-
-  // MONEY
-  { icon: FileText, label: "Estimates", path: "/estimates", group: "money" },
-  { icon: Receipt, label: "Invoices", path: "/invoices", group: "money" },
-  { icon: CreditCard, label: "Payments", path: "/payments", group: "money" },
-  { icon: DollarSign, label: "Finances", path: "/finances", group: "money" },
-  { icon: BarChart3, label: "Reports", path: "/reports", group: "money" },
-  { icon: ClipboardList, label: "Tax Center", path: "/tax-center", group: "money" },
-
-  // SECOND ME
-  { icon: Brain, label: "Second Me", path: "/second-me", group: "second_me" },
-  { icon: Bot, label: "TitanAI", path: "/assistant", group: "second_me" },
-  { icon: Workflow, label: "Autopilot", path: "/autopilot", group: "second_me" },
-
-  // BUSINESS
-  { icon: Building2, label: "My Business", path: "/companies", group: "business" },
-  { icon: User, label: "Profile", path: "/profile", group: "business" },
-  { icon: LineChart, label: "Analytics", path: "/analytics", group: "business" },
-  { icon: Settings, label: "Settings", path: "/settings", group: "business" },
-
-  // SUPPORT & SAFETY
+  { icon: LayoutDashboard, label: "Career Home", path: "/", group: "today" },
+  { icon: Briefcase, label: "Find Jobs", path: "/hire", group: "work" },
+  { icon: Briefcase, label: "Job Matches", path: "/hire/matches", group: "work" },
+  { icon: FileText, label: "Résumé Builder", path: "/resume", group: "work" },
+  { icon: ClipboardList, label: "My Applications", path: "/hire?tab=applications", group: "work" },
+  { icon: Briefcase, label: "Saved Jobs", path: "/hire?tab=saved", group: "work" },
+  { icon: User, label: "Career Profile", path: "/profile", group: "business" },
+  { icon: Bot, label: "Career Assistant", path: "/assistant", group: "business" },
   { icon: LifeBuoy, label: "Titan Support", path: "/support", group: "support" },
-  { icon: Shield, label: "Trust & Safety", path: "/trust-safety", group: "support" },
-
-  // ADMIN — actual server/route authorization is still mandatory.
-  { icon: Shield, label: "Control Center", path: "/admin", group: "administration", adminOnly: true },
-  { icon: LifeBuoy, label: "Support Command Center", path: "/admin/support", group: "administration", adminOnly: true },
-  { icon: ShieldAlert, label: "Moderation", path: "/admin/moderation", group: "administration", adminOnly: true },
-  { icon: Percent, label: "Fee Management", path: "/admin/fees", group: "administration", adminOnly: true },
-  { icon: Landmark, label: "Tax Rules", path: "/admin/tax-rules", group: "administration", adminOnly: true },
 ];
 
 /**
@@ -111,12 +69,12 @@ export const INTERNAL_WORKFLOW_GROUPS = [
 ];
 
 export const NAV_GROUP_META = {
-  today: { label: "Today", collapsible: false, defaultOpen: true },
-  work: { label: "Work", collapsible: true, defaultOpen: true },
+  today: { label: "Career Center", collapsible: false, defaultOpen: true },
+  work: { label: "Job Search", collapsible: true, defaultOpen: true },
   customers: { label: "Customers", collapsible: true, defaultOpen: true },
   money: { label: "Money", collapsible: true, defaultOpen: true },
   second_me: { label: "Second Me", collapsible: true, defaultOpen: true },
-  business: { label: "Business", collapsible: true, defaultOpen: false },
+  business: { label: "Career Tools", collapsible: true, defaultOpen: false },
   support: { label: "Support & Safety", collapsible: true, defaultOpen: false },
   administration: { label: "Admin", collapsible: true, defaultOpen: false },
 };
@@ -135,61 +93,24 @@ export const NAV_GROUP_ORDER = [
 /** Keep mobile focused on the four highest-frequency roots; More exposes the rest. */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
-  { icon: Briefcase, label: "Jobs", path: "/jobs" },
-  { icon: Car, label: "Driver", path: "/driver" },
-  { icon: Radio, label: "Comms", path: "/comms" },
+  { icon: Briefcase, label: "Find Jobs", path: "/hire" },
+  { icon: Briefcase, label: "Matches", path: "/hire/matches" },
+  { icon: FileText, label: "Résumé", path: "/resume" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/driver", "/comms", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/hire", "/hire/matches", "/resume", "/more"];
 
 export const MORE_MENU_GROUPS = [
-  {
-    title: "Today",
-    description: "What is happening and what needs your attention",
-    paths: ["/", "/notifications"],
-  },
-  {
-    title: "Work",
-    description: "Plan, dispatch, complete, and document work",
-    paths: ["/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
-  },
-  {
-    title: "Customers",
-    description: "Manage customers, leads, communication, and reputation",
-    paths: ["/customers", "/leads", "/follow-ups", "/comms", "/reputation"],
-  },
-  {
-    title: "Money",
-    description: "Estimate, invoice, collect, track, and report",
-    paths: ["/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"],
-  },
-  {
-    title: "Second Me",
-    description: "Memory, intelligence, and approved automation",
-    paths: ["/second-me", "/assistant", "/autopilot"],
-  },
-  {
-    title: "Business",
-    description: "Your business, profile, analytics, and settings",
-    paths: ["/companies", "/profile", "/analytics", "/settings"],
-  },
-  {
-    title: "Support & Safety",
-    description: "Get help and manage safety",
-    paths: ["/support", "/trust-safety"],
-  },
-  {
-    title: "Admin",
-    description: "Authorized staff controls",
-    paths: ["/admin", "/admin/support", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
-  },
+  { title: "Find Work", description: "Search, save and apply", paths: ["/hire", "/hire/matches", "/hire?tab=saved", "/hire?tab=applications"] },
+  { title: "Career Tools", description: "Prepare for your next job", paths: ["/resume", "/profile", "/assistant"] },
+  { title: "Support", description: "Get help with TitanOS", paths: ["/support"] },
 ];
 
 export const QUICK_CREATE_ACTIONS = [
-  { label: "New Job", path: "/jobs?new=1", icon: Briefcase },
-  { label: "Create Estimate", path: "/estimates?new=1", icon: FileText },
-  { label: "Invoice", path: "/invoices?new=1", icon: Receipt },
-  { label: "Customer", path: "/customers?new=1", icon: Users },
+  { label: "Find Jobs", path: "/hire", icon: Briefcase },
+  { label: "Create Résumé", path: "/resume", icon: FileText },
+  { label: "Job Matches", path: "/hire/matches", icon: Briefcase },
+  { label: "My Applications", path: "/hire?tab=applications", icon: ClipboardList },
 ];
 
 export function resolveNavDomain(pathname = "/") {

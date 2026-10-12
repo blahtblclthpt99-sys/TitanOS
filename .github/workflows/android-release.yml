@@ -154,9 +154,14 @@ jobs:
             AAB_SIGNED=false
             ACTUAL_UPLOAD_SHA256=""
           fi
+          # PR builds may produce unsigned test bundles. A Play release MUST
+          # contain the correct signed certificate; never publish an unsigned AAB.
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            test "$PLAY_SIGNING_CONFIGURED" = "true" || { echo "::error::Missing Play signing secrets"; exit 1; }
+          fi
           if [ "$PLAY_SIGNING_CONFIGURED" = "true" ]; then
-            test "$AAB_SIGNED" = "true"
-            test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256"
+            test "$AAB_SIGNED" = "true" || { echo "::error::AAB is not signed"; exit 1; }
+            test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256" || { echo "::error::Play upload certificate does not match"; exit 1; }
           fi
           {
             echo "VERSION_NAME=2.0.5"
@@ -180,7 +185,7 @@ jobs:
       - name: Upload Android release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TitanOS-2.0.5-code38-AAB
+          name: ${{ github.event_name == 'pull_request' && 'TitanOS-2.0.5-code38-UNSIGNED-TEST-ONLY' || 'TitanOS-2.0.5-code38-SIGNED-RELEASE' }}
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             TitanOS-2.0.5-code38-AAB-SHA256.txt

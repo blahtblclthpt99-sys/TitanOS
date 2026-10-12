@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import packageJson from './package.json' with { type: 'json' };
@@ -7,14 +7,17 @@ import { checkAndroidSupabaseEnv } from './scripts/verify-android-supabase-confi
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({ command }) => {
+export default defineConfig(({ command, mode }) => {
+  // Vite reads .env.production after resolving config. Merge its parsed VITE_*
+  // values with explicit CI environment values, which must take precedence.
+  const appEnv = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env };
   // A Play APK/AAB must never compile without its actual public auth configuration.
-  if (command === 'build' && process.env.VITE_CAPACITOR_BUILD === 'true') {
-    const { errors } = checkAndroidSupabaseEnv(process.env);
+  if (command === 'build' && appEnv.VITE_CAPACITOR_BUILD === 'true') {
+    const { errors } = checkAndroidSupabaseEnv(appEnv);
     if (errors.length) throw new Error(`Invalid TitanOS Android Supabase configuration: ${errors.join('; ')}`);
   }
   return {
-    base: process.env.VITE_CAPACITOR_BUILD === 'true' ? './' : '/',
+    base: appEnv.VITE_CAPACITOR_BUILD === 'true' ? './' : '/',
     plugins: [react()],
     define: {
       // Expose Vercel build metadata to the client Sentry release/environment

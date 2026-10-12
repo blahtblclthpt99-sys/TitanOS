@@ -41,7 +41,7 @@
     "test:money": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
     "test:tax": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/tax-engine.test.mjs",
     "test:hardening": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/production-hardening.test.mjs",
-    "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs scripts/native-auth-url.test.mjs",
+    "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs scripts/native-auth-url.test.mjs scripts/native-link.test.mjs",
     "test:api": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/api-error.test.mjs",
     "test:comms": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/titancom-channels.test.mjs",
     "test:export": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/export-stack.test.mjs",

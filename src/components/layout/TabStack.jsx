@@ -15,7 +15,7 @@ const JobMatches = lazy(() => import("@/pages/JobMatches"));
 const ResumeBuilder = lazy(() => import("@/pages/ResumeBuilder"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const Profile = lazy(() => import("@/pages/Profile"));
-const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const CareerCoach = lazy(() => import("@/pages/CareerCoach"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
@@ -26,7 +26,7 @@ const CAREER_ROUTES = {
   "/resume": ResumeBuilder,
   "/more": MoreMenu,
   "/profile": Profile,
-  "/assistant": AIAssistant,
+  "/assistant": CareerCoach,
   "/notifications": Notifications,
   "/settings": Settings,
 };

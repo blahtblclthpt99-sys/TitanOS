@@ -19,7 +19,7 @@
     "android:sign": "powershell -ExecutionPolicy Bypass -File scripts/sign-android-release.ps1",
     "ionos:package": "powershell -ExecutionPolicy Bypass -File scripts/package-ionos-web.ps1",
     "dealforge:package": "powershell -ExecutionPolicy Bypass -File dealnest/scripts/package-website.ps1",
-    "cap:sync": "npm run build && npx cap sync android",
+    "cap:sync": "node scripts/capacitor-sync.mjs",
     "seed:owner": "node --env-file=.env.local scripts/seed-owner-account.mjs",
     "import:legacy-csv": "node scripts/import-legacy-csv.mjs",
     "purge:owner-seed": "node --env-file=.env.local scripts/purge-owner-seed.mjs",

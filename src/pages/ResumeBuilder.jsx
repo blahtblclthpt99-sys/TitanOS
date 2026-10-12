@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { Download, FileText, Plus, Printer, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { Download, FileText, Plus, Printer, Sparkles, Trash2 } from "lucide-react";
 
 const emptyExperience = () => ({ id: crypto.randomUUID(), employer: "", title: "", location: "", start: "", end: "", details: "" });
 const emptyEducation = () => ({ id: crypto.randomUUID(), school: "", credential: "", year: "" });

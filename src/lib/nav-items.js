@@ -48,7 +48,7 @@ export const APP_NAV_ITEMS = [
   { icon: ClipboardList, label: "My Applications", path: "/hire?tab=applications", group: "work" },
   { icon: Briefcase, label: "Saved Jobs", path: "/hire?tab=saved", group: "work" },
   { icon: User, label: "Career Profile", path: "/profile", group: "business" },
-  { icon: Bot, label: "Career Assistant", path: "/assistant", group: "business" },
+  { icon: Bot, label: "Career Coach", path: "/assistant", group: "business" },
   { icon: LifeBuoy, label: "Titan Support", path: "/support", group: "support" },
 ];
 

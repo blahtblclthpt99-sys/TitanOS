@@ -1,124 +1,28 @@
 import React from "react";
 import { Link } from "react-router";
-import { BriefcaseBusiness, ChevronRight, Sparkles, Trash2 } from "lucide-react";
-import PageHeader from "@/components/shared/PageHeader";
-import PageShell from "@/components/shared/PageShell";
-import ThemeToggle from "@/components/brand/ThemeToggle";
-import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
-import { MORE_MENU_GROUPS, filterNavItems, navItemsByPaths } from "@/lib/nav-items";
-import { useAuth } from "@/lib/AuthContext";
-import { isUserAdmin } from "@/lib/isAdmin";
-import { betaBadgeLabel } from "@/lib/plan";
-import { cn } from "@/lib/utils";
+import { ArrowRight, BookmarkCheck, BriefcaseBusiness, FileText, LifeBuoy, Settings, Sparkles, Trash2, UserRound } from "lucide-react";
 
+const links = [
+  {path:"/hire",icon:BriefcaseBusiness,title:"Find Jobs",description:"Browse the jobs employers have posted in TitanOS."},
+  {path:"/hire/matches",icon:Sparkles,title:"Matches & Preferences",description:"See matching work and edit the skills and credentials used for matching."},
+  {path:"/assistant",icon:Sparkles,title:"Career Coach",description:"Prepare role-specific cover letters and practice interviews."},
+  {path:"/resume",icon:FileText,title:"Résumé Builder",description:"Edit work history, education, skills, and export your résumé."},
+  {path:"/hire?tab=saved",icon:BookmarkCheck,title:"Saved Jobs",description:"Go back to the opportunities you bookmarked."},
+  {path:"/hire?tab=applications",icon:BriefcaseBusiness,title:"My Applications",description:"Review your submitted TitanOS applications."},
+  {path:"/profile",icon:UserRound,title:"My Account",description:"Manage your TitanOS account and personal details."},
+  {path:"/settings",icon:Settings,title:"Settings",description:"Review your app and account settings."},
+  {path:"/support",icon:LifeBuoy,title:"Support",description:"Get help with your TitanOS account."},
+];
 export default function MoreMenu() {
-  const { user } = useAuth();
-  const isAdmin = isUserAdmin(user);
-
-  return (
-    <PageShell maxWidth="md">
-      <PageHeader
-        title="More"
-        subtitle="Your operating system — Live, History, Analytics, Reports, Communication, AI, Configuration, and Labs. Domains, not a feature list."
-      />
-
-      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
-        <TitanBrandLogo layout="svg" markClassName="h-9 w-9" showTagline />
-        <ThemeToggle variant="segmented" className="w-full sm:w-auto sm:min-w-[240px]" />
-      </div>
-
-      <Link
-        to="/hire/matches"
-        className="titan-surface titan-surface-interactive mb-6 flex min-h-[88px] items-center gap-4 border-primary/20 p-4 focus-ring"
-      >
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <BriefcaseBusiness className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-            Matches for you <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Use your skills, certifications, location and preferences to find Titan jobs and approved outside opportunities.
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-
-      <Link
-        to="/delete-account"
-        className="titan-surface titan-surface-interactive mb-6 flex min-h-[72px] items-center gap-4 border-red-500/15 p-4 focus-ring"
-      >
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
-          <Trash2 className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">Delete account & data</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Submit a verified TitanOS account-deletion request and review data-retention details.
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-
-      {betaBadgeLabel(user) && (
-        <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-medium text-primary">
-          {betaBadgeLabel(user)}
-        </div>
-      )}
-
-      <div className="space-y-8">
-        {MORE_MENU_GROUPS.map((group) => {
-          const paths = group.paths.filter(
-            (path) =>
-              (!path.startsWith("/admin")) || isAdmin
-          );
-          const items = filterNavItems(navItemsByPaths(paths), { isAdmin });
-          if (!items.length) return null;
-
-          return (
-            <section key={group.title} aria-labelledby={`more-${group.title}`}>
-              <div className="mb-3 px-0.5">
-                <h2
-                  id={`more-${group.title}`}
-                  className="text-caption font-bold uppercase tracking-wider text-muted-foreground"
-                >
-                  {group.title}
-                </h2>
-                {group.description && (
-                  <p className="mt-0.5 text-xs text-muted-foreground/80">{group.description}</p>
-                )}
-              </div>
-              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {items.map((item) => (
-                  <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "titan-surface titan-surface-interactive flex min-h-[64px] items-center gap-3 p-3.5 focus-ring",
-                        item.beta && "border-primary/15"
-                      )}
-                    >
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                        <item.icon className="h-5 w-5" aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-foreground leading-snug">
-                          {item.label}
-                        </p>
-                      </div>
-                      <ChevronRight
-                        className="h-4 w-4 flex-shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
-    </PageShell>
-  );
+  return <div className="mx-auto max-w-4xl px-4 py-6 md:px-8 space-y-5">
+    <header><p className="uppercase tracking-widest font-bold text-xs text-primary">Career workspace</p><h1 className="text-3xl font-bold mt-2">More career tools</h1><p className="text-muted-foreground text-sm mt-2">Everything you need to prepare, find work and stay organized.</p></header>
+    <nav aria-label="Career tools" className="grid sm:grid-cols-2 gap-3">
+      {links.map((item)=><Link to={item.path} key={item.path} className="rounded-xl border border-border bg-card p-4 flex items-center min-h-24 gap-4 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <div className="rounded-lg bg-primary/10 p-3 text-primary"><item.icon className="w-5 h-5"/></div>
+        <div className="min-w-0 flex-1"><h2 className="text-sm font-bold">{item.title}</h2><p className="text-xs leading-relaxed text-muted-foreground mt-1">{item.description}</p></div>
+        <ArrowRight className="h-4 w-4 text-primary shrink-0"/>
+      </Link>)}
+    </nav>
+    <div className="border-t border-border pt-5"><Link to="/delete-account" className="min-h-11 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4"/> Account deletion & privacy</Link></div>
+  </div>;
 }

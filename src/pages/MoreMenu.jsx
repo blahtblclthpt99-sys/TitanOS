@@ -5,6 +5,7 @@ import { ArrowRight, BookmarkCheck, BriefcaseBusiness, FileText, LifeBuoy, Setti
 const links = [
   {path:"/hire",icon:BriefcaseBusiness,title:"Find Jobs",description:"Browse the jobs employers have posted in TitanOS."},
   {path:"/hire/matches",icon:Sparkles,title:"Matches & Preferences",description:"See matching work and edit the skills and credentials used for matching."},
+  {path:"/assistant",icon:Sparkles,title:"Career Coach",description:"Prepare role-specific cover letters and practice interviews."},
   {path:"/resume",icon:FileText,title:"Résumé Builder",description:"Edit work history, education, skills, and export your résumé."},
   {path:"/hire?tab=saved",icon:BookmarkCheck,title:"Saved Jobs",description:"Go back to the opportunities you bookmarked."},
   {path:"/hire?tab=applications",icon:BriefcaseBusiness,title:"My Applications",description:"Review your submitted TitanOS applications."},

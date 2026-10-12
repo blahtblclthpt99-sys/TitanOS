@@ -1,0 +1,45 @@
+name: TitanOS Jobs First QA
+
+on:
+  push:
+    branches:
+      - feature/jobs-first-resume-builder-20261012
+      - fix/remove-attention-restore-jobs-20261012
+  pull_request:
+    branches:
+      - main
+      - release/titanos-play
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  career-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Jobs-first regression tests
+        run: node --test scripts/career-first.test.mjs
+      - name: Verify legacy free job-seeker contract
+        run: node --test scripts/free-job-access.test.mjs
+      - name: Lint, type-check, and compile
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Test auth and job security
+        run: |
+          npm run test:auth
+          npm run test:hire
+
+# This workflow is a code-quality gate only: device login, production
+# account-backend compatibility, Google Play signing, and migration remain
+# separate manual release blockers.

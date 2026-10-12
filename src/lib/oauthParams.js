@@ -13,7 +13,8 @@ export function hasPendingOAuthParams() {
       get("code") ||
         (get("access_token") && get("refresh_token")) ||
         get("error_description") ||
-        get("error") === "access_denied"
+        get("error_code") ||
+        get("error")
     );
   } catch {
     return false;

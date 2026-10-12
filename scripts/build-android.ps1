@@ -35,7 +35,7 @@ function Find-AndroidSdk {
 
 Write-Host "Building web assets..."
 $env:VITE_CAPACITOR_BUILD = "true"
-npm run build
+npm run cap:sync
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Never ship website APK/AAB binaries inside the Android WebView assets
@@ -45,9 +45,7 @@ Get-ChildItem -Path $distDir -Recurse -Include *.apk,*.aab -ErrorAction Silently
   Remove-Item $_.FullName -Force
 }
 
-Write-Host "Syncing Capacitor Android project..."
-npx cap sync android
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# cap:sync already built, validated, and synchronized the native assets.
 
 $javaHome = Find-JavaHome
 if (-not $javaHome) {

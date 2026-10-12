@@ -46,7 +46,7 @@ export default function SocialAuthButtons({ onError, returnTo }) {
       const raw = err?.message || "";
       const message =
         /provider is not enabled|Unsupported provider|validation_failed/i.test(raw)
-          ? "Google sign-in is not enabled yet in Supabase. Use email for now, or finish GOOGLE_AUTH.md setup."
+          ? "Google sign-in is not enabled yet in Supabase. Use email sign-in for now."
           : raw || "Google sign-in failed";
       onError?.(message);
     }
@@ -56,9 +56,9 @@ export default function SocialAuthButtons({ onError, returnTo }) {
     return (
       <div
         role="status"
-        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-xs text-slate-600"
+        className="rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-center text-xs text-muted-foreground"
       >
-        Google sign-in is not configured yet. Use email below.
+        Google sign-in is currently unavailable. You can still sign in with email below.
       </div>
     );
   }
@@ -71,14 +71,16 @@ export default function SocialAuthButtons({ onError, returnTo }) {
           type="button"
           onClick={() => start(id)}
           disabled={Boolean(loadingProvider)}
+          aria-busy={loadingProvider === id}
           className={cn(
-            "w-full h-12 rounded-xl border border-slate-200 bg-white text-slate-700 text-[15px] font-medium",
-            "flex items-center justify-center gap-3 hover:bg-slate-50 transition-colors",
+            "w-full h-12 rounded-xl border border-border bg-card text-foreground text-[15px] font-medium",
+            "flex items-center justify-center gap-3 hover:bg-muted transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "disabled:opacity-60"
           )}
         >
           {loadingProvider === id ? (
-            <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" aria-hidden="true" />
           ) : (
             <Icon className="w-5 h-5" />
           )}

@@ -19,8 +19,11 @@ jobs:
     timeout-minutes: 35
     env:
       VITE_CAPACITOR_BUILD: "true"
+      TITANOS_ANDROID_PROJECT_REF: "wbymywwrpbljfbsemung"
       VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
+      # Legacy env alias for any screens still checking VITE_SUPABASE_ANON_KEY.
+      VITE_SUPABASE_ANON_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
       VITE_API_BASE_URL: "https://titanos-web.vercel.app"
       VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
 
@@ -78,6 +81,11 @@ jobs:
             echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
           fi
 
+      - name: Verify Supabase connection is present in Android package
+        run: |
+          node scripts/verify-android-supabase-config.mjs --env
+          node scripts/verify-android-supabase-config.mjs --bundle
+
       - name: Build Android release AAB
         run: |
           npx cap sync android
@@ -97,6 +105,11 @@ jobs:
           else
             AAB_SIGNED=false
           fi
+          test "$PLAY_SIGNING_CONFIGURED" = "true" || { echo "::error::Missing Play signing secrets"; exit 1; }
+          test "$AAB_SIGNED" = "true" || { echo "::error::Unsigned AAB cannot be certified for Google Play"; exit 1; }
+          EXPECTED_UPLOAD_SHA256="7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D"
+          ACTUAL_UPLOAD_SHA256="$(keytool -printcert -jarfile "$AAB" | sed -n 's/.*SHA256: //p' | head -1)"
+          test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256" || { echo "::error::Wrong Play upload certificate"; exit 1; }
           {
             echo "VERSION_NAME=2.0.5"
             echo "VERSION_CODE=38"

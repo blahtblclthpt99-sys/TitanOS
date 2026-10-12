@@ -1,6 +1,7 @@
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
+import { nativeAuthCallbackRoute } from "@/lib/nativeAuthCallback";
 
 /**
  * When Google OAuth returns to com.titanos.myapp://auth/callback?...
@@ -14,21 +15,20 @@ export function installNativeAuthDeepLinks() {
 
   const handleAuthUrl = async (url) => {
     try {
-      const parsed = new URL(url);
-      if (parsed.host === "auth" && parsed.pathname.startsWith("/callback")) {
-        try {
-          await Browser.close();
-        } catch {
-          // Browser may already be closed
-        }
+      const route = nativeAuthCallbackRoute(url);
+      if (!route) return;
 
-        const query = parsed.search || "";
-        const hashTarget = `#/auth/callback${query}`;
+      try {
+        await Browser.close();
+      } catch {
+        // Browser may already be closed
+      }
 
-        // Soft navigate when possible (preserves Preferences + JS heap)
-        if (window.location.hash !== hashTarget) {
-          window.location.hash = `/auth/callback${query}`;
-        }
+      // Keep the Android WebView on its packaged document and navigate only
+      // the hash route. PKCE codes or token fragments are handled by AuthCallback.
+      const hashTarget = `#${route}`;
+      if (window.location.hash !== hashTarget) {
+        window.location.hash = route;
       }
     } catch {
       // ignore malformed deep links

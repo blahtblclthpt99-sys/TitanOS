@@ -5,7 +5,7 @@ Set-Location $Root
 Write-Host "Building web assets for Capacitor..."
 $env:VITE_CAPACITOR_BUILD = "true"
 $env:NODE_OPTIONS = "--use-system-ca"
-npm run build
+npm run cap:sync
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Never ship website APK/AAB binaries inside the Android WebView assets
@@ -15,9 +15,7 @@ Get-ChildItem -Path $distDir -Recurse -Include *.apk,*.aab -ErrorAction Silently
   Remove-Item $_.FullName -Force
 }
 
-Write-Host "Syncing Capacitor Android project..."
-npx cap sync android
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# cap:sync already built, validated, and synchronized the native assets.
 
 & (Join-Path $Root "scripts\setup-android-signing.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

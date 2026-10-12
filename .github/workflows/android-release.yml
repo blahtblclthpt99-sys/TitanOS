@@ -49,8 +49,11 @@ jobs:
     timeout-minutes: 30
     env:
       VITE_CAPACITOR_BUILD: "true"
+      TITANOS_ANDROID_PROJECT_REF: "wbymywwrpbljfbsemung"
       VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
+      # Legacy env alias for any screens still checking VITE_SUPABASE_ANON_KEY.
+      VITE_SUPABASE_ANON_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
       VITE_API_BASE_URL: "https://titanos-web.vercel.app"
       VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
 
@@ -122,6 +125,11 @@ jobs:
             echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
           fi
 
+      - name: Verify Supabase connection is present in Android package
+        run: |
+          node scripts/verify-android-supabase-config.mjs --env
+          node scripts/verify-android-supabase-config.mjs --bundle
+
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
@@ -146,9 +154,14 @@ jobs:
             AAB_SIGNED=false
             ACTUAL_UPLOAD_SHA256=""
           fi
+          # PR builds may produce unsigned test bundles. A Play release MUST
+          # contain the correct signed certificate; never publish an unsigned AAB.
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            test "$PLAY_SIGNING_CONFIGURED" = "true" || { echo "::error::Missing Play signing secrets"; exit 1; }
+          fi
           if [ "$PLAY_SIGNING_CONFIGURED" = "true" ]; then
-            test "$AAB_SIGNED" = "true"
-            test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256"
+            test "$AAB_SIGNED" = "true" || { echo "::error::AAB is not signed"; exit 1; }
+            test "$ACTUAL_UPLOAD_SHA256" = "$EXPECTED_UPLOAD_SHA256" || { echo "::error::Play upload certificate does not match"; exit 1; }
           fi
           {
             echo "VERSION_NAME=2.0.5"
@@ -172,7 +185,7 @@ jobs:
       - name: Upload Android release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TitanOS-2.0.5-code38-AAB
+          name: ${{ github.event_name == 'pull_request' && 'TitanOS-2.0.5-code38-UNSIGNED-TEST-ONLY' || 'TitanOS-2.0.5-code38-SIGNED-RELEASE' }}
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             TitanOS-2.0.5-code38-AAB-SHA256.txt

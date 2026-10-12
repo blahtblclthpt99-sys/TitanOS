@@ -19,7 +19,7 @@
     "android:sign": "powershell -ExecutionPolicy Bypass -File scripts/sign-android-release.ps1",
     "ionos:package": "powershell -ExecutionPolicy Bypass -File scripts/package-ionos-web.ps1",
     "dealforge:package": "powershell -ExecutionPolicy Bypass -File dealnest/scripts/package-website.ps1",
-    "cap:sync": "npm run build && npx cap sync android",
+    "cap:sync": "node scripts/capacitor-sync.mjs",
     "seed:owner": "node --env-file=.env.local scripts/seed-owner-account.mjs",
     "import:legacy-csv": "node scripts/import-legacy-csv.mjs",
     "purge:owner-seed": "node --env-file=.env.local scripts/purge-owner-seed.mjs",
@@ -41,7 +41,7 @@
     "test:money": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/money-document.test.mjs scripts/portal-otp.test.mjs",
     "test:tax": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/tax-engine.test.mjs",
     "test:hardening": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/production-hardening.test.mjs",
-    "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs",
+    "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs scripts/native-auth-url.test.mjs scripts/native-link.test.mjs",
     "test:api": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/api-error.test.mjs",
     "test:comms": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/titancom-channels.test.mjs",
     "test:export": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/export-stack.test.mjs",
@@ -67,8 +67,9 @@
     "test:e2e": "playwright test --project=chromium-desktop",
     "test:e2e:browsers": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit",
-    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
-    "gate:ship": "npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
+    "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:android-config && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
+    "gate:ship": "npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run test:android-config && npm run build",
+    "test:android-config": "node --test scripts/verify-android-supabase-config.test.mjs scripts/android-play-signing.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

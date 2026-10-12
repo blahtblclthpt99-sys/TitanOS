@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/api/supabaseClient";
 import { hasPendingOAuthParams } from "@/lib/oauthParams";
+import { cleanedOAuthCallbackUrl } from "@/lib/oauthReturnUrl";
 
 export { hasPendingOAuthParams };
 
@@ -23,18 +24,13 @@ function readAuthParams() {
     code: get("code"),
     accessToken: get("access_token"),
     refreshToken: get("refresh_token"),
-    error: get("error_description") || get("error"),
+    error: get("error_description") || get("error") || get("error_code"),
   };
 }
 
 function cleanAuthParamsFromUrl() {
   if (typeof window === "undefined" || !window.history?.replaceState) return;
-  const url = new URL(window.location.href);
-  ["code", "state", "error", "error_description", "error_code", "access_token", "refresh_token", "token_type", "expires_in"].forEach(
-    (k) => url.searchParams.delete(k)
-  );
-  const path = url.pathname === "/auth/callback" ? "/" : url.pathname;
-  window.history.replaceState({}, document.title, `${path}${url.search}${url.hash}`);
+  window.history.replaceState({}, document.title, cleanedOAuthCallbackUrl(window.location.href));
 }
 
 /**
@@ -43,6 +39,7 @@ function cleanAuthParamsFromUrl() {
 export async function completeOAuthFromUrl() {
   const params = readAuthParams();
   if (params.error) {
+    cleanAuthParamsFromUrl();
     return { ok: false, error: params.error };
   }
   if (!params.code && !(params.accessToken && params.refreshToken)) {

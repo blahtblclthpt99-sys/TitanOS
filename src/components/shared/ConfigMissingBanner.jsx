@@ -28,7 +28,7 @@ export default function ConfigMissingBanner() {
     >
       <span className="inline-flex items-center justify-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-        TitanOS is misconfigured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before launch.
+        This TitanOS app version is missing its connection configuration. Please install the latest update or contact TitanOS support.
       </span>
     </div>
   );

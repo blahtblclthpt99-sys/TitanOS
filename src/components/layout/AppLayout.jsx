@@ -1,83 +1,41 @@
-import React, { useEffect, useRef } from "react";
-import { useLocation } from "react-router";
+import React from "react";
+import { Link, useLocation } from "react-router";
+import { BriefcaseBusiness, FileText, Search } from "lucide-react";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import MobileHeader from "./MobileHeader";
-import DesktopTopBar from "./DesktopTopBar";
-import MobileActionDock from "./MobileActionDock";
 import TabStack from "./TabStack";
-import FloatingAIButton from "@/components/shared/FloatingAIButton";
 import TitanSupportButton from "@/components/shared/TitanSupportButton";
-import AppDownloadBanner from "@/components/shared/AppDownloadBanner";
-import FeedbackButton from "@/components/shared/FeedbackButton";
 import OfflineIndicator from "@/components/shared/OfflineIndicator";
 import SessionExpiryBanner from "@/components/shared/SessionExpiryBanner";
 import AppUpdateGate from "@/components/shared/AppUpdateGate";
 import SupportCenter from "@/pages/SupportCenter";
-import SupportCommandCenter from "@/pages/SupportCommandCenter";
-import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { normalizeAppPath } from "@/lib/routing";
 import "@/styles/titan-reference.css";
 
+/** One focused workspace for job seekers. Business and advertising tools are not mounted. */
 export default function AppLayout() {
-  const feedbackRef = useRef(null);
-  const location = useLocation();
-  const pathname = normalizeAppPath(location.pathname);
-  const isSupportCenter = pathname === "/support";
-  const isSupportCommandCenter = pathname === "/admin/support";
-
-  useEffect(() => {
-    const pref = getStoredTheme();
-    applyTheme(pref);
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      if (getStoredTheme() === "system") applyTheme("system");
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  return (
-    <div className="titan-app-shell min-h-screen bg-background text-foreground">
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
-      <div className="sr-only" aria-live="polite" id="a11y-status" />
-      <OfflineIndicator />
-      <SessionExpiryBanner />
-      <AppUpdateGate />
-      <div className="contents">
-        <Sidebar />
-        <DesktopTopBar />
-        <MobileHeader />
-        <nav aria-label="Mobile primary" className="md:hidden contents">
-          <MobileNav />
-        </nav>
-      </div>
-
-      <main
-        id="main-content"
-        tabIndex={-1}
-        aria-label="Main content"
-        className="titan-main-stage md:ml-[var(--sidebar-width,72px)] transition-[margin] duration-fast ease-out pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 outline-none pb-[calc(env(safe-area-inset-bottom)+10.5rem)] md:pb-8"
-        style={{
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
-          minHeight: "100svh",
-        }}
-      >
-        <div className="page-enter">
-          {isSupportCenter ? <SupportCenter /> : isSupportCommandCenter ? <SupportCommandCenter /> : <TabStack />}
-        </div>
-      </main>
-
-      <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      <TitanSupportButton />
-      <div className="hidden md:contents">
-        <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      </div>
-      <FeedbackButton ref={feedbackRef} />
-      <AppDownloadBanner />
-    </div>
-  );
+  const pathname = normalizeAppPath(useLocation().pathname);
+  return <div className="titan-app-shell min-h-screen bg-background text-foreground">
+    <a href="#main-content" className="skip-link">Skip to career tools</a>
+    <OfflineIndicator />
+    <SessionExpiryBanner />
+    <AppUpdateGate />
+    <Sidebar />
+    <MobileHeader />
+    <header className="hidden md:flex fixed z-30 top-0 right-0 left-[var(--sidebar-width,72px)] h-14 items-center justify-between gap-3 px-6 border-b border-border bg-card/95 backdrop-blur-md" aria-label="Career navigation">
+      <Link to="/" className="flex gap-2 items-center text-sm font-bold"><BriefcaseBusiness className="w-5 h-5 text-primary"/> TitanOS Careers</Link>
+      <nav className="flex gap-2">
+        <Link to="/hire" className="min-h-10 px-3 flex gap-1.5 items-center rounded-lg text-sm hover:bg-muted"><Search className="h-4 w-4"/> Find jobs</Link>
+        <Link to="/resume" className="min-h-10 px-3 flex gap-1.5 items-center rounded-lg bg-primary text-primary-foreground text-sm font-semibold"><FileText className="h-4 w-4"/> My résumé</Link>
+      </nav>
+    </header>
+    <main id="main-content" tabIndex={-1} aria-label="Career workspace"
+      className="titan-main-stage md:ml-[var(--sidebar-width,72px)] pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-14 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] md:pb-8 min-h-[100svh] outline-none"
+      style={{paddingLeft:"env(safe-area-inset-left)",paddingRight:"env(safe-area-inset-right)"}}>
+      {pathname === "/support" ? <SupportCenter /> : <TabStack />}
+    </main>
+    <MobileNav />
+    <TitanSupportButton />
+  </div>;
 }

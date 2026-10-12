@@ -61,10 +61,9 @@ export default function AuthCallback() {
           }
         }
 
-        // Drop oauth query params from the address bar after a successful exchange
-        if (typeof window !== "undefined" && window.history?.replaceState) {
-          window.history.replaceState({}, document.title, "/auth/callback");
-        }
+        // oauthBootstrap removes one-time credentials without rewriting the
+        // native HashRouter document path. Do not replaceState('/auth/callback')
+        // here: that breaks reloads in packaged Android WebViews.
 
         // Log new OAuth signups (created in the last 10 minutes)
         try {

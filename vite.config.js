@@ -3,10 +3,16 @@ import { defineConfig } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import packageJson from './package.json' with { type: 'json' };
+import { checkAndroidSupabaseEnv } from './scripts/verify-android-supabase-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
+  // A Play APK/AAB must never compile without its actual public auth configuration.
+  if (command === 'build' && process.env.VITE_CAPACITOR_BUILD === 'true') {
+    const { errors } = checkAndroidSupabaseEnv(process.env);
+    if (errors.length) throw new Error(`Invalid TitanOS Android Supabase configuration: ${errors.join('; ')}`);
+  }
   return {
     base: process.env.VITE_CAPACITOR_BUILD === 'true' ? './' : '/',
     plugins: [react()],

@@ -96,52 +96,22 @@ export function filterNavItems(items, { isAdmin = false } = {}) {
 
 export function resolvePageTitle(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
-
-  if (path === "/") return "Home";
-  if (path === "/more") return "More";
-  if (path.startsWith("/driver/trip")) return "Trip detail";
-  if (path.startsWith("/driver/") && path !== "/driver") return "Driver profile";
-  if (path.startsWith("/customers/") && path !== "/customers") return "Customer";
-  if (path.startsWith("/invoices/") && path !== "/invoices") return "Invoice";
-  if (path.startsWith("/features/")) return "Feature";
-  if (path.startsWith("/admin/support")) return "Support Command Center";
-  if (path.startsWith("/admin/moderation")) return "Moderation";
-  if (path === "/admin") return "Control Center";
-  if (path.startsWith("/admin/fees")) return "Fee Management";
-  if (path.startsWith("/admin/tax-rules")) return "Tax Rules";
-  if (path.startsWith("/book/")) return "Booking";
-  if (path.startsWith("/u/")) return "Public profile";
-  if (path.startsWith("/sign/")) return "Sign document";
-
-  const internal = INTERNAL_WORKFLOW_ITEMS.find((item) => item.path === path);
-  if (internal) return internal.label;
-
-  const exact = APP_NAV_ITEMS.find((item) => item.path === path);
-  if (exact) return exact.label;
-
-  const tab = MOBILE_TAB_ITEMS.find((item) => item.path === path);
-  if (tab) return tab.label === "Driver" ? "Driver Hub" : tab.label;
-
-  const prefix = APP_NAV_ITEMS.find((item) => item.path !== "/" && path.startsWith(`${item.path}/`));
-  if (prefix) return prefix.label;
-
-  return "TitanOS";
+  if (path === "/") return "Career Home";
+  if (path === "/more") return "More Career Tools";
+  const item = APP_NAV_ITEMS.find((entry) => entry.path.split("?")[0] === path);
+  if (item) return item.label;
+  const tab = MOBILE_TAB_ITEMS.find((entry) => entry.path === path);
+  if (tab) return tab.label;
+  if (path.startsWith("/hire")) return "Find Jobs";
+  return "TitanOS Careers";
 }
 
 export function resolveNavParent(pathname = "/") {
   const path = String(pathname || "/").split("?")[0] || "/";
-  if (path.startsWith("/driver")) return { label: "Driver Hub", path: "/driver" };
-  if (path.startsWith("/customers")) return { label: "Customers", path: "/customers" };
-  if (path.startsWith("/invoices")) return { label: "Invoices", path: "/invoices" };
-  if (path.startsWith("/jobs")) return { label: "Jobs", path: "/jobs" };
-  if (path.startsWith("/estimates")) return { label: "Estimates", path: "/estimates" };
-  if (path.startsWith("/comms")) return { label: "Communications", path: "/comms" };
-  if (path.startsWith("/assistant")) return { label: "TitanAI", path: "/assistant" };
-  if (path.startsWith("/hire")) return { label: "Hire Workers", path: "/hire" };
-  if (path.startsWith("/business-documents") || path.startsWith("/credentials") || path.startsWith("/contracts") || path.startsWith("/insurance")) {
-    return { label: "Business Documents", path: "/business-documents" };
-  }
-  if (path.startsWith("/support")) return { label: "Titan Support", path: "/support" };
-  if (path.startsWith("/admin")) return { label: "More", path: "/more" };
-  return { label: "More", path: "/more" };
+  if (path === "/resume") return { label: "Résumé Builder", path: "/resume" };
+  if (path === "/assistant") return { label: "Career Coach", path: "/assistant" };
+  if (path.startsWith("/hire")) return { label: "Find Jobs", path: "/hire" };
+  if (path === "/profile") return { label: "Career Profile", path: "/profile" };
+  if (path === "/support") return { label: "Support", path: "/support" };
+  return { label: "Career Home", path: "/" };
 }

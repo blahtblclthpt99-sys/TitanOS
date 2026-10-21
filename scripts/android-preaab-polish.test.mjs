@@ -20,3 +20,10 @@ test("brand tagline matches approved employment focus", () => {
   assert.ok(brand.includes("Work Builds Tomorrow"));
   assert.ok(!brand.includes("Platform for Modern Business"));
 });
+
+test("in-app brand mark uses the metallic shield instead of old orbit/star motif", () => {
+  const mark = read("../src/components/brand/TitanMark.jsx");
+  assert.ok(mark.includes("Metallic Titan shield"));
+  assert.ok(mark.includes("#FFBD43"));
+  assert.ok(!mark.includes("titan-mark-disc-light"));
+});

@@ -1,75 +1,26 @@
 import React, { useId } from "react";
 
-/**
- * TitanOS shield mark — star + orbit. Theme-aware disc via CSS (light/dark).
- */
+/** Metallic Titan shield, shared by the in-app header and Android adaptive icon. */
 export default function TitanMark({ className = "h-8 w-8", title = "TitanOS" }) {
   const uid = useId().replace(/:/g, "");
-  const grad = `titanShieldGrad-${uid}`;
-  const shine = `titanShieldShine-${uid}`;
-
+  const silver = `titan-silver-${uid}`;
+  const blue = `titan-blue-${uid}`;
   return (
-    <svg
-      className={`titan-mark ${className}`}
-      viewBox="0 0 96 96"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label={title}
-    >
-      <circle
-        className="titan-mark-disc-light"
-        cx="48"
-        cy="48"
-        r="46"
-        fill="#EFF6FF"
-        stroke="#BFDBFE"
-        strokeWidth="2"
-      />
-      <circle
-        className="titan-mark-disc-dark"
-        cx="48"
-        cy="48"
-        r="46"
-        fill="transparent"
-        stroke="rgba(96,165,250,0.4)"
-        strokeWidth="2"
-      />
-      <ellipse
-        cx="48"
-        cy="48"
-        rx="34"
-        ry="13"
-        transform="rotate(-28 48 48)"
-        stroke="var(--titan-orbit, #22D3EE)"
-        strokeWidth="2.75"
-        fill="none"
-        opacity="0.95"
-      />
-      <path
-        d="M48 16c-13 6.5-22 15-22 30 0 17 13 30 22 36 9-6 22-19 22-36 0-15-9-23.5-22-30z"
-        fill={`url(#${grad})`}
-      />
-      <path
-        d="M48 16c-13 6.5-22 15-22 30 0 17 13 30 22 36 9-6 22-19 22-36 0-15-9-23.5-22-30z"
-        fill={`url(#${shine})`}
-        opacity="0.45"
-      />
-      <path
-        d="M48 30l3.2 9.6H62l-8.6 6.2 3.3 10.2L48 49.6l-8.7 6.4 3.3-10.2L34 39.6h10.8L48 30z"
-        fill="#FFFFFF"
-      />
-      <circle cx="74" cy="40" r="2.2" fill="var(--titan-orbit, #22D3EE)" opacity="0.95" />
+    <svg className={`titan-mark shrink-0 ${className}`} viewBox="0 0 108 108"
+      xmlns="http://www.w3.org/2000/svg" role="img" aria-label={title}>
       <defs>
-        <linearGradient id={grad} x1="30" y1="16" x2="66" y2="82" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#3B82F6" />
-          <stop offset="1" stopColor="#1D4ED8" />
+        <linearGradient id={silver} x1="28" y1="33" x2="74" y2="76" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFFFFF" /><stop offset=".48" stopColor="#D6E6F7" /><stop offset="1" stopColor="#718EAC" />
         </linearGradient>
-        <linearGradient id={shine} x1="40" y1="18" x2="58" y2="50" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FFFFFF" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        <linearGradient id={blue} x1="19" y1="24" x2="84" y2="89" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#4ED5FF" /><stop offset="1" stopColor="#0058C7" />
         </linearGradient>
       </defs>
+      <path d="M54 16 88 34 83 70 54 92 25 70 20 34Z" fill="#102A48" stroke="#FFBD43" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M54 23 79 37 75 65 54 82 33 65 29 37Z" fill={`url(#${blue})`} />
+      <path d="M54 27 74 39 70 62 54 76 38 62 34 39Z" fill="#061A35" />
+      <path d="M32 38H76L70 49H60V71L54 78 48 71V49H38Z" fill={`url(#${silver})`} />
+      <path d="M34 39H73L69 43H39Z" fill="#FFFFFF" opacity=".85" />
     </svg>
   );
 }

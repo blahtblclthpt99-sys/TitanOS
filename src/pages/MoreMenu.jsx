@@ -51,21 +51,6 @@ export default function MoreMenu() {
         <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>
 
-      <Link
-        to="/delete-account"
-        className="titan-surface titan-surface-interactive mb-6 flex min-h-[72px] items-center gap-4 border-red-500/15 p-4 focus-ring"
-      >
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
-          <Trash2 className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">Delete account & data</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Submit a verified TitanOS account-deletion request and review data-retention details.
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
 
 
       <div className="space-y-8">
@@ -120,6 +105,22 @@ export default function MoreMenu() {
           );
         })}
       </div>
+      <div className="mt-8 border-t border-border pt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account controls</p>      <Link
+        to="/delete-account"
+        className="titan-surface titan-surface-interactive mb-0 flex min-h-[72px] items-center gap-4 border-red-500/15 p-4 focus-ring"
+      >
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
+          <Trash2 className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">Delete account & data</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Submit a verified TitanOS account-deletion request and review data-retention details.
+          </p>
+        </div>
+        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
+</div>
     </PageShell>
   );
 }

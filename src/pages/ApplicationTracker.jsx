@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { ArrowLeft, Download, Plus, Trash2 } from "lucide-react";
 const key = "titanos-career-applications-v1";
 const statuses = ["Saved", "Applied", "Interview", "Offer", "Rejected", "Closed"];
@@ -8,8 +8,14 @@ function read() {
   catch { return []; }
 }
 export default function ApplicationTracker() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState(read);
-  const [draft, setDraft] = useState({ company: "", position: "", url: "", notes: "" });
+  const [draft, setDraft] = useState(() => ({
+    company: (searchParams.get("company") || "").slice(0, 150),
+    position: (searchParams.get("position") || "").slice(0, 150),
+    url: (searchParams.get("url") || "").startsWith("https://") ? (searchParams.get("url") || "").slice(0, 2000) : "",
+    notes: "",
+  }));
   const [status, setStatus] = useState("Saved");
   const [saveNotice, setSaveNotice] = useState("");
   useEffect(() => {
@@ -32,6 +38,7 @@ export default function ApplicationTracker() {
     if (!draft.company.trim() || !draft.position.trim()) return;
     setItems(all => [{ id: globalThis.crypto?.randomUUID?.() || String(Date.now()), ...draft, company: draft.company.trim(), position: draft.position.trim(), status, createdAt: new Date().toISOString() }, ...all]);
     setDraft({ company: "", position: "", url: "", notes: "" }); setStatus("Saved");
+    if (searchParams.has("position") || searchParams.has("company") || searchParams.has("url")) setSearchParams({}, { replace: true });
   }
   return <section className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6">
     <Link to="/career" className="inline-flex min-h-11 items-center gap-2 text-sm text-primary"><ArrowLeft size={17}/> Back to careers</Link>

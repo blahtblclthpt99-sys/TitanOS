@@ -14,7 +14,6 @@ import EmptyState from "@/components/shared/EmptyState";
 import ReviewForm from "@/components/shared/ReviewForm";
 import { useAuth } from "@/lib/AuthContext";
 import { SERVICE_CATEGORIES, US_STATES, timeAgo } from "@/lib/platformConstants";
-import { betaBadgeLabel } from "@/lib/plan";
 import {
   applyToHireJob, createHireJob, formatBudget, hireApplicant, listApplicationsForJobs,
   listHireJobs, listHireJobsByIds, listHireMessages, listMyApplications, listSavedJobIds, listSavedJobs,
@@ -271,15 +270,6 @@ export default function Hire() {
         When the hire board can’t reach Supabase, posts and applications stay on this device and are labeled
         in toasts. Applications are private to the job owner and applicant once RLS migration 016 is applied.
       </FeatureHonestyBanner>
-      {betaBadgeLabel() && (
-        <div className="titan-surface mb-5 p-4 flex justify-between gap-3">
-          <div>
-            <p className="font-semibold text-foreground">{betaBadgeLabel()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Post jobs and connect with local professionals at no cost.</p>
-          </div>
-          <span className="text-xs font-medium text-primary whitespace-nowrap">No fees</span>
-        </div>
-      )}
       <div className="flex overflow-x-auto gap-1 mb-6 border-b border-border" role="tablist" aria-label="Hire sections">
         {tabs.map(([id, label]) => (
           <button

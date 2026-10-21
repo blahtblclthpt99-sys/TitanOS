@@ -29,15 +29,21 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
-      await api.auth.loginViaEmailPassword(email, password);
+      await api.auth.loginViaEmailPassword(email.trim(), password);
       await checkUserAuth();
       // Navigate via the isAuthenticated effect so the shell gate sees auth=true
       // in the same render as `/`.
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      const message = String(err?.message || "");
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      const connectionError = /network|fetch failed|failed to fetch|timeout|timed out/i.test(message);
+      setError(offline || connectionError
+        ? "Cannot reach TitanOS right now. Check your internet connection and try again."
+        : message || "Sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -73,11 +79,14 @@ export default function Login() {
               id="email"
               type="email"
               autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
               autoFocus
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-12 pl-10"
+              disabled={loading}
               required
             />
           </div>
@@ -92,6 +101,7 @@ export default function Login() {
               id="password"
               type="password"
               autoComplete="current-password"
+              autoCapitalize="none"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -100,7 +110,7 @@ export default function Login() {
             />
           </div>
         </div>
-        <Button type="submit" disabled={loading} className="h-12 w-full">
+        <Button type="submit" disabled={loading || !email.trim() || !password} className="h-12 w-full">
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

@@ -41,6 +41,32 @@ android {
             }
         }
     }
+
+    // A Play release must never be generated without the registered upload key.
+    // Debug builds remain available without signing credentials.
+    applicationVariants.all { variant ->
+        if (variant.buildType.name == 'release') {
+            def verifyUploadSigning = tasks.register('verifyTitanOSUploadSigning') {
+                doLast {
+                    if (!keystorePropertiesFile.exists()) {
+                        throw new GradleException('Release signing blocked: android/keystore.properties is missing')
+                    }
+                    ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].each { field ->
+                        if (!keystoreProperties.getProperty(field)?.trim()) {
+                            throw new GradleException("Release signing blocked: missing ${field}")
+                        }
+                    }
+                    def keyFile = rootProject.file(keystoreProperties.getProperty('storeFile'))
+                    if (!keyFile.isFile()) {
+                        throw new GradleException('Release signing blocked: upload keystore file missing')
+                    }
+                }
+            }
+            tasks.named("pre${variant.name.capitalize()}Build").configure {
+                dependsOn verifyUploadSigning
+            }
+        }
+    }
 }
 
 repositories {

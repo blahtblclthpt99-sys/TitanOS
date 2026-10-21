@@ -120,10 +120,15 @@ export default function JobMatches() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const [driver, prefs, result] = await Promise.all([
+      // An unavailable matching service must not prevent users from viewing
+      // or editing their saved preferences.
+      const [driver, prefs, matchResult] = await Promise.all([
         getMyDriverProfile(user.id).catch(() => null),
         getMyJobMatchPreferences(user.id).catch(() => null),
-        getJobMatches({ includeExternal: true }),
+        getJobMatches({ includeExternal: true }).then(
+          (value) => ({ value, error: null }),
+          (error) => ({ value: null, error }),
+        ),
       ]);
       setForm({
         skills: csvText(driver?.skills || prefs?.skills),
@@ -137,8 +142,15 @@ export default function JobMatches() {
         searchLat: prefs?.search_lat ?? null,
         searchLng: prefs?.search_lng ?? null,
       });
-      setMatches(result.matches || []);
-      setStatus(result);
+      if (matchResult.error) {
+        setMatches([]);
+        setStatus({ needsProfile: false, needsSkills: false, external: { reason: "unavailable" } });
+        toast({ variant: "destructive", title: "Job matching service unavailable", description: "Your profile is still available. Please try Refresh later." });
+      } else {
+        const result = matchResult.value || {};
+        setMatches(Array.isArray(result.matches) ? result.matches : []);
+        setStatus(result);
+      }
     } catch (error) {
       setMatches([]);
       toast({ variant: "destructive", title: "Job matching is temporarily unavailable", description: "We couldn't reach the matching service. Your profile has not been changed. Try Refresh later." });

@@ -19,7 +19,7 @@ export default function MoreMenu() {
     <PageShell maxWidth="md">
       <PageHeader
         title="More"
-        subtitle="Your operating system — Live, History, Analytics, Reports, Communication, AI, Configuration, and Labs. Domains, not a feature list."
+        subtitle="Choose how you work. Job seekers, employers, and independent contractors each have a simpler set of tools."
       />
 
       <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">

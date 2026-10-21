@@ -16,6 +16,18 @@ export default function ApplicationTracker() {
     url: (searchParams.get("url") || "").startsWith("https://") ? (searchParams.get("url") || "").slice(0, 2000) : "",
     notes: "",
   }));
+  // HashRouter may reuse this mounted page when users choose another job match.
+  // Refresh the form whenever the incoming job changes.
+  useEffect(() => {
+    if (!searchParams.has("position") && !searchParams.has("company")) return;
+    const nextUrl = searchParams.get("url") || "";
+    setDraft({
+      company: (searchParams.get("company") || "").slice(0, 150),
+      position: (searchParams.get("position") || "").slice(0, 150),
+      url: nextUrl.startsWith("https://") ? nextUrl.slice(0, 2000) : "",
+      notes: "",
+    });
+  }, [searchParams]);
   const [status, setStatus] = useState("Saved");
   const [saveNotice, setSaveNotice] = useState("");
   useEffect(() => {
@@ -36,7 +48,12 @@ export default function ApplicationTracker() {
   function add(event) {
     event.preventDefault();
     if (!draft.company.trim() || !draft.position.trim()) return;
-    setItems(all => [{ id: globalThis.crypto?.randomUUID?.() || String(Date.now()), ...draft, company: draft.company.trim(), position: draft.position.trim(), status, createdAt: new Date().toISOString() }, ...all]);
+    const canonicalUrl = draft.url.trim();
+    if (canonicalUrl && !/^https:\/\//i.test(canonicalUrl)) {
+      setSaveNotice("Job link must start with https://");
+      return;
+    }
+    setItems(all => [{ id: globalThis.crypto?.randomUUID?.() || String(Date.now()), ...draft, url: canonicalUrl, company: draft.company.trim(), position: draft.position.trim(), status, createdAt: new Date().toISOString() }, ...all]);
     setDraft({ company: "", position: "", url: "", notes: "" }); setStatus("Saved");
     if (searchParams.has("position") || searchParams.has("company") || searchParams.has("url")) setSearchParams({}, { replace: true });
   }

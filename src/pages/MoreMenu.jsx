@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router";
-import { BriefcaseBusiness, ChevronRight, Sparkles, Trash2 } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import PageShell from "@/components/shared/PageShell";
 import ThemeToggle from "@/components/brand/ThemeToggle";
@@ -31,24 +31,6 @@ export default function MoreMenu() {
         className="mb-4 inline-flex min-h-[44px] items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground focus-ring hover:border-primary/40"
       >
         Open classic business dashboard
-      </Link>
-
-      <Link
-        to="/hire/matches"
-        className="titan-surface titan-surface-interactive mb-6 flex min-h-[88px] items-center gap-4 border-primary/20 p-4 focus-ring"
-      >
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <BriefcaseBusiness className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-            Matches for you <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Use your skills, certifications, location and preferences to find Titan jobs and approved outside opportunities.
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>
 
 

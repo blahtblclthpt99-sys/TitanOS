@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Printer, Save } from "lucide-react";
 const key = "titanos-career-resume-v1";
 const initial = { name: "", email: "", phone: "", location: "", headline: "", summary: "", experience: "", education: "", skills: "" };
 function load() {
-  try { return { ...initial, ...JSON.parse(localStorage.getItem(key) || "{}") }; }
+  try { const data = JSON.parse(localStorage.getItem(key) || "{}"); return Object.fromEntries(Object.keys(initial).map(field => [field, typeof data?.[field] === "string" ? data[field] : ""])); }
   catch { return initial; }
 }
 function textResume(data) {

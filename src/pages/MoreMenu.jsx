@@ -105,7 +105,8 @@ export default function MoreMenu() {
           );
         })}
       </div>
-      <div className="mt-8 border-t border-border pt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account controls</p>      <Link
+      <div className="mt-8 border-t border-border pt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account controls</p>
+        <Link
         to="/delete-account"
         className="titan-surface titan-surface-interactive mb-0 flex min-h-[72px] items-center gap-4 border-red-500/15 p-4 focus-ring"
       >

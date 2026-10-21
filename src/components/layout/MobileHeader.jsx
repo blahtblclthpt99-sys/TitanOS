@@ -13,6 +13,7 @@ import MobileGlobalSearch from "@/components/layout/MobileGlobalSearch";
  * or the entry was a cold deep link (location.key === "default").
  */
 function getTabRoot(pathname) {
+  if (pathname === "/resume" || pathname === "/applications" || pathname.startsWith("/hire/matches")) return "/career";
   if (pathname.startsWith("/driver")) return "/driver";
   if (pathname.startsWith("/customers")) return "/customers";
   if (pathname.startsWith("/invoices")) return "/invoices";

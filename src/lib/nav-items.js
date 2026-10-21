@@ -46,7 +46,8 @@ export const APP_NAV_ITEMS = [
   { icon: Bell, label: "Notifications", path: "/notifications", group: "today" },
 
   // WORK
-  { icon: Briefcase, label: "Jobs", path: "/jobs", group: "work" },
+  { icon: Briefcase, label: "Careers", path: "/career", group: "work" },
+  { icon: Briefcase, label: "Business Jobs", path: "/jobs", group: "work" },
   { icon: Calendar, label: "Schedule", path: "/schedule", group: "work" },
   { icon: Car, label: "Driver Hub", path: "/driver", group: "work" },
   { icon: Route, label: "Route Planner", path: "/routes", group: "work" },
@@ -135,12 +136,12 @@ export const NAV_GROUP_ORDER = [
 /** Keep mobile focused on the four highest-frequency roots; More exposes the rest. */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
-  { icon: Briefcase, label: "Jobs", path: "/jobs" },
+  { icon: Briefcase, label: "Careers", path: "/career" },
   { icon: Car, label: "Driver", path: "/driver" },
   { icon: Radio, label: "Comms", path: "/comms" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/jobs", "/driver", "/comms", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/career", "/driver", "/comms", "/more"];
 
 export const MORE_MENU_GROUPS = [
   {
@@ -151,7 +152,7 @@ export const MORE_MENU_GROUPS = [
   {
     title: "Work",
     description: "Plan, dispatch, complete, and document work",
-    paths: ["/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
+    paths: ["/career", "/hire/matches", "/hire", "/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
   },
   {
     title: "Customers",

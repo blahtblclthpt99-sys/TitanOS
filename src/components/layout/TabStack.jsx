@@ -24,7 +24,7 @@ const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
 
 const TAB_COMPONENTS = {
-  "/": Dashboard,
+  "/": CareerHub,
   "/driver": DriverHubTab,
   "/comms": TitanCommsTab,
   "/jobs": Jobs,
@@ -100,6 +100,7 @@ const LEGACY_REDIRECTS = {
 };
 
 const NON_TAB_ROUTES = {
+  "/business-dashboard": Dashboard,
   "/schedule": Schedule,
   "/estimates": Estimates,
   "/job-estimator": JobEstimator,

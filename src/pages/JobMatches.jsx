@@ -30,6 +30,11 @@ function MatchCard({ job, onAction, busy }) {
   const source = jobMatchSourceLabel(job);
   const state = job.interaction_state || null;
   const destination = external ? job.source_url || job.match?.source_url : `/hire?tab=browse&job=${encodeURIComponent(job.id)}`;
+  const trackerParams = new URLSearchParams({
+    position: String(job.title || "Job").slice(0, 150),
+    company: String(job.company_name || job.company?.name || job.employer_name || source).slice(0, 150),
+    ...(external && typeof destination === "string" && destination.startsWith("https://") ? { url: destination } : {}),
+  });
 
   return (
     <article className="titan-surface p-5 space-y-4">
@@ -75,6 +80,8 @@ function MatchCard({ job, onAction, busy }) {
         </Button>
         <Button type="button" variant="outline" disabled={busy} onClick={() => onAction(job, "ignore")} className="gap-2"><EyeOff className="h-4 w-4" aria-hidden="true" />Ignore</Button>
       </div>
+
+      <Link to={`/applications?${trackerParams.toString()}`} className="inline-flex min-h-[44px] w-full items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground focus-ring hover:border-primary/50">Add to application tracker</Link>
 
       {external ? (
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">

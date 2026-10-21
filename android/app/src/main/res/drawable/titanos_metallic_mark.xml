@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Detailed metallic emblem, safely inset for Android adaptive icon masking. -->
+    <path android:fillColor="#112C4D" android:pathData="M54,16 L88,34 L83,70 L54,92 L25,70 L20,34 Z"/>
+    <path android:fillColor="#FFBD43" android:pathData="M54,16 L88,34 L83,70 L54,92 L25,70 L20,34 Z M54,20 L24,36 L29,68 L54,87 L79,68 L84,36 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#35B9FF" android:pathData="M54,22 L80,37 L75,65 L54,82 L33,65 L28,37 Z"/>
+    <path android:fillColor="#061A35" android:pathData="M54,26 L75,39 L70,62 L54,76 L38,62 L33,39 Z"/>
+    <!-- Silver core / angular Titan T. -->
+    <path android:fillColor="#E9F5FF" android:pathData="M32,38 L76,38 L70,49 L60,49 L60,71 L54,78 L48,71 L48,49 L38,49 Z"/>
+    <path android:fillColor="#8DAFCB" android:pathData="M54,40 L76,38 L70,49 L60,49 L60,71 L54,78 Z"/>
+    <path android:fillColor="#006BDA" android:pathData="M29,39 L38,49 L46,49 L46,62 L38,56 Z"/>
+    <path android:fillColor="#007DE7" android:pathData="M79,39 L70,49 L62,49 L62,62 L70,56 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M34,39 L73,39 L69,43 L39,43 Z"/>
+</vector>

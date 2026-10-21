@@ -25,6 +25,9 @@ export default function AppLayout() {
   const pathname = normalizeAppPath(location.pathname);
   const isSupportCenter = pathname === "/support";
   const isSupportCommandCenter = pathname === "/admin/support";
+  const isFocusedWorkflow = ["/hire", "/hire/matches", "/resume", "/applications", "/support"].some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
 
   useEffect(() => {
     const pref = getStoredTheme();
@@ -71,8 +74,8 @@ export default function AppLayout() {
         </div>
       </main>
 
-      <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />
-      <TitanSupportButton />
+      {!isFocusedWorkflow && <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />}
+      {!isFocusedWorkflow && <TitanSupportButton />}
       <div className="hidden md:contents">
         <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />
       </div>

@@ -27,3 +27,13 @@ test("in-app brand mark uses the metallic shield instead of old orbit/star motif
   assert.ok(mark.includes("#FFBD43"));
   assert.ok(!mark.includes("titan-mark-disc-light"));
 });
+
+test("mobile navigation chooses one active tab and routes career subpages home", () => {
+  const nav = read("../src/components/layout/MobileNav.jsx");
+  const header = read("../src/components/layout/MobileHeader.jsx");
+  assert.ok(nav.includes("const primaryActive = MOBILE_TAB_ITEMS.some"));
+  assert.ok(nav.includes("!primaryActive &&"));
+  assert.ok(header.includes('pathname === "/resume"'));
+  assert.ok(header.includes('pathname === "/applications"'));
+  assert.ok(header.includes('return "/career"'));
+});

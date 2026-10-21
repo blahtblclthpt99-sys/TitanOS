@@ -32,3 +32,14 @@ No production schema or authentication policy was changed as part of this audit.
 - Next safe technical gate: inspect the actual Vercel production deployment and relevant server logs, then identify the legitimate historical jobs schema and private RLS policy baseline before any migrations.
 
 This inspection did not modify production Vercel deployments, environment variables, database schema or roles.
+
+
+## Schema recovery source files discovered
+
+- The repository already contains `supabase/migrations/001_titanos_schema.sql`, which creates `public.profiles` and `public.jobs`, and enables RLS on them.
+- `supabase/migrations/002_platform_expansion.sql` creates `public.hire_jobs` and `public.hire_applications`, with RLS enabled.
+- This is **source code evidence only**; it does not mean those migrations were applied to the current Supabase project.
+- Do not execute the old migrations blindly: inspect each policy, function, trigger, dependency, and existing historical data. Old migrations contain many unrelated business/marketplace tables, so a jobs-first rebuild should be scoped and reviewed.
+- The configured client API targets Vercel `/api/functions/...`, including `jobMatchesV2` and `supportListCases`; the files `api/functions/jobMatchesV2.js` and `api/functions/supportListCases.js` exist on the improvement branch.
+- Latest `titanos-web` production deployment found in Vercel was from 2026-08-18 `main`, commit `4d09fbc`; current feature-branch code cannot be assumed deployed. A Vercel production **READY** status is not an end-to-end test.
+- Production schema recovery should be separately reviewed and migration-tested on an isolated environment with valid test users and ownership-based RLS before publication.

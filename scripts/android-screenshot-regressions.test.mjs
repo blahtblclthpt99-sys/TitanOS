@@ -22,3 +22,8 @@ test("floating elements are hidden on full-screen hiring and editing forms", () 
   assert.match(layout, /!isFocusedWorkflow && <MobileActionDock/);
   assert.match(layout, /!isFocusedWorkflow && <TitanSupportButton/);
 });
+test("job matching outages preserve editing of user preferences", () => {
+  assert.match(matches, /const \[driver, prefs, matchResult\] = await Promise\.all/);
+  assert.match(matches, /if \(matchResult\.error\)/);
+  assert.match(matches, /setForm\(\{/);
+});

@@ -20,3 +20,15 @@
 6. Only then rebuild test APK, verify Android, and prepare Google Play AAB.
 
 No production schema or authentication policy was changed as part of this audit.
+
+
+## Vercel inspection follow-up
+
+- Verified accessible Vercel projects `titanos-web`, `titan-os`, `titanos` in team `team_y4JdYzbNnxR4TSXANG84GN9j`.
+- `titanos-web` project contains production variable *names* `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Their values were **not decrypted or disclosed** in this audit. Presence does not validate the project target or application tables.
+- Recent `titanos-web` deployment entries with status READY were on `product/titan-core-four` (e.g. commit `39ef952`), rather than the Android improvement branch. READY only establishes a successful Vercel deployment, not functional endpoints.
+- Android `src/api/functions.js` calls `https://titanos-web.vercel.app/api/functions/<functionName>` using `VITE_API_BASE_URL`. Therefore check the Vercel project's **production** deployment and routing explicitly.
+- Connected Supabase production project's public schema has only five `attention_*` tables; this is independently incompatible with `src/api/entityTables.js`, which maps `HireJob` to `hire_jobs` and `HireApplication` to `hire_applications`.
+- Next safe technical gate: inspect the actual Vercel production deployment and relevant server logs, then identify the legitimate historical jobs schema and private RLS policy baseline before any migrations.
+
+This inspection did not modify production Vercel deployments, environment variables, database schema or roles.

@@ -8,7 +8,6 @@ import TitanBrandLogo from "@/components/brand/TitanBrandLogo";
 import { MORE_MENU_GROUPS, filterNavItems, navItemsByPaths } from "@/lib/nav-items";
 import { useAuth } from "@/lib/AuthContext";
 import { isUserAdmin } from "@/lib/isAdmin";
-import { betaBadgeLabel } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 
 export default function MoreMenu() {
@@ -68,11 +67,6 @@ export default function MoreMenu() {
         <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>
 
-      {betaBadgeLabel(user) && (
-        <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-medium text-primary">
-          {betaBadgeLabel(user)}
-        </div>
-      )}
 
       <div className="space-y-8">
         {MORE_MENU_GROUPS.map((group) => {

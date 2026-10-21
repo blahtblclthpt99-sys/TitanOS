@@ -9,10 +9,24 @@ workflows:
     environment:
       node: 22
       java: 21
+      groups:
+        - titanos_supabase
       vars:
         VITE_API_BASE_URL: "https://titanos-web.vercel.app"
         VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
     scripts:
+      - name: Verify Supabase configuration before compiling
+        script: |
+          set -eu
+          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${VITE_SUPABASE_ANON_KEY:-}" ]; then
+            echo "BLOCKED: Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Codemagic group titanos_supabase."
+            exit 1
+          fi
+          case "$VITE_SUPABASE_URL" in
+            https://*) ;;
+            *) echo "BLOCKED: VITE_SUPABASE_URL must begin with https://"; exit 1;;
+          esac
+          echo "Supabase build configuration present (values hidden)."
       - name: Install dependencies and compile mobile assets
         script: |
           set -eu
@@ -42,12 +56,26 @@ workflows:
     environment:
       node: 22
       java: 21
+      groups:
+        - titanos_supabase
       android_signing:
         - titanos_upload
       vars:
         VITE_API_BASE_URL: "https://titanos-web.vercel.app"
         VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
     scripts:
+      - name: Verify Supabase configuration before compiling
+        script: |
+          set -eu
+          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${VITE_SUPABASE_ANON_KEY:-}" ]; then
+            echo "BLOCKED: Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Codemagic group titanos_supabase."
+            exit 1
+          fi
+          case "$VITE_SUPABASE_URL" in
+            https://*) ;;
+            *) echo "BLOCKED: VITE_SUPABASE_URL must begin with https://"; exit 1;;
+          esac
+          echo "Supabase build configuration present (values hidden)."
       - name: Install dependencies and compile mobile assets
         script: |
           set -eu

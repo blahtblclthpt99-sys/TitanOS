@@ -72,7 +72,7 @@ export default function SupportCenter() {
       setCases(next);
       if (!preserveSelection || !selectedCaseId) setSelectedCaseId(next[0]?.id || null);
     } catch (err) {
-      setError(err?.message || "Support cases could not be loaded.");
+      setError("Support is temporarily unavailable. Check your connection and try Refresh. Your unsent message stays on this device.");
     } finally {
       setLoading(false);
     }

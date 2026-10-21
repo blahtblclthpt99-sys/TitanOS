@@ -26,7 +26,7 @@ export default function TitanWordmark({
       </span>
       {showTagline ? (
         <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          Platform for Modern Business
+          Work Builds Tomorrow
         </span>
       ) : null}
     </span>

@@ -1,9 +1,10 @@
 # TitanOS 2.0.7 (versionCode 41) — Android tablet-friendly Codemagic builds.
+# Use free-eligible macOS M2 build minutes on a Codemagic Personal account.
 # Only manually triggered builds; never auto-publish to Google Play.
 workflows:
   titanos-android-test:
     name: TitanOS Android test APK (side-by-side)
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     max_build_duration: 90
     environment:
       node: 22
@@ -36,7 +37,7 @@ workflows:
 
   titanos-android-play:
     name: TitanOS 2.0.7 (41) signed Google Play AAB
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     max_build_duration: 90
     environment:
       node: 22

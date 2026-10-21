@@ -3,8 +3,8 @@ import { Link } from "react-router";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, FileText, Sparkles, UserRound, Wrench } from "lucide-react";
 
 const actions = [
-  { to: "/hire/matches", icon: Sparkles, title: "Find matching jobs", detail: "Explore opportunities matched to your skills and preferences.", primary: true },
-  { to: "/hire", icon: BriefcaseBusiness, title: "Browse opportunities", detail: "Search available work and view job details." },
+  { to: "/hire/matches", icon: Sparkles, title: "Find matching jobs", detail: "See matching opportunities when the live jobs service is connected.", primary: true },
+  { to: "/hire", icon: BriefcaseBusiness, title: "Browse opportunities", detail: "Browse posted jobs when the live job board is available." },
   { to: "/applications", icon: ClipboardList, title: "Track applications", detail: "Organize saved jobs, applications and interviews on this device." },
   { to: "/resume", icon: FileText, title: "Build your résumé", detail: "Write, save and export a résumé on this device." },
   { to: "/profile", icon: UserRound, title: "Update your profile", detail: "Keep your experience and qualifications current." },
@@ -16,9 +16,9 @@ export default function CareerHub() {
     <section className="mx-auto w-full max-w-4xl space-y-6 px-4 py-5 sm:px-6 sm:py-8" aria-labelledby="career-heading">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">TitanOS Careers</p>
-        <h1 id="career-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Your next opportunity starts here</h1>
+        <h1 id="career-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Find work. Build your future.</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Find relevant work, strengthen your profile, and prepare for your next application.
+          Your job search, résumé, applications, and interview preparation—together in one free workspace.
         </p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -42,8 +42,8 @@ export default function CareerHub() {
           Complete your profile before comparing job matches. Review each employer's qualifications and application process independently.
         </p>
       </div>
-      <Link to="/jobs" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline focus-ring">
-        <Wrench className="h-4 w-4" aria-hidden="true" /> Manage business jobs
+      <Link to="/more" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline focus-ring">
+        <Wrench className="h-4 w-4" aria-hidden="true" /> Business and contractor tools
       </Link>
     </section>
   );

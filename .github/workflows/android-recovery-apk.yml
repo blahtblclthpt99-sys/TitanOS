@@ -22,6 +22,9 @@ jobs:
   recovery-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      VITE_API_BASE_URL: https://titanos-web.vercel.app
+      VITE_TITANOS_PUBLIC_ORIGIN: https://titanos-web.vercel.app
     steps:
       - name: Checkout recovery source
         uses: actions/checkout@v4
@@ -41,6 +44,10 @@ jobs:
           gradle-version: '8.14.3'
       - name: Install locked dependencies
         run: npm ci
+      - name: Verify Android preview API configuration
+        run: |
+          test "$VITE_API_BASE_URL" = "https://titanos-web.vercel.app"
+          test "$VITE_TITANOS_PUBLIC_ORIGIN" = "https://titanos-web.vercel.app"
       - name: Build and sync original UI
         run: npm run cap:sync
       - name: Isolate preview app from Play app

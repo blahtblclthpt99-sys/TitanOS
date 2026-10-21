@@ -1,4 +1,5 @@
 import React from "react";
+import { Capacitor } from "@capacitor/core";
 import AppError from "@/components/shared/AppError";
 import { captureException } from "@/lib/sentry";
 import { trackEvent } from "@/lib/productAnalytics";
@@ -67,7 +68,8 @@ export default class ErrorBoundary extends React.Component {
 
     // After a deploy, stale tabs can reference missing hashed chunks. Recover at
     // most once per short incident window, not just once for the whole session.
-    if (isChunkLoadError(error) && typeof window !== "undefined") {
+    // A native APK bundles its chunks locally: reloading cannot download a missing chunk.
+    if (isChunkLoadError(error) && typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
       markAndReloadOnce();
     }
   }
@@ -84,7 +86,14 @@ export default class ErrorBoundary extends React.Component {
   };
 
   handleHome = () => {
-    window.location.href = "/";
+    // The native Android shell uses HashRouter, so a pathname navigation to /
+    // can strand users on the WebView origin rather than the in-app home screen.
+    if (Capacitor.isNativePlatform()) {
+      window.location.hash = "#/";
+      this.setState({ hasError: false });
+    } else {
+      window.location.assign("/");
+    }
   };
 
   render() {

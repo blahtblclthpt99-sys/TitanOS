@@ -9,7 +9,7 @@ const careers = read("../src/pages/CareerHub.jsx");
 test("careers is a real routed mobile tab", () => {
   assert.match(routes, /"\/career": CareerHub/);
   assert.match(routes, /import\("@\/pages\/CareerHub"\)/);
-  assert.match(nav, /label: "Careers", path: "\/career"/);
+  assert.match(nav, /label: "Find Work", path: "\/career"/);
 });
 test("business jobs remain reachable rather than removed", () => {
   assert.match(routes, /"\/jobs": Jobs/);

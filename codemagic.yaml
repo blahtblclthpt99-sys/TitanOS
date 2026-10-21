@@ -31,7 +31,7 @@ workflows:
         script: |
           set -eu
           npm ci
-          node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs
+          node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs scripts/android-career-export.test.mjs
           npm run cap:sync
       - name: Build independent Android test APK
         script: |
@@ -81,7 +81,7 @@ workflows:
         script: |
           set -eu
           npm ci
-          node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs
+          node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs scripts/android-career-export.test.mjs
           npm run cap:sync
       - name: Configure private upload signing on build machine
         script: |

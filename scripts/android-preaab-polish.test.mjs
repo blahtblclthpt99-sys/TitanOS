@@ -50,3 +50,10 @@ test("application backups can be restored with validation and confirmation", () 
   assert.ok(tracker.includes("window.confirm("));
   assert.ok(tracker.includes("Import backup"));
 });
+
+test("resume draft is saved on page exit and stored fields are validated", () => {
+  const resume = read("../src/pages/ResumeStudio.jsx");
+  assert.ok(resume.includes('window.addEventListener("pagehide", saveBeforeExit)'));
+  assert.ok(resume.includes('latestDraft.current = form'));
+  assert.ok(resume.includes('typeof data?.[field] === "string"'));
+});

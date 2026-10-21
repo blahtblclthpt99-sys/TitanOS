@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, Trash2 } from "lucide-react";
 const key = "titanos-career-applications-v1";
 const statuses = ["Saved", "Applied", "Interview", "Offer", "Rejected", "Closed"];
 function read() {
@@ -16,6 +16,17 @@ export default function ApplicationTracker() {
     try { localStorage.setItem(key, JSON.stringify(items)); setSaveNotice("Saved on this device"); }
     catch { setSaveNotice("Storage is unavailable; export your information separately."); }
   }, [items]);
+  function exportRecords() {
+    const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), applications: items }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "TitanOS-Applications-Backup.json";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
   function add(event) {
     event.preventDefault();
     if (!draft.company.trim() || !draft.position.trim()) return;
@@ -32,7 +43,10 @@ export default function ApplicationTracker() {
       <label className="block text-sm"><span className="font-medium">Notes</span><textarea value={draft.notes} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} rows={2} className="mt-1 w-full rounded-lg border border-border bg-background p-3"/></label>
       <button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 font-semibold text-primary-foreground"><Plus size={18}/> Add opportunity</button>
     </form>
-    <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{saveNotice}</p>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{saveNotice}</p>
+      <button type="button" onClick={exportRecords} disabled={!items.length} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground disabled:opacity-50"><Download size={17}/> Export backup</button>
+    </div>
     {!items.length && <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">No saved opportunities yet. Add a job you're considering or have applied for.</p>}
     <ul className="space-y-3">{items.map(item=><li key={item.id} className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{item.position}</h3><p className="text-sm text-muted-foreground">{item.company}</p></div><button type="button" onClick={()=>{if(window.confirm("Delete this entry?"))setItems(all=>all.filter(i=>i.id!==item.id));}} aria-label={`Delete ${item.position} at ${item.company}`} className="min-h-11 min-w-11 text-destructive"><Trash2 size={18}/></button></div>

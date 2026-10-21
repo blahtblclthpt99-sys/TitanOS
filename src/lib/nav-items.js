@@ -134,55 +134,46 @@ export const NAV_GROUP_ORDER = [
 ];
 
 /** Keep mobile focused on the four highest-frequency roots; More exposes the rest. */
+/** Four focused destinations on mobile. Advanced tools remain available under More. */
 export const MOBILE_TAB_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/" },
-  { icon: Briefcase, label: "Careers", path: "/career" },
-  { icon: Car, label: "Driver", path: "/driver" },
-  { icon: Radio, label: "Comms", path: "/comms" },
+  { icon: Briefcase, label: "Find Work", path: "/career" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
-export const MOBILE_ROOT_PATHS = ["/", "/career", "/driver", "/comms", "/more"];
+export const MOBILE_ROOT_PATHS = ["/", "/career", "/profile", "/more"];
 
+/**
+ * Deliberately short menu: Job Seeker, Employer, Independent Contractor,
+ * and Account. Routes omitted from More remain available via existing
+ * bookmarks, deep links and the underlying authenticated route table.
+ * This is a navigation change, not deletion of data or product modules.
+ */
 export const MORE_MENU_GROUPS = [
   {
-    title: "Today",
-    description: "What is happening and what needs your attention",
-    paths: ["/", "/notifications"],
+    title: "Find Work",
+    description: "Jobs, matching and career assistance",
+    paths: ["/career", "/assistant"],
   },
   {
-    title: "Work",
-    description: "Plan, dispatch, complete, and document work",
-    paths: ["/career", "/hire/matches", "/hire", "/jobs", "/schedule", "/driver", "/routes", "/booking", "/employees", "/fleet", "/inventory", "/business-documents"],
+    title: "Employer",
+    description: "Post work and manage hiring",
+    paths: ["/jobs", "/companies", "/employees"],
   },
   {
-    title: "Customers",
-    description: "Manage customers, leads, communication, and reputation",
-    paths: ["/customers", "/leads", "/follow-ups", "/comms", "/reputation"],
+    title: "Independent Contractor",
+    description: "Tools for completing paid work",
+    paths: ["/driver", "/schedule", "/estimates", "/invoices"],
   },
   {
-    title: "Money",
-    description: "Estimate, invoice, collect, track, and report",
-    paths: ["/estimates", "/invoices", "/payments", "/finances", "/reports", "/tax-center"],
+    title: "Account & Help",
+    description: "Your account, alerts and support",
+    paths: ["/profile", "/notifications", "/settings", "/support", "/trust-safety"],
   },
   {
-    title: "Second Me",
-    description: "Memory, intelligence, and approved automation",
-    paths: ["/second-me", "/assistant", "/autopilot"],
-  },
-  {
-    title: "Business",
-    description: "Your business, profile, analytics, and settings",
-    paths: ["/companies", "/profile", "/analytics", "/settings"],
-  },
-  {
-    title: "Support & Safety",
-    description: "Get help and manage safety",
-    paths: ["/support", "/trust-safety"],
-  },
-  {
-    title: "Admin",
-    description: "Authorized staff controls",
-    paths: ["/admin", "/admin/support", "/admin/moderation", "/admin/fees", "/admin/tax-rules"],
+    title: "Administration",
+    description: "Authorized staff only",
+    paths: ["/admin"],
   },
 ];
 

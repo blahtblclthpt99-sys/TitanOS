@@ -121,7 +121,7 @@ export default function JobMatches() {
     setLoading(true);
     try {
       const [driver, prefs, result] = await Promise.all([
-        getMyDriverProfile(user.id),
+        getMyDriverProfile(user.id).catch(() => null),
         getMyJobMatchPreferences(user.id).catch(() => null),
         getJobMatches({ includeExternal: true }),
       ]);
@@ -140,7 +140,8 @@ export default function JobMatches() {
       setMatches(result.matches || []);
       setStatus(result);
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't load job matches", description: error.message || "Please try again." });
+      setMatches([]);
+      toast({ variant: "destructive", title: "Job matching is temporarily unavailable", description: "We couldn't reach the matching service. Your profile has not been changed. Try Refresh later." });
     } finally {
       setLoading(false);
     }

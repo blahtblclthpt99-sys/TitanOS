@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ArrowLeft, Download, Plus, Trash2 } from "lucide-react";
 const key = "titanos-career-applications-v1";
@@ -30,6 +30,7 @@ export default function ApplicationTracker() {
   }, [searchParams]);
   const [status, setStatus] = useState("Saved");
   const [saveNotice, setSaveNotice] = useState("");
+  const importInput = useRef(null);
   useEffect(() => {
     try { localStorage.setItem(key, JSON.stringify(items)); setSaveNotice("Saved on this device"); }
     catch { setSaveNotice("Storage is unavailable; export your information separately."); }
@@ -44,6 +45,35 @@ export default function ApplicationTracker() {
     anchor.click();
     anchor.remove();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
+  async function importRecords(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { setSaveNotice("Backup too large (2 MB maximum)."); return; }
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (parsed?.version !== 1 || !Array.isArray(parsed.applications) || parsed.applications.length > 1000) {
+        throw new Error("Invalid TitanOS applications backup.");
+      }
+      const valid = parsed.applications.every((item) =>
+        item && typeof item.id === "string" && typeof item.company === "string" &&
+        typeof item.position === "string" && statuses.includes(item.status) &&
+        (!item.url || (typeof item.url === "string" && item.url.startsWith("https://"))) &&
+        (!item.notes || typeof item.notes === "string")
+      );
+      if (!valid) throw new Error("Backup contains invalid application records.");
+      if (!window.confirm(`Restore ${parsed.applications.length} applications? This replaces the current tracker. Export a backup first.`)) return;
+      setItems(parsed.applications.map(item => ({
+        id: item.id.slice(0, 150), company: item.company.slice(0, 150),
+        position: item.position.slice(0, 150), status: item.status,
+        url: (item.url || "").slice(0, 2000), notes: (item.notes || "").slice(0, 5000),
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+      })));
+      setSaveNotice("Backup restored on this device.");
+    } catch {
+      setSaveNotice("Could not import that TitanOS applications backup. No existing records were changed.");
+    }
   }
   function add(event) {
     event.preventDefault();
@@ -69,6 +99,8 @@ export default function ApplicationTracker() {
     </form>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{saveNotice}</p>
+      <input ref={importInput} type="file" accept=".json,application/json" onChange={importRecords} className="sr-only" aria-label="Choose applications backup file" />
+      <button type="button" onClick={() => importInput.current?.click()} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground">Import backup</button>
       <button type="button" onClick={exportRecords} disabled={!items.length} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground disabled:opacity-50"><Download size={17}/> Export backup</button>
     </div>
     {!items.length && <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">No saved opportunities yet. Add a job you're considering or have applied for.</p>}

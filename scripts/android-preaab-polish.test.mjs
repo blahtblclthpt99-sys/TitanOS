@@ -37,3 +37,16 @@ test("mobile navigation chooses one active tab and routes career subpages home",
   assert.ok(header.includes('pathname === "/applications"'));
   assert.ok(header.includes('return "/career"'));
 });
+
+test("resume export omits empty placeholder sections", () => {
+  const resume = read("../src/pages/ResumeStudio.jsx");
+  assert.ok(resume.includes('.filter(([, value]) => Boolean(value?.trim()))'));
+  assert.ok(!resume.includes('Add information above to complete this section.'));
+});
+test("application backups can be restored with validation and confirmation", () => {
+  const tracker = read("../src/pages/ApplicationTracker.jsx");
+  assert.ok(tracker.includes("async function importRecords"));
+  assert.ok(tracker.includes("file.size > 2 * 1024 * 1024"));
+  assert.ok(tracker.includes("window.confirm("));
+  assert.ok(tracker.includes("Import backup"));
+});

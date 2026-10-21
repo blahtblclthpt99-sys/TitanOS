@@ -13,11 +13,12 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const PageNotFound = lazy(() => import("@/lib/PageNotFound"));
 
-const TAB_PATHS = ["/", "/driver", "/comms", "/jobs", "/more"];
+const TAB_PATHS = ["/", "/career", "/driver", "/comms", "/jobs", "/more"];
 const TAB_LRU_SIZE = 3;
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
+const CareerHub = lazy(() => import("@/pages/CareerHub"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
@@ -27,6 +28,7 @@ const TAB_COMPONENTS = {
   "/driver": DriverHubTab,
   "/comms": TitanCommsTab,
   "/jobs": Jobs,
+  "/career": CareerHub,
   "/more": MoreMenu,
 };
 

@@ -25,6 +25,10 @@ export default function AppLayout() {
   const pathname = normalizeAppPath(location.pathname);
   const isSupportCenter = pathname === "/support";
   const isSupportCommandCenter = pathname === "/admin/support";
+  // The legacy business action dock is not useful on the jobs-first home or profile.
+  const showBusinessDock = ["/driver", "/jobs", "/business-dashboard", "/customers", "/invoices", "/estimates", "/schedule"].some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
   const isFocusedWorkflow = ["/hire", "/hire/matches", "/resume", "/applications", "/support"].some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
@@ -74,7 +78,7 @@ export default function AppLayout() {
         </div>
       </main>
 
-      {!isFocusedWorkflow && <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />}
+      {showBusinessDock && !isFocusedWorkflow && <MobileActionDock onOpenFeedback={() => feedbackRef.current?.open?.()} />}
       {!isFocusedWorkflow && <TitanSupportButton />}
       <div className="hidden md:contents">
         <FloatingAIButton onOpenFeedback={() => feedbackRef.current?.open?.()} />

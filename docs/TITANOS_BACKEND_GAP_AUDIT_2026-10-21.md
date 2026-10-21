@@ -43,3 +43,18 @@ This inspection did not modify production Vercel deployments, environment variab
 - The configured client API targets Vercel `/api/functions/...`, including `jobMatchesV2` and `supportListCases`; the files `api/functions/jobMatchesV2.js` and `api/functions/supportListCases.js` exist on the improvement branch.
 - Latest `titanos-web` production deployment found in Vercel was from 2026-08-18 `main`, commit `4d09fbc`; current feature-branch code cannot be assumed deployed. A Vercel production **READY** status is not an end-to-end test.
 - Production schema recovery should be separately reviewed and migration-tested on an isolated environment with valid test users and ownership-based RLS before publication.
+
+## Security blocker found in original employment migration
+
+**DO NOT apply `002_platform_expansion.sql` unchanged.** Its `hire_apps_read` policy allows `SELECT TO authenticated USING (true)` on `public.hire_applications`. Any authenticated account could read the application rows (including private messages and bid information) if the table is exposed through PostgREST. A read-only source assertion now lives at `scripts/titanos-career-rls-audit.test.mjs`.
+
+Required replacement model before any production migration:
+1. Job seekers may read only their **own** applications (`created_by_id = auth.uid()` or rigorously established applicant identity).
+2. Employers may read applications submitted to **their own** job posting. Determine employer ownership by a join against a job whose owner is `auth.uid()`, not by client-provided role fields.
+3. Employers may edit the status of applications to their own postings only; applicants cannot approve themselves. Prefer narrowly scoped server-side operations for any fields not directly editable by applicants.
+4. Public job browsing may read only published/open listings, never unpublished postings or applicant contact data.
+5. Inserts and updates must enforce `WITH CHECK` ownership and avoid setting arbitrary owner IDs.
+6. Review legacy `public.is_admin()` SECURITY DEFINER function; do not reuse a privileged function without checking `EXECUTE` grants and hardened `search_path`.
+7. Use separate authenticated applicant and employer test accounts to prove expected access and cross-account denial. A regex check is *not* a runtime access-control test.
+
+No migration was applied to Supabase as part of this phase.

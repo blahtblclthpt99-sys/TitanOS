@@ -1,0 +1,70 @@
+name: TitanOS Original Android Recovery APK
+
+on:
+  push:
+    branches:
+      - recovery/android-original-20261020
+    paths:
+      - .github/workflows/android-recovery-apk.yml
+      - android/**
+      - src/**
+      - public/**
+      - index.html
+      - package.json
+      - package-lock.json
+      - capacitor.config.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout recovery source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build and sync original UI
+        run: npm run cap:sync
+      - name: Isolate preview app from Play app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          text = p.read_text()
+          original = 'applicationId "com.titanos.myapp"'
+          assert text.count(original) == 1, "Unexpected Android package configuration"
+          text = text.replace(original, original + '\n        applicationIdSuffix ".recovery"', 1)
+          p.write_text(text)
+          PY
+      - name: Build recovery preview APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+      - name: Verify APK exists
+        run: |
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload installable recovery APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-Original-Recovery-Preview-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error

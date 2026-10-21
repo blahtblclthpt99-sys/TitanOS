@@ -21,7 +21,9 @@ export default function MobileNav() {
   const pathname = normalizeAppPath(location.pathname);
   const touchStart = useRef(null);
 
-  const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
+  // A primary destination wins over nested More-menu matches (e.g. Profile).
+  const primaryActive = MOBILE_TAB_ITEMS.some((item) => isRouteActive(pathname, item.path));
+  const moreActive = !primaryActive && (pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path)));
 
   const activeIndex = TABS.findIndex((item) => {
     if (item.path === "/more") return moreActive;

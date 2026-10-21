@@ -1,0 +1,89 @@
+# TitanOS 2.0.7 (versionCode 41) — Android tablet-friendly Codemagic builds.
+# Only manually triggered builds; never auto-publish to Google Play.
+workflows:
+  titanos-android-test:
+    name: TitanOS Android test APK (side-by-side)
+    instance_type: linux_x2
+    max_build_duration: 90
+    environment:
+      node: 22
+      java: 21
+      vars:
+        VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+        VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+    scripts:
+      - name: Install dependencies and compile mobile assets
+        script: |
+          set -eu
+          npm ci
+          npm run cap:sync
+      - name: Build independent Android test APK
+        script: |
+          set -eu
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          needle = 'applicationId "com.titanos.myapp"'
+          assert s.count(needle) == 1
+          p.write_text(s.replace(needle, needle + '\n        applicationIdSuffix ".recovery"', 1))
+          PY
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+
+  titanos-android-play:
+    name: TitanOS 2.0.7 (41) signed Google Play AAB
+    instance_type: linux_x2
+    max_build_duration: 90
+    environment:
+      node: 22
+      java: 21
+      android_signing:
+        - titanos_upload
+      vars:
+        VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+        VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+    scripts:
+      - name: Install dependencies and compile mobile assets
+        script: |
+          set -eu
+          npm ci
+          npm run cap:sync
+      - name: Configure private upload signing on build machine
+        script: |
+          set -eu
+          test -f "$CM_KEYSTORE_PATH"
+          test -n "$CM_KEYSTORE_PASSWORD"
+          test -n "$CM_KEY_ALIAS"
+          test -n "$CM_KEY_PASSWORD"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from urllib.parse import quote
+          # java.util.Properties consumes escaped backslashes and special chars.
+          def escape(s):
+              return str(s).replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("=", "\\=").replace(":", "\\:")
+          values = {
+              "storeFile": os.environ["CM_KEYSTORE_PATH"],
+              "storePassword": os.environ["CM_KEYSTORE_PASSWORD"],
+              "keyAlias": os.environ["CM_KEY_ALIAS"],
+              "keyPassword": os.environ["CM_KEY_PASSWORD"],
+          }
+          p = Path("android/keystore.properties")
+          p.write_text("".join(f"{k}={escape(v)}\n" for k,v in values.items()))
+          p.chmod(0o600)
+          PY
+      - name: Build signed AAB
+        script: |
+          set -eu
+          grep -q 'versionCode 41' android/app/build.gradle
+          grep -q 'versionName "2.0.7"' android/app/build.gradle
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+          test -s app/build/outputs/bundle/release/app-release.aab
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab

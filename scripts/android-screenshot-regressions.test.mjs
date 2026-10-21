@@ -19,11 +19,16 @@ test("support load failure has actionable plain-language explanation", () => {
 });
 test("floating elements are hidden on full-screen hiring and editing forms", () => {
   assert.match(layout, /const isFocusedWorkflow/);
-  assert.match(layout, /!isFocusedWorkflow && <MobileActionDock/);
+  assert.match(layout, /showBusinessDock && !isFocusedWorkflow && <MobileActionDock/);
   assert.match(layout, /!isFocusedWorkflow && <TitanSupportButton/);
 });
 test("job matching outages preserve editing of user preferences", () => {
   assert.match(matches, /const \[driver, prefs, matchResult\] = await Promise\.all/);
   assert.match(matches, /if \(matchResult\.error\)/);
   assert.match(matches, /setForm\(\{/);
+});
+
+test("legacy business dock is not displayed on jobs-first home", () => {
+  assert.ok(layout.includes('const showBusinessDock = ["/driver", "/jobs"'));
+  assert.ok(!layout.includes('["/", "/career"'));
 });

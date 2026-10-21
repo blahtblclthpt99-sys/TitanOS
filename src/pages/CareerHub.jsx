@@ -5,6 +5,7 @@ import { ArrowRight, BriefcaseBusiness, ClipboardList, FileText, Sparkles, UserR
 const actions = [
   { to: "/hire/matches", icon: Sparkles, title: "Find matching jobs", detail: "Explore opportunities matched to your skills and preferences.", primary: true },
   { to: "/hire", icon: BriefcaseBusiness, title: "Browse opportunities", detail: "Search available work and view job details." },
+  { to: "/applications", icon: ClipboardList, title: "Track applications", detail: "Organize saved jobs, applications and interviews on this device." },
   { to: "/resume", icon: FileText, title: "Build your résumé", detail: "Write, save and export a résumé on this device." },
   { to: "/profile", icon: UserRound, title: "Update your profile", detail: "Keep your experience and qualifications current." },
   { to: "/assistant", icon: FileText, title: "Interview preparation", detail: "Ask TitanAI for writing, interview practice and career advice." },

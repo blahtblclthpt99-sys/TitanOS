@@ -41,7 +41,7 @@ export default function ResumeStudio() {
     ["education", "Education and certifications"], ["skills", "Skills"]
   ];
   return (
-    <section className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6">
+    <section className="resume-studio mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6">
       <Link to="/career" className="inline-flex min-h-11 items-center gap-2 text-sm text-primary"><ArrowLeft size={17}/> Back to careers</Link>
       <header><h1 className="text-2xl font-bold text-foreground">Résumé Builder</h1>
         <p className="mt-2 text-sm text-muted-foreground">Build your résumé. Changes save locally on this device—not to your TitanOS account yet.</p></header>
@@ -59,7 +59,8 @@ export default function ResumeStudio() {
         <button type="button" onClick={()=>window.print()} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 font-semibold text-foreground"><Printer size={17}/> Print / Save PDF</button>
       </div>
       <p className="text-xs text-muted-foreground">On supported devices, Print may offer “Save as PDF.” Export a copy before clearing app data.</p>
-      <article className="space-y-3 rounded-xl border border-border bg-white p-6 text-black print:border-0 print:p-0" aria-label="Résumé preview">
+      <style>{`@media print { body { background: white !important; } body * { visibility: hidden !important; } .resume-print-preview, .resume-print-preview * { visibility: visible !important; } .resume-print-preview { position: absolute !important; inset: 0 auto auto 0; width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; } @page { margin: 16mm; } }`}</style>
+      <article className="resume-print-preview space-y-3 rounded-xl border border-border bg-white p-6 text-black print:border-0 print:p-0" aria-label="Résumé preview">
         <h2 className="text-2xl font-bold">{form.name || "Your Name"}</h2>
         <p className="text-sm">{[form.email,form.phone,form.location].filter(Boolean).join(" • ")}</p>
         {form.headline && <p className="font-semibold">{form.headline}</p>}

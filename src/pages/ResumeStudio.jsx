@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft, Download, Printer, Save } from "lucide-react";
 
@@ -19,6 +19,8 @@ function textResume(data) {
 export default function ResumeStudio() {
   const [form, setForm] = useState(load);
   const [notice, setNotice] = useState("");
+  const latestDraft = useRef(form);
+  latestDraft.current = form;
   useEffect(() => {
     const timeout = setTimeout(() => {
       try { localStorage.setItem(key, JSON.stringify(form)); setNotice("Saved on this device"); }
@@ -26,6 +28,14 @@ export default function ResumeStudio() {
     }, 500);
     return () => clearTimeout(timeout);
   }, [form]);
+  useEffect(() => {
+    const saveBeforeExit = () => {
+      try { localStorage.setItem(key, JSON.stringify(latestDraft.current)); }
+      catch { /* Storage failures are already reported by autosave. */ }
+    };
+    window.addEventListener("pagehide", saveBeforeExit);
+    return () => { saveBeforeExit(); window.removeEventListener("pagehide", saveBeforeExit); };
+  }, []);
   function update(field, value) { setForm(current => ({ ...current, [field]: value })); setNotice("Unsaved changes"); }
   function download() {
     const blob = new Blob([textResume(form)], { type: "text/plain;charset=utf-8" });

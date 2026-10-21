@@ -15,3 +15,9 @@ test("tracker accepts job match prefill without submitting automatically", () =>
   assert.match(tracker, /searchParams\.get\("company"\)/);
   assert.match(tracker, /setSearchParams\(\{\}, \{ replace: true \}\)/);
 });
+
+test("tracker handles subsequent job selections and validates links", () => {
+  assert.match(tracker, /setDraft\(\{/);
+  assert.match(tracker, /\[searchParams\]/);
+  assert.ok(tracker.includes("Job link must start with https://"));
+});

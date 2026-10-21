@@ -28,6 +28,13 @@ export default function MoreMenu() {
       </div>
 
       <Link
+        to="/business-dashboard"
+        className="mb-4 inline-flex min-h-[44px] items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground focus-ring hover:border-primary/40"
+      >
+        Open classic business dashboard
+      </Link>
+
+      <Link
         to="/hire/matches"
         className="titan-surface titan-surface-interactive mb-6 flex min-h-[88px] items-center gap-4 border-primary/20 p-4 focus-ring"
       >

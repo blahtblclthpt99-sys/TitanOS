@@ -20,6 +20,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const CareerHub = lazy(() => import("@/pages/CareerHub"));
 const ResumeStudio = lazy(() => import("@/pages/ResumeStudio"));
+const ApplicationTracker = lazy(() => import("@/pages/ApplicationTracker"));
 const MoreMenu = lazy(() => import("@/pages/MoreMenu"));
 const DriverHubTab = lazy(() => import("@/pages/DriverHub"));
 const TitanCommsTab = lazy(() => import("@/pages/TitanComms"));
@@ -102,6 +103,7 @@ const LEGACY_REDIRECTS = {
 
 const NON_TAB_ROUTES = {
   "/resume": ResumeStudio,
+  "/applications": ApplicationTracker,
   "/business-dashboard": Dashboard,
   "/schedule": Schedule,
   "/estimates": Estimates,

@@ -64,9 +64,9 @@ export default function ResumeStudio() {
         <h2 className="text-2xl font-bold">{form.name || "Your Name"}</h2>
         <p className="text-sm">{[form.email,form.phone,form.location].filter(Boolean).join(" • ")}</p>
         {form.headline && <p className="font-semibold">{form.headline}</p>}
-        {[[ "Professional Summary", form.summary ],["Experience",form.experience],["Education",form.education],["Skills",form.skills]].map(([title,value])=><section key={title}>
+        {[[ "Professional Summary", form.summary ],["Experience",form.experience],["Education",form.education],["Skills",form.skills]].filter(([, value]) => Boolean(value?.trim())).map(([title,value])=><section key={title}>
           <h3 className="border-b pb-1 font-bold">{title}</h3>
-          <p className="whitespace-pre-wrap text-sm">{value || "Add information above to complete this section."}</p>
+          <p className="whitespace-pre-wrap text-sm">{value}</p>
         </section>)}
       </article>
     </section>

@@ -31,6 +31,16 @@ export default function ApplicationTracker() {
   const [status, setStatus] = useState("Saved");
   const [saveNotice, setSaveNotice] = useState("");
   const importInput = useRef(null);
+  const latestItems = useRef(items);
+  latestItems.current = items;
+  useEffect(() => {
+    const saveOnExit = () => {
+      try { localStorage.setItem(key, JSON.stringify(latestItems.current)); }
+      catch { /* Main save status reports storage failures. */ }
+    };
+    window.addEventListener("pagehide", saveOnExit);
+    return () => { saveOnExit(); window.removeEventListener("pagehide", saveOnExit); };
+  }, []);
   useEffect(() => {
     try { localStorage.setItem(key, JSON.stringify(items)); setSaveNotice("Saved on this device"); }
     catch { setSaveNotice("Storage is unavailable; export your information separately."); }

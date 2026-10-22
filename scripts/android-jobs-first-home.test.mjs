@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { transformWithEsbuild } from "vite";
 const read = file => readFileSync(new URL(file, import.meta.url), "utf8");
 const routes = read("../src/components/layout/TabStack.jsx");
 const more = read("../src/pages/MoreMenu.jsx");
@@ -28,4 +29,8 @@ test("native WebView resets a restored Driver Hub hash before React mounts", () 
   assert.match(entry, /initialHash/);
   assert.match(entry, /window\.history\.replaceState/);
   assert.ok(entry.indexOf("window.history.replaceState") < entry.indexOf("ReactDOM.createRoot"));
+});
+
+test("Android entry JSX parses before Vite bundles the app", async () => {
+  await assert.doesNotReject(transformWithEsbuild(entry, "src/main.jsx", { loader: "jsx" }));
 });

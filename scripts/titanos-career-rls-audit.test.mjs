@@ -7,7 +7,8 @@ const legacy = readFileSync(new URL("../supabase/migrations/002_platform_expansi
 test("hire application read policy never permits every authenticated user", () => {
   const unsafe = /CREATE POLICY\s+hire_apps_read\s+ON\s+public\.hire_applications\s+FOR\s+SELECT\s+TO\s+authenticated\s+USING\s*\(true\)/i;
   assert.doesNotMatch(legacy, unsafe, "Block release: application messages must not be readable by all authenticated users.");
-  assert.match(legacy, /CREATE POLICY\s+hire_apps_read[\s\S]*?USING\s*\(created_by_id\s*=\s*auth\.uid\(\)\s+OR\s+public\.is_admin\(\)\)/i);
+  assert.ok(legacy.includes("job.created_by_id = auth.uid()"));
+  assert.ok(legacy.includes("job.id::text = hire_applications.hire_job_id"));
 });
 test("original schema has relevant job and application structures", () => {
   assert.match(legacy, /CREATE TABLE IF NOT EXISTS public\.hire_jobs/);

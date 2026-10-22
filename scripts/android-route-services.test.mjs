@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../src/AuthenticatedShell.jsx", import.meta.url), "utf8");
 
-test("dashboard prefetch is only enabled at the home route", () => {
+test("business prefetch is only enabled on the classic business dashboard", () => {
   assert.match(source, /const isDashboard = pathname === "\/business-dashboard";/);
   assert.match(source, /usePrefetchDashboard\(isDashboard\)/);
 });

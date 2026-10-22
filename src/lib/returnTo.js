@@ -97,10 +97,15 @@ export function resolveReturnTo(location) {
       ? new URLSearchParams(location?.search || window.location.search).get("from_url")
       : null;
 
-  const candidate =
-    sanitizeReturnPath(fromState) ||
-    sanitizeReturnPath(fromQuery) ||
-    (peekReturnTo() === "/driver" ? "/" : peekReturnTo()) ||
+  const explicitDestination = sanitizeReturnPath(fromState) || sanitizeReturnPath(fromQuery);
+  const rememberedDestination = peekReturnTo();
+  // The previous TitanOS version silently saved Driver Hub as the login default.
+  // Do not restore that stale destination after a normal app launch.
+  if (!explicitDestination && rememberedDestination === "/driver") {
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
+  }
+  const candidate = explicitDestination ||
+    (rememberedDestination === "/driver" ? "/" : rememberedDestination) ||
     "/";
 
   if (candidate && candidate !== "/") {

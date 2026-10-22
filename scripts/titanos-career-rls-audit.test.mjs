@@ -27,3 +27,12 @@ test("forward migration replaces old read policy and scopes employer access", ()
   assert.match(repair, /job\.created_by_id = auth\.uid\(\)/);
   assert.match(repair, /job\.id::text = hire_applications\.hire_job_id/);
 });
+
+const bootstrap = readFileSync(new URL("../supabase/migrations/001_titanos_schema.sql", import.meta.url), "utf8");
+test("admin authorization helper uses a fixed empty search path", () => {
+  const fn = bootstrap.split("CREATE OR REPLACE FUNCTION public.is_admin()")[1]?.split("CREATE OR REPLACE FUNCTION")[0];
+  assert.ok(fn, "Missing admin authorization helper");
+  assert.ok(fn.includes("SET search_path = ''"));
+  assert.ok(fn.includes("FROM public.profiles"));
+  assert.ok(fn.includes("id = auth.uid()"));
+});

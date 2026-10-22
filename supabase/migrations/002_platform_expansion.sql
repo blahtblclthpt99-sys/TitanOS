@@ -357,9 +357,8 @@ DO $$ BEGIN
     );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
-  CREATE POLICY hire_apps_write ON public.hire_applications FOR ALL TO authenticated
-    USING (created_by_id = auth.uid() OR public.is_admin())
-    WITH CHECK (created_by_id = auth.uid() OR public.is_admin());
+  CREATE POLICY hire_apps_write ON public.hire_applications FOR INSERT TO authenticated
+    WITH CHECK ((created_by_id = auth.uid() AND status = 'pending') OR public.is_admin());
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN

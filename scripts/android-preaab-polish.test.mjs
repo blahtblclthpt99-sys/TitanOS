@@ -57,3 +57,15 @@ test("resume draft is saved on page exit and stored fields are validated", () =>
   assert.ok(resume.includes('latestDraft.current = form'));
   assert.ok(resume.includes('typeof data?.[field] === "string"'));
 });
+
+test("application tracker saves current records when Android view closes", () => {
+  const tracker = read("../src/pages/ApplicationTracker.jsx");
+  assert.ok(tracker.includes('latestItems.current = items'));
+  assert.ok(tracker.includes('window.addEventListener("pagehide", saveOnExit)'));
+});
+test("AAB signing check tolerates legitimate self-signed upload certificates", () => {
+  const yaml = read("../codemagic.yaml");
+  assert.ok(yaml.includes("jarsigner -verify app/build/outputs/bundle/release/app-release.aab"));
+  assert.ok(yaml.includes("grep -q 'jar verified'"));
+  assert.ok(!yaml.includes("jarsigner -verify -strict"));
+});

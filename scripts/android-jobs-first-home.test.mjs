@@ -21,3 +21,11 @@ test("Android cold start redirects restored driver route to jobs-first home", ()
   assert.match(normalizer, /navigate\("\/", \{ replace: true \}\)/);
   assert.match(normalizer, /initialRouteChecked\.current = true/);
 });
+
+const entry = read("../src/main.jsx");
+test("native WebView resets a restored Driver Hub hash before React mounts", () => {
+  assert.match(entry, /Capacitor\.isNativePlatform\(\)/);
+  assert.match(entry, /initialHash/);
+  assert.match(entry, /window\.history\.replaceState/);
+  assert.ok(entry.indexOf("window.history.replaceState") < entry.indexOf("ReactDOM.createRoot"));
+});

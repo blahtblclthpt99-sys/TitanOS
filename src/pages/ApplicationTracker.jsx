@@ -133,15 +133,6 @@ export default function ApplicationTracker() {
       <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{item.position}</h3><p className="text-sm text-muted-foreground">{item.company}</p></div><button type="button" onClick={()=>{if(window.confirm("Delete this entry?"))setItems(all=>all.filter(i=>i.id!==item.id));}} aria-label={`Delete ${item.position} at ${item.company}`} className="min-h-11 min-w-11 text-destructive"><Trash2 size={18}/></button></div>
       <label className="mt-3 block text-sm">Application stage <select value={item.status} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,status:e.target.value}:i))} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3">{statuses.map(s=><option key={s}>{s}</option>)}</select></label>
       {item.url?.startsWith("https://") && <a target="_blank" rel="noopener noreferrer" href={item.url} className="mt-2 inline-block text-sm text-primary underline">View job listing</a>}
-      {["Applied", "Interview", "Offer"].includes(item.status) && item.url?.startsWith("https://") && <div className="mt-3 rounded-lg border border-border p-3">
-        <p className="text-sm font-medium">Know someone else looking for work?</p>
-        <p className="mt-1 text-xs text-muted-foreground">Share this public listing so they can apply independently. Additional openings are not verified.</p>
-        <button type="button" className="mt-2 min-h-11 rounded-lg border border-border px-3 text-sm font-semibold" onClick={async () => {
-          const message = `I found this job listing at ${item.company}: ${item.position}. Check availability and apply separately: ${item.url}`;
-          try { await navigator.clipboard.writeText(message); setSaveNotice("Public job link copied. No private application information shared."); }
-          catch { setSaveNotice("Could not copy. Open the public job listing to share its link."); }
-        }}>Copy job invitation</button>
-      </div>}
       {item.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.notes}</p>}
     </li>)}</ul>
   </section>;

@@ -78,3 +78,10 @@ test("Android manifest uses a NoActionBar theme for the application and splash a
   assert.ok(styles.includes('parent="Theme.AppCompat.DayNight.NoActionBar"'));
   assert.ok(styles.includes('name="postSplashScreenTheme">@style/AppTheme.NoActionBar'));
 });
+
+test("downloaded text resumes omit blank sections just like printable preview", () => {
+  const resume = read("../src/pages/ResumeStudio.jsx");
+  assert.ok(resume.includes('const sections = ['));
+  assert.ok(resume.includes('].filter(([, value]) => Boolean(value?.trim()))'));
+  assert.ok(resume.includes('sections.flatMap'));
+});

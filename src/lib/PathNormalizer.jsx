@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useLocation, useNavigate } from "react-router";
 import { normalizeAppPath } from "@/lib/routing";
 
@@ -10,6 +11,7 @@ import { normalizeAppPath } from "@/lib/routing";
 export default function PathNormalizer({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const initialRouteChecked = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -19,6 +21,13 @@ export default function PathNormalizer({ children }) {
       (params.has("error") && (params.has("error_description") || params.get("error") === "access_denied"));
 
     const path = normalizeAppPath(location.pathname);
+    if (!initialRouteChecked.current) {
+      initialRouteChecked.current = true;
+      if (Capacitor.isNativePlatform() && (path === "/driver" || path.startsWith("/driver/"))) {
+        navigate("/", { replace: true });
+        return;
+      }
+    }
     const onCallback = path === "/auth/callback" || path === "/reset-password";
 
     // Prefer callback route for visible progress; bootstrap may already have exchanged.

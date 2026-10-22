@@ -8,6 +8,10 @@ BEGIN
     RETURN;
   END IF;
 
+  IF to_regprocedure('public.is_admin()') IS NULL THEN
+    RAISE EXCEPTION 'Cannot repair hiring RLS: public.is_admin() is missing';
+  END IF;
+
   DROP POLICY IF EXISTS hire_apps_read ON public.hire_applications;
   CREATE POLICY hire_apps_read ON public.hire_applications
     FOR SELECT TO authenticated

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../src/AuthenticatedShell.jsx", import.meta.url), "utf8");
 
 test("dashboard prefetch is only enabled at the home route", () => {
-  assert.match(source, /const isDashboard = pathname === "\/";/);
+  assert.match(source, /const isDashboard = pathname === "\/business-dashboard";/);
   assert.match(source, /usePrefetchDashboard\(isDashboard\)/);
 });
 test("driver keep-alive services only mount on driver routes", () => {

@@ -36,3 +36,17 @@ test("admin authorization helper uses a fixed empty search path", () => {
   assert.ok(fn.includes("FROM public.profiles"));
   assert.ok(fn.includes("id = auth.uid()"));
 });
+
+test("hiring application policies use owner checks for write access", () => {
+  const block = legacy.split("CREATE POLICY hire_apps_write")[1]?.split("EXCEPTION WHEN duplicate_object")[0];
+  assert.ok(block, "Missing hiring application write policy");
+  assert.match(block, /created_by_id\s*=\s*auth\.uid\(\)/);
+  assert.match(block, /WITH CHECK\s*\(created_by_id\s*=\s*auth\.uid\(\)\s+OR\s+public\.is_admin\(\)\)/i);
+});
+test("repair policy never substitutes an unrestricted authenticated-user read", () => {
+  const policy = repair.split("CREATE POLICY hire_apps_read")[1]?.split("END $$")[0];
+  assert.ok(policy, "Missing replacement application read policy");
+  assert.match(policy, /created_by_id\s*=\s*auth\.uid\(\)/);
+  assert.match(policy, /job\.created_by_id\s*=\s*auth\.uid\(\)/);
+  assert.doesNotMatch(policy, /USING\s*\(\s*true\s*\)/i);
+});

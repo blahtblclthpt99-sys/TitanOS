@@ -7,7 +7,7 @@ const more = read("../src/pages/MoreMenu.jsx");
 const home = read("../src/pages/CareerHub.jsx");
 test("native authenticated home uses the career hub", () => {
   assert.match(routes, /"\/": CareerHub/);
-  assert.match(home, /Your next opportunity starts here/);
+  assert.match(home, /Find work\. Build your future\./);
 });
 test("original business dashboard is preserved behind an explicit route", () => {
   assert.match(routes, /"\/business-dashboard": Dashboard/);

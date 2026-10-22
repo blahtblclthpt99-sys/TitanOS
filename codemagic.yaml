@@ -30,6 +30,11 @@ workflows:
       - name: Install dependencies and compile mobile assets
         script: |
           set -eu
+          echo "TitanOS source commit: $(git rev-parse --short HEAD)"
+          grep -Fq '"/": CareerHub' src/components/layout/TabStack.jsx
+          grep -Fq 'Find work. Build your future.' src/pages/CareerHub.jsx
+          grep -Fq 'initialRouteChecked.current = true' src/lib/PathNormalizer.jsx
+          echo "Jobs-first home and Android redirect verified in checked-out source."
           npm ci
           node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs scripts/android-career-export.test.mjs scripts/android-match-to-tracker.test.mjs scripts/android-brand-icon.test.mjs scripts/android-screenshot-regressions.test.mjs scripts/android-preaab-polish.test.mjs scripts/titanos-career-rls-audit.test.mjs
           npm run cap:sync
@@ -80,6 +85,11 @@ workflows:
       - name: Install dependencies and compile mobile assets
         script: |
           set -eu
+          echo "TitanOS source commit: $(git rev-parse --short HEAD)"
+          grep -Fq '"/": CareerHub' src/components/layout/TabStack.jsx
+          grep -Fq 'Find work. Build your future.' src/pages/CareerHub.jsx
+          grep -Fq 'initialRouteChecked.current = true' src/lib/PathNormalizer.jsx
+          echo "Jobs-first home and Android redirect verified in checked-out source."
           npm ci
           node --test scripts/android-error-recovery.test.mjs scripts/android-login-ux.test.mjs scripts/android-route-services.test.mjs scripts/android-career-navigation.test.mjs scripts/android-simplified-navigation.test.mjs scripts/android-jobs-first-home.test.mjs scripts/android-career-tools.test.mjs scripts/android-career-export.test.mjs scripts/android-match-to-tracker.test.mjs scripts/android-brand-icon.test.mjs scripts/android-screenshot-regressions.test.mjs scripts/android-preaab-polish.test.mjs scripts/titanos-career-rls-audit.test.mjs
           npm run cap:sync

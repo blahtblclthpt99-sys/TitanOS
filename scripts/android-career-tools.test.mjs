@@ -22,3 +22,10 @@ test("application tracker records and updates stage locally", () => {
   assert.match(tracker, /setItems\(all=>all\.map/);
   assert.match(tracker, /do not submit applications/);
 });
+
+test("multiple-opening matching is opt-in and invitation does not claim verified vacancies", () => {
+  assert.ok(hub.includes("titanos-multiple-openings-opt-in-v1"));
+  assert.ok(hub.includes("Live alerts are not connected yet"));
+  assert.ok(tracker.includes("Copy job invitation"));
+  assert.ok(tracker.includes("Additional openings are not verified"));
+});

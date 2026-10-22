@@ -8,6 +8,7 @@ import { hydrateLaunchStatus } from '@/lib/launchStatus'
 import { trackEvent } from '@/lib/productAnalytics'
 import { applyTheme, getStoredTheme, watchSystemContrast } from '@/lib/theme'
 import { prefetchHotRoutes, runWhenIdle } from '@/lib/perf'
+import { Capacitor } from '@capacitor/core'
 import '@/index.css'
 
 const CHUNK_RELOAD_KEY = "titanos-chunk-reload";
@@ -112,6 +113,16 @@ function BootProbe({ children }) {
     return () => window.clearTimeout(id);
   }, []);
   return children;
+}
+
+// A restored WebView hash can override the jobs-first landing screen on Android.
+// Normalize a legacy Driver Hub address before HashRouter is constructed.
+// OAuth callback routes and deliberate in-session Driver Hub navigation are untouched.
+if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+  const initialHash = window.location.hash || '';
+  if (/^#\\/driver(?:\\/|$|[?])/i.test(initialHash)) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search + '#/');
+  }
 }
 
 // Paint immediately — never block first render on auth/network.

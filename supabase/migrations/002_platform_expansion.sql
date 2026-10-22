@@ -346,9 +346,17 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY hire_apps_read ON public.hire_applications FOR SELECT TO authenticated
-    USING (created_by_id = auth.uid() OR public.is_admin());
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
+    USING (
+      created_by_id = auth.uid()
+      OR public.is_admin()
+      OR EXISTS (
+        SELECT 1 FROM public.hire_jobs AS job
+        WHERE job.id::text = hire_applications.hire_job_id
+          AND job.created_by_id = auth.uid()
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+DO $ BEGIN
   CREATE POLICY hire_apps_write ON public.hire_applications FOR ALL TO authenticated
     USING (created_by_id = auth.uid() OR public.is_admin())
     WITH CHECK (created_by_id = auth.uid() OR public.is_admin());

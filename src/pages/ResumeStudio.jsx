@@ -9,13 +9,20 @@ function load() {
   catch { return initial; }
 }
 function textResume(data) {
+  const sections = [
+    ["PROFESSIONAL SUMMARY", data.summary],
+    ["EXPERIENCE", data.experience],
+    ["EDUCATION", data.education],
+    ["SKILLS", data.skills],
+  ].filter(([, value]) => Boolean(value?.trim()));
   return [
-    data.name, [data.email, data.phone, data.location].filter(Boolean).join(" | "),
-    data.headline, "", "PROFESSIONAL SUMMARY", data.summary,
-    "", "EXPERIENCE", data.experience, "", "EDUCATION", data.education,
-    "", "SKILLS", data.skills
-  ].join("\n").trim() + "\n";
+    data.name.trim(),
+    [data.email, data.phone, data.location].filter(Boolean).join(" | "),
+    data.headline.trim(),
+    ...sections.flatMap(([heading, body]) => ["", heading, body.trim()]),
+  ].filter((line, index, all) => line !== "" || (index > 0 && all[index - 1] !== "")).join("\n").trim() + "\n";
 }
+
 export default function ResumeStudio() {
   const [form, setForm] = useState(load);
   const [notice, setNotice] = useState("");

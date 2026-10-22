@@ -120,7 +120,7 @@ function BootProbe({ children }) {
 // OAuth callback routes and deliberate in-session Driver Hub navigation are untouched.
 if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
   const initialHash = window.location.hash || '';
-  if (/^#\\/driver(?:\\/|$|[?])/i.test(initialHash)) {
+  if (initialHash === '#/driver' || initialHash.startsWith('#/driver/') || initialHash.startsWith('#/driver?')) {
     window.history.replaceState(null, '', window.location.pathname + window.location.search + '#/');
   }
 }

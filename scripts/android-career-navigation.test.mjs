@@ -13,7 +13,7 @@ test("careers is a real routed mobile tab", () => {
 });
 test("business jobs remain reachable rather than removed", () => {
   assert.match(routes, /"\/jobs": Jobs/);
-  assert.match(careers, /to="\/jobs"/);
+  assert.match(careers, /to="\/more"/);
 });
 test("career actions point to existing job matching and profile routes", () => {
   for (const route of ["/hire/matches", "/hire", "/profile", "/assistant"]) {

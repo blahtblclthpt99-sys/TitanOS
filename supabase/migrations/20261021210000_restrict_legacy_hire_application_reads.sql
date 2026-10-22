@@ -12,6 +12,11 @@ BEGIN
     RAISE EXCEPTION 'Cannot repair hiring RLS: public.is_admin() is missing';
   END IF;
 
+  DROP POLICY IF EXISTS hire_apps_write ON public.hire_applications;
+  CREATE POLICY hire_apps_write ON public.hire_applications
+    FOR INSERT TO authenticated
+    WITH CHECK ((created_by_id = auth.uid() AND status = 'pending') OR public.is_admin());
+
   DROP POLICY IF EXISTS hire_apps_read ON public.hire_applications;
   CREATE POLICY hire_apps_read ON public.hire_applications
     FOR SELECT TO authenticated

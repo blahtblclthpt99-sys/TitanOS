@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, FileText, Sparkles, UserRound, Wrench } from "lucide-react";
 
@@ -12,6 +12,15 @@ const actions = [
 ];
 
 export default function CareerHub() {
+  const [multipleOpenings, setMultipleOpenings] = useState(() => {
+    try { return localStorage.getItem("titanos-multiple-openings-opt-in-v1") === "true"; }
+    catch { return false; }
+  });
+  function updateMultipleOpenings(enabled) {
+    setMultipleOpenings(enabled);
+    try { localStorage.setItem("titanos-multiple-openings-opt-in-v1", String(enabled)); }
+    catch { /* Preference is available for this session only. */ }
+  }
   return (
     <section className="mx-auto w-full max-w-4xl space-y-6 px-4 py-5 sm:px-6 sm:py-8" aria-labelledby="career-heading">
       <header className="space-y-2">
@@ -37,6 +46,15 @@ export default function CareerHub() {
           </Link>
         ))}
       </div>
+      <section className="rounded-xl border border-border bg-card p-4" aria-label="Multiple-opening job match preferences">
+        <h2 className="font-semibold text-foreground">Dual &amp; Group Job Match</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Interested in employers hiring two or more workers? Opt in to see multiple-opening opportunities when verified vacancy counts become available. No carpool or group is required.</p>
+        <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-medium">
+          <input type="checkbox" checked={multipleOpenings} onChange={event => updateMultipleOpenings(event.target.checked)} className="h-5 w-5" />
+          Notify me about verified multiple-worker openings
+        </label>
+        <p className="mt-2 text-xs text-muted-foreground">Saved on this device. Live alerts are not connected yet. Everyone applies separately and controls their own information.</p>
+      </section>
       <div className="rounded-xl border border-border bg-card p-4">
         <h2 className="flex items-center gap-2 font-semibold text-foreground"><ClipboardList className="h-5 w-5 text-primary" aria-hidden="true" /> Your next steps</h2>
         <p className="mt-2 text-sm text-muted-foreground">

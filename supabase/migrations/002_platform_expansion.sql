@@ -345,7 +345,8 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY hire_apps_read ON public.hire_applications FOR SELECT TO authenticated USING (true);
+  CREATE POLICY hire_apps_read ON public.hire_applications FOR SELECT TO authenticated
+    USING (created_by_id = auth.uid() OR public.is_admin());
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY hire_apps_write ON public.hire_applications FOR ALL TO authenticated

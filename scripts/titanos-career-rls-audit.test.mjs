@@ -4,9 +4,10 @@ import { readFileSync } from "node:fs";
 
 const legacy = readFileSync(new URL("../supabase/migrations/002_platform_expansion.sql", import.meta.url), "utf8");
 
-test("original hire application read policy is unsafe and requires replacement", () => {
+test("hire application read policy never permits every authenticated user", () => {
   const unsafe = /CREATE POLICY\s+hire_apps_read\s+ON\s+public\.hire_applications\s+FOR\s+SELECT\s+TO\s+authenticated\s+USING\s*\(true\)/i;
-  assert.match(legacy, unsafe, "Audit original migration again if changed; never deploy unrestricted application reads.");
+  assert.doesNotMatch(legacy, unsafe, "Block release: application messages must not be readable by all authenticated users.");
+  assert.match(legacy, /CREATE POLICY\s+hire_apps_read[\s\S]*?USING\s*\(created_by_id\s*=\s*auth\.uid\(\)\s+OR\s+public\.is_admin\(\)\)/i);
 });
 test("original schema has relevant job and application structures", () => {
   assert.match(legacy, /CREATE TABLE IF NOT EXISTS public\.hire_jobs/);

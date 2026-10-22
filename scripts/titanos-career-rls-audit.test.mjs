@@ -22,6 +22,8 @@ test("hiring SQL blocks have valid delimiters", () => {
 });
 test("forward migration replaces old read policy and scopes employer access", () => {
   assert.match(repair, /DROP POLICY IF EXISTS hire_apps_read/);
+  assert.ok(repair.includes("to_regprocedure('public.is_admin()')"));
+  assert.ok(repair.includes("RAISE EXCEPTION"));
   assert.match(repair, /job\.created_by_id = auth\.uid\(\)/);
   assert.match(repair, /job\.id::text = hire_applications\.hire_job_id/);
 });

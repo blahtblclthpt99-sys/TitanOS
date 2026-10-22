@@ -69,3 +69,12 @@ test("AAB signing check tolerates legitimate self-signed upload certificates", (
   assert.ok(yaml.includes("grep -q 'jar verified'"));
   assert.ok(!yaml.includes("jarsigner -verify -strict"));
 });
+
+test("Android manifest uses a NoActionBar theme for the application and splash activity", () => {
+  const manifest = read("../android/app/src/main/AndroidManifest.xml");
+  const styles = read("../android/app/src/main/res/values/styles.xml");
+  assert.ok(manifest.includes('android:theme="@style/AppTheme.NoActionBar"'));
+  assert.ok(manifest.includes('android:theme="@style/AppTheme.NoActionBarLaunch"'));
+  assert.ok(styles.includes('parent="Theme.AppCompat.DayNight.NoActionBar"'));
+  assert.ok(styles.includes('name="postSplashScreenTheme">@style/AppTheme.NoActionBar'));
+});

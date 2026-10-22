@@ -13,7 +13,8 @@ test("original business dashboard is preserved behind an explicit route", () => 
   assert.match(routes, /"\/business-dashboard": Dashboard/);
   assert.match(more, /to="\/business-dashboard"/);
 });
-\nconst normalizer = read("../src/lib/PathNormalizer.jsx");
+
+const normalizer = read("../src/lib/PathNormalizer.jsx");
 test("Android cold start redirects restored driver route to jobs-first home", () => {
   assert.match(normalizer, /Capacitor\.isNativePlatform\(\)/);
   assert.match(normalizer, /path === "\/driver"/);

@@ -76,7 +76,11 @@ export function consumeReturnTo(fallback = "/") {
   } catch {
     /* ignore */
   }
-  return sanitizeReturnPath(stored) || sanitizeReturnPath(fallback) || "/";
+  const storedPath = sanitizeReturnPath(stored);
+  // Older TitanOS builds used /driver as a generic login destination.
+  // The default sign-in must not restore it unless /driver was explicitly requested.
+  if (storedPath === "/driver" && fallback === "/") return "/";
+  return storedPath || sanitizeReturnPath(fallback) || "/";
 }
 
 export function peekReturnTo() {

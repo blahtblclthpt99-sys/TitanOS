@@ -94,7 +94,7 @@ export default function AuthCallback() {
           PROFILE_BOOT_TIMEOUT_MS,
           "Your account signed in, but profile setup took too long. Tap retry to continue."
         );
-        const dest = consumeReturnTo("/driver");
+        const dest = consumeReturnTo("/");
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

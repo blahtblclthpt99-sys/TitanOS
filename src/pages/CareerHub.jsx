@@ -16,6 +16,7 @@ export default function CareerHub() {
     <section className="mx-auto w-full max-w-4xl space-y-6 px-4 py-5 sm:px-6 sm:py-8" aria-labelledby="career-heading">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">TitanOS Careers</p>
+        <p className="text-xs text-muted-foreground">Jobs-first Android build · Oct 22, 2026</p>
         <h1 id="career-heading" className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Find work. Build your future.</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Your job search, résumé, applications, and interview preparation—together in one free workspace.

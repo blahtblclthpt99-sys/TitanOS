@@ -355,8 +355,8 @@ DO $$ BEGIN
           AND job.created_by_id = auth.uid()
       )
     );
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
-DO $ BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   CREATE POLICY hire_apps_write ON public.hire_applications FOR ALL TO authenticated
     USING (created_by_id = auth.uid() OR public.is_admin())
     WITH CHECK (created_by_id = auth.uid() OR public.is_admin());

@@ -14,7 +14,7 @@ import ScheduledExportRunner from "@/components/shared/ScheduledExportRunner";
 
 function PrefetchOnMount() {
   const { pathname } = useLocation();
-  const isDashboard = pathname === "/";
+  const isDashboard = pathname === "/business-dashboard";
   usePrefetchDashboard(isDashboard);
   const { user } = useAuth();
   useEffect(() => {

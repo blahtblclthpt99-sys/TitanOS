@@ -37,12 +37,17 @@ test("admin authorization helper uses a fixed empty search path", () => {
   assert.ok(fn.includes("id = auth.uid()"));
 });
 
-test("hiring application policies use owner checks for write access", () => {
+test("applicants can only INSERT pending applications, not alter hiring decisions", () => {
   const block = legacy.split("CREATE POLICY hire_apps_write")[1]?.split("EXCEPTION WHEN duplicate_object")[0];
-  assert.ok(block, "Missing hiring application write policy");
-  assert.match(block, /created_by_id\s*=\s*auth\.uid\(\)/);
-  assert.match(block, /WITH CHECK\s*\(created_by_id\s*=\s*auth\.uid\(\)\s+OR\s+public\.is_admin\(\)\)/i);
+  assert.ok(block, "Missing application INSERT policy");
+  assert.match(block, /FOR INSERT TO authenticated/);
+  assert.match(block, /created_by_id\s*=\s*auth\.uid\(\) AND status\s*=\s*'pending'/);
+  assert.doesNotMatch(block, /FOR ALL/i);
+  const repairBlock = repair.split("CREATE POLICY hire_apps_write")[1]?.split("DROP POLICY IF EXISTS hire_apps_read")[0];
+  assert.ok(repairBlock, "Migration does not repair the broad write policy");
+  assert.match(repairBlock, /FOR INSERT TO authenticated/);
 });
+
 test("repair policy never substitutes an unrestricted authenticated-user read", () => {
   const policy = repair.split("CREATE POLICY hire_apps_read")[1]?.split("END $$")[0];
   assert.ok(policy, "Missing replacement application read policy");

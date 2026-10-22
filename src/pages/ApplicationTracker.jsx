@@ -4,7 +4,22 @@ import { ArrowLeft, Download, Plus, Trash2 } from "lucide-react";
 const key = "titanos-career-applications-v1";
 const statuses = ["Saved", "Applied", "Interview", "Offer", "Rejected", "Closed"];
 function read() {
-  try { const value = JSON.parse(localStorage.getItem(key) || "[]"); return Array.isArray(value) ? value : []; }
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter(item =>
+      item && typeof item.id === "string" && typeof item.company === "string" &&
+      typeof item.position === "string" && statuses.includes(item.status)
+    ).slice(0, 1000).map(item => ({
+      id: item.id.slice(0, 150),
+      company: item.company.slice(0, 150),
+      position: item.position.slice(0, 150),
+      status: item.status,
+      url: typeof item.url === "string" && item.url.startsWith("https://") ? item.url.slice(0, 2000) : "",
+      notes: typeof item.notes === "string" ? item.notes.slice(0, 5000) : "",
+      createdAt: typeof item.createdAt === "string" ? item.createdAt : "",
+    }));
+  }
   catch { return []; }
 }
 export default function ApplicationTracker() {

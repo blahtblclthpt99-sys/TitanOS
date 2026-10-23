@@ -19,13 +19,11 @@ import {
 import { toast } from "@/components/ui/use-toast";
 
 const QUICK_HELP = [
-  ["Account & Login", "account"], ["Billing & Subscription", "billing"], ["Jobs", "jobs"],
-  ["Customers", "customers"], ["Scheduling", "scheduling"], ["Estimates", "estimates"],
-  ["Invoices", "invoices"], ["Money", "money"], ["Driver Hub", "driver_hub"],
-  ["GPS", "gps"], ["Mileage", "mileage"], ["Titan AI", "titan_ai"],
-  ["Invisible Interface", "invisible_interface"], ["Android", "android"], ["PWA", "pwa"],
-  ["Notifications", "notifications"], ["Communications", "communications"], ["Files", "files"],
-  ["Import / Export", "import_export"], ["Technical Problems", "technical"],
+  ["Account & Login", "account"], ["Jobs & Applications", "jobs"],
+  ["Titan AI", "titan_ai"], ["Android", "android"], ["PWA", "pwa"],
+  ["Notifications", "notifications"], ["Communications", "communications"],
+  ["Files", "files"], ["Import / Export", "import_export"],
+  ["Technical Problems", "technical"],
 ];
 
 const STATUS_LABELS = {
@@ -189,7 +187,7 @@ export default function SupportCenter() {
             <div><h2 className="font-semibold text-foreground">How can we help?</h2><p className="text-sm text-muted-foreground">Describe the exact problem. Titan Support will create a case and start troubleshooting.</p></div>
           </div>
           <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="support-problem">Problem description</label>
-          <Textarea id="support-problem" value={problem} onChange={(e) => setProblem(e.target.value)} rows={5} placeholder="Example: Driver Hub stopped recording mileage after I returned to the app…" className="min-h-[132px]" />
+          <Textarea id="support-problem" value={problem} onChange={(e) => setProblem(e.target.value)} rows={5} placeholder="Example: My saved jobs won't load when I reopen the app…" className="min-h-[132px]" />
 
           <div className="mt-4">
             <p className="mb-2 text-sm font-medium text-foreground">Issue area</p>

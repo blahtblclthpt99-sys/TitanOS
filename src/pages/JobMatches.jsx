@@ -11,7 +11,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { getJobMatches, isExternalJobMatch, jobMatchSourceLabel } from "@/lib/jobMatchApi";
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
 import { clearMyJobMatchInteraction, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
-import { getMyDriverProfile, saveMyDriverProfile } from "@/lib/driverProfilesApi";
 import { toggleSaveJob } from "@/lib/hireApi";
 
 function csv(value) {
@@ -40,7 +39,7 @@ function safeJobUrl(raw) {
 }
 function MatchCard({ job, onAction, busy }) {
   const external = isExternalJobMatch(job);
-  const score = Number(job.match?.score || 0);
+  const score = job.match?.score == null ? null : Number(job.match.score);
   const reasons = Array.isArray(job.match?.reasons) ? job.match.reasons : [];
   const blockers = Array.isArray(job.match?.blockers) ? job.match.blockers : [];
   const source = jobMatchSourceLabel(job);
@@ -53,7 +52,7 @@ function MatchCard({ job, onAction, busy }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-foreground">{job.title || "Job"}</h2>
-            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{score}% match</span>
+            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{score == null ? "Not ranked" : `${score}% keyword match`}</span>
             {state && <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{state}</span>}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Source: {source}</p>
@@ -131,9 +130,7 @@ export default function JobMatches() {
     setLoading(true);
     setLoadError("");
     try {
-      // Do not let a missing legacy Driver Hub profile crash the job-seeker screen.
-      const [driver, prefs, result] = await Promise.all([
-        getMyDriverProfile(user.id).catch(() => null),
+      const [prefs, result] = await Promise.all([
         getMyJobMatchPreferences(user.id).catch(() => null),
         getJobMatches({ includeExternal: true }).catch((error) => ({
           matches: [], needsProfile: false, needsSkills: false, external: { reason: "service_unavailable" },
@@ -144,8 +141,8 @@ export default function JobMatches() {
       const local = localPrefsFor(user.id);
       const resume = localResumeFor(user.id);
       setForm({
-        skills: csvText(driver?.skills || prefs?.skills) || local.skills || resume.skills || "",
-        certifications: csvText(driver?.certifications || prefs?.certifications) || local.certifications || resume.certifications || "",
+        skills: local.skills || resume.skills || "",
+        certifications: local.certifications || resume.certifications || "",
         interests: csvText(prefs?.job_interests) || local.interests || resume.headline || "",
         radius: Number(prefs?.work_radius_miles || local.radius || 50),
         desiredPay: Number(prefs?.desired_pay_min || local.desiredPay || 0),
@@ -181,7 +178,6 @@ export default function JobMatches() {
     if (!user?.id || saving) return;
     setSaving(true);
     try {
-      await saveMyDriverProfile(user.id, { skills: csv(form.skills), certifications: csv(form.certifications) });
       await saveMyJobMatchPreferences(user.id, {
         job_interests: csv(form.interests),
         work_radius_miles: Number(form.radius),
@@ -192,8 +188,14 @@ export default function JobMatches() {
         search_lat: form.searchLat,
         search_lng: form.searchLng,
       });
-      try { localStorage.removeItem(`titanos:jobprefs:v1:${user.id}`); } catch { /* optional cleanup */ }
-      toast({ title: "Job matching updated", description: "Your matching preferences were saved to your account." });
+      // Skills and certificates remain device-local until job-seeker cloud sync is available.
+      localStorage.setItem(`titanos:jobprefs:v1:${user.id}`, JSON.stringify({
+        skills: form.skills, certifications: form.certifications, interests: form.interests,
+        radius: form.radius, desiredPay: form.desiredPay, payType: form.payType,
+        schedule: form.schedule, externalConsent: form.externalConsent,
+        searchLat: form.searchLat, searchLng: form.searchLng,
+      }));
+      toast({ title: "Job matching updated", description: "Preferences synced; skills and certificates saved on this device." });
       await load();
     } catch (error) {
       // Explicitly label device-only storage: it must not masquerade as cloud sync.
@@ -318,13 +320,13 @@ export default function JobMatches() {
 
       {loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Finding work that fits you…</div>
-      ) : status.needsProfile ? (
+      ) : !matches.length && status.needsProfile ? (
         <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Edit matching profile" onAction={() => { document.getElementById("match-profile-heading")?.scrollIntoView({ behavior: "smooth" }); }} />
-      ) : status.needsSkills ? (
+      ) : !matches.length && status.needsSkills ? (
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (
         <section aria-labelledby="matches-heading">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Opportunity inbox</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : "Location currently uses city/state fallback."} Ignored matches stay hidden.</p></div><span className="text-xs text-muted-foreground">{visibleMatches.length} shown</span></div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Opportunity inbox</h2><p className="text-xs text-muted-foreground">{status.needsSkills ? "These real jobs are not ranked yet. Add a target role or skills to get keyword matches." : "Titan jobs are ranked by keyword alignment."} {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : status.radiusMode === "unranked_no_preferences" ? "No location filter has been applied." : "Location currently uses city/state fallback."} Ignored matches stay hidden.</p></div><span className="text-xs text-muted-foreground">{visibleMatches.length} shown</span></div>
           <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter job matches">
             {[['all', 'All'], ['saved', 'Saved'], ['applied', 'Applied']].map(([id, label]) => (
               <Button key={id} type="button" size="sm" variant={view === id ? "default" : "outline"} onClick={() => setView(id)}>{label} ({matchCounts[id]})</Button>

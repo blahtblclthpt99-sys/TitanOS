@@ -126,25 +126,66 @@ export default async function handler(req, res) {
 
     const userId = userData.user.id;
     const body = readJson(req);
-    const [profileResult, prefsResult, jobsResult, interactionsResult, savesResult, appsResult] = await Promise.all([
-      admin.from("driver_profiles").select("user_id,skills,certifications,years_experience,city,state,availability").eq("user_id", userId).maybeSingle(),
+    const [prefsResult, jobsResult, interactionsResult, savesResult, appsResult] = await Promise.all([
       admin.from("job_match_preferences").select("user_id,job_interests,work_radius_miles,desired_pay_min,desired_pay_type,preferred_schedule,external_job_search_consent,search_lat,search_lng").eq("user_id", userId).maybeSingle(),
       admin.from("hire_jobs").select("id,created_at,created_by_id,title,description,category,city,state,lat,lng,budget_min,budget_max,deadline,status,is_urgent,is_same_day,required_skills,required_certifications,minimum_years_experience,employment_type,pay_type,schedule_tags,work_mode").eq("status", "open").neq("created_by_id", userId).order("created_at", { ascending: false }).limit(250),
       admin.from("job_match_interactions").select("source,source_name,source_job_id,state").eq("user_id", userId),
       admin.from("hire_saves").select("hire_job_id").eq("user_id", userId),
       admin.from("hire_applications").select("hire_job_id,status").eq("worker_id", userId),
     ]);
-    for (const result of [profileResult, prefsResult, jobsResult, interactionsResult, savesResult, appsResult]) {
+    for (const result of [prefsResult, jobsResult, interactionsResult, savesResult, appsResult]) {
       if (result.error) throw result.error;
     }
 
-    const profile = profileResult.data;
-    if (!profile) return res.status(200).json({ data: { matches: [], needsProfile: true, needsSkills: true, external: { requested: false, enabled: false, reason: "profile_required" } } });
+    // General-purpose job interests are available without Driver Hub enrollment.
+    // Do not infer certifications, experience or skills from a job title alone.
     const privatePrefs = prefsResult.data || {};
-    const worker = buildWorkerMatchProfile({ ...profile, ...privatePrefs });
+    const worker = buildWorkerMatchProfile({
+      user_id: userId,
+      skills: [],
+      certifications: [],
+      years_experience: 0,
+      city: "",
+      state: "",
+      ...privatePrefs,
+    });
     worker.lat = privatePrefs.search_lat == null ? null : Number(privatePrefs.search_lat);
     worker.lng = privatePrefs.search_lng == null ? null : Number(privatePrefs.search_lng);
-    if (!profileReady(worker)) return res.status(200).json({ data: { matches: [], needsProfile: false, needsSkills: true, external: { requested: false, enabled: false, reason: "skills_required" } } });
+    if (!profileReady(worker)) {
+      // An empty career profile is not an empty job market. Show actual open
+      // TitanOS posts without claiming to have calculated a qualification match.
+      const today = new Date().toISOString().slice(0, 10);
+      const openJobs = (jobsResult.data || []).filter((job) => {
+        const deadline = String(job.deadline || "").slice(0, 10);
+        return job.id && job.title && (!deadline || deadline >= today);
+      });
+      const unranked = openJobs.map((job) => ({
+        ...job,
+        match: {
+          source: "titan",
+          score: null,
+          reasons: [],
+          blockers: [],
+          score_method: "unranked",
+          score_note: "Add a target role or skills to see keyword alignment.",
+        },
+      }));
+      const interactionMap = new Map((interactionsResult.data || []).map((row) =>
+        [interactionKey(row.source, row.source_name, row.source_job_id), row]
+      ));
+      const savedIds = new Set((savesResult.data || []).map((row) => String(row.hire_job_id)));
+      const appliedIds = new Set((appsResult.data || []).map((row) => String(row.hire_job_id)));
+      const matches = annotateAndFilter(unranked, interactionMap, savedIds, appliedIds).slice(0, 40);
+      return res.status(200).json({ data: {
+        matches,
+        needsProfile: false,
+        needsSkills: true,
+        internalCount: openJobs.length,
+        radiusMode: "unranked_no_preferences",
+        dataSource: "native_jobs_unranked",
+        external: { requested: false, enabled: false, reason: "skills_required" },
+      } });
+    }
 
     const nativeJobs = jobsResult.data || [];
     const internal = filterByRadius(rankInternalJobMatches(nativeJobs, worker), worker);

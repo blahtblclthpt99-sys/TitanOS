@@ -5,23 +5,26 @@ import { supabase } from "@/api/supabaseClient";
  * A degraded, fully source-attributed matcher for REAL TitanOS job postings.
  * It does not manufacture jobs, bypass RLS, or contact any outside provider.
  */
+function safeLocalJson(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); }
+  catch { return null; }
+}
+
 function savedResumeSkills(userId) {
   if (!userId || typeof localStorage === "undefined") return { skills: [], target: "" };
-  try {
-    const value = JSON.parse(localStorage.getItem(`titanos:resume:v1:${userId}`) || "null");
-    const skills = typeof value?.skills === "string"
-      ? [...new Set(value.skills.split(/[,;\n]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
-      : [];
-    let localPrefs = null;
-    try { localPrefs = JSON.parse(localStorage.getItem(`titanos:jobprefs:v1:${userId}`) || "null"); } catch { /* no saved local preferences */ }
-    const prefSkills = typeof localPrefs?.skills === "string"
-      ? [...new Set(localPrefs.skills.split(/[;,]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
-      : [];
-    const target = typeof localPrefs?.interests === "string" && localPrefs.interests.trim()
-      ? localPrefs.interests.split(",")[0].trim().toLowerCase().slice(0, 150)
-      : typeof value?.headline === "string" ? value.headline.trim().toLowerCase().slice(0, 150) : "";
-    return { skills: prefSkills.length ? prefSkills : skills, target };
-  } catch { return { skills: [], target: "" }; }
+  // Résumé and job preferences are independent drafts. A malformed résumé
+  // must not discard valid job preferences (or vice versa).
+  const resume = safeLocalJson(`titanos:resume:v1:${userId}`);
+  const prefs = safeLocalJson(`titanos:jobprefs:v1:${userId}`);
+  const parseSkills = (value) => typeof value === "string"
+    ? [...new Set(value.split(/[,;\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.length > 1))].slice(0, 30)
+    : [];
+  const prefSkills = parseSkills(prefs?.skills);
+  const resumeSkills = parseSkills(resume?.skills);
+  const interests = typeof prefs?.interests === "string" ? prefs.interests.trim() : "";
+  const headline = typeof resume?.headline === "string" ? resume.headline.trim() : "";
+  const target = (interests ? interests.split(",")[0].trim() : headline).toLowerCase().slice(0, 150);
+  return { skills: prefSkills.length ? prefSkills : resumeSkills, target };
 }
 
 export function rankNativePosting(job, profile) {
@@ -44,6 +47,30 @@ export function rankNativePosting(job, profile) {
   } };
 }
 
+/**
+ * Add on-device keyword scores to server-returned, unranked native openings.
+ * The résumé stays on the device; never replace server-verified match scores.
+ */
+export function enrichUnrankedWithResume(data, profile) {
+  const jobs = Array.isArray(data?.matches) ? data.matches : [];
+  const hasSkills = Boolean(profile?.skills?.length || profile?.target);
+  if (!hasSkills || !jobs.length) return data;
+  let enriched = false;
+  const matches = jobs.map((job) => {
+    const isExternal = job?.source === "external" || job?.match?.source === "external";
+    if (isExternal || job?.match?.score != null) return job;
+    enriched = true;
+    return rankNativePosting(job, profile);
+  });
+  if (!enriched) return data;
+  return {
+    ...data,
+    matches: matches.sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1)),
+    needsSkills: false,
+    localResumeScoring: "keyword_overlap_only",
+  };
+}
+
 async function nativeFallback(includeExternal) {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   const userId = authData?.user?.id;
@@ -61,9 +88,22 @@ async function nativeFallback(includeExternal) {
     job?.id && job?.title && job.status === "open" && (!job.deadline || job.deadline >= today)
   );
   const profile = savedResumeSkills(userId);
-  const matches = profile.skills.length || profile.target
-    ? postings.map((job) => rankNativePosting(job, profile)).filter((job) => job.match.score >= 10).sort((a, b) => b.match.score - a.match.score)
-    : [];
+  const hasMatchInputs = Boolean(profile.skills.length || profile.target);
+  // Never hide real open positions merely because a new job seeker has not
+  // completed a résumé yet. Unranked is not equivalent to a 0% qualification.
+  const matches = hasMatchInputs
+    ? postings.map((job) => rankNativePosting(job, profile)).sort((a, b) => b.match.score - a.match.score)
+    : postings.map((job) => ({
+      ...job,
+      match: {
+        score: null,
+        reasons: [],
+        blockers: [],
+        source: "titan",
+        score_method: "unranked",
+        score_note: "Complete your skills or target role to see keyword alignment.",
+      },
+    }));
 
   return {
     matches,
@@ -82,7 +122,17 @@ async function nativeFallback(includeExternal) {
 export async function getJobMatches({ includeExternal = true } = {}) {
   try {
     const response = await api.functions.invoke("jobMatchesV2", { includeExternal });
-    if (response?.data && Array.isArray(response.data.matches)) return response.data;
+    if (response?.data && Array.isArray(response.data.matches)) {
+      // Resume skills are device-local in this release. Use them to annotate
+      // actual server-returned jobs without transferring the résumé to the API.
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const profile = savedResumeSkills(auth?.user?.id);
+        return enrichUnrankedWithResume(response.data, profile);
+      } catch {
+        return response.data;
+      }
+    }
   } catch {
     // Existing dedicated server is unavailable; use only real RLS-filtered
     // TitanOS jobs, never simulated positions or external scraping.

@@ -18,6 +18,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const CareerCoach = lazy(() => import("@/pages/CareerCoach"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const SupportCenter = lazy(() => import("@/pages/SupportCenter"));
 
 const CAREER_ROUTES = {
   "/": CareerHome,
@@ -29,6 +30,7 @@ const CAREER_ROUTES = {
   "/assistant": CareerCoach,
   "/notifications": Notifications,
   "/settings": Settings,
+  "/support": SupportCenter,
 };
 
 // Existing bookmarks continue to land somewhere useful without restoring
@@ -47,6 +49,10 @@ const JOB_REDIRECTS = {
 export default function TabStack() {
   const location = useLocation();
   const path = normalizeAppPath(location.pathname);
+  // Retire all former Driver Hub deep links without mounting legacy screens.
+  if (path === "/driver" || path.startsWith("/driver/") || path === "/driver-hub" || path.startsWith("/driver-hub/")) {
+    return <Navigate to="/hire" replace />;
+  }
   const redirect = JOB_REDIRECTS[path];
   if (redirect) return <Navigate to={redirect} replace />;
 

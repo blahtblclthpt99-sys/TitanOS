@@ -151,7 +151,41 @@ export default async function handler(req, res) {
     });
     worker.lat = privatePrefs.search_lat == null ? null : Number(privatePrefs.search_lat);
     worker.lng = privatePrefs.search_lng == null ? null : Number(privatePrefs.search_lng);
-    if (!profileReady(worker)) return res.status(200).json({ data: { matches: [], needsProfile: false, needsSkills: true, external: { requested: false, enabled: false, reason: "skills_required" } } });
+    if (!profileReady(worker)) {
+      // An empty career profile is not an empty job market. Show actual open
+      // TitanOS posts without claiming to have calculated a qualification match.
+      const today = new Date().toISOString().slice(0, 10);
+      const openJobs = (jobsResult.data || []).filter((job) => {
+        const deadline = String(job.deadline || "").slice(0, 10);
+        return job.id && job.title && (!deadline || deadline >= today);
+      });
+      const unranked = openJobs.map((job) => ({
+        ...job,
+        match: {
+          source: "titan",
+          score: null,
+          reasons: [],
+          blockers: [],
+          score_method: "unranked",
+          score_note: "Add a target role or skills to see keyword alignment.",
+        },
+      }));
+      const interactionMap = new Map((interactionsResult.data || []).map((row) =>
+        [interactionKey(row.source, row.source_name, row.source_job_id), row]
+      ));
+      const savedIds = new Set((savesResult.data || []).map((row) => String(row.hire_job_id)));
+      const appliedIds = new Set((appsResult.data || []).map((row) => String(row.hire_job_id)));
+      const matches = annotateAndFilter(unranked, interactionMap, savedIds, appliedIds).slice(0, 40);
+      return res.status(200).json({ data: {
+        matches,
+        needsProfile: false,
+        needsSkills: true,
+        internalCount: openJobs.length,
+        radiusMode: "unranked_no_preferences",
+        dataSource: "native_jobs_unranked",
+        external: { requested: false, enabled: false, reason: "skills_required" },
+      } });
+    }
 
     const nativeJobs = jobsResult.data || [];
     const internal = filterByRadius(rankInternalJobMatches(nativeJobs, worker), worker);

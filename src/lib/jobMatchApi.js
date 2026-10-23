@@ -17,7 +17,7 @@ function savedResumeSkills(userId) {
   const resume = safeLocalJson(`titanos:resume:v1:${userId}`);
   const prefs = safeLocalJson(`titanos:jobprefs:v1:${userId}`);
   const parseSkills = (value) => typeof value === "string"
-    ? [...new Set(value.split(/[,;\\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.length > 1))].slice(0, 30)
+    ? [...new Set(value.split(/[,;\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.length > 1))].slice(0, 30)
     : [];
   const prefSkills = parseSkills(prefs?.skills);
   const resumeSkills = parseSkills(resume?.skills);

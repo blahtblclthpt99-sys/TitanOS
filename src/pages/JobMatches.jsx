@@ -320,13 +320,13 @@ export default function JobMatches() {
 
       {loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Finding work that fits you…</div>
-      ) : status.needsProfile ? (
+      ) : !matches.length && status.needsProfile ? (
         <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Edit matching profile" onAction={() => { document.getElementById("match-profile-heading")?.scrollIntoView({ behavior: "smooth" }); }} />
-      ) : status.needsSkills ? (
+      ) : !matches.length && status.needsSkills ? (
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (
         <section aria-labelledby="matches-heading">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Opportunity inbox</h2><p className="text-xs text-muted-foreground">Titan jobs are ranked first. {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : "Location currently uses city/state fallback."} Ignored matches stay hidden.</p></div><span className="text-xs text-muted-foreground">{visibleMatches.length} shown</span></div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="matches-heading" className="text-lg font-semibold text-foreground">Opportunity inbox</h2><p className="text-xs text-muted-foreground">{status.needsSkills ? "These real jobs are not ranked yet. Add a target role or skills to get keyword matches." : "Titan jobs are ranked by keyword alignment."} {status.radiusMode === "precise" ? "Precise work-radius filtering is active." : status.radiusMode === "unranked_no_preferences" ? "No location filter has been applied." : "Location currently uses city/state fallback."} Ignored matches stay hidden.</p></div><span className="text-xs text-muted-foreground">{visibleMatches.length} shown</span></div>
           <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter job matches">
             {[['all', 'All'], ['saved', 'Saved'], ['applied', 'Applied']].map(([id, label]) => (
               <Button key={id} type="button" size="sm" variant={view === id ? "default" : "outline"} onClick={() => setView(id)}>{label} ({matchCounts[id]})</Button>

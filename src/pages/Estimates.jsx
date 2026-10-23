@@ -242,7 +242,7 @@ export default function Estimates() {
     .filter(e => `${e.customer_name ?? ""} ${e.estimate_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) return <PageLoader variant="list" label="Loading estimates" />;
-  if (error) return <ErrorState title="Couldn't load estimates" onRetry={reload} />;
+  if (error) return <ErrorState title="Couldn't load estimates" error={error} onRetry={reload} />;
 
   const renderEstimateRow = (est) => (
     <div

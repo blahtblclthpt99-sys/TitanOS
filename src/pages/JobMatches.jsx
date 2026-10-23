@@ -11,7 +11,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { getJobMatches, isExternalJobMatch, jobMatchSourceLabel } from "@/lib/jobMatchApi";
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
 import { clearMyJobMatchInteraction, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
-import { getMyDriverProfile, saveMyDriverProfile } from "@/lib/driverProfilesApi";
 import { toggleSaveJob } from "@/lib/hireApi";
 
 function csv(value) {
@@ -131,9 +130,7 @@ export default function JobMatches() {
     setLoading(true);
     setLoadError("");
     try {
-      // Do not let a missing legacy Driver Hub profile crash the job-seeker screen.
-      const [driver, prefs, result] = await Promise.all([
-        getMyDriverProfile(user.id).catch(() => null),
+      const [prefs, result] = await Promise.all([
         getMyJobMatchPreferences(user.id).catch(() => null),
         getJobMatches({ includeExternal: true }).catch((error) => ({
           matches: [], needsProfile: false, needsSkills: false, external: { reason: "service_unavailable" },
@@ -144,8 +141,8 @@ export default function JobMatches() {
       const local = localPrefsFor(user.id);
       const resume = localResumeFor(user.id);
       setForm({
-        skills: csvText(driver?.skills || prefs?.skills) || local.skills || resume.skills || "",
-        certifications: csvText(driver?.certifications || prefs?.certifications) || local.certifications || resume.certifications || "",
+        skills: local.skills || resume.skills || "",
+        certifications: local.certifications || resume.certifications || "",
         interests: csvText(prefs?.job_interests) || local.interests || resume.headline || "",
         radius: Number(prefs?.work_radius_miles || local.radius || 50),
         desiredPay: Number(prefs?.desired_pay_min || local.desiredPay || 0),
@@ -181,7 +178,6 @@ export default function JobMatches() {
     if (!user?.id || saving) return;
     setSaving(true);
     try {
-      await saveMyDriverProfile(user.id, { skills: csv(form.skills), certifications: csv(form.certifications) });
       await saveMyJobMatchPreferences(user.id, {
         job_interests: csv(form.interests),
         work_radius_miles: Number(form.radius),
@@ -192,8 +188,14 @@ export default function JobMatches() {
         search_lat: form.searchLat,
         search_lng: form.searchLng,
       });
-      try { localStorage.removeItem(`titanos:jobprefs:v1:${user.id}`); } catch { /* optional cleanup */ }
-      toast({ title: "Job matching updated", description: "Your matching preferences were saved to your account." });
+      // Skills and certificates remain device-local until job-seeker cloud sync is available.
+      localStorage.setItem(`titanos:jobprefs:v1:${user.id}`, JSON.stringify({
+        skills: form.skills, certifications: form.certifications, interests: form.interests,
+        radius: form.radius, desiredPay: form.desiredPay, payType: form.payType,
+        schedule: form.schedule, externalConsent: form.externalConsent,
+        searchLat: form.searchLat, searchLng: form.searchLng,
+      }));
+      toast({ title: "Job matching updated", description: "Preferences synced; skills and certificates saved on this device." });
       await load();
     } catch (error) {
       // Explicitly label device-only storage: it must not masquerade as cloud sync.

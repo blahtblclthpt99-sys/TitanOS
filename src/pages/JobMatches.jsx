@@ -39,7 +39,7 @@ function safeJobUrl(raw) {
 }
 function MatchCard({ job, onAction, busy }) {
   const external = isExternalJobMatch(job);
-  const score = Number(job.match?.score || 0);
+  const score = job.match?.score == null ? null : Number(job.match.score);
   const reasons = Array.isArray(job.match?.reasons) ? job.match.reasons : [];
   const blockers = Array.isArray(job.match?.blockers) ? job.match.blockers : [];
   const source = jobMatchSourceLabel(job);
@@ -52,7 +52,7 @@ function MatchCard({ job, onAction, busy }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-foreground">{job.title || "Job"}</h2>
-            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{score}% match</span>
+            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{score == null ? "Not ranked" : `${score}% keyword match`}</span>
             {state && <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{state}</span>}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Source: {source}</p>

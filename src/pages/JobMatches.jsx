@@ -133,7 +133,19 @@ export default function JobMatches() {
       setMatches(result.matches || []);
       setStatus(result);
     } catch (error) {
-      toast({ variant: "destructive", title: "Couldn't load job matches", description: error.message || "Please try again." });
+      toast({
+        variant: "destructive",
+        title: "Couldn't load job matches",
+        description: error?.status === 401
+          ? "Your session may have expired. Sign in again to refresh job matching."
+          : error?.status === 403
+            ? "Your account does not have access to this service."
+            : error?.status === 404
+              ? "The job-matching service could not be found. An app or server update may be required."
+              : error?.status >= 500
+                ? "The job-matching service is unavailable. Please retry later."
+                : "Job matching could not load. Check your connection and retry.",
+      });
     } finally {
       setLoading(false);
     }

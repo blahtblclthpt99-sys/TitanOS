@@ -12,10 +12,26 @@ export default function AppError({
   message = "This section couldn’t load. Check your connection and try again — your data is safe.",
   onRetry,
   onHome,
+  error,
   fullScreen = false,
   className,
 }) {
   const reduceMotion = useReducedMotion();
+  const code = String(error?.code || "").toUpperCase();
+  const status = Number(error?.status || error?.statusCode || 0);
+  // Do not expose raw backend error messages, which can include sensitive data.
+  const diagnostic =
+    status === 401 || code === "PGRST301"
+      ? "Your session may have expired. Check your sign-in before retrying."
+      : status === 403 || code === "42501"
+        ? "Access was denied. Account permissions may need attention."
+        : status === 404 || code === "42P01" || code === "PGRST205"
+          ? "A required service or data resource is unavailable. An update or backend repair may be needed."
+          : status >= 500 || code === "NETWORK_ERROR" || code === "TIMEOUT"
+            ? "The service is temporarily unavailable. Check your connection and try again."
+            : error
+              ? "The requested information could not be loaded. Retry or contact support if this continues."
+              : message;
 
   return (
     <motion.div
@@ -37,7 +53,7 @@ export default function AppError({
         <AlertCircle className="h-7 w-7" />
       </div>
       <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-      <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">{message}</p>
+      <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">{diagnostic}</p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         {onRetry ? (
           <Button type="button" onClick={onRetry} className="gap-2">

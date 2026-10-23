@@ -6,18 +6,31 @@ import {
   toEntityRow,
 } from "./entityTables";
 
-function apiError(message, status = 400) {
+function apiError(message, status = 400, code = "") {
   const error = new Error(message);
   error.status = status;
+  if (code) error.code = code;
   return error;
 }
 
-function throwIfError(error, status = 400) {
+/** Preserve safe error categories for UI while keeping backend details private. */
+function throwIfError(error, fallbackStatus = 400) {
   if (!error) return;
-  if (error.code === "PGRST116") {
-    throw apiError("Not found", 404);
-  }
-  throw apiError(error.message || "Request failed", status);
+  const code = String(error.code || "").toUpperCase();
+  const httpStatus = Number(error.status);
+  const status = Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599
+    ? httpStatus
+    : code === "PGRST116" || code === "42P01" || code === "PGRST205"
+      ? 404
+      : code === "42501"
+        ? 403
+        : fallbackStatus;
+  const safeCode = /^[A-Z0-9_]{2,32}$/.test(code) ? code : "";
+  if (status === 401) throw apiError("Please sign in again.", 401, safeCode);
+  if (status === 403) throw apiError("Access denied.", 403, safeCode);
+  if (status === 404) throw apiError("Required resource not found.", 404, safeCode);
+  if (status >= 500) throw apiError("Data service is unavailable.", status, safeCode);
+  throw apiError("Data request could not be completed.", status, safeCode);
 }
 
 async function currentUserId() {

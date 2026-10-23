@@ -66,7 +66,7 @@ export default function Schedule() {
   const weekEnd = addDays(weekDays[0], 6);
 
   if (loading) return <PageLoader variant="list" label="Loading schedule" />;
-  if (error) return <ErrorState title="Couldn't load schedule" onRetry={reload} />;
+  if (error) return <ErrorState title="Couldn't load schedule" error={error} onRetry={reload} />;
 
   return (
     <div className="page-pad max-w-7xl mx-auto">

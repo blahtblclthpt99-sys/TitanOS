@@ -93,7 +93,7 @@ export default function Employees() {
     );
   }
   if (loading) return <PageLoader variant="list" label="Loading employees" />;
-  if (loadError) return <ErrorState title="Couldn't load employees" onRetry={load} />;
+  if (loadError) return <ErrorState title="Couldn't load employees" error={loadError} onRetry={load} />;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">

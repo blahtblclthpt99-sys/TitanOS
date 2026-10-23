@@ -61,9 +61,22 @@ async function nativeFallback(includeExternal) {
     job?.id && job?.title && job.status === "open" && (!job.deadline || job.deadline >= today)
   );
   const profile = savedResumeSkills(userId);
-  const matches = profile.skills.length || profile.target
-    ? postings.map((job) => rankNativePosting(job, profile)).filter((job) => job.match.score >= 10).sort((a, b) => b.match.score - a.match.score)
-    : [];
+  const hasMatchInputs = Boolean(profile.skills.length || profile.target);
+  // Never hide real open positions merely because a new job seeker has not
+  // completed a résumé yet. Unranked is not equivalent to a 0% qualification.
+  const matches = hasMatchInputs
+    ? postings.map((job) => rankNativePosting(job, profile)).sort((a, b) => b.match.score - a.match.score)
+    : postings.map((job) => ({
+      ...job,
+      match: {
+        score: null,
+        reasons: [],
+        blockers: [],
+        source: "titan",
+        score_method: "unranked",
+        score_note: "Complete your skills or target role to see keyword alignment.",
+      },
+    }));
 
   return {
     matches,

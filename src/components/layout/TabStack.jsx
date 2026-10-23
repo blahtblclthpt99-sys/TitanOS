@@ -47,6 +47,10 @@ const JOB_REDIRECTS = {
 export default function TabStack() {
   const location = useLocation();
   const path = normalizeAppPath(location.pathname);
+  // Retire all former Driver Hub deep links without mounting legacy screens.
+  if (path === "/driver" || path.startsWith("/driver/") || path === "/driver-hub" || path.startsWith("/driver-hub/")) {
+    return <Navigate to="/hire" replace />;
+  }
   const redirect = JOB_REDIRECTS[path];
   if (redirect) return <Navigate to={redirect} replace />;
 

@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { Capacitor } from "@capacitor/core";
 
 const FUNCTION_TIMEOUT_MS = 15_000;
 
@@ -187,7 +188,9 @@ function candidateUrls(path) {
   const base = functionsBaseUrl();
   if (base) urls.push(`${base}${path}`);
 
-  if (typeof window !== "undefined") {
+  // Native Capacitor WebViews host app assets at localhost, not our API.
+  // Never treat that asset origin as an API fallback.
+  if (typeof window !== "undefined" && !Capacitor.isNativePlatform()) {
     const { hostname, origin } = window.location;
     // Same-origin /api on Vercel / custom domains
     if (

@@ -44,6 +44,7 @@
     "test:hardening": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/production-hardening.test.mjs",
     "test:auth": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/auth-guards.test.mjs",
     "test:api": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/api-error.test.mjs",
+    "test:jobs-first": "node --test scripts/driver-hub-retirement.test.mjs scripts/jobmatches-no-driver.test.mjs scripts/jobs-without-resume.test.mjs scripts/jobs-draft-recovery.test.mjs",
     "test:comms": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/titancom-channels.test.mjs",
     "test:export": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/export-stack.test.mjs",
     "test:search": "node --import ./scripts/node-test-setup.mjs --test-force-exit --test scripts/search-index.test.mjs",
@@ -69,7 +70,7 @@
     "test:e2e:browsers": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit",
     "test": "npm run test:fees && npm run test:hire && npm run test:payments && npm run test:driver && npm run test:money && npm run test:tax && npm run test:auth && npm run test:hardening && npm run test:api && npm run test:comms && npm run test:export && npm run test:search && npm run test:settings && npm run test:ai && npm run test:gps && npm run test:offline && npm run test:a11y && npm run test:security && npm run test:voice && npm run test:perf && npm run test:observability && npm run test:code-quality && npm run test:scalability && npm run test:maintainability && npm run test:integration-merge && npm run test:final-qa && npm run test:founding && npm run test:regression",
-    "gate:ship": "npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
+    "gate:ship": "npm run test:jobs-first && npm run lint && npm run typecheck && npm run test:payments && npm run test:hardening && npm run test:security && npm run test:integration-merge && npm run test:final-qa && npm run build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

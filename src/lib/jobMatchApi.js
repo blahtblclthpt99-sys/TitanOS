@@ -47,6 +47,30 @@ export function rankNativePosting(job, profile) {
   } };
 }
 
+/**
+ * Add on-device keyword scores to server-returned, unranked native openings.
+ * The résumé stays on the device; never replace server-verified match scores.
+ */
+export function enrichUnrankedWithResume(data, profile) {
+  const jobs = Array.isArray(data?.matches) ? data.matches : [];
+  const hasSkills = Boolean(profile?.skills?.length || profile?.target);
+  if (!hasSkills || !jobs.length) return data;
+  let enriched = false;
+  const matches = jobs.map((job) => {
+    const isExternal = job?.source === "external" || job?.match?.source === "external";
+    if (isExternal || job?.match?.score != null) return job;
+    enriched = true;
+    return rankNativePosting(job, profile);
+  });
+  if (!enriched) return data;
+  return {
+    ...data,
+    matches: matches.sort((a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1)),
+    needsSkills: false,
+    localResumeScoring: "keyword_overlap_only",
+  };
+}
+
 async function nativeFallback(includeExternal) {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   const userId = authData?.user?.id;
@@ -98,7 +122,17 @@ async function nativeFallback(includeExternal) {
 export async function getJobMatches({ includeExternal = true } = {}) {
   try {
     const response = await api.functions.invoke("jobMatchesV2", { includeExternal });
-    if (response?.data && Array.isArray(response.data.matches)) return response.data;
+    if (response?.data && Array.isArray(response.data.matches)) {
+      // Resume skills are device-local in this release. Use them to annotate
+      // actual server-returned jobs without transferring the résumé to the API.
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const profile = savedResumeSkills(auth?.user?.id);
+        return enrichUnrankedWithResume(response.data, profile);
+      } catch {
+        return response.data;
+      }
+    }
   } catch {
     // Existing dedicated server is unavailable; use only real RLS-filtered
     // TitanOS jobs, never simulated positions or external scraping.

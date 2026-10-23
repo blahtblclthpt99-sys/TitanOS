@@ -5,23 +5,26 @@ import { supabase } from "@/api/supabaseClient";
  * A degraded, fully source-attributed matcher for REAL TitanOS job postings.
  * It does not manufacture jobs, bypass RLS, or contact any outside provider.
  */
+function safeLocalJson(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); }
+  catch { return null; }
+}
+
 function savedResumeSkills(userId) {
   if (!userId || typeof localStorage === "undefined") return { skills: [], target: "" };
-  try {
-    const value = JSON.parse(localStorage.getItem(`titanos:resume:v1:${userId}`) || "null");
-    const skills = typeof value?.skills === "string"
-      ? [...new Set(value.skills.split(/[,;\n]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
-      : [];
-    let localPrefs = null;
-    try { localPrefs = JSON.parse(localStorage.getItem(`titanos:jobprefs:v1:${userId}`) || "null"); } catch { /* no saved local preferences */ }
-    const prefSkills = typeof localPrefs?.skills === "string"
-      ? [...new Set(localPrefs.skills.split(/[;,]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 1))].slice(0, 30)
-      : [];
-    const target = typeof localPrefs?.interests === "string" && localPrefs.interests.trim()
-      ? localPrefs.interests.split(",")[0].trim().toLowerCase().slice(0, 150)
-      : typeof value?.headline === "string" ? value.headline.trim().toLowerCase().slice(0, 150) : "";
-    return { skills: prefSkills.length ? prefSkills : skills, target };
-  } catch { return { skills: [], target: "" }; }
+  // Résumé and job preferences are independent drafts. A malformed résumé
+  // must not discard valid job preferences (or vice versa).
+  const resume = safeLocalJson(`titanos:resume:v1:${userId}`);
+  const prefs = safeLocalJson(`titanos:jobprefs:v1:${userId}`);
+  const parseSkills = (value) => typeof value === "string"
+    ? [...new Set(value.split(/[,;\\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.length > 1))].slice(0, 30)
+    : [];
+  const prefSkills = parseSkills(prefs?.skills);
+  const resumeSkills = parseSkills(resume?.skills);
+  const interests = typeof prefs?.interests === "string" ? prefs.interests.trim() : "";
+  const headline = typeof resume?.headline === "string" ? resume.headline.trim() : "";
+  const target = (interests ? interests.split(",")[0].trim() : headline).toLowerCase().slice(0, 150);
+  return { skills: prefSkills.length ? prefSkills : resumeSkills, target };
 }
 
 export function rankNativePosting(job, profile) {

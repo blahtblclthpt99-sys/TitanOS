@@ -16,8 +16,8 @@ test("the interface never mislabels unranked jobs as zero-percent matches", () =
   assert.match(screen, /keyword match/);
 });
 test("the opportunity inbox renders real unranked jobs before profile prompts", () => {
-  assert.match(screen, /!matches\\.length && status\\.needsSkills/);
-  assert.match(screen, /!matches\\.length && status\\.needsProfile/);
+  assert.match(screen, /!matches\.length && status\.needsSkills/);
+  assert.match(screen, /!matches\.length && status\.needsProfile/);
   assert.match(screen, /These real jobs are not ranked yet/);
   assert.match(screen, /No location filter has been applied/);
 });

@@ -35,6 +35,11 @@ const CAREER_ROUTES = {
 // the advertising, dispatch, or invoicing surfaces.
 const JOB_REDIRECTS = {
   "/jobs": "/hire",
+  "/driver": "/hire",
+  "/driver/": "/hire",
+  "/driver/profile": "/profile",
+  "/driver/trip": "/hire",
+  "/comms": "/assistant",
   "/job-search": "/hire",
   "/applications": "/hire?tab=applications",
   "/saved-jobs": "/hire?tab=saved",

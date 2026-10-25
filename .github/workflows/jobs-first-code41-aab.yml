@@ -1,0 +1,121 @@
+name: TitanOS Jobs-First AAB Code 41
+
+on:
+  push:
+    branches:
+      - fix/jobs-first-android-entry-20261025
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'index.html'
+      - 'package*.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/jobs-first-code41-aab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-jobs-first-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VITE_CAPACITOR_BUILD: 'true'
+      VITE_SUPABASE_URL: 'https://wbymywwrpbljfbsemung.supabase.co'
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI'
+      VITE_API_BASE_URL: 'https://titanos-web.vercel.app'
+      VITE_TITANOS_PUBLIC_ORIGIN: 'https://titanos-web.vercel.app'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify build identity and jobs-first entry
+        shell: bash
+        run: |
+          grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
+          grep -q 'versionCode 41' android/app/build.gradle
+          grep -q 'versionName "2.0.7"' android/app/build.gradle
+          grep -q '"/driver": "/hire"' src/components/layout/TabStack.jsx
+          grep -q '"/resume": ResumeBuilder' src/components/layout/TabStack.jsx
+          ! grep -q 'DriverHubTab' src/components/layout/TabStack.jsx
+      - name: Install and compile frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Restore release upload key if available
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/titanos-upload.jks
+            printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
+            echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+          else
+            echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+          fi
+      - name: Sync Android assets
+        run: npx cap sync android
+      - name: Build Android AAB
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+      - name: Verify bundle and certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          unzip -t "$AAB" > /dev/null
+          sha256sum "$AAB" > TitanOS-2.0.7-code41-SHA256.txt
+          EXPECTED_SHA256='7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D'
+          SIGNED=false
+          CERT_SHA256=''
+          if keytool -printcert -jarfile "$AAB" > TitanOS-code41-certificate.txt 2>&1; then
+            SIGNED=true
+            CERT_SHA256="$(grep 'SHA256:' TitanOS-code41-certificate.txt | head -1 | sed 's/.*SHA256: //')"
+          fi
+          if [[ "$PLAY_SIGNING_CONFIGURED" == "true" ]]; then
+            test "$SIGNED" = true
+            test "$CERT_SHA256" = "$EXPECTED_SHA256"
+          fi
+          {
+            echo "APPLICATION_ID=com.titanos.myapp"
+            echo "VERSION_NAME=2.0.7"
+            echo "VERSION_CODE=41"
+            echo "COMMIT=$GITHUB_SHA"
+            echo "SIGNED=$SIGNED"
+            echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED"
+            echo "UPLOAD_CERT_SHA256=$CERT_SHA256"
+            if [[ "$SIGNED" != "true" ]]; then
+              echo "STATUS=UNSIGNED_NOT_FOR_PLAY_UPLOAD"
+            else
+              echo "STATUS=CERTIFICATE_CHECKED"
+            fi
+          } > TitanOS-code41-build-info.txt
+      - name: Delete upload keystore
+        if: always()
+        run: rm -f android/titanos-upload.jks android/keystore.properties
+      - name: Publish AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-2.0.7-code41-AAB
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            TitanOS-2.0.7-code41-SHA256.txt
+            TitanOS-code41-certificate.txt
+            TitanOS-code41-build-info.txt
+          if-no-files-found: error
+          retention-days: 30

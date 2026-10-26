@@ -85,3 +85,9 @@ test('stale Android auth cache recovers to Login instead of infinite splash', ()
   assert.match(app, /authChecked && !isLoadingAuth && !isAuthenticated/);
   assert.match(app, /<Navigate to="\/login" replace state=\{\{ from: location \}\} \/>/);
 });
+
+test('authenticated career shell does not wait on public settings', () => {
+  const app = read('src/App.jsx');
+  assert.match(app, /if \(!isAuthenticated \|\| isLoadingAuth \|\| !authChecked\)/);
+  assert.doesNotMatch(app, /!isAuthenticated \|\| isLoadingAuth \|\| isLoadingPublicSettings \|\| !authChecked/);
+});

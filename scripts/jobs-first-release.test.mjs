@@ -126,3 +126,11 @@ test('signed-out deep links reach Login without waiting for public settings', ()
   assert.match(app, /if \(!authChecked \|\| isLoadingAuth\)/);
   assert.doesNotMatch(app, /if \(!authChecked \|\| isLoadingAuth \|\| isLoadingPublicSettings\)/);
 });
+
+test('failed Android builds preserve diagnostics without copying signing files', () => {
+  const workflow = read('.github/workflows/jobs-first-code41-aab.yml');
+  assert.match(workflow, /name: Collect Android build diagnostics on failure/);
+  assert.match(workflow, /name: Upload safe build diagnostics/);
+  assert.match(workflow, /name: TitanOS-code41-build-diagnostics/);
+  assert.match(workflow, /path: release-diagnostics\//);
+});

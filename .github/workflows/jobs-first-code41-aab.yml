@@ -9,6 +9,7 @@ on:
       - 'android/**'
       - 'index.html'
       - 'package*.json'
+      - 'scripts/jobs-first-release.test.mjs'
       - 'capacitor.config.json'
       - '.github/workflows/jobs-first-code41-aab.yml'
   workflow_dispatch:
@@ -48,6 +49,8 @@ jobs:
           ! grep -q 'DriverHubTab' src/components/layout/TabStack.jsx
           grep -q '"/support": SupportCenter' src/components/layout/TabStack.jsx
           grep -q '"/resume",' src/lib/nav-items.js
+      - name: Run jobs-first regression checks
+        run: node --test scripts/jobs-first-release.test.mjs
       - name: Install and compile frontend
         run: |
           npm ci

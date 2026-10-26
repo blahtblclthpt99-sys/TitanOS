@@ -108,7 +108,7 @@ export default function AuthCallback() {
         const dest =
           callbackDestination === "/reset-password"
             ? "/reset-password"
-            : consumeReturnTo("/driver");
+            : consumeReturnTo("/");
         if (!cancelled) navigate(dest, { replace: true });
       } catch (err) {
         if (!cancelled) setError(friendlyAuthError(err.message));

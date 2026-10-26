@@ -54,4 +54,6 @@ test('mobile navigation selects the most specific careers tab', () => {
   const mobile = read('src/components/layout/MobileNav.jsx');
   assert.match(mobile, /item\.path\.length > TABS\[best\]\.path\.length/);
   assert.match(mobile, /activeIndex === TABS\.findIndex/);
+  assert.match(mobile, /currentDestination === path/);
+  assert.match(mobile, /location\.search/);
 });

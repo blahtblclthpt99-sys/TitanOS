@@ -137,6 +137,28 @@ jobs:
               echo "STATUS=CERTIFICATE_CHECKED"
             fi
           } > TitanOS-code41-build-info.txt
+      - name: Collect Android build diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p release-diagnostics
+          {
+            echo "COMMIT=$GITHUB_SHA"
+            echo "WORKFLOW=$GITHUB_WORKFLOW"
+            echo "RUN_ID=$GITHUB_RUN_ID"
+            echo "NOTE=See failed step logs in GitHub Actions. Signing secrets are never included."
+          } > release-diagnostics/build-failure-info.txt
+          if [[ -d android/app/build/reports ]]; then
+            cp -r android/app/build/reports release-diagnostics/gradle-reports
+          fi
+      - name: Upload safe build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-code41-build-diagnostics
+          path: release-diagnostics/
+          if-no-files-found: error
+          retention-days: 14
       - name: Delete upload keystore
         if: always()
         run: rm -f android/titanos-upload.jks android/keystore.properties

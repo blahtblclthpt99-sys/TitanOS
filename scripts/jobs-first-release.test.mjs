@@ -31,4 +31,13 @@ test('release bundle is a strictly newer Play candidate', () => {
   assert.match(gradle, /versionCode 41/);
   assert.match(gradle, /versionName "2\.0\.7"/);
   assert.equal(pkg.version, '2.0.7');
+  assert.equal(JSON.parse(read('package-lock.json')).version, pkg.version);
+  assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, pkg.version);
+});
+
+test('job match deep links resolve their selected listing in Hire', () => {
+  const hire = read('src/pages/Hire.jsx');
+  assert.match(hire, /searchParams\.get\("job"\)/);
+  assert.match(hire, /setSelectedJob\(target\)/);
+  assert.match(hire, /next\.delete\("job"\)/);
 });

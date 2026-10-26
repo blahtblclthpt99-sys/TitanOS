@@ -154,7 +154,7 @@ function AppShellGate() {
       rememberReturnTo(location);
       return <Navigate to="/login" replace state={{ from: location }} />;
     }
-    if (!isAuthenticated || isLoadingAuth || isLoadingPublicSettings || !authChecked) {
+    if (!isAuthenticated || isLoadingAuth || !authChecked) {
       return <Spinner fullScreen label="Loading TitanOS" />;
     }
     return (

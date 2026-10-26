@@ -69,6 +69,7 @@ jobs:
             echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
           else
             echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "::warning::Upload signing secrets missing: no Play-ready AAB can be published."
           fi
       - name: Sync Android assets
         run: npx cap sync android
@@ -92,9 +93,14 @@ jobs:
             SIGNED=true
             CERT_SHA256="$(grep 'SHA256:' TitanOS-code41-certificate.txt | head -1 | sed 's/.*SHA256: //')"
           fi
-          if [[ "$PLAY_SIGNING_CONFIGURED" == "true" ]]; then
-            test "$SIGNED" = true
-            test "$CERT_SHA256" = "$EXPECTED_SHA256"
+          # A downloadable release artifact must be Play-upload-ready. Fail closed.
+          if [[ "$PLAY_SIGNING_CONFIGURED" != "true" ]]; then
+            echo "::error::Missing Android upload signing secrets; refusing to publish unsigned AAB."
+            exit 1
+          fi
+          if [[ "$SIGNED" != "true" || "$CERT_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::AAB signature missing or upload certificate differs from Google Play certificate."
+            exit 1
           fi
           {
             echo "APPLICATION_ID=com.titanos.myapp"

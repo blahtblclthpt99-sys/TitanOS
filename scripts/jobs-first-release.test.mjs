@@ -120,3 +120,9 @@ test('release rejects an incorrect upload key before Gradle compilation', () => 
   assert.match(workflow, /keytool -list -v -keystore android\/titanos-upload\.jks/);
   assert.match(workflow, /Signing key does not match the expected Google Play upload certificate/);
 });
+
+test('signed-out deep links reach Login without waiting for public settings', () => {
+  const app = read('src/App.jsx');
+  assert.match(app, /if \(!authChecked \|\| isLoadingAuth\)/);
+  assert.doesNotMatch(app, /if \(!authChecked \|\| isLoadingAuth \|\| isLoadingPublicSettings\)/);
+});

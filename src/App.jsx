@@ -148,6 +148,12 @@ function AppShellGate() {
     if (authError?.type === "user_not_registered") {
       return <Navigate to="/login" replace />;
     }
+    // A stale cached session must not trap Android in an infinite loading screen.
+    // Once auth has been checked, send signed-out users to Login where they can recover.
+    if (authChecked && !isLoadingAuth && !isAuthenticated) {
+      rememberReturnTo(location);
+      return <Navigate to="/login" replace state={{ from: location }} />;
+    }
     if (!isAuthenticated || isLoadingAuth || isLoadingPublicSettings || !authChecked) {
       return <Spinner fullScreen label="Loading TitanOS" />;
     }

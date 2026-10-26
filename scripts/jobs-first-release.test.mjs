@@ -39,6 +39,7 @@ test('job match deep links resolve their selected listing in Hire', () => {
   const hire = read('src/pages/Hire.jsx');
   assert.match(hire, /searchParams\.get\("job"\)/);
   assert.match(hire, /setSelectedJob\(target\)/);
+  assert.match(hire, /listHireJobsByIds\(\[requestedId\]\)/);
   assert.match(hire, /next\.delete\("job"\)/);
 });
 

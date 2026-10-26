@@ -103,3 +103,10 @@ test('Google OAuth callback defaults to Career Home', () => {
   assert.match(callback, /consumeReturnTo\("\/"\)/);
   assert.doesNotMatch(callback, /consumeReturnTo\("\/driver"\)/);
 });
+
+test('legacy stored Driver Hub destination migrates to job search', () => {
+  const returns = read('src/lib/returnTo.js');
+  assert.match(returns, /pathnameOnly === "\/driver"/);
+  assert.match(returns, /pathnameOnly\.startsWith\("\/driver\/"\)/);
+  assert.match(returns, /return "\/hire"/);
+});

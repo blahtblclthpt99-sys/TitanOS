@@ -48,7 +48,7 @@ jobs:
           grep -q '"/resume": ResumeBuilder' src/components/layout/TabStack.jsx
           ! grep -q 'DriverHubTab' src/components/layout/TabStack.jsx
           grep -q '"/support": SupportCenter' src/components/layout/TabStack.jsx
-          grep -q '"/resume",' src/lib/nav-items.js
+          grep -q 'label: "Résumé", path: "/resume"' src/lib/nav-items.js
       - name: Run jobs-first regression checks
         run: node --test scripts/jobs-first-release.test.mjs
       - name: Install and compile frontend

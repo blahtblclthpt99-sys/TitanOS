@@ -68,8 +68,8 @@ jobs:
             printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
             echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
           else
-            echo "PLAY_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
-            echo "::warning::Upload signing secrets missing: no Play-ready AAB can be published."
+            echo "::error::Android upload signing secrets are missing. Configure all four secrets before running a Play release build."
+            exit 1
           fi
       - name: Sync Android assets
         run: npx cap sync android

@@ -173,7 +173,7 @@ function AppShellGate() {
   }
 
   // Protected deep-link while auth resolves
-  if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
+  if (!authChecked || isLoadingAuth) {
     return <Spinner fullScreen label="Loading TitanOS" />;
   }
 

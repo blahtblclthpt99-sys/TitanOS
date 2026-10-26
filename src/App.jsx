@@ -108,7 +108,6 @@ function AppShellGate() {
   const {
     isAuthenticated,
     isLoadingAuth,
-    isLoadingPublicSettings,
     authChecked,
     authError,
     checkUserAuth,

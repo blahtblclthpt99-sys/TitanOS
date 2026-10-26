@@ -56,4 +56,5 @@ test('mobile navigation selects the most specific careers tab', () => {
   assert.match(mobile, /activeIndex === TABS\.findIndex/);
   assert.match(mobile, /currentDestination === path/);
   assert.match(mobile, /location\.search/);
+  assert.match(mobile, /pathname === path && !location\.search/);
 });

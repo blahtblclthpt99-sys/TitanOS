@@ -118,6 +118,14 @@ export default function Hire() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Links from Career Home and More can change the query without remounting Hire.
+  // Keep the visible tab synchronized with the URL (including browser back/forward).
+  useEffect(() => {
+    const requested = searchParams.get("new") === "1" ? "post" : searchParams.get("tab");
+    const next = ["browse", "saved", "post", "posts", "applications"].includes(requested) ? requested : "browse";
+    setTab((current) => current === next ? current : next);
+  }, [searchParams]);
+
   const selectTab = (id) => {
     setTab(id);
     if (id === "browse") setSearchParams({}, { replace: true });

@@ -97,3 +97,9 @@ test('login returns to Career Home instead of legacy Driver Hub', () => {
   assert.match(authReturn, /consumeReturnTo\(fallback = "\/"\)/);
   assert.doesNotMatch(authReturn, /"\/driver"/);
 });
+
+test('Google OAuth callback defaults to Career Home', () => {
+  const callback = read('src/pages/AuthCallback.jsx');
+  assert.match(callback, /consumeReturnTo\("\/"\)/);
+  assert.doesNotMatch(callback, /consumeReturnTo\("\/driver"\)/);
+});

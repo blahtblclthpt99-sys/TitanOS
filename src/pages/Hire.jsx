@@ -157,21 +157,35 @@ export default function Hire() {
 
   useEffect(() => { if (authChecked && user?.id) load(); }, [authChecked, user?.id, tab, filters.search, filters.category, filters.state]);
 
-  // Job-match links include a job id. Open its application panel after the
-  // browse results load, then consume the id to avoid reopening on close.
+  // A match may be outside the current search filters or result page.
+  // Resolve by its canonical ID instead of incorrectly declaring it unavailable.
   useEffect(() => {
     const requestedId = searchParams.get("job");
     if (!requestedId || tab !== "browse" || loading) return;
-    const target = jobs.find((job) => String(job.id) === requestedId);
-    if (target) {
-      setSelectedJob(target);
-      setApplyForm({ message: "", bid_amount: "" });
-    } else {
-      toast({ variant: "destructive", title: "This job is no longer available in the current results." });
+    let cancelled = false;
+    async function openRequestedJob() {
+      try {
+        const inResults = jobs.find((job) => String(job.id) === requestedId);
+        const target = inResults || (await listHireJobsByIds([requestedId]))?.[0];
+        if (cancelled) return;
+        if (target && String(target.id) === requestedId) {
+          setSelectedJob(target);
+          setApplyForm({ message: "", bid_amount: "" });
+        } else {
+          toast({ variant: "destructive", title: "This job is no longer available." });
+        }
+      } catch {
+        if (!cancelled) toast({ variant: "destructive", title: "Couldn't open this job. Try again." });
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete("job");
+          setSearchParams(next, { replace: true });
+        }
+      }
     }
-    const next = new URLSearchParams(searchParams);
-    next.delete("job");
-    setSearchParams(next, { replace: true });
+    openRequestedJob();
+    return () => { cancelled = true; };
   }, [jobs, loading, tab, searchParams, setSearchParams]);
 
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));

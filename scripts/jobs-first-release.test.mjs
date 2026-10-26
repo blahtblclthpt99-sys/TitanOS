@@ -41,3 +41,10 @@ test('job match deep links resolve their selected listing in Hire', () => {
   assert.match(hire, /setSelectedJob\(target\)/);
   assert.match(hire, /next\.delete\("job"\)/);
 });
+
+test('Play workflow refuses to publish an unsigned or wrongly signed AAB', () => {
+  const workflow = read('.github/workflows/jobs-first-code41-aab.yml');
+  assert.match(workflow, /PLAY_SIGNING_CONFIGURED" != "true"/);
+  assert.match(workflow, /CERT_SHA256" != "\$EXPECTED_SHA256"/);
+  assert.match(workflow, /exit 1/);
+});

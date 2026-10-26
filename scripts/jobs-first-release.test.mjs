@@ -141,3 +141,10 @@ test('Android SDK 36 is explicitly provisioned for code-41 builds', () => {
   assert.match(workflow, /platforms;android-36/);
   assert.match(workflow, /build-tools;36\.0\.0/);
 });
+
+test('release verifies AAB entry signatures and uploads verification evidence', () => {
+  const workflow = read('.github/workflows/jobs-first-code41-aab.yml');
+  assert.match(workflow, /jarsigner -verify -certs "\$AAB"/);
+  assert.match(workflow, /grep -q "jar verified" TitanOS-code41-signature-verification\.txt/);
+  assert.match(workflow, /TitanOS-code41-signature-verification\.txt/);
+});

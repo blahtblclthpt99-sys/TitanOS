@@ -111,3 +111,12 @@ test('legacy stored Driver Hub destination migrates to job search', () => {
   assert.match(returns, /pathnameOnly\.startsWith\("\/driver\/"\)/);
   assert.match(returns, /return "\/hire"/);
 });
+
+test('release rejects an incorrect upload key before Gradle compilation', () => {
+  const workflow = read('.github/workflows/jobs-first-code41-aab.yml');
+  const preflight = workflow.indexOf('name: Verify upload keystore before Android compilation');
+  const gradle = workflow.indexOf('name: Build Android AAB');
+  assert.ok(preflight > 0 && gradle > preflight);
+  assert.match(workflow, /keytool -list -v -keystore android\/titanos-upload\.jks/);
+  assert.match(workflow, /Signing key does not match the expected Google Play upload certificate/);
+});

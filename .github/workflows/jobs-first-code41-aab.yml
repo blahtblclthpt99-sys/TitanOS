@@ -46,6 +46,8 @@ jobs:
           grep -q '"/driver": "/hire"' src/components/layout/TabStack.jsx
           grep -q '"/resume": ResumeBuilder' src/components/layout/TabStack.jsx
           ! grep -q 'DriverHubTab' src/components/layout/TabStack.jsx
+          grep -q '"/support": SupportCenter' src/components/layout/TabStack.jsx
+          grep -q '"/resume",' src/lib/nav-items.js
       - name: Install and compile frontend
         run: |
           npm ci

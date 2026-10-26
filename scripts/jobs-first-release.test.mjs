@@ -58,3 +58,17 @@ test('mobile navigation selects the most specific careers tab', () => {
   assert.match(mobile, /location\.search/);
   assert.match(mobile, /pathname === path && !location\.search/);
 });
+
+test('Vite Android entry resolves into the React app', () => {
+  const html = read('index.html');
+  const main = read('src/main.jsx');
+  const app = read('src/App.jsx');
+  const capacitor = JSON.parse(read('capacitor.config.json'));
+  assert.match(html, /<script type="module" src="\/src\/main\.jsx"><\/script>/);
+  assert.match(html, /<div id="root">/);
+  assert.match(main, /ReactDOM\.createRoot\(document\.getElementById\('root'\)\)/);
+  assert.match(main, /<App \/>/);
+  assert.match(app, /HashRouter/);
+  assert.equal(capacitor.webDir, 'dist');
+  assert.equal(capacitor.appId, 'com.titanos.myapp');
+});

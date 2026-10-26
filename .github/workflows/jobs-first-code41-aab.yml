@@ -53,12 +53,13 @@ jobs:
         run: node --test scripts/jobs-first-release.test.mjs
       - name: Install, validate, and compile frontend
         run: |
+          set -euo pipefail
           npm ci
           npm run typecheck
           npm run build
           test -s dist/index.html
           test -d dist/assets
-      - name: Restore release upload key if available
+      - name: Restore release upload key
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -66,6 +67,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/titanos-upload.jks
             printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties

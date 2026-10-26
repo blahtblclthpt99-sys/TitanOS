@@ -42,6 +42,11 @@ export function sanitizeReturnPath(raw) {
   }
 
   const pathnameOnly = path.split("?")[0].split("#")[0] || "/";
+  // Existing installs may have saved Driver Hub as the post-login destination.
+  // Do not reopen retired screens when users sign in after upgrading.
+  if (pathnameOnly === "/driver" || pathnameOnly.startsWith("/driver/")) {
+    return "/hire";
+  }
   if (AUTH_PATHS.has(pathnameOnly) || pathnameOnly.startsWith("/auth/")) {
     return "/";
   }

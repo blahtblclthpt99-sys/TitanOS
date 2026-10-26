@@ -49,3 +49,9 @@ test('Play workflow refuses to publish an unsigned or wrongly signed AAB', () =>
   assert.match(workflow, /CERT_SHA256" != "\$EXPECTED_SHA256"/);
   assert.match(workflow, /exit 1/);
 });
+
+test('mobile navigation selects the most specific careers tab', () => {
+  const mobile = read('src/components/layout/MobileNav.jsx');
+  assert.match(mobile, /item\.path\.length > TABS\[best\]\.path\.length/);
+  assert.match(mobile, /activeIndex === TABS\.findIndex/);
+});

@@ -51,10 +51,13 @@ jobs:
           grep -q 'label: "Résumé", path: "/resume"' src/lib/nav-items.js
       - name: Run jobs-first regression checks
         run: node --test scripts/jobs-first-release.test.mjs
-      - name: Install and compile frontend
+      - name: Install, validate, and compile frontend
         run: |
           npm ci
+          npm run typecheck
           npm run build
+          test -s dist/index.html
+          test -d dist/assets
       - name: Restore release upload key if available
         shell: bash
         env:

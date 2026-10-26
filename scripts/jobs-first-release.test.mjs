@@ -79,3 +79,9 @@ test('jobs-first Android permissions do not request legacy microphone access', (
   assert.doesNotMatch(manifest, /android\.permission\.MODIFY_AUDIO_SETTINGS"/);
   assert.match(manifest, /android\.permission\.INTERNET"/);
 });
+
+test('stale Android auth cache recovers to Login instead of infinite splash', () => {
+  const app = read('src/App.jsx');
+  assert.match(app, /authChecked && !isLoadingAuth && !isAuthenticated/);
+  assert.match(app, /<Navigate to="\/login" replace state=\{\{ from: location \}\} \/>/);
+});

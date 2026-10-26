@@ -21,7 +21,14 @@ export default function MobileNav() {
   const pathname = normalizeAppPath(location.pathname);
   const touchStart = useRef(null);
 
-  const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
+  // Saved Jobs and My Applications share /hire but belong in the More menu.
+  // Their query parameters distinguish them from the Find Jobs browse tab.
+  const currentDestination = `${pathname}${location.search || ""}`;
+  const moreActive = pathname === "/more" || MORE_PATHS.some((path) =>
+    path.includes("?")
+      ? currentDestination === path
+      : isRouteActive(pathname, path)
+  );
 
   // Prefer the most specific destination: /hire/matches must not activate /hire.
   const activeIndex = moreActive

@@ -95,7 +95,8 @@ test('authenticated career shell does not wait on public settings', () => {
 test('login returns to Career Home instead of legacy Driver Hub', () => {
   const authReturn = read('src/lib/returnTo.js');
   assert.match(authReturn, /consumeReturnTo\(fallback = "\/"\)/);
-  assert.doesNotMatch(authReturn, /"\/driver"/);
+  assert.doesNotMatch(authReturn, /consumeReturnTo\(fallback = "\/driver"\)/);
+  assert.match(authReturn, /return "\/hire"/);
 });
 
 test('Google OAuth callback defaults to Career Home', () => {

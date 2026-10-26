@@ -72,3 +72,10 @@ test('Vite Android entry resolves into the React app', () => {
   assert.equal(capacitor.webDir, 'dist');
   assert.equal(capacitor.appId, 'com.titanos.myapp');
 });
+
+test('jobs-first Android permissions do not request legacy microphone access', () => {
+  const manifest = read('android/app/src/main/AndroidManifest.xml');
+  assert.doesNotMatch(manifest, /android\.permission\.RECORD_AUDIO"/);
+  assert.doesNotMatch(manifest, /android\.permission\.MODIFY_AUDIO_SETTINGS"/);
+  assert.match(manifest, /android\.permission\.INTERNET"/);
+});

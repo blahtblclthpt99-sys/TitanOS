@@ -23,10 +23,13 @@ export default function MobileNav() {
 
   const moreActive = pathname === "/more" || MORE_PATHS.some((path) => isRouteActive(pathname, path));
 
-  const activeIndex = TABS.findIndex((item) => {
-    if (item.path === "/more") return moreActive;
-    return isRouteActive(pathname, item.path);
-  });
+  // Prefer the most specific destination: /hire/matches must not activate /hire.
+  const activeIndex = moreActive
+    ? TABS.findIndex((item) => item.path === "/more")
+    : TABS.reduce((best, item, index) => {
+        if (item.path === "/more" || !isRouteActive(pathname, item.path)) return best;
+        return best < 0 || item.path.length > TABS[best].path.length ? index : best;
+      }, -1);
 
   const handleTab = (path) => {
     if (pathname === path) return;
@@ -62,7 +65,7 @@ export default function MobileNav() {
     >
       <div className="flex h-[64px] items-stretch justify-around px-1">
         {MOBILE_TAB_ITEMS.map((item) => {
-          const isActive = isRouteActive(pathname, item.path);
+          const isActive = activeIndex === TABS.findIndex((tab) => tab.path === item.path);
           return (
             <button
               key={item.path}

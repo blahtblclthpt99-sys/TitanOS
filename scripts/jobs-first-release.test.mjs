@@ -134,3 +134,10 @@ test('failed Android builds preserve diagnostics without copying signing files',
   assert.match(workflow, /name: TitanOS-code41-build-diagnostics/);
   assert.match(workflow, /path: release-diagnostics\//);
 });
+
+test('Android SDK 36 is explicitly provisioned for code-41 builds', () => {
+  const workflow = read('.github/workflows/jobs-first-code41-aab.yml');
+  assert.match(workflow, /android-actions\/setup-android@v3/);
+  assert.match(workflow, /platforms;android-36/);
+  assert.match(workflow, /build-tools;36\.0\.0/);
+});

@@ -18,6 +18,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const CareerCoach = lazy(() => import("@/pages/CareerCoach"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const SupportCenter = lazy(() => import("@/pages/SupportCenter"));
 
 const CAREER_ROUTES = {
   "/": CareerHome,
@@ -29,6 +30,7 @@ const CAREER_ROUTES = {
   "/assistant": CareerCoach,
   "/notifications": Notifications,
   "/settings": Settings,
+  "/support": SupportCenter,
 };
 
 // Existing bookmarks continue to land somewhere useful without restoring

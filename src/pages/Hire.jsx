@@ -157,6 +157,23 @@ export default function Hire() {
 
   useEffect(() => { if (authChecked && user?.id) load(); }, [authChecked, user?.id, tab, filters.search, filters.category, filters.state]);
 
+  // Job-match links include a job id. Open its application panel after the
+  // browse results load, then consume the id to avoid reopening on close.
+  useEffect(() => {
+    const requestedId = searchParams.get("job");
+    if (!requestedId || tab !== "browse" || loading) return;
+    const target = jobs.find((job) => String(job.id) === requestedId);
+    if (target) {
+      setSelectedJob(target);
+      setApplyForm({ message: "", bid_amount: "" });
+    } else {
+      toast({ variant: "destructive", title: "This job is no longer available in the current results." });
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("job");
+    setSearchParams(next, { replace: true });
+  }, [jobs, loading, tab, searchParams, setSearchParams]);
+
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const openApply = (job) => { setSelectedJob(job); setApplyForm({ message: "", bid_amount: "" }); };
   const saveToggle = async (jobId) => {

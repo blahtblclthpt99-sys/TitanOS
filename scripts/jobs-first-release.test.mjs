@@ -91,3 +91,9 @@ test('authenticated career shell does not wait on public settings', () => {
   assert.match(app, /if \(!isAuthenticated \|\| isLoadingAuth \|\| !authChecked\)/);
   assert.doesNotMatch(app, /!isAuthenticated \|\| isLoadingAuth \|\| isLoadingPublicSettings \|\| !authChecked/);
 });
+
+test('login returns to Career Home instead of legacy Driver Hub', () => {
+  const authReturn = read('src/lib/returnTo.js');
+  assert.match(authReturn, /consumeReturnTo\(fallback = "\/"\)/);
+  assert.doesNotMatch(authReturn, /"\/driver"/);
+});

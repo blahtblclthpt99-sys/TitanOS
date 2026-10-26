@@ -39,7 +39,9 @@ export default function MobileNav() {
       }, -1);
 
   const handleTab = (path) => {
-    if (pathname === path) return;
+    // Re-selecting Find Jobs from Saved/Applications must clear ?tab=...
+    // rather than returning early because the pathname already equals /hire.
+    if (pathname === path && !location.search) return;
     navigate(path);
   };
 

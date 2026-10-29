@@ -7,6 +7,7 @@ function list(values, max = 30) {
 }
 
 function coordinate(value, min, max, fallback = null) {
+  if (value === null || value === undefined || value === "") return fallback;
   const n = Number(value);
   return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
 }

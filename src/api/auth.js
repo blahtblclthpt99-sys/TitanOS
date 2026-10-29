@@ -3,7 +3,6 @@ import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
 import { resolveStoredUploadUrl } from "./integrations";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
-import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 
 function apiError(message, status = 400) {
   const error = new Error(message);
@@ -129,36 +128,6 @@ async function buildUser(authUser, profile) {
     created_date: profile?.created_at || authUser.created_at,
     updated_date: profile?.updated_at || authUser.updated_at,
   };
-}
-
-async function oauthProviderEnabled(provider) {
-  const base = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
-  const publicKey =
-    import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!base || !publicKey) return null;
-  try {
-    const res = await fetch(`${base}/auth/v1/settings`, {
-      headers: { apikey: publicKey, Authorization: `Bearer ${publicKey}` },
-    });
-    if (!res.ok) return null;
-    const settings = await res.json();
-    const key = provider === "azure" ? "azure" : provider;
-    if (!settings?.external || typeof settings.external[key] !== "boolean") return null;
-    return settings.external[key];
-  } catch {
-    return null;
-  }
-}
-
-async function assertOAuthProviderEnabled(provider) {
-  const enabled = await oauthProviderEnabled(provider);
-  if (enabled === false) {
-    const label = provider === "google" ? "Google" : provider;
-    throw apiError(
-      `${label} sign-in is not enabled yet. Use email sign-in for now.`,
-      400
-    );
-  }
 }
 
 async function registerViaServer({ email, password, fullName }) {
@@ -330,13 +299,7 @@ export function createAuthModule() {
       // Supabase provider availability is already enforced by the OAuth
       // endpoint. Avoid blocking Android Custom Tab launch on an extra
       // settings request, which can hang indefinitely on some WebViews.
-      if (!isNative) {
-        await withTimeout(
-          assertOAuthProviderEnabled(provider),
-          5000,
-          "Could not verify Google sign-in. Check your connection and try again."
-        );
-      }
+      // Supabase OAuth endpoint validates provider availability directly.
       const options = {
         redirectTo,
         skipBrowserRedirect: true,

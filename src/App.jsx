@@ -108,7 +108,6 @@ function AppShellGate() {
   const {
     isAuthenticated,
     isLoadingAuth,
-    isLoadingPublicSettings,
     authChecked,
     authError,
     checkUserAuth,
@@ -148,7 +147,13 @@ function AppShellGate() {
     if (authError?.type === "user_not_registered") {
       return <Navigate to="/login" replace />;
     }
-    if (!isAuthenticated || isLoadingAuth || isLoadingPublicSettings || !authChecked) {
+    // A stale cached session must not trap Android in an infinite loading screen.
+    // Once auth has been checked, send signed-out users to Login where they can recover.
+    if (authChecked && !isLoadingAuth && !isAuthenticated) {
+      rememberReturnTo(location);
+      return <Navigate to="/login" replace state={{ from: location }} />;
+    }
+    if (!isAuthenticated || isLoadingAuth || !authChecked) {
       return <Spinner fullScreen label="Loading TitanOS" />;
     }
     return (
@@ -167,7 +172,7 @@ function AppShellGate() {
   }
 
   // Protected deep-link while auth resolves
-  if (!authChecked || isLoadingAuth || isLoadingPublicSettings) {
+  if (!authChecked || isLoadingAuth) {
     return <Spinner fullScreen label="Loading TitanOS" />;
   }
 

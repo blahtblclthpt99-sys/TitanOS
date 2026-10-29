@@ -118,6 +118,14 @@ export default function Hire() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Links from Career Home and More can change the query without remounting Hire.
+  // Keep the visible tab synchronized with the URL (including browser back/forward).
+  useEffect(() => {
+    const requested = searchParams.get("new") === "1" ? "post" : searchParams.get("tab");
+    const next = ["browse", "saved", "post", "posts", "applications"].includes(requested) ? requested : "browse";
+    setTab((current) => current === next ? current : next);
+  }, [searchParams]);
+
   const selectTab = (id) => {
     setTab(id);
     if (id === "browse") setSearchParams({}, { replace: true });
@@ -148,6 +156,37 @@ export default function Hire() {
   };
 
   useEffect(() => { if (authChecked && user?.id) load(); }, [authChecked, user?.id, tab, filters.search, filters.category, filters.state]);
+
+  // A match may be outside the current search filters or result page.
+  // Resolve by its canonical ID instead of incorrectly declaring it unavailable.
+  useEffect(() => {
+    const requestedId = searchParams.get("job");
+    if (!requestedId || tab !== "browse" || loading) return;
+    let cancelled = false;
+    async function openRequestedJob() {
+      try {
+        const inResults = jobs.find((job) => String(job.id) === requestedId);
+        const target = inResults || (await listHireJobsByIds([requestedId]))?.[0];
+        if (cancelled) return;
+        if (target && String(target.id) === requestedId) {
+          setSelectedJob(target);
+          setApplyForm({ message: "", bid_amount: "" });
+        } else {
+          toast({ variant: "destructive", title: "This job is no longer available." });
+        }
+      } catch {
+        if (!cancelled) toast({ variant: "destructive", title: "Couldn't open this job. Try again." });
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete("job");
+          setSearchParams(next, { replace: true });
+        }
+      }
+    }
+    openRequestedJob();
+    return () => { cancelled = true; };
+  }, [jobs, loading, tab, searchParams, setSearchParams]);
 
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const openApply = (job) => { setSelectedJob(job); setApplyForm({ message: "", bid_amount: "" }); };

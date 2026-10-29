@@ -1,0 +1,186 @@
+name: TitanOS Jobs-First AAB Code 41
+
+on:
+  push:
+    branches:
+      - fix/jobs-first-android-entry-20261025
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'index.html'
+      - 'package*.json'
+      - 'scripts/jobs-first-release.test.mjs'
+      - 'capacitor.config.json'
+      - '.github/workflows/jobs-first-code41-aab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-jobs-first-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VITE_CAPACITOR_BUILD: 'true'
+      VITE_SUPABASE_URL: 'https://wbymywwrpbljfbsemung.supabase.co'
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI'
+      VITE_API_BASE_URL: 'https://titanos-web.vercel.app'
+      VITE_TITANOS_PUBLIC_ORIGIN: 'https://titanos-web.vercel.app'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36 build requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          test -f "$ANDROID_HOME/platforms/android-36/android.jar"
+      - name: Verify build identity and jobs-first entry
+        shell: bash
+        run: |
+          grep -q 'applicationId "com.titanos.myapp"' android/app/build.gradle
+          grep -q 'versionCode 41' android/app/build.gradle
+          grep -q 'versionName "2.0.7"' android/app/build.gradle
+          grep -q '"/driver": "/hire"' src/components/layout/TabStack.jsx
+          grep -q '"/resume": ResumeBuilder' src/components/layout/TabStack.jsx
+          ! grep -q 'DriverHubTab' src/components/layout/TabStack.jsx
+          grep -q '"/support": SupportCenter' src/components/layout/TabStack.jsx
+          grep -q 'label: "Résumé", path: "/resume"' src/lib/nav-items.js
+      - name: Run jobs-first regression checks
+        run: node --test scripts/jobs-first-release.test.mjs
+      - name: Install, validate, and compile frontend
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck
+          npm run build
+          test -s dist/index.html
+          test -d dist/assets
+      - name: Restore release upload key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/titanos-upload.jks
+            printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
+            echo "PLAY_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+          else
+            echo "::error::Android upload signing secrets are missing. Configure all four secrets before running a Play release build."
+            exit 1
+          fi
+      - name: Verify upload keystore before Android compilation
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          EXPECTED_SHA256='7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D'
+          keytool -list -v -keystore android/titanos-upload.jks \
+            -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" > android-upload-key-check.txt
+          CERT_SHA256="$(grep 'SHA256:' android-upload-key-check.txt | head -1 | sed 's/.*SHA256: //')"
+          rm -f android-upload-key-check.txt
+          if [[ "$CERT_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::Signing key does not match the expected Google Play upload certificate."
+            exit 1
+          fi
+      - name: Sync Android assets
+        run: npx cap sync android
+      - name: Build Android AAB
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+      - name: Verify bundle and certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          unzip -t "$AAB" > /dev/null
+          # A certificate fingerprint alone does not prove bundle entries are signed.
+          jarsigner -verify -certs "$AAB" > TitanOS-code41-signature-verification.txt
+          grep -q "jar verified" TitanOS-code41-signature-verification.txt
+          sha256sum "$AAB" > TitanOS-2.0.7-code41-SHA256.txt
+          EXPECTED_SHA256='7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D'
+          SIGNED=false
+          CERT_SHA256=''
+          if keytool -printcert -jarfile "$AAB" > TitanOS-code41-certificate.txt 2>&1; then
+            SIGNED=true
+            CERT_SHA256="$(grep 'SHA256:' TitanOS-code41-certificate.txt | head -1 | sed 's/.*SHA256: //')"
+          fi
+          # A downloadable release artifact must be Play-upload-ready. Fail closed.
+          if [[ "$PLAY_SIGNING_CONFIGURED" != "true" ]]; then
+            echo "::error::Missing Android upload signing secrets; refusing to publish unsigned AAB."
+            exit 1
+          fi
+          if [[ "$SIGNED" != "true" || "$CERT_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::AAB signature missing or upload certificate differs from Google Play certificate."
+            exit 1
+          fi
+          {
+            echo "APPLICATION_ID=com.titanos.myapp"
+            echo "VERSION_NAME=2.0.7"
+            echo "VERSION_CODE=41"
+            echo "COMMIT=$GITHUB_SHA"
+            echo "SIGNED=$SIGNED"
+            echo "PLAY_SIGNING_CONFIGURED=$PLAY_SIGNING_CONFIGURED"
+            echo "UPLOAD_CERT_SHA256=$CERT_SHA256"
+            if [[ "$SIGNED" != "true" ]]; then
+              echo "STATUS=UNSIGNED_NOT_FOR_PLAY_UPLOAD"
+            else
+              echo "STATUS=CERTIFICATE_CHECKED"
+            fi
+          } > TitanOS-code41-build-info.txt
+      - name: Collect Android build diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p release-diagnostics
+          {
+            echo "COMMIT=$GITHUB_SHA"
+            echo "WORKFLOW=$GITHUB_WORKFLOW"
+            echo "RUN_ID=$GITHUB_RUN_ID"
+            echo "NOTE=See failed step logs in GitHub Actions. Signing secrets are never included."
+          } > release-diagnostics/build-failure-info.txt
+          if [[ -d android/app/build/reports ]]; then
+            cp -r android/app/build/reports release-diagnostics/gradle-reports
+          fi
+      - name: Upload safe build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-code41-build-diagnostics
+          path: release-diagnostics/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Delete upload keystore
+        if: always()
+        run: rm -f android/titanos-upload.jks android/keystore.properties
+      - name: Publish AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanOS-2.0.7-code41-AAB
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            TitanOS-2.0.7-code41-SHA256.txt
+            TitanOS-code41-certificate.txt
+            TitanOS-code41-signature-verification.txt
+            TitanOS-code41-build-info.txt
+          if-no-files-found: error
+          retention-days: 30

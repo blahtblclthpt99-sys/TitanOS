@@ -18,6 +18,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const CareerCoach = lazy(() => import("@/pages/CareerCoach"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const SupportCenter = lazy(() => import("@/pages/SupportCenter"));
 
 const CAREER_ROUTES = {
   "/": CareerHome,
@@ -29,12 +30,18 @@ const CAREER_ROUTES = {
   "/assistant": CareerCoach,
   "/notifications": Notifications,
   "/settings": Settings,
+  "/support": SupportCenter,
 };
 
 // Existing bookmarks continue to land somewhere useful without restoring
 // the advertising, dispatch, or invoicing surfaces.
 const JOB_REDIRECTS = {
   "/jobs": "/hire",
+  "/driver": "/hire",
+  "/driver/": "/hire",
+  "/driver/profile": "/profile",
+  "/driver/trip": "/hire",
+  "/comms": "/assistant",
   "/job-search": "/hire",
   "/applications": "/hire?tab=applications",
   "/saved-jobs": "/hire?tab=saved",

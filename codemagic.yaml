@@ -1,0 +1,131 @@
+# TitanOS jobs-first Android release candidate — Code 42.
+# Select the repair branch in Codemagic, not the Play production branch.
+workflows:
+  titanos-code41-diagnostic:
+    name: TitanOS 2.0.8 — Android diagnostic AAB
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      node: v22.22.0
+      java: 21
+      vars:
+        VITE_CAPACITOR_BUILD: "true"
+        VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
+        VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+        VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          set -eu
+          node --version
+          npm ci
+      - name: Run jobs-first regression tests
+        script: node --test scripts/jobs-first-release.test.mjs
+      - name: Validate TypeScript
+        script: npm run typecheck
+      - name: Compile Android web assets
+        script: |
+          set -eu
+          npm run build
+          test -s dist/index.html
+      - name: Prepare Capacitor Android
+        script: |
+          set -eu
+          : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
+          test -d "$ANDROID_SDK_ROOT"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          echo "Using Android SDK: $ANDROID_SDK_ROOT"
+          # Codemagic manages its Android SDK. Gradle resolves required SDK
+          # packages; sdkmanager need not be present on macOS PATH.
+          npx cap sync android
+      - name: Build unsigned diagnostic AAB
+        script: |
+          set -eu
+          java -version
+          javac -version
+          javac -source 21 -target 21 -version
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/reports/**/*
+
+  titanos-code41-signed:
+    name: TitanOS 2.0.8 — Signed Google Play AAB
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      node: v22.22.0
+      java: 21
+      groups:
+        - titanos_android_signing
+      vars:
+        VITE_CAPACITOR_BUILD: "true"
+        VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
+        VITE_API_BASE_URL: "https://titanos-web.vercel.app"
+        VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
+    scripts:
+      - name: Restore and verify existing Play upload signing key
+        script: |
+          set -eu
+          : "${ANDROID_KEYSTORE_BASE64:?Missing Codemagic signing secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing Codemagic signing secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing Codemagic signing secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing Codemagic signing secret}"
+          printf %s "$ANDROID_KEYSTORE_BASE64" | base64 -D > android/titanos-upload.jks
+          printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
+          keytool -list -v -keystore android/titanos-upload.jks -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" > /tmp/titanos-key-cert.txt
+          grep -F '7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D' /tmp/titanos-key-cert.txt
+          rm -f /tmp/titanos-key-cert.txt
+      - name: Install npm dependencies
+        script: |
+          set -eu
+          node --version
+          npm ci
+      - name: Run jobs-first regression tests
+        script: node --test scripts/jobs-first-release.test.mjs
+      - name: Validate TypeScript
+        script: npm run typecheck
+      - name: Compile Android web assets
+        script: |
+          set -eu
+          npm run build
+          test -s dist/index.html
+      - name: Prepare Capacitor Android
+        script: |
+          set -eu
+          : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
+          test -d "$ANDROID_SDK_ROOT"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          echo "Using Android SDK: $ANDROID_SDK_ROOT"
+          # Codemagic manages its Android SDK. Gradle resolves required SDK
+          # packages; sdkmanager need not be present on macOS PATH.
+          npx cap sync android
+      - name: Build and validate signed AAB
+        script: |
+          set -eu
+          java -version
+          javac -version
+          javac -source 21 -target 21 -version
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          jarsigner -verify "$AAB" > ../titanos-code42-signature.txt
+          grep -q 'jar verified' ../titanos-code42-signature.txt
+          keytool -printcert -jarfile "$AAB" > ../titanos-code42-certificate.txt
+          grep -F '7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D' ../titanos-code42-certificate.txt
+          shasum -a 256 "$AAB" > ../titanos-code42-sha256.txt
+      - name: Remove temporary signing material
+        script: |
+          rm -f android/titanos-upload.jks android/keystore.properties
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - titanos-code42-signature.txt
+      - titanos-code42-certificate.txt
+      - titanos-code42-sha256.txt
+      - android/app/build/reports/**/*

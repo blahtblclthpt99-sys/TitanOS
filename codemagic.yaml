@@ -7,6 +7,7 @@ workflows:
     max_build_duration: 60
     environment:
       node: v22.22.0
+      java: 21
       vars:
         VITE_CAPACITOR_BUILD: "true"
         VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
@@ -41,6 +42,9 @@ workflows:
       - name: Build unsigned diagnostic AAB
         script: |
           set -eu
+          java -version
+          javac -version
+          javac -source 21 -target 21 -version
           cd android
           chmod +x gradlew
           ./gradlew --no-daemon bundleRelease
@@ -54,6 +58,7 @@ workflows:
     max_build_duration: 60
     environment:
       node: v22.22.0
+      java: 21
       groups:
         - titanos_android_signing
       vars:
@@ -102,6 +107,9 @@ workflows:
       - name: Build and validate signed AAB
         script: |
           set -eu
+          java -version
+          javac -version
+          javac -source 21 -target 21 -version
           cd android
           chmod +x gradlew
           ./gradlew --no-daemon bundleRelease

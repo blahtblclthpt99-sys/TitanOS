@@ -1,7 +1,7 @@
 # TitanOS jobs-first Android release candidate — Code 42.
 # Select the repair branch in Codemagic, not the Play production branch.
 workflows:
-  titanos-code42-diagnostic:
+  titanos-code41-diagnostic:
     name: TitanOS 2.0.8 — Android diagnostic AAB
     instance_type: mac_mini_m2
     max_build_duration: 60
@@ -52,7 +52,7 @@ workflows:
       - android/app/build/outputs/bundle/release/*.aab
       - android/app/build/reports/**/*
 
-  titanos-code42-signed:
+  titanos-code41-signed:
     name: TitanOS 2.0.8 — Signed Google Play AAB
     instance_type: mac_mini_m2
     max_build_duration: 60

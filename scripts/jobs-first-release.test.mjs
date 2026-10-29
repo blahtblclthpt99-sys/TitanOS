@@ -171,3 +171,10 @@ test('career UI avoids retired Driver Hub and employer navigation', () => {
   assert.doesNotMatch(hire, /\["post", "Post a job"\]/);
   assert.match(hire, /Application NOT submitted/);
 });
+
+test('job match preferences do not require a driver profile', () => {
+  const profile = read('src/lib/jobMatchProfileApi.js');
+  assert.doesNotMatch(profile, /if \(!profile\) return null/);
+  assert.doesNotMatch(profile, /Create your Driver Profile before enabling job matching/);
+  assert.match(profile, /value === null \|\| value === undefined \|\| value === ""/);
+});

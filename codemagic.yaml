@@ -31,9 +31,12 @@ workflows:
       - name: Prepare Capacitor Android
         script: |
           set -eu
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
+          test -d "$ANDROID_SDK_ROOT"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          echo "Using Android SDK: $ANDROID_SDK_ROOT"
+          # Codemagic manages its Android SDK. Gradle resolves required SDK
+          # packages; sdkmanager need not be present on macOS PATH.
           npx cap sync android
       - name: Build unsigned diagnostic AAB
         script: |
@@ -89,9 +92,12 @@ workflows:
       - name: Prepare Capacitor Android
         script: |
           set -eu
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
+          test -d "$ANDROID_SDK_ROOT"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          echo "Using Android SDK: $ANDROID_SDK_ROOT"
+          # Codemagic manages its Android SDK. Gradle resolves required SDK
+          # packages; sdkmanager need not be present on macOS PATH.
           npx cap sync android
       - name: Build and validate signed AAB
         script: |

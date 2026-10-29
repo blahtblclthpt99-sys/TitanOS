@@ -227,11 +227,11 @@ export default function Hire() {
       const app = await applyToHireJob(user, selectedJob.id, applyForm);
       if (getSource(app) === DATA_SOURCE.local) {
         toast({
-          title: "Application saved on this device",
-          description: "The poster was not notified — server hire applications aren’t reachable right now.",
+          title: "Application NOT submitted",
+          description: "Your draft is stored on this device only. The employer has not received it. Try again when the service is available.",
         });
       } else {
-        toast({ title: "Application sent", description: "The job poster will be notified." });
+        toast({ title: "Application submitted", description: "Your application was recorded on the server. Check Applications for its status." });
       }
       setSelectedJob(null);
     }
@@ -277,14 +277,14 @@ export default function Hire() {
   };
 
 
-  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading Hire" />;
+  if (!authChecked || isLoadingAuth) return <PageLoader variant="list" label="Loading jobs" />;
   if (!user?.id) {
     return (
       <PageShell maxWidth="lg">
-        <PageHeader title="Hire workers" subtitle="Post hauls and gigs, or apply to work." />
+        <PageHeader title="Find Jobs" subtitle="Explore openings and track your applications." />
         <EmptyState
-          title="Sign in to use Hire"
-          description="Posting jobs and applications require an account."
+          title="Sign in to find jobs"
+          description="Sign in to save jobs and track applications."
           actionLabel="Sign in"
           onAction={() => { window.location.href = "/login"; }}
         />
@@ -294,17 +294,15 @@ export default function Hire() {
   const tabs = [
     ["browse", "Browse"],
     ["saved", "Saved"],
-    ["post", "Post a job"],
-    ["posts", "My posts"],
     ["applications", "Applications"],
   ];
 
   return (
     <PageShell maxWidth="lg">
       <PageHeader
-        eyebrow="Grow"
-        title="Hire workers"
-        subtitle="Post hauls and gigs, or apply to work. Device-only saves are labeled — they don’t notify other users."
+        eyebrow="Careers"
+        title="Find Jobs"
+        subtitle="Browse current opportunities, save listings, and track your applications."
       />
       <FeatureHonestyBanner>
         When the hire board can’t reach Supabase, posts and applications stay on this device and are labeled
@@ -319,7 +317,7 @@ export default function Hire() {
           <span className="text-xs font-medium text-primary whitespace-nowrap">No fees</span>
         </div>
       )}
-      <div className="flex overflow-x-auto gap-1 mb-6 border-b border-border" role="tablist" aria-label="Hire sections">
+      <div className="flex overflow-x-auto gap-1 mb-6 border-b border-border" role="tablist" aria-label="Job search sections">
         {tabs.map(([id, label]) => (
           <button
             key={id}

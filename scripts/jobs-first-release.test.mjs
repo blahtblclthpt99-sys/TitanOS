@@ -148,3 +148,13 @@ test('release verifies AAB entry signatures and uploads verification evidence', 
   assert.match(workflow, /grep -q "jar verified" TitanOS-code41-signature-verification\.txt/);
   assert.match(workflow, /TitanOS-code41-signature-verification\.txt/);
 });
+
+test('career home gives job seekers a four-step launch path', () => {
+  const home = read('src/pages/CareerHome.jsx');
+  assert.match(home, /Your job-search launch plan/);
+  assert.match(home, /careerSteps\.map/);
+  assert.match(home, /path: "\/profile"/);
+  assert.match(home, /path: "\/resume"/);
+  assert.match(home, /path: "\/hire\/matches"/);
+  assert.match(home, /path: "\/hire\?tab=applications"/);
+});

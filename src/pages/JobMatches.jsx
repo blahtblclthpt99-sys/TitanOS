@@ -228,8 +228,8 @@ export default function JobMatches() {
       <PageHeader eyebrow="Work" title="Matches for you" subtitle="Titan ranks work from your skills first, then can search approved external providers when you allow it." />
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline"><Link to="/hire">Hire home</Link></Button>
-        <Button asChild variant="outline"><Link to="/hire/post-match-ready">Post a match-ready job</Link></Button>
+        <Button asChild variant="outline"><Link to="/hire">Find Jobs</Link></Button>
+        <Button asChild variant="outline"><Link to="/hire?tab=applications">My applications</Link></Button>
       </div>
 
       <section className="titan-surface p-5" aria-labelledby="match-profile-heading">
@@ -273,7 +273,7 @@ export default function JobMatches() {
       {loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Finding work that fits you…</div>
       ) : status.needsProfile ? (
-        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Open Driver Hub" onAction={() => { window.location.href = "/driver"; }} />
+        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Open Career Profile" onAction={() => { window.location.href = "/#/profile"; }} />
       ) : status.needsSkills ? (
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (

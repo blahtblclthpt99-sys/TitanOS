@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { getJobMatches, isExternalJobMatch, jobMatchSourceLabel } from "@/lib/jobMatchApi";
 import { getMyJobMatchPreferences, saveMyJobMatchPreferences } from "@/lib/jobMatchProfileApi";
 import { clearMyJobMatchInteraction, setMyJobMatchInteraction } from "@/lib/jobMatchInteractionsApi";
-import { getMyDriverProfile, saveMyDriverProfile } from "@/lib/driverProfilesApi";
+import { getMyProfessionalProfile, saveProfessionalProfile } from "@/lib/professionalProfileApi";
 import { toggleSaveJob } from "@/lib/hireApi";
 
 function csv(value) {
@@ -114,14 +114,14 @@ export default function JobMatches() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const [driver, prefs, result] = await Promise.all([
-        getMyDriverProfile(user.id),
+      const [careerProfile, prefs, result] = await Promise.all([
+        getMyProfessionalProfile(user),
         getMyJobMatchPreferences(user.id).catch(() => null),
         getJobMatches({ includeExternal: true }),
       ]);
       setForm({
-        skills: csvText(driver?.skills || prefs?.skills),
-        certifications: csvText(driver?.certifications || prefs?.certifications),
+        skills: csvText(careerProfile?.skills?.length ? careerProfile.skills : prefs?.skills),
+        certifications: csvText(careerProfile?.certifications || prefs?.certifications),
         interests: csvText(prefs?.job_interests),
         radius: Number(prefs?.work_radius_miles || 50),
         desiredPay: Number(prefs?.desired_pay_min || 0),
@@ -156,7 +156,7 @@ export default function JobMatches() {
     if (!user?.id || saving) return;
     setSaving(true);
     try {
-      await saveMyDriverProfile(user.id, { skills: csv(form.skills), certifications: csv(form.certifications) });
+      await saveProfessionalProfile(user, { skills: csv(form.skills), certifications: csv(form.certifications) });
       await saveMyJobMatchPreferences(user.id, {
         job_interests: csv(form.interests),
         work_radius_miles: Number(form.radius),

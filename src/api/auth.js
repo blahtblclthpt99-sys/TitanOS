@@ -3,7 +3,6 @@ import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabaseClient";
 import { resolveStoredUploadUrl } from "./integrations";
 import { getAuthRedirectTo } from "@/lib/auth-redirect";
-import { normalizeSupabaseUrl } from "@/lib/supabaseUrl";
 
 function apiError(message, status = 400) {
   const error = new Error(message);
@@ -129,30 +128,6 @@ async function buildUser(authUser, profile) {
     created_date: profile?.created_at || authUser.created_at,
     updated_date: profile?.updated_at || authUser.updated_at,
   };
-}
-
-async function assertOAuthProviderEnabled(provider) {
-  const base = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!base || !anon) return;
-  try {
-    const res = await fetch(`${base}/auth/v1/settings`, {
-      headers: { apikey: anon, Authorization: `Bearer ${anon}` },
-    });
-    if (!res.ok) return;
-    const settings = await res.json();
-    const key = provider === "azure" ? "azure" : provider;
-    if (settings?.external && settings.external[key] === false) {
-      const label = provider === "google" ? "Google" : provider;
-      throw apiError(
-        `${label} sign-in is not enabled yet in Supabase. Use email, or finish GOOGLE_AUTH.md setup.`,
-        400
-      );
-    }
-  } catch (err) {
-    if (err?.status) throw err;
-    // Network hiccup — let OAuth attempt proceed
-  }
 }
 
 async function registerViaServer({ email, password, fullName }) {
@@ -313,16 +288,8 @@ export function createAuthModule() {
       const redirectTo = getAuthRedirectTo("/auth/callback");
       const isNative = Capacitor.isNativePlatform();
 
-      // Supabase provider availability is already enforced by the OAuth
-      // endpoint. Avoid blocking Android Custom Tab launch on an extra
-      // settings request, which can hang indefinitely on some WebViews.
-      if (!isNative) {
-        await withTimeout(
-          assertOAuthProviderEnabled(provider),
-          5000,
-          "Could not verify Google sign-in. Check your connection and try again."
-        );
-      }
+      // Let Supabase's OAuth endpoint validate provider configuration directly.
+      // Avoid a separate settings preflight that can falsely block sign-in.
       const options = {
         redirectTo,
         skipBrowserRedirect: true,

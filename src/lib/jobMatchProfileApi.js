@@ -37,9 +37,10 @@ export async function getMyJobMatchPreferences(userId) {
     getDriverQualifications(userId),
     getPrivatePreferences(userId),
   ]);
-  if (!profile) return null;
+  // A job seeker can set matching preferences without enrolling as a driver.
+  // Existing driver qualifications remain readable as a compatibility source.
   return {
-    ...profile,
+    ...(profile || { user_id: userId, skills: [], certifications: [] }),
     job_interests: privatePrefs?.job_interests || [],
     work_radius_miles: Number(privatePrefs?.work_radius_miles || 50),
     desired_pay_min: Number(privatePrefs?.desired_pay_min || 0),
@@ -55,7 +56,7 @@ export async function getMyJobMatchPreferences(userId) {
 export async function saveMyJobMatchPreferences(userId, patch = {}) {
   if (!userId) throw new Error("Sign in to save job matching preferences.");
   const current = await getMyJobMatchPreferences(userId);
-  if (!current) throw new Error("Create your Driver Profile before enabling job matching.");
+  // Preferences belong to every authenticated job seeker, not only driver profiles.
 
   const payType = String(patch.desired_pay_type ?? current.desired_pay_type ?? "hourly").trim().toLowerCase();
   const radius = Number(patch.work_radius_miles ?? current.work_radius_miles ?? 50);

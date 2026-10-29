@@ -12,6 +12,13 @@ const tools = [
   { icon: UserRound, title: "Career profile", detail: "Manage information TitanOS uses when matching you with work.", path: "/profile", cta: "Review profile" },
 ];
 
+const careerSteps = [
+  { number: "01", title: "Build your career profile", detail: "Add skills, experience, and the kind of work you want.", path: "/profile", action: "Set up profile" },
+  { number: "02", title: "Prepare your résumé", detail: "Make a résumé you can use when applying.", path: "/resume", action: "Open résumé builder" },
+  { number: "03", title: "Find matching work", detail: "Review listings and why they match your preferences.", path: "/hire/matches", action: "Explore matches" },
+  { number: "04", title: "Track your applications", detail: "Keep follow-ups and applications in one place.", path: "/hire?tab=applications", action: "View applications" },
+];
+
 export default function CareerHome() {
   const { user } = useAuth();
   const displayName = user?.user_metadata?.full_name || user?.full_name || user?.first_name || "";
@@ -25,6 +32,26 @@ export default function CareerHome() {
         <Link className="inline-flex items-center justify-center min-h-12 gap-2 rounded-lg bg-primary text-primary-foreground font-semibold px-5" to="/hire?tab=browse">Find a job <ArrowRight className="w-4 h-4"/></Link>
         <Link className="inline-flex items-center justify-center min-h-12 gap-2 rounded-lg border border-border bg-background font-semibold px-5" to="/resume">Create résumé <FileText className="w-4 h-4"/></Link>
       </div>
+    </section>
+    <section aria-labelledby="career-launch-title">
+      <div className="mb-4">
+        <h2 id="career-launch-title" className="text-xl font-bold">Your job-search launch plan</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Four practical steps. Start anywhere and return whenever you're ready.</p>
+      </div>
+      <ol className="grid gap-3 sm:grid-cols-2">
+        {careerSteps.map((step) => (
+          <li key={step.number} className="flex gap-4 rounded-xl border border-border bg-card p-4">
+            <span className="shrink-0 text-xl font-bold tabular-nums text-primary" aria-hidden="true">{step.number}</span>
+            <div className="min-w-0">
+              <h3 className="font-semibold">{step.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{step.detail}</p>
+              <Link to={step.path} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                {step.action} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ol>
     </section>
     <section aria-labelledby="career-actions-title">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4"><h2 id="career-actions-title" className="text-xl font-bold">What would you like to do?</h2><span className="text-xs text-muted-foreground inline-flex gap-1 items-center"><ShieldCheck className="h-4 w-4"/> No sponsored job placement</span></div>

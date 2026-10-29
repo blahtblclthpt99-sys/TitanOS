@@ -158,3 +158,16 @@ test('career home gives job seekers a four-step launch path', () => {
   assert.match(home, /path: "\/hire\/matches"/);
   assert.match(home, /path: "\/hire\?tab=applications"/);
 });
+
+test('career UI avoids retired Driver Hub and employer navigation', () => {
+  const matches = read('src/pages/JobMatches.jsx');
+  const support = read('src/pages/SupportCenter.jsx');
+  const hire = read('src/pages/Hire.jsx');
+  assert.doesNotMatch(matches, /actionLabel="Open Driver Hub"/);
+  assert.doesNotMatch(matches, /Post a match-ready job/);
+  assert.match(matches, /navigate\("\/profile"\)/);
+  assert.doesNotMatch(support, /\["Driver Hub", "driver_hub"\]/);
+  assert.match(support, /\["Applications", "applications"\]/);
+  assert.doesNotMatch(hire, /\["post", "Post a job"\]/);
+  assert.match(hire, /Application NOT submitted/);
+});

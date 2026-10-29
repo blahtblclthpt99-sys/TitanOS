@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { ArrowUpRight, Bookmark, BriefcaseBusiness, CheckCircle2, EyeOff, Loader2, MapPin, Navigation, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import PageShell from "@/components/shared/PageShell";
 import PageHeader from "@/components/shared/PageHeader";
@@ -89,6 +89,7 @@ function MatchCard({ job, onAction, busy }) {
 }
 
 export default function JobMatches() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -273,7 +274,7 @@ export default function JobMatches() {
       {loading ? (
         <div className="titan-surface flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Finding work that fits you…</div>
       ) : status.needsProfile ? (
-        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Open Career Profile" onAction={() => { window.location.href = "/#/profile"; }} />
+        <EmptyState icon={BriefcaseBusiness} title="Build your work profile" description="Add your work skills so Titan can start matching you to jobs." actionLabel="Open Career Profile" onAction={() => navigate("/profile")} />
       ) : status.needsSkills ? (
         <EmptyState icon={Sparkles} title="Tell Titan what you can do" description="Add skills or job interests above, then save to start matching." />
       ) : matches.length ? (

@@ -178,3 +178,10 @@ test('job match preferences do not require a driver profile', () => {
   assert.doesNotMatch(profile, /Create your Driver Profile before enabling job matching/);
   assert.match(profile, /value === null \|\| value === undefined \|\| value === ""/);
 });
+
+test('job match qualifications use career profile instead of driver enrollment UI', () => {
+  const screen = read('src/pages/JobMatches.jsx');
+  assert.match(screen, /getMyProfessionalProfile\(user\)/);
+  assert.match(screen, /saveProfessionalProfile\(user,/);
+  assert.doesNotMatch(screen, /getMyDriverProfile|saveMyDriverProfile/);
+});

@@ -193,3 +193,11 @@ test('Android release builds use the active production Supabase auth project', (
   assert.doesNotMatch(codemagic, /wbymywwrpbljfbsemung/);
   assert.match(codemagic, /sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI/);
 });
+
+test('Codemagic signed Android workflow does not reference an unconfigured variable group', () => {
+  const codemagic = read('codemagic.yaml');
+  assert.doesNotMatch(codemagic, /titanos_android_signing/);
+  for (const name of ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']) {
+    assert.match(codemagic, new RegExp(name));
+  }
+});

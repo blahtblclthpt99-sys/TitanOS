@@ -185,3 +185,11 @@ test('job match qualifications use career profile instead of driver enrollment U
   assert.match(screen, /saveProfessionalProfile\(user,/);
   assert.doesNotMatch(screen, /getMyDriverProfile|saveMyDriverProfile/);
 });
+
+test('Android release builds use the active production Supabase auth project', () => {
+  const codemagic = read('codemagic.yaml');
+  assert.equal((codemagic.match(/name: Verify production Supabase auth target/g) || []).length, 2);
+  assert.equal((codemagic.match(/https:\/\/xcfjpxcmokdfwkarwomy\.supabase\.co/g) || []).length, 2);
+  assert.doesNotMatch(codemagic, /wbymywwrpbljfbsemung/);
+  assert.match(codemagic, /sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI/);
+});

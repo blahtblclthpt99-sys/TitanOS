@@ -1,8 +1,8 @@
-# TitanOS jobs-first Android release candidate — Code 41.
+# TitanOS jobs-first Android release candidate — Code 42.
 # Select the repair branch in Codemagic, not the Play production branch.
 workflows:
-  titanos-code41-diagnostic:
-    name: TitanOS 2.0.7 — Android diagnostic AAB
+  titanos-code42-diagnostic:
+    name: TitanOS 2.0.8 — Android diagnostic AAB
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -10,8 +10,8 @@ workflows:
       java: 21
       vars:
         VITE_CAPACITOR_BUILD: "true"
-        VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
-        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
+        VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
         VITE_API_BASE_URL: "https://titanos-web.vercel.app"
         VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
     scripts:
@@ -20,6 +20,10 @@ workflows:
           set -eu
           node --version
           npm ci
+      - name: Verify production Supabase auth target
+        script: |
+          set -eu
+          node -e 'const u = new URL(process.env.VITE_SUPABASE_URL || ""); if (u.hostname !== "xcfjpxcmokdfwkarwomy.supabase.co" || !process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_")) { console.error("Refusing Android build: Supabase URL/key do not target the production auth project"); process.exit(1); } console.log("Supabase production auth target verified:", u.hostname);'
       - name: Run jobs-first regression tests
         script: node --test scripts/jobs-first-release.test.mjs
       - name: Validate TypeScript
@@ -52,8 +56,8 @@ workflows:
       - android/app/build/outputs/bundle/release/*.aab
       - android/app/build/reports/**/*
 
-  titanos-code41-signed:
-    name: TitanOS 2.0.7 — Signed Google Play AAB
+  titanos-code42-signed:
+    name: TitanOS 2.0.8 — Signed Google Play AAB
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -63,8 +67,8 @@ workflows:
         - titanos_android_signing
       vars:
         VITE_CAPACITOR_BUILD: "true"
-        VITE_SUPABASE_URL: "https://wbymywwrpbljfbsemung.supabase.co"
-        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_RzUfaeZN5WU58Ma-a5iJNw_fPEC25cI"
+        VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tVLR58SR1KgOYqDbLaqNJA_r9ML0nLI"
         VITE_API_BASE_URL: "https://titanos-web.vercel.app"
         VITE_TITANOS_PUBLIC_ORIGIN: "https://titanos-web.vercel.app"
     scripts:
@@ -115,17 +119,17 @@ workflows:
           ./gradlew --no-daemon bundleRelease
           AAB=app/build/outputs/bundle/release/app-release.aab
           test -s "$AAB"
-          jarsigner -verify "$AAB" > ../titanos-code41-signature.txt
-          grep -q 'jar verified' ../titanos-code41-signature.txt
-          keytool -printcert -jarfile "$AAB" > ../titanos-code41-certificate.txt
-          grep -F '7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D' ../titanos-code41-certificate.txt
-          shasum -a 256 "$AAB" > ../titanos-code41-sha256.txt
+          jarsigner -verify "$AAB" > ../titanos-code42-signature.txt
+          grep -q 'jar verified' ../titanos-code42-signature.txt
+          keytool -printcert -jarfile "$AAB" > ../titanos-code42-certificate.txt
+          grep -F '7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D' ../titanos-code42-certificate.txt
+          shasum -a 256 "$AAB" > ../titanos-code42-sha256.txt
       - name: Remove temporary signing material
         script: |
           rm -f android/titanos-upload.jks android/keystore.properties
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
-      - titanos-code41-signature.txt
-      - titanos-code41-certificate.txt
-      - titanos-code41-sha256.txt
+      - titanos-code42-signature.txt
+      - titanos-code42-certificate.txt
+      - titanos-code42-sha256.txt
       - android/app/build/reports/**/*

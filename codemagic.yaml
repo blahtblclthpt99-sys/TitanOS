@@ -63,8 +63,10 @@ workflows:
     environment:
       node: v22.22.0
       java: 21
-      groups:
-        - titanos_android_signing
+      # Signing secrets are supplied as individual secure Codemagic environment
+      # variables (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+      # ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Do not reference an
+      # unprovisioned Codemagic variable group here.
       vars:
         VITE_CAPACITOR_BUILD: "true"
         VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"

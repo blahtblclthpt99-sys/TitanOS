@@ -29,7 +29,7 @@ test('release bundle is a strictly newer Play candidate', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.match(gradle, /applicationId "com\.titanos\.myapp"/);
   assert.match(gradle, /versionCode 42/);
-  assert.match(gradle, /versionName "2\\.0\\.8"/);
+  assert.match(gradle, /versionName "2\.0\.8"/);
   assert.equal(pkg.version, '2.0.8');
   assert.equal(JSON.parse(read('package-lock.json')).version, pkg.version);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, pkg.version);

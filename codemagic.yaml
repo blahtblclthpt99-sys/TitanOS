@@ -89,6 +89,10 @@ workflows:
           set -eu
           node --version
           npm ci
+      - name: Verify production Supabase auth target
+        script: |
+          set -eu
+          node -e 'const u = new URL(process.env.VITE_SUPABASE_URL || ""); if (u.hostname !== "xcfjpxcmokdfwkarwomy.supabase.co" || !process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_")) { console.error("Refusing Android build: Supabase URL/key do not target the production auth project"); process.exit(1); } console.log("Supabase production auth target verified:", u.hostname);'
       - name: Run jobs-first regression tests
         script: node --test scripts/jobs-first-release.test.mjs
       - name: Validate TypeScript

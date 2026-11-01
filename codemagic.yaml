@@ -61,12 +61,12 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
+      groups:
+        - titanos_android_signing
       node: v22.22.0
       java: 21
-      # Signing secrets are supplied as individual secure Codemagic environment
-      # variables (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
-      # ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Do not reference an
-      # unprovisioned Codemagic variable group here.
+      # Signing secrets are supplied by the titanos_android_signing variable group.
+      # Keep all four variables marked Secret in Codemagic UI.
       vars:
         VITE_CAPACITOR_BUILD: "true"
         VITE_SUPABASE_URL: "https://xcfjpxcmokdfwkarwomy.supabase.co"

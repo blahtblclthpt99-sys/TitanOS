@@ -38,7 +38,7 @@ workflows:
           set -eu
           : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
           test -d "$ANDROID_SDK_ROOT"
-          printf 'sdk.dir=%s\\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
           echo "Using Android SDK: $ANDROID_SDK_ROOT"
           # Codemagic manages its Android SDK. Gradle resolves required SDK
           # packages; sdkmanager need not be present on macOS PATH.
@@ -82,7 +82,7 @@ workflows:
           : "${ANDROID_KEY_ALIAS:?Missing Codemagic signing secret}"
           : "${ANDROID_KEY_PASSWORD:?Missing Codemagic signing secret}"
           printf %s "$ANDROID_KEYSTORE_BASE64" | base64 -D > android/titanos-upload.jks
-          printf 'storeFile=titanos-upload.jks\\nstorePassword=%s\\nkeyAlias=%s\\nkeyPassword=%s\\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
+          printf 'storeFile=titanos-upload.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
           keytool -list -v -keystore android/titanos-upload.jks -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" > /tmp/titanos-key-cert.txt
           grep -F '7A:D5:FE:24:6B:AD:E3:45:6C:FA:83:B0:62:C4:FA:8F:C9:2A:A2:07:2F:46:F6:E1:1D:92:10:EB:3A:BF:D4:5D' /tmp/titanos-key-cert.txt
           rm -f /tmp/titanos-key-cert.txt
@@ -109,7 +109,7 @@ workflows:
           set -eu
           : "${ANDROID_SDK_ROOT:?Codemagic Android SDK path is missing}"
           test -d "$ANDROID_SDK_ROOT"
-          printf 'sdk.dir=%s\\n' "$ANDROID_SDK_ROOT" > android/local.properties
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
           echo "Using Android SDK: $ANDROID_SDK_ROOT"
           # Codemagic manages its Android SDK. Gradle resolves required SDK
           # packages; sdkmanager need not be present on macOS PATH.

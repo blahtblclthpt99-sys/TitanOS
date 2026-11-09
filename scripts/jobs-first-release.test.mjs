@@ -201,7 +201,7 @@ test('Codemagic signed Android workflow attaches the configured signing group', 
   assert.ok(diagnostic.length > 0, 'diagnostic workflow must exist');
   assert.ok(signed.length > 0, 'signed workflow must exist');
   assert.doesNotMatch(diagnostic, /titanos_android_signing/);
-  assert.match(signed, /groups:\\s*\\n\\s*- titanos_android_signing/);
+  assert.match(signed, /groups:\s*\n\s*- titanos_android_signing/);
   for (const name of ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']) {
     assert.match(signed, new RegExp(name));
   }
